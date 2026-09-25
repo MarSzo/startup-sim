@@ -1,0 +1,359 @@
+{
+ "version": 1,
+ "id": "floor0",
+ "floor": 0,
+ "tile_px": 16,
+ "width": 64,
+ "height": 40,
+ "legend": {
+  "#": {
+   "type": "wall",
+   "solid": true,
+   "color": "#3b3b4f"
+  },
+  ".": {
+   "type": "floor",
+   "solid": false,
+   "color": "#c9c2b0"
+  },
+  ",": {
+   "type": "carpet",
+   "solid": false,
+   "color": "#7d8fb3"
+  },
+  ":": {
+   "type": "tiles",
+   "solid": false,
+   "color": "#e6e6e6"
+  },
+  "_": {
+   "type": "lobby",
+   "solid": false,
+   "color": "#d8c7a0"
+  },
+  "=": {
+   "type": "parking",
+   "solid": false,
+   "color": "#6f6f6f"
+  },
+  "D": {
+   "type": "door",
+   "solid": false,
+   "color": "#a0522d"
+  },
+  "G": {
+   "type": "glass_door",
+   "solid": true,
+   "color": "#8fd3e8"
+  },
+  "T": {
+   "type": "furniture",
+   "solid": true,
+   "color": "#8b6b4a"
+  },
+  "X": {
+   "type": "car",
+   "solid": true,
+   "color": "#b03a2e"
+  }
+ },
+ "tiles": [
+  "################################################################",
+  "#==================#..........................#,,,,,,,,#TTTTTTT#",
+  "#==================#..........................#,,,,,,,,#:::::::#",
+  "#==XXX========XXX==#...TTTTTT...TTTTTT..TTTT..#,,,,,,,,#:::::::#",
+  "#==XXX========XXX==#....................TTTT..#,,,,,,,,#:::::::#",
+  "#==================#....................TTTT..#,,TTTT,,#::::TT:#",
+  "#==================#..........................#,,TTTT,,#::::TT:#",
+  "#==================#...TTTTTT...TTTTTT........#,,TTTT,,#::::TT:#",
+  "#==================#..........................#,,TTTT,,#::::TT:#",
+  "#==XXX========XXX==#..........................#,,TTTT,,#:::::::#",
+  "#==XXX========XXX==#..........................#,,TTTT,,#:::::::#",
+  "#==================#...TTTTTT...TTTTTT........#,,TTTT,,#:::::::#",
+  "#==================#..........................#,,TTTT,,#:::::::#",
+  "#==================#..........................#,,TTTT,,#:::::::#",
+  "#==================#..........................#,,,,,,,,#:::::::#",
+  "#==XXX========XXX==#...TTTTTT...TTTTTT........#,,,,,,,,#:::::::#",
+  "#==XXX========XXX==#..........................#,,,,,,,,#:::::::#",
+  "#==================#..........................#,,,,,,,,#:::::::#",
+  "#==================#..........................#,,,,,,,,#:::::::#",
+  "#==================#############DD######DD########DD######DD####",
+  "#==================#...........................................#",
+  "#==================D...........................................#",
+  "#==================D...........................................#",
+  "#==================#...........................................#",
+  "#==================#####################DDD#####################",
+  "#==================#...........#___________________#...........#",
+  "#==================#...........#___________________#...TTTTTTT.#",
+  "#==XXX========XXX==#...........#___________________#...........#",
+  "#==XXX========XXX==#...........D___________________#...........#",
+  "#==================#...........D___________________#...TTTTTTT.#",
+  "#==================#...........#___________________D...........#",
+  "#==================#...........#___________________D...........#",
+  "#==================#TTTTTTT....#___________________#...TTTTTTT.#",
+  "#==XXX========XXX==#...........#___________________#...........#",
+  "#==XXX========XXX==#...........#___________________#...........#",
+  "#==================#...........#___________________#...........#",
+  "#==================#...........#___________________#.TTT.......#",
+  "#==================#...........#___________________#...........#",
+  "#==================#...........#___________________#...........#",
+  "########################################GGG#####################"
+ ],
+ "rooms": [
+  "----------------------------------------------------------------",
+  "-KKKKKKKKKKKKKKKKKK-OOOOOOOOOOOOOOOOOOOOOOOOOO-SSSSSSSS-UUUUUUU-",
+  "-KKKKKKKKKKKKKKKKKK-OOOOOOOOOOOOOOOOOOOOOOOOOO-SSSSSSSS-UUUUUUU-",
+  "-KKKKKKKKKKKKKKKKKK-OOOOOOOOOOOOOOOOOOOOOOOOOO-SSSSSSSS-UUUUUUU-",
+  "-KKKKKKKKKKKKKKKKKK-OOOOOOOOOOOOOOOOOOOOOOOOOO-SSSSSSSS-UUUUUUU-",
+  "-KKKKKKKKKKKKKKKKKK-OOOOOOOOOOOOOOOOOOOOOOOOOO-SSSSSSSS-UUUUUUU-",
+  "-KKKKKKKKKKKKKKKKKK-OOOOOOOOOOOOOOOOOOOOOOOOOO-SSSSSSSS-UUUUUUU-",
+  "-KKKKKKKKKKKKKKKKKK-OOOOOOOOOOOOOOOOOOOOOOOOOO-SSSSSSSS-UUUUUUU-",
+  "-KKKKKKKKKKKKKKKKKK-OOOOOOOOOOOOOOOOOOOOOOOOOO-SSSSSSSS-UUUUUUU-",
+  "-KKKKKKKKKKKKKKKKKK-OOOOOOOOOOOOOOOOOOOOOOOOOO-SSSSSSSS-UUUUUUU-",
+  "-KKKKKKKKKKKKKKKKKK-OOOOOOOOOOOOOOOOOOOOOOOOOO-SSSSSSSS-UUUUUUU-",
+  "-KKKKKKKKKKKKKKKKKK-OOOOOOOOOOOOOOOOOOOOOOOOOO-SSSSSSSS-UUUUUUU-",
+  "-KKKKKKKKKKKKKKKKKK-OOOOOOOOOOOOOOOOOOOOOOOOOO-SSSSSSSS-UUUUUUU-",
+  "-KKKKKKKKKKKKKKKKKK-OOOOOOOOOOOOOOOOOOOOOOOOOO-SSSSSSSS-UUUUUUU-",
+  "-KKKKKKKKKKKKKKKKKK-OOOOOOOOOOOOOOOOOOOOOOOOOO-SSSSSSSS-UUUUUUU-",
+  "-KKKKKKKKKKKKKKKKKK-OOOOOOOOOOOOOOOOOOOOOOOOOO-SSSSSSSS-UUUUUUU-",
+  "-KKKKKKKKKKKKKKKKKK-OOOOOOOOOOOOOOOOOOOOOOOOOO-SSSSSSSS-UUUUUUU-",
+  "-KKKKKKKKKKKKKKKKKK-OOOOOOOOOOOOOOOOOOOOOOOOOO-SSSSSSSS-UUUUUUU-",
+  "-KKKKKKKKKKKKKKKKKK-OOOOOOOOOOOOOOOOOOOOOOOOOO-SSSSSSSS-UUUUUUU-",
+  "-KKKKKKKKKKKKKKKKKK-------------CC------CC--------CC------CC----",
+  "-KKKKKKKKKKKKKKKKKK-CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC-",
+  "-KKKKKKKKKKKKKKKKKKCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC-",
+  "-KKKKKKKKKKKKKKKKKKCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC-",
+  "-KKKKKKKKKKKKKKKKKK-CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC-",
+  "-KKKKKKKKKKKKKKKKKK---------------------EEE---------------------",
+  "-KKKKKKKKKKKKKKKKKK-PPPPPPPPPPP-EEEEEEEEEEEEEEEEEEE-HHHHHHHHHHH-",
+  "-KKKKKKKKKKKKKKKKKK-PPPPPPPPPPP-EEEEEEEEEEEEEEEEEEE-HHHHHHHHHHH-",
+  "-KKKKKKKKKKKKKKKKKK-PPPPPPPPPPP-EEEEEEEEEEEEEEEEEEE-HHHHHHHHHHH-",
+  "-KKKKKKKKKKKKKKKKKK-PPPPPPPPPPPEEEEEEEEEEEEEEEEEEEE-HHHHHHHHHHH-",
+  "-KKKKKKKKKKKKKKKKKK-PPPPPPPPPPPEEEEEEEEEEEEEEEEEEEE-HHHHHHHHHHH-",
+  "-KKKKKKKKKKKKKKKKKK-PPPPPPPPPPP-EEEEEEEEEEEEEEEEEEEEHHHHHHHHHHH-",
+  "-KKKKKKKKKKKKKKKKKK-PPPPPPPPPPP-EEEEEEEEEEEEEEEEEEEEHHHHHHHHHHH-",
+  "-KKKKKKKKKKKKKKKKKK-PPPPPPPPPPP-EEEEEEEEEEEEEEEEEEE-HHHHHHHHHHH-",
+  "-KKKKKKKKKKKKKKKKKK-PPPPPPPPPPP-EEEEEEEEEEEEEEEEEEE-HHHHHHHHHHH-",
+  "-KKKKKKKKKKKKKKKKKK-PPPPPPPPPPP-EEEEEEEEEEEEEEEEEEE-HHHHHHHHHHH-",
+  "-KKKKKKKKKKKKKKKKKK-PPPPPPPPPPP-EEEEEEEEEEEEEEEEEEE-HHHHHHHHHHH-",
+  "-KKKKKKKKKKKKKKKKKK-PPPPPPPPPPP-EEEEEEEEEEEEEEEEEEE-HHHHHHHHHHH-",
+  "-KKKKKKKKKKKKKKKKKK-PPPPPPPPPPP-EEEEEEEEEEEEEEEEEEE-HHHHHHHHHHH-",
+  "-KKKKKKKKKKKKKKKKKK-PPPPPPPPPPP-EEEEEEEEEEEEEEEEEEE-HHHHHHHHHHH-",
+  "----------------------------------------------------------------"
+ ],
+ "room_defs": {
+  "E": {
+   "id": 1,
+   "name": "Wejście",
+   "type": "entrance"
+  },
+  "P": {
+   "id": 2,
+   "name": "Portiernia",
+   "type": "reception"
+  },
+  "C": {
+   "id": 3,
+   "name": "Korytarz",
+   "type": "corridor"
+  },
+  "H": {
+   "id": 4,
+   "name": "Sklep",
+   "type": "shop"
+  },
+  "K": {
+   "id": 5,
+   "name": "Parking wewnętrzny",
+   "type": "parking"
+  },
+  "O": {
+   "id": 6,
+   "name": "Open space",
+   "type": "office"
+  },
+  "S": {
+   "id": 7,
+   "name": "Sala konferencyjna",
+   "type": "meeting"
+  },
+  "U": {
+   "id": 8,
+   "name": "Kuchnia",
+   "type": "kitchen"
+  }
+ },
+ "doors": [
+  {
+   "x": 19,
+   "y": 21,
+   "access": null
+  },
+  {
+   "x": 19,
+   "y": 22,
+   "access": null
+  },
+  {
+   "x": 32,
+   "y": 19,
+   "access": null
+  },
+  {
+   "x": 33,
+   "y": 19,
+   "access": null
+  },
+  {
+   "x": 40,
+   "y": 19,
+   "access": null
+  },
+  {
+   "x": 41,
+   "y": 19,
+   "access": null
+  },
+  {
+   "x": 50,
+   "y": 19,
+   "access": null
+  },
+  {
+   "x": 51,
+   "y": 19,
+   "access": null
+  },
+  {
+   "x": 58,
+   "y": 19,
+   "access": null
+  },
+  {
+   "x": 59,
+   "y": 19,
+   "access": null
+  },
+  {
+   "x": 40,
+   "y": 24,
+   "access": null
+  },
+  {
+   "x": 41,
+   "y": 24,
+   "access": null
+  },
+  {
+   "x": 42,
+   "y": 24,
+   "access": null
+  },
+  {
+   "x": 31,
+   "y": 28,
+   "access": null
+  },
+  {
+   "x": 31,
+   "y": 29,
+   "access": null
+  },
+  {
+   "x": 51,
+   "y": 30,
+   "access": null
+  },
+  {
+   "x": 51,
+   "y": 31,
+   "access": null
+  }
+ ],
+ "spawns": [
+  [
+   38,
+   35
+  ],
+  [
+   39,
+   35
+  ],
+  [
+   40,
+   35
+  ],
+  [
+   41,
+   35
+  ],
+  [
+   42,
+   35
+  ],
+  [
+   43,
+   35
+  ],
+  [
+   44,
+   35
+  ],
+  [
+   38,
+   36
+  ],
+  [
+   39,
+   36
+  ],
+  [
+   40,
+   36
+  ],
+  [
+   41,
+   36
+  ],
+  [
+   42,
+   36
+  ],
+  [
+   43,
+   36
+  ],
+  [
+   44,
+   36
+  ],
+  [
+   38,
+   37
+  ],
+  [
+   39,
+   37
+  ],
+  [
+   40,
+   37
+  ],
+  [
+   41,
+   37
+  ],
+  [
+   42,
+   37
+  ],
+  [
+   43,
+   37
+  ],
+  [
+   44,
+   37
+  ]
+ ]
+}

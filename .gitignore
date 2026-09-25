@@ -1,0 +1,4 @@
+/server/target
+/client/.godot
+*.import
+.DS_Store

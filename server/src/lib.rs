@@ -1,0 +1,8 @@
+//! Shared game logic: used by the server binary and by the load-test bots.
+
+pub mod args;
+pub mod map;
+pub mod net;
+pub mod protocol;
+pub mod server;
+pub mod sim;
