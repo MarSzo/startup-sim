@@ -1,10 +1,12 @@
 //! Golden files shared with the Godot client tests (`client/tests/run_tests.gd`).
 //! Regenerate with `UPDATE_GOLDEN=1 cargo test --test golden`.
 
+#![allow(clippy::unwrap_used)] // test / dev tool: a panic is the right report
+
 use std::path::PathBuf;
 
 use game::building::{default_building_path, Building};
-use game::map::{access, Tile};
+use game::map::access;
 use game::nav::Walker;
 use game::protocol::{golden_samples, to_hex};
 use game::sim::{self, Body, Pos};

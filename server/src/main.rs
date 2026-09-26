@@ -1,10 +1,12 @@
+use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::path::PathBuf;
+use std::process::ExitCode;
 use std::time::Duration;
 
 use game::args::Args;
 use game::building::{default_building_path, Building};
-use game::recruitment::{default_recruitment_path, Recruitment};
 use game::net::LinkConditions;
+use game::recruitment::{default_recruitment_path, Recruitment};
 use game::server::{Config, Server, DEFAULT_CLIENT_TIMEOUT, TICK_HZ};
 
 const HELP: &str = "\
@@ -36,78 +38,102 @@ OPTIONS:
   --recruitment <path>  recruitment JSON  [default: data/recruitment.json]
 ";
 
-/// "8:30" -> minutes since midnight.
-fn parse_time(s: &str) -> u32 {
-    let (h, m) = s.split_once(':').unwrap_or((s, "0"));
-    match (h.trim().parse::<u32>(), m.trim().parse::<u32>()) {
-        (Ok(h), Ok(m)) if h < 24 && m < 60 => h * 60 + m,
-        _ => {
-            eprintln!("invalid --start-time {s} (expected hh:mm)");
-            std::process::exit(2);
+const PORT: u16 = 7777;
+/// Player ids live below the NPC ids; keep the cap well inside that range.
+const MAX_PLAYERS_LIMIT: usize = 4096;
+
+/// Why the server didn't start.
+enum StartError {
+    /// Bad command line (exit status 2).
+    Usage(String),
+    /// Couldn't load data or bind the socket (exit status 1).
+    Fatal(String),
+}
+
+impl From<game::args::InvalidArg> for StartError {
+    fn from(e: game::args::InvalidArg) -> Self {
+        StartError::Usage(e.to_string())
+    }
+}
+
+fn main() -> ExitCode {
+    let args = Args::from_env();
+    if args.flag("help") {
+        print!("{HELP}");
+        return ExitCode::SUCCESS;
+    }
+    match start(&args) {
+        Ok(mut server) => server.run(),
+        Err(StartError::Usage(msg)) => {
+            eprintln!("{msg}");
+            ExitCode::from(2)
+        }
+        Err(StartError::Fatal(msg)) => {
+            eprintln!("{msg}");
+            ExitCode::FAILURE
         }
     }
 }
 
-fn main() {
-    let args = Args::from_env();
-    if args.flag("help") {
-        print!("{HELP}");
-        return;
-    }
-    let map_path = args.str("map").map(PathBuf::from).unwrap_or_else(default_building_path);
-    let building = Building::load(&map_path).unwrap_or_else(|e| {
-        eprintln!("failed to load map: {e}");
-        std::process::exit(1);
-    });
-    let rec_path = args.str("recruitment").map(PathBuf::from).unwrap_or_else(default_recruitment_path);
-    let recruitment = Recruitment::load(&rec_path).unwrap_or_else(|e| {
-        eprintln!("failed to load recruitment: {e}");
-        std::process::exit(1);
-    });
+/// Load the data, parse the options, bind the socket.
+fn start(args: &Args) -> Result<Server, StartError> {
+    let map_path = args.str("map").map_or_else(default_building_path, PathBuf::from);
+    let building = Building::load(&map_path).map_err(|e| StartError::Fatal(format!("failed to load map: {e}")))?;
+    let rec_path = args.str("recruitment").map_or_else(default_recruitment_path, PathBuf::from);
+    let recruitment = Recruitment::load(&rec_path).map_err(|e| StartError::Fatal(format!("failed to load recruitment: {e}")))?;
     let link = LinkConditions {
-        lag: Duration::from_millis(args.get("lag-ms", 0)),
-        jitter: Duration::from_millis(args.get("jitter-ms", 0)),
-        loss: args.get("loss", 0.0),
+        lag: Duration::from_millis(args.try_get("lag-ms", 0)?),
+        jitter: Duration::from_millis(args.try_get("jitter-ms", 0)?),
+        loss: args.try_get("loss", 0.0)?,
     };
+    if !(0.0..=1.0).contains(&link.loss) {
+        return Err(StartError::Usage("--loss must be between 0 and 1".into()));
+    }
+    let max_players = args.try_get("max-players", 256)?;
+    if !(1..=MAX_PLAYERS_LIMIT).contains(&max_players) {
+        return Err(StartError::Usage(format!("--max-players must be 1..={MAX_PLAYERS_LIMIT}")));
+    }
+    let time = |key: &str, default: u32| match args.str(key) {
+        None => Ok(default),
+        Some(s) => parse_time(s).ok_or_else(|| StartError::Usage(format!("invalid --{key} {s} (expected hh:mm)"))),
+    };
+    let weather = match args.str("weather") {
+        None => None,
+        Some(w) => Some(
+            game::weather::parse(w)
+                .ok_or_else(|| StartError::Usage(format!("invalid --weather {w} (sun, clouds, rain, storm, fog)")))?,
+        ),
+    };
+    let bind = match args.str("bind") {
+        Some(_) => args.try_get("bind", dual_stack())?,
+        // No IPv6 on this host: plain IPv4.
+        None if game::net::bind_udp(dual_stack()).is_err() => SocketAddr::from((Ipv4Addr::UNSPECIFIED, PORT)),
+        None => dual_stack(),
+    };
+    let cleaning_fixed = args.str("cleaning-at").is_some();
     let cfg = Config {
-        bind: args.get("bind", "[::]:7777".parse().unwrap()),
+        bind,
         link,
-        max_players: args.get("max-players", 256),
-        stats_every: Duration::from_secs(args.get("stats-secs", 5)),
+        max_players,
+        stats_every: Duration::from_secs(args.try_get("stats-secs", 5)?.max(1)),
         client_timeout: DEFAULT_CLIENT_TIMEOUT,
         start_access: if args.flag("start-with-card") { game::map::access::CARD } else { 0 },
         recruitment,
         skip_recruitment: args.flag("skip-recruitment") || args.flag("start-employed"),
         start_employed: args.flag("start-employed"),
         start_cigarettes: args.flag("start-cigarettes"),
-        needs_speed: args.get("needs-speed", 1),
-        start_minute: parse_time(args.str("start-time").unwrap_or("8:00")),
-        time_scale: args.get("time-scale", 1),
+        needs_speed: args.try_get("needs-speed", 1)?,
+        start_minute: time("start-time", 8 * 60)?,
+        time_scale: args.try_get("time-scale", 1)?,
         treats_now: args.flag("treats"),
-        stale_fruit_percent: args.get("stale-fruit", game::treats::STALE_FRUIT_PERCENT),
-        cleaning_at: args.str("cleaning-at").map_or(game::cleaning::ROUND_AT, parse_time),
-        cleaning_spread: if args.str("cleaning-at").is_some() { 0 } else { game::cleaning::ROUND_SPREAD },
-        weather: args.str("weather").map(|w| {
-            game::weather::parse(w).unwrap_or_else(|| {
-                eprintln!("invalid --weather {w} (sun, clouds, rain, storm, fog)");
-                std::process::exit(2);
-            })
-        }),
+        stale_fruit_percent: args.try_get("stale-fruit", game::treats::STALE_FRUIT_PERCENT)?,
+        cleaning_at: time("cleaning-at", game::cleaning::ROUND_AT)?,
+        cleaning_spread: if cleaning_fixed { 0 } else { game::cleaning::ROUND_SPREAD },
+        weather,
     };
-    let mut cfg = cfg;
-    if args.str("bind").is_none() && game::net::bind_udp(cfg.bind).is_err() {
-        // No IPv6 on this host: plain IPv4.
-        cfg.bind = "0.0.0.0:7777".parse().unwrap();
-    }
     let crc = building.crc;
     let floors = building.active_floors().count();
-    let mut server = match Server::new(building, cfg) {
-        Ok(s) => s,
-        Err(e) => {
-            eprintln!("failed to bind: {e}");
-            std::process::exit(1);
-        }
-    };
+    let server = Server::new(building, cfg).map_err(|e| StartError::Fatal(format!("failed to bind: {e}")))?;
     println!(
         "server listening on {} | tick {} Hz | building crc {:08x}, {} active floors ({}) | link: lag {:?} jitter {:?} loss {:.1}%",
         server.local_addr(),
@@ -119,5 +145,17 @@ fn main() {
         link.jitter,
         link.loss * 100.0
     );
-    server.run();
+    Ok(server)
+}
+
+/// `[::]:7777`: IPv6 and (dual-stack) IPv4.
+fn dual_stack() -> SocketAddr {
+    SocketAddr::from((Ipv6Addr::UNSPECIFIED, PORT))
+}
+
+/// "8:30" -> minutes since midnight.
+fn parse_time(s: &str) -> Option<u32> {
+    let (h, m) = s.split_once(':').unwrap_or((s, "0"));
+    let (h, m) = (h.trim().parse::<u32>().ok()?, m.trim().parse::<u32>().ok()?);
+    (h < 24 && m < 60).then_some(h * 60 + m)
 }

@@ -88,8 +88,8 @@ impl Clock {
             return None;
         }
         match self.minute() {
-            m if m == CLOSE_MIN && self.ds % DS_PER_MIN == 0 => Some(Transition::Evening),
-            m if m == OPEN_MIN && self.ds % DS_PER_MIN == 0 => Some(Transition::Morning),
+            m if m == CLOSE_MIN && self.ds.is_multiple_of(DS_PER_MIN) => Some(Transition::Evening),
+            m if m == OPEN_MIN && self.ds.is_multiple_of(DS_PER_MIN) => Some(Transition::Morning),
             _ => None,
         }
     }

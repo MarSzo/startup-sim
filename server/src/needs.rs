@@ -245,15 +245,13 @@ impl Needs {
                     ev.push(Event::RestDone(lines::SMOKE_DONE));
                 }
             }
-            Some(Rest::Washing { until }) => {
-                if tick >= until {
-                    rest = None;
-                    self.dirty_hands = false;
-                    self.hygiene += 40 * SCALE;
-                    ev.push(Event::RestDone(lines::WASHED));
-                }
+            Some(Rest::Washing { until }) if tick >= until => {
+                rest = None;
+                self.dirty_hands = false;
+                self.hygiene += 40 * SCALE;
+                ev.push(Event::RestDone(lines::WASHED));
             }
-            None => {}
+            Some(Rest::Washing { .. }) | None => {}
         }
         if self.bladder >= MAX && rest != Some(Rest::Toilet) {
             self.bladder = 0;

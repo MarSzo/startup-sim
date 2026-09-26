@@ -95,7 +95,7 @@ impl Smoke {
         if self.amount.is_empty() {
             return;
         }
-        if tick % DRIFT_EVERY == 0 {
+        if tick.is_multiple_of(DRIFT_EVERY) {
             for i in 0..self.links.len() {
                 let (a, c) = self.links[i];
                 let (ca, cc) = (self.get(a) as u32, self.get(c) as u32);
@@ -117,7 +117,7 @@ impl Smoke {
                 }
             }
         }
-        if tick % DECAY_EVERY == 0 {
+        if tick.is_multiple_of(DECAY_EVERY) {
             let tiles = &self.tiles;
             for (k, a) in self.amount.iter_mut() {
                 *a = a.saturating_sub(tiles.get(k).copied().unwrap_or(1).max(1));

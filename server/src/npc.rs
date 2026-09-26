@@ -435,7 +435,7 @@ impl Npc {
                         self.go_home(b);
                     }
                     Some(t) if *ticks < give_up => {
-                        if walker.as_ref().map_or(true, |w| w.done()) || *ticks % REPATH_TICKS == 1 {
+                        if walker.as_ref().is_none_or(|w| w.done()) || *ticks % REPATH_TICKS == 1 {
                             let (tx, ty) = t.pos.tile();
                             if let Some(w) = Walker::to(b, &self.body, (t.floor, crate::map::Tile { x: tx, y: ty })) {
                                 *walker = Some(w);

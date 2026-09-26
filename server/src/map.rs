@@ -340,7 +340,7 @@ impl Map {
     /// Whether a tile is solid (walls, furniture). Out-of-map tiles are solid.
     /// Ignores access rules - see `blocks` for movement.
     pub fn is_blocked(&self, tx: i32, ty: i32) -> bool {
-        self.idx(tx, ty).map_or(true, |i| self.solid[i])
+        self.idx(tx, ty).is_none_or(|i| self.solid[i])
     }
 
     /// Whether a character with rights `access`, moving in direction `d`

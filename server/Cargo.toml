@@ -2,6 +2,7 @@
 name = "startup-server"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.88"
 default-run = "server"
 
 [lib]
@@ -25,3 +26,23 @@ socket2 = "0.6"
 
 [profile.dev]
 opt-level = 1
+
+[profile.release]
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+correctness = { level = "deny", priority = -1 }
+suspicious = { level = "warn", priority = -1 }
+perf = { level = "warn", priority = -1 }
+style = { level = "warn", priority = -1 }
+complexity = { level = "warn", priority = -1 }
+unwrap_used = "warn"
+cast_possible_truncation = "allow"
+too_many_arguments = "allow"
+# Money is written as zł_gr (e.g. 187_50 = 187,50 zł).
+inconsistent_digit_grouping = "allow"

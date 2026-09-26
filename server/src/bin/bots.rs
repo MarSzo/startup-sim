@@ -5,6 +5,8 @@
 //! Each bot predicts its own movement exactly like the real client and
 //! reconciles with the server, so the log also reports misprediction counts.
 
+#![allow(clippy::unwrap_used)] // test / dev tool: a panic is the right report
+
 use std::collections::VecDeque;
 use std::net::{SocketAddr, ToSocketAddrs, UdpSocket};
 use std::path::PathBuf;

@@ -1,5 +1,7 @@
 //! End-to-end: real server on a random port, raw UDP test clients.
 
+#![allow(clippy::unwrap_used)] // test / dev tool: a panic is the right report
+
 use std::net::{SocketAddr, UdpSocket};
 use std::time::{Duration, Instant};
 
@@ -137,6 +139,7 @@ impl Client {
     }
 
     /// Latest snapshot (tick, room, pos, visible ids) seen within `wait`.
+    #[allow(clippy::type_complexity)]
     fn latest_snapshot(&self, wait: Duration) -> Option<(u32, u16, (i32, i32), Vec<u16>, u32)> {
         let deadline = Instant::now() + wait;
         let mut last = None;
