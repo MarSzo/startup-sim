@@ -49,5 +49,10 @@ sed "s/^/file '/; s/$/'/" build/list.txt.tmp | sed "s#file 'build/#file '#" > bu
 ffmpeg -loglevel error -y -f concat -safe 0 -i build/list.txt -c copy build/video.mp4
 DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 build/video.mp4)
 python3 $T/music.py build/music.wav $DUR
-ffmpeg -loglevel error -y -i build/video.mp4 -i build/music.wav -c:v copy -c:a aac -b:a 192k -shortest -movflags +faststart startup_sim_zwiastun.mp4
+python3 $T/sfx.py build/sfx.wav $DUR
+# Music ducked under the gameplay clips (4.5-24.5 s), the game's sounds on top.
+DUCK="1-0.62*clip((t-4.1)/0.4,0,1)*clip((24.9-t)/0.4,0,1)"
+ffmpeg -loglevel error -y -i build/video.mp4 -i build/music.wav -i build/sfx.wav \
+  -filter_complex "[1:a]aresample=44100,volume='$DUCK':eval=frame[m];[2:a]aresample=44100,volume=1.1[s];[m][s]amix=inputs=2:normalize=0:duration=first,alimiter=limit=0.95[a]" \
+  -map 0:v -map "[a]" -c:v copy -c:a aac -b:a 192k -shortest -movflags +faststart startup_sim_zwiastun.mp4
 ffprobe -v error -show_entries format=duration,size -of default=nw=1 startup_sim_zwiastun.mp4

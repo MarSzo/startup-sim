@@ -13,6 +13,8 @@ tools/trailer/build.sh          # -> tools/trailer/out/startup_sim_zwiastun.mp4
   stałym tempie, `client/dev_recorder.gd`).
 - `build.sh` — napisy (ramki „papier i tusz”, czcionka Patrick Hand),
   przejścia, plansza końcowa ze splasha, muzyka z `music.py`.
+- `sfx.py` — dźwięki gry (client/sounds) ułożone na osi czasu zwiastuna;
+  muzyka jest pod nimi ściszana.
 - `music.py` — pętla lo-fi syntetyzowana od zera (bez próbek i cudzych praw).
 
 Wymaga: `godot`, `ffmpeg`, `magick` (ImageMagick), `python3`.
