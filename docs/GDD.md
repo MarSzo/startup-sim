@@ -208,7 +208,8 @@ gracze).
 **Pomysły 2026-09-26 (II)** — kolejność: sklep → kubki → dym → interfejs.
 - Kradzież w sklepie: ochrona, a potem policja — *zrobione (10.29)*.
 - Kubki po kawie zostawiane gdzie popadnie; NPC sprzątaczka pod koniec dnia
-  obchodzi pokoje i sprząta, przy dużej liczbie kubków narzeka.
+  obchodzi pokoje i sprząta, przy dużej liczbie kubków narzeka — *zrobione
+  (10.30)*.
 - Papierosa można zapalić wszędzie; w środku dym rozchodzi się po pokoju, w
   części pomieszczeń czujka → alarm, straż pożarna, ewakuacja, kara.
 - Interfejs w pikselowym stylu gry: HUD (ekwipunek, statystyki), komputer,
@@ -811,6 +812,25 @@ Zastępuje prosty portal z 10.8. Po połączeniu gracz widzi pulpit komputera
   konta. Policjant wraca do radiowozu i odjeżdża.
 - Licznik kradzieży zeruje się każdego ranka.
 
+### 10.30 Kubki po kawie i sprzątaczka
+
+- Po wypiciu kawy (albo gdy wystygnie i trzeba ją wylać) w rękach zostaje
+  **pusty kubek**. Można go:
+  - zostawić gdziekolwiek (Q — upuść), np. na stole czy przy biurku;
+  - **umyć** przy umywalce w łazience (E) — znika;
+  - podstawić pod **ekspres** (E) — kawa leci do tego samego kubka.
+- Kubki leżą, dopóki ktoś ich nie podniesie albo nie przyjdzie sprzątaczka —
+  zostają nawet po wyjściu gracza z gry.
+- **Pani Krysia** (NPC, turkusowy fartuch i mop) siedzi w zapleczu technicznym
+  na parterze. **O 18:00** zaczyna obchód: idzie do najbliższego kubka (najpierw
+  na swoim piętrze), zbiera wszystkie w zasięgu, chwilę wyciera stół i idzie
+  dalej — po całym budynku (ma klucze wszędzie; kubków w zamkniętej kabinie nie
+  zbierze).
+- **Narzekanie**: 3 i więcej kubków w jednym pokoju — komentarz na miejscu („No
+  nie… 3 kubki w jednym pokoju!”). Na koniec podsumowanie; przy 5 i więcej
+  kubkach dziennie także wpis na **#ogólny** z rekordzistą dnia (kto zostawił
+  najwięcej). Czysto — pochwała.
+
 ### 10.6 Stan implementacji
 
 *Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie,
@@ -847,6 +867,9 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Ekwipunek**: kieszenie i ręce, przedmioty (przepustka, karta, laptop,
   kawa), upuszczanie / podnoszenie / podawanie, dostęp z przedmiotów (10.13);
   protokół v8.
+- **Kubki i sprzątaczka**: pusty kubek po kawie (zostaw / umyj / dolewka z
+  ekspresu), wieczorny obchód Pani Krysi z narzekaniem i wpisem na #ogólny
+  (10.30); protokół v25.
 - **Ochrona i policja**: ochroniarz w sklepie goni złodzieja, radiowóz i
   policjant przy recydywie albo ucieczce, mandat (10.29); protokół v24.
 - **Panel założyciela**: zakładanie firmy z portalu, nazwa firmy w grze,
@@ -892,12 +915,12 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Sieć mobilna**: serwer dual-stack IPv4/IPv6; gracz identyfikowany tokenem
   (zmiana adresu w trakcie gry przenosi sesję); klient przepina gniazdo po
   ciszy/powrocie z tła i sam łączy się ponownie po utracie sesji.
-- **Testy**: 90 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
+- **Testy**: 91 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
   zależna od uprawnień, bramki, ruch/kolizje, schody, winda, nawigacja,
-  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, zegar, dojazd, pogoda, zarząd, słodycze, obiady, wakaty, firma, ochrona i policja, protokół), 2 golden, 25 e2e serwera
+  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, zegar, dojazd, pogoda, zarząd, słodycze, obiady, wakaty, firma, ochrona i policja, kubki, protokół), 2 golden, 26 e2e serwera
   (m.in. portal: odrzucenie → przyjęcie → spawn; całe wdrożenie aż do karty;
   niewidoczność między piętrami; zgodność stanu serwera z predykcją) —
-  łącznie 117 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 porannego dojazdu samochodem moknięcia w deszczu spotkania z Prezesem tacy ze słodyczami obiadu z odbiorem na recepcji, obsadzonego stanowiska, panelu założyciela i kradzieży w sklepie z ochroną i policją); 145 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
+  łącznie 119 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 porannego dojazdu samochodem moknięcia w deszczu spotkania z Prezesem tacy ze słodyczami obiadu z odbiorem na recepcji, obsadzonego stanowiska, panelu założyciela kradzieży w sklepie z ochroną i policją oraz kubka zebranego przez sprzątaczkę); 145 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
   adresów).
 
 #### Pomiary (MacBook, wszystko lokalnie)

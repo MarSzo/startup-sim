@@ -34,6 +34,7 @@ const SUSHI := 30
 const SCHNITZEL := 31
 const SALAD := 32
 const KEBAB := 33
+const EMPTY_CUP := 34
 
 const NAMES := {GUEST_PASS: "Przepustka gościa", EMPLOYEE_CARD: "Karta pracownika", LAPTOP: "Laptop", COFFEE: "Kawa", FRUIT: "Owoc",
 	SANDWICH_CHEESE: "Kanapka z serem", SANDWICH_HAM: "Kanapka z szynką", WRAP: "Wrap wege", BURGER: "Hamburger",
@@ -41,7 +42,7 @@ const NAMES := {GUEST_PASS: "Przepustka gościa", EMPLOYEE_CARD: "Karta pracowni
 	JUICE: "Sok pomarańczowy", BEER: "Piwo", WINE: "Wino", CIGARETTES: "Papierosy", UMBRELLA: "Parasol",
 	DONUT: "Pączek", COOKIE: "Ciastko", CHEESECAKE: "Kawałek sernika",
 	PIEROGI: "Pierogi ruskie", PIZZA: "Pizza margherita", SUSHI: "Zestaw sushi", SCHNITZEL: "Schabowy z ziemniakami",
-	SALAD: "Sałatka z kurczakiem", KEBAB: "Kebab"}
+	SALAD: "Sałatka z kurczakiem", KEBAB: "Kebab", EMPTY_CUP: "Pusty kubek"}
 const SMALL := [GUEST_PASS, EMPLOYEE_CARD, FRUIT, SANDWICH_CHEESE, SANDWICH_HAM, WRAP, BUN, BAR, CHIPS, WATER,
 	ENERGY_DRINK, JUICE, BEER, CIGARETTES, UMBRELLA, DONUT, COOKIE, CHEESECAKE]
 
@@ -85,6 +86,13 @@ static func draw(c: CanvasItem, kind: int, o: Vector2, s: float) -> void:
 			r.call(12, 9, 1, 1, Color("#1c1c24"))
 			r.call(6, 2, 1, 2, Color(1, 1, 1, 0.6))
 			r.call(8, 1, 1, 3, Color(1, 1, 1, 0.5))
+		EMPTY_CUP:  # a mug with a brown ring at the bottom
+			r.call(3, 5, 9, 9, Color("#1c1c24"))
+			r.call(4, 6, 7, 7, Color("#f4f1ea"))
+			r.call(4, 6, 7, 1, Color("#d8d2c4"))
+			r.call(5, 11, 5, 1, Color("#9c7b5b"))
+			r.call(11, 8, 3, 3, Color("#f4f1ea"))
+			r.call(12, 9, 1, 1, Color("#1c1c24"))
 		FRUIT:
 			r.call(3, 5, 10, 9, Color("#1c1c24"))
 			r.call(4, 6, 8, 7, Color("#e74c3c"))

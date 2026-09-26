@@ -42,6 +42,8 @@ pub mod kind {
     pub const SCHNITZEL: u8 = 31;
     pub const SALAD: u8 = 32;
     pub const KEBAB: u8 = 33;
+    /// What's left of a coffee (cleaning.rs).
+    pub const EMPTY_CUP: u8 = 34;
 }
 
 pub const POCKETS: usize = 3;
@@ -63,6 +65,7 @@ pub fn display_name(k: u8) -> &'static str {
         kind::EMPLOYEE_CARD => "Karta pracownika",
         kind::LAPTOP => "Laptop",
         kind::COFFEE => "Kawa",
+        kind::EMPTY_CUP => "Pusty kubek",
         kind::FRUIT => "Owoc",
         k if crate::shop::product(k).is_some() => crate::shop::product(k).unwrap().name,
         _ => "?",

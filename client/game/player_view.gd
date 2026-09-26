@@ -21,6 +21,7 @@ const LOOK_PORTER := 1
 const LOOK_OFFICE := 2
 const LOOK_GUARD := 3      # shop security
 const LOOK_POLICE := 4
+const LOOK_CLEANER := 5
 
 const SKINS := [Color("#f2cfae"), Color("#e3b08c"), Color("#c68c63"), Color("#8d5a3b")]
 const HAIRS := [Color("#2b2118"), Color("#5a3b22"), Color("#a0703a"), Color("#d9b66b"), Color("#8a8a8a"), Color("#b5462e"), Color("#1d1d27")]
@@ -119,6 +120,9 @@ func set_seed(seed_id: int) -> void:
 		LOOK_POLICE:
 			shirt = Color("#1f3358")
 			pants = Color("#17233d")
+		LOOK_CLEANER:
+			shirt = Color("#2bb3a8")
+			pants = Color("#3d4f5c")
 	queue_redraw()
 
 
@@ -268,6 +272,13 @@ func _draw() -> void:
 	_r(-4, ty, 8, 1, shirt.lightened(0.15))
 	if look == LOOK_OFFICE and facing != FACING_UP:
 		_r(-0.5 if not side else dir * 1.5 - 0.5, ty + 1, 1.5, 5, tie)
+	if look == LOOK_CLEANER:
+		if facing != FACING_UP:
+			_r(-3, ty + 2, 6, 5, Color("#e8f4f2"))  # apron
+		# Mop: handle at her side, head on the floor.
+		var mx := 6 if not side else dir * 5
+		_r(mx, ty - 2, 1, 14, Color("#a0764b"))
+		_r(mx - 2, ty + 12, 5, 2, Color("#d9d4c7"))
 	if look == LOOK_GUARD:
 		_r(-4, ty + 2, 8, 2, Color("#f1c40f"))  # "OCHRONA" band
 		if facing != FACING_UP:

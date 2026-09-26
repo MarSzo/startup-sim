@@ -30,6 +30,7 @@ OPTIONS:
   --weather <kind>      fixed weather: sun, clouds, rain, storm, fog (dev) [default: changing]
   --treats              a tray of sweets in the chill room right away (dev)
   --stale-fruit <pct>   chance that fruit from the bowl is stale      [default: 15]
+  --cleaning-at <hh:mm> when the cleaner starts her round             [default: 18:00]
   --needs-speed <n>     needs (hunger, energy...) change n times faster (dev)
   --recruitment <path>  recruitment JSON  [default: data/recruitment.json]
 ";
@@ -82,6 +83,7 @@ fn main() {
         time_scale: args.get("time-scale", 1),
         treats_now: args.flag("treats"),
         stale_fruit_percent: args.get("stale-fruit", game::treats::STALE_FRUIT_PERCENT),
+        cleaning_at: args.str("cleaning-at").map_or(game::cleaning::ROUND_AT, parse_time),
         weather: args.str("weather").map(|w| {
             game::weather::parse(w).unwrap_or_else(|| {
                 eprintln!("invalid --weather {w} (sun, clouds, rain, storm, fog)");

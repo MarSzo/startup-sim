@@ -46,6 +46,8 @@ fn start_server_full(start_access: u8, skip_recruitment: bool) -> (SocketAddr, u
 thread_local! {
     /// Fixed weather for servers started on this test thread (None = changing).
     static WEATHER: std::cell::Cell<Option<u8>> = const { std::cell::Cell::new(Some(game::weather::kind::CLOUDY)) };
+    /// When the cleaner starts her round on servers started on this thread.
+    static CLEANING_AT: std::cell::Cell<u32> = const { std::cell::Cell::new(game::cleaning::ROUND_AT) };
 }
 
 fn start_server_cfg(start_access: u8, skip_recruitment: bool, start_employed: bool) -> (SocketAddr, u32) {
@@ -76,6 +78,7 @@ fn start_server_at(start_access: u8, skip_recruitment: bool, start_employed: boo
         weather: WEATHER.with(|w| w.get()),
         treats_now: true,
         stale_fruit_percent: game::treats::STALE_FRUIT_PERCENT,
+        cleaning_at: CLEANING_AT.with(|c| c.get()),
     };
     let mut server = Server::new(map, cfg).unwrap();
     let port = server.local_addr().port();
@@ -523,6 +526,49 @@ fn desktop_portal_mail_interview_and_office() {
         unreachable!()
     };
     assert_eq!((floor, b.floor(0).unwrap().room_name(room), self_access), (0, "Na zewnątrz", 0));
+}
+
+#[test]
+fn a_mug_left_in_the_chill_room_is_collected_by_the_cleaner() {
+    use game::cleaning::lines as cl;
+    use game::coffee::lines as coffee_lines;
+    use game::inventory::kind as item_kind;
+    use proto::item_action as act;
+    // 10:00, the cleaner comes at 10:04 (20 s).
+    CLEANING_AT.with(|c| c.set(10 * 60 + 4));
+    let (addr, _) = start_server_at(access::CARD, true, true, 10 * 60, 1);
+    let b = building();
+    let (mut ola, _) = Client::connect(addr, "Ola");
+    let ws = game::computer::find_workstations(&b);
+    let w = ws.iter().find(|w| w.room_name == "IT / Produkt").unwrap();
+    let body = Body { access: access::CARD, ..Body::at(w.floor, Pos::tile_center(w.tile.x, w.tile.y + 1)) };
+    let action = |c: &Client, a: u8| c.sock.send(&Packet::ItemAction { token: c.token, action: a, slot: 0 }.encode()).unwrap();
+    let hands = |c: &Client, k: u8| {
+        wait_for(c, &[], Duration::from_millis(2500), |p| match p {
+            Packet::Inventory { slots } if slots[0].kind == k => Some(()),
+            _ => None,
+        })
+        .is_some()
+    };
+    // A coffee, drunk: an empty mug in hands (the laptop stays at the desk).
+    action(&ola, act::DROP);
+    std::thread::sleep(Duration::from_millis(100));
+    let at = ola.walk_to(&b, body, (1, Tile { x: 36, y: 27 }), &[]);
+    let at = ola.press_e(&b, at);
+    assert!(ola.wait_for_line(coffee_lines::READY, Duration::from_secs(5)).is_some());
+    action(&ola, act::USE);
+    assert!(hands(&ola, item_kind::EMPTY_CUP), "empty mug after the coffee");
+    // The same mug back under the spout, drunk again, left on the floor.
+    let at = ola.press_e(&b, at);
+    assert!(ola.wait_for_line(cl::REFILL, Duration::from_millis(800)).is_some());
+    assert!(ola.wait_for_line(coffee_lines::READY, Duration::from_secs(5)).is_some());
+    action(&ola, act::USE);
+    assert!(hands(&ola, item_kind::EMPTY_CUP));
+    action(&ola, act::DROP);
+    assert!(hands(&ola, item_kind::NONE));
+    // At 10:04 the cleaner comes up from the service room and takes it.
+    assert!(ola.wait_for_line(&cl::few(1), Duration::from_secs(40)).is_some(), "the cleaner collected the mug");
+    let _ = at;
 }
 
 #[test]

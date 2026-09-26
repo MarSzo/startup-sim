@@ -8,6 +8,7 @@ use std::time::{Duration, Instant};
 use crate::board::{self, Meeting};
 use crate::building::Building;
 use crate::clock::{self, Clock, Transition};
+use crate::cleaning;
 use crate::coffee::{self, Cup, Machine};
 use crate::commute::{self, Vehicle, VehicleEvent};
 use crate::company::{self, Company};
@@ -66,6 +67,22 @@ pub struct Config {
     pub treats_now: bool,
     /// Chance (%) that fruit from the bowl is stale.
     pub stale_fruit_percent: u32,
+    /// Minute of the day the cleaner starts her round.
+    pub cleaning_at: u32,
+}
+
+/// The cleaner's evening round in progress.
+#[derive(Default)]
+struct Round {
+    collected: u32,
+    /// Mugs per player who left them.
+    by_owner: HashMap<u16, u32>,
+    /// Rooms she already grumbled about.
+    grumbled: HashSet<(u8, u16)>,
+    /// Mugs she can't get to (e.g. in a locked stall).
+    unreachable: HashSet<u16>,
+    /// Wiping up where the mugs stood until this tick.
+    busy_until: u32,
 }
 
 /// Where a connected player is in the game.
@@ -273,6 +290,9 @@ pub struct Server {
     tray: Option<Tray>,
     /// Patrol cars called for shoplifters.
     police_calls: Vec<PoliceCall>,
+    /// The cleaner's round (evening) and the world day it last ran.
+    round: Option<Round>,
+    round_day: u32,
     next_officer_id: u16,
     treat_drops: Vec<u32>,
     /// (floor, room) of the board room.
@@ -333,6 +353,8 @@ impl Server {
             meetings: Vec::new(),
             tray: None,
             police_calls: Vec::new(),
+            round: None,
+            round_day: 0,
             next_officer_id: 0,
             lunch_orders: Vec::new(),
             vacancies: cfg.recruitment.offers.iter().filter(|o| o.hiring).map(|o| (o.id, o.vacancies)).collect(),
@@ -1324,6 +1346,7 @@ impl Server {
             item_kind::EMPLOYEE_CARD => p.nick.clone(),
             item_kind::LAPTOP => format!("Laptop: {}", p.nick),
             item_kind::COFFEE => "Gorąca, z ekspresu".into(),
+            item_kind::EMPTY_CUP => "Po kawie".into(),
             _ => String::new(),
         }
     }
@@ -1435,8 +1458,11 @@ impl Server {
                         p.inventory.take_hands();
                         p.needs.drink_coffee();
                         refresh(p);
-                        coffee::lines::DRUNK.to_string()
+                        self.pending_says.push(say(coffee::lines::DRUNK));
+                        self.give_new(id, item_kind::EMPTY_CUP);
+                        return;
                     }
+                    item_kind::EMPTY_CUP => "Pusty kubek. Można go umyć przy umywalce albo nalać kawy przy ekspresie.".into(),
                     item_kind::FRUIT if p.needs.is_full() => needs::lines::NOT_HUNGRY.into(),
                     item_kind::FRUIT => {
                         let what = held.label.to_lowercase();
@@ -1661,6 +1687,96 @@ impl Server {
         if late {
             p.needs.add_stress(10);
             self.pending_says.push((pid, commute::lines::LATE.to_string(), None));
+        }
+    }
+
+    /// The cleaner's evening round: from `cleaning_at`, she walks to the
+    /// nearest mug left lying around (her floor first), collects what's in
+    /// reach, grumbles about messy rooms, and at the end reports.
+    fn tick_cleaning(&mut self) {
+        let Some(ci) = self.npcs.iter().position(|n| n.role == npc::Role::Cleaner) else { return };
+        let cleaner = self.npcs[ci].id;
+        if self.round.is_none() {
+            if !self.clock.is_night() && self.clock.minute() >= self.cfg.cleaning_at && self.round_day != self.clock.day {
+                self.round_day = self.clock.day;
+                self.round = Some(Round::default());
+                self.pending_says.push((cleaner, cleaning::lines::START.into(), None));
+                self.log("* cleaning round starts");
+            }
+            return;
+        }
+        if !self.npcs[ci].is_idle() || self.round.as_ref().is_some_and(|r| self.tick < r.busy_until) {
+            return; // on her way / wiping the table
+        }
+        let (floor, pos) = (self.npcs[ci].body.floor, self.npcs[ci].body.pos);
+        let room = self.room_of(floor, pos);
+        // Collect what's in reach; a room full of mugs = a grumble.
+        let in_room = self
+            .dropped
+            .iter()
+            .filter(|d| d.item.kind == item_kind::EMPTY_CUP && d.floor == floor && self.room_of(d.floor, d.pos) == room)
+            .count() as u32;
+        let round = self.round.as_mut().unwrap();
+        if in_room >= cleaning::ROOM_COMPLAINT && round.grumbled.insert((floor, room)) {
+            self.pending_says.push((cleaner, cleaning::lines::room_mess(in_room), None));
+        }
+        let reach = PICKUP_RADIUS * 2;
+        let mut return_after_wipe = false;
+        let mut picked = Vec::new();
+        self.dropped.retain(|d| {
+            let here = d.item.kind == item_kind::EMPTY_CUP && d.floor == floor && dist2(d.pos, pos) <= reach * reach;
+            if here {
+                picked.push(d.item.owner);
+            }
+            !here
+        });
+        if !picked.is_empty() {
+            round.busy_until = self.tick + cleaning::WIPE_TICKS;
+            return_after_wipe = true;
+        }
+        for owner in picked {
+            round.collected += 1;
+            *round.by_owner.entry(owner).or_default() += 1;
+        }
+        if return_after_wipe {
+            return;
+        }
+        // Next mug: this floor first, then the nearest.
+        let next = self
+            .dropped
+            .iter()
+            .filter(|d| d.item.kind == item_kind::EMPTY_CUP && !round.unreachable.contains(&d.handle))
+            .min_by_key(|d| (d.floor != floor, dist2(d.pos, pos)))
+            .map(|d| (d.handle, d.floor, d.pos));
+        match next {
+            Some((handle, f, p)) => {
+                let (x, y) = p.tile();
+                if !self.npcs[ci].go_to(&self.building, (f, crate::map::Tile { x, y })) {
+                    round.unreachable.insert(handle);
+                }
+            }
+            None => {
+                let round = self.round.take().unwrap();
+                let n = round.collected;
+                let line = match n {
+                    0 => cleaning::lines::SPOTLESS.to_string(),
+                    n if n < cleaning::DAY_COMPLAINT => cleaning::lines::few(n),
+                    n => cleaning::lines::done_many(n),
+                };
+                self.pending_says.push((cleaner, line, None));
+                if n >= cleaning::DAY_COMPLAINT {
+                    let record = round
+                        .by_owner
+                        .iter()
+                        .filter_map(|(o, k)| self.players.get(o).map(|p| (p.nick.clone(), *k)))
+                        .max_by_key(|(nick, k)| (*k, std::cmp::Reverse(nick.clone())));
+                    let text = cleaning::lines::post(n, record.as_ref().map(|(nick, k)| (nick.as_str(), *k)));
+                    let name = self.npcs[ci].name.clone();
+                    self.messenger.post_system(computer::conv::GENERAL, cleaner, &name, &text);
+                }
+                self.npcs[ci].return_home(&self.building);
+                self.log(format!("* cleaning round done: {n} mugs"));
+            }
         }
     }
 
@@ -2424,6 +2540,11 @@ impl Server {
                 p.rest = Some((Rest::Smoking { until: self.tick + needs::SMOKE_TICKS }, floor, pos));
                 needs::lines::SMOKE.into()
             }
+            SpotKind::Sink if p.inventory.held_kind() == item_kind::EMPTY_CUP => {
+                p.inventory.take_hands();
+                refresh(p);
+                cleaning::lines::WASHED.into()
+            }
             SpotKind::Sink => {
                 p.rest = Some((Rest::Washing { until: self.tick + needs::WASH_TICKS }, floor, pos));
                 needs::lines::WASHING.into()
@@ -2672,7 +2793,7 @@ impl Server {
             if let Some(v) = p.position.and_then(|o| self.vacancies.get_mut(&o)) {
                 *v = (*v + 1).min(MAX_VACANCIES);
             }
-            self.dropped.retain(|d| d.item.owner != id);
+            self.dropped.retain(|d| d.item.owner != id || d.item.kind == item_kind::EMPTY_CUP); // mugs stay
             for other in self.players.values_mut() {
                 let before = other.inventory.clone();
                 other.inventory.remove_owned_by(id);
@@ -2714,6 +2835,7 @@ impl Server {
         let mut talks: Vec<(u16, Body)> = Vec::new();
         let mut coffee_says: Vec<(u16, String, Option<u16>)> = std::mem::take(&mut self.pending_says);
         let mut coffee_ready = Vec::new();
+        let mut cold_cups = Vec::new();
         let mut portal_resend = Vec::new();
         // Left a bathroom with dirty hands: (player, floor, bathroom room).
         let mut unwashed_exits: Vec<(u16, u8, u16)> = Vec::new();
@@ -2774,6 +2896,7 @@ impl Server {
             if !p.inventory.expire(self.tick).is_empty() {
                 refresh(p);
                 coffee_says.push((p.id, coffee::lines::COLD.to_string(), None));
+                cold_cups.push(p.id);
             }
             // Needs: moving ends a rest; exhausted / desperate = slow.
             if let Some((_, floor, pos)) = p.rest {
@@ -2861,6 +2984,9 @@ impl Server {
             coffee_says.push((pid, if free { coffee::lines::READY } else { coffee::lines::WAITING }.to_string(), None));
             self.give_new(pid, item_kind::COFFEE); // no free hands: it waits on the floor
         }
+        for pid in cold_cups {
+            self.give_new(pid, item_kind::EMPTY_CUP);
+        }
 
         for id in portal_resend {
             self.deliver_replies(id);
@@ -2899,7 +3025,14 @@ impl Server {
                 events.extend(n.interact(&self.building, pid, body.access, dept.as_deref(), hands_free));
             } else if let Some(i) = coffee::machine_in_reach(&self.machines, &body) {
                 let p = self.players.get_mut(&pid).unwrap();
-                let line = match coffee::use_machine(&mut self.machines, i, &mut p.cup, hands_free, self.tick) {
+                // Your own empty mug goes under the spout.
+                let mug = p.inventory.held_kind() == item_kind::EMPTY_CUP;
+                let line = match coffee::use_machine(&mut self.machines, i, &mut p.cup, hands_free || mug, self.tick) {
+                    coffee::Outcome::Started if mug => {
+                        p.inventory.take_hands();
+                        refresh(p);
+                        cleaning::lines::REFILL
+                    }
                     coffee::Outcome::Started => coffee::lines::BREWING,
                     coffee::Outcome::Busy => coffee::lines::BUSY,
                     coffee::Outcome::HandsFull => coffee::lines::HANDS_FULL,
@@ -2932,6 +3065,7 @@ impl Server {
         self.tick_elevators();
         self.tick_vehicles();
         self.tick_police();
+        self.tick_cleaning();
         self.tick_meetings();
         self.tick_lunch();
         self.tick_company();
@@ -2958,6 +3092,7 @@ impl Server {
                 }
                 npc::Event::Say { npc, text, to } => says.push((npc, text, to)),
                 npc::Event::Caught { npc, player } => says.extend(self.caught(npc, player)),
+                npc::Event::Arrived { .. } => {} // the cleaner: see tick_cleaning
                 npc::Event::Escaped { npc, player } => says.extend(self.escaped(npc, player)),
                 npc::Event::Meeting { npc, player } => {
                     if let Some(line) = self.start_meeting(npc, player) {

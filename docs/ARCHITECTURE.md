@@ -32,6 +32,7 @@ server/                 crate Rusta (lib `game` + binarki)
   src/coffee.rs         ekspresy do kawy (parzenie → kawa jako przedmiot)
   src/inventory.rs      przedmioty, kieszenie i ręce, uprawnienia z przedmiotów
   src/computer.rs       stanowiska (biurka działów), laptopy na biurkach, komunikator
+  src/cleaning.rs       kubki po kawie i wieczorny obchód sprzątaczki (stałe, teksty)
   src/security.rs       kradzież w sklepie: mandat, radiowóz (trasa), wezwania policji
   src/company.rs        firma i założyciel: nazwa, opisy ofert, kandydaci, zespół
   src/lunch.rs          zamawianie obiadów: menu, zamówienia, dostawa na recepcję
@@ -189,6 +190,15 @@ towarem `unpaid` → `Player::thefts_today` + pościg ochroniarza. `call_police`
 dodaje `Vehicle::police` (parkuje przy wejściu) i `PoliceCall`; `tick_police`
 wypuszcza policjanta (`Npc::police`, id od `NPC_ID_BASE + 0xF00`), a gdy ten
 wróci do auta — usuwa NPC i odsyła radiowóz (`Vehicle::leave`).
+
+**Sprzątaczka** (`cleaning.rs`): pusty kubek (`EMPTY_CUP`) powstaje po
+wypiciu / wystygnięciu kawy; umywalka i ekspres go zabierają. Od
+`Config::cleaning_at` (`--cleaning-at`, domyślnie 18:00) `tick_cleaning` prowadzi
+`Round`: gdy sprzątaczka (`Role::Cleaner`) jest bezczynna, zbiera kubki
+(`dropped`) w zasięgu, po `WIPE_TICKS` wysyła ją (`Npc::go_to` → stan `Errand`)
+do najbliższego następnego (najpierw jej piętro); nieosiągalne pomija. Koniec:
+podsumowanie, przy `DAY_COMPLAINT` wpis na #ogólny (`post_system`), powrót do
+zaplecza. Raz na dzień świata (`round_day`).
 
 **Firma** (`company.rs`): `Server::company` (nazwa z pierwszej oferty
 `recruitment.json`, `founder`, własne opisy, `candidates`, `hired_on`).

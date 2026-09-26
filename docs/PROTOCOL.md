@@ -118,7 +118,7 @@ Encja (14 B): `id u16 | kind u8 | x i32 | y i32 | flags u8 | held u8 | activity 
 - `flags`: bity 0–1 kierunek (0 dół, 1 góra, 2 lewo, 3 prawo), bit 2 „w ruchu”,
   bity 3–5 wygląd (0 gracz, 1 portier — mundur z czapką, 2 pracownik biurowy —
   koszula z krawatem, 3 ochroniarz — czarny strój z żółtą opaską, 4 policjant —
-  granatowy mundur z czapką), bit 6 wolny chód (zmęczenie / pilna toaleta), bit 7
+  granatowy mundur z czapką, 5 sprzątaczka — turkusowy fartuch i mop), bit 6 wolny chód (zmęczenie / pilna toaleta), bit 7
   niska higiena (chmurka). U graczy (nie NPC) bit 3 = rozłożony parasol.
   Dla laptopa (`kind` 3): bit 0 zablokowany, bit 1 ktoś przy nim siedzi.
 
@@ -424,6 +424,7 @@ szyfrowaniem.
 
 ## Historia wersji
 
+- **25** — kubki i sprzątaczka: przedmiot 34 = pusty kubek, wygląd NPC 5 (sprzątaczka); bez nowych pakietów.
 - **24** — ochrona i policja: wygląd NPC 3 (ochroniarz) i 4 (policjant), pojazd 5 (radiowóz); bez nowych pakietów.
 - **23** — panel założyciela: `Clock` + `company`, `founded`; `CompanyOffers`, `CompanyPeople`, `CompanyAction`; dział 3 (Zarząd).
 - **22** — wakaty: `JobOffers` + `vacancies u8` po `applied` (wolne miejsca; stanowiska z 0 portal ukrywa, chyba że gracz już aplikował).

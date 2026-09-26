@@ -19,8 +19,8 @@ pub mod lines {
     pub const READY: &str = "Kawa gotowa!";
     pub const BUSY: &str = "Ekspres zajęty — chwilka.";
     pub const HANDS_FULL: &str = "Najpierw muszę mieć wolne ręce.";
-    pub const DRUNK: &str = "Pycha! Kawa wypita.";
-    pub const COLD: &str = "Kawa wystygła…";
+    pub const DRUNK: &str = "Pycha! Kawa wypita — został pusty kubek.";
+    pub const COLD: &str = "Kawa wystygła… Wylewam, został pusty kubek.";
     pub const WAITING: &str = "Kawa czeka przy ekspresie — ręce były zajęte.";
 }
 

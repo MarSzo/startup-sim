@@ -4,6 +4,7 @@ pub mod args;
 pub mod board;
 pub mod building;
 pub mod clock;
+pub mod cleaning;
 pub mod coffee;
 pub mod elevator;
 pub mod commute;

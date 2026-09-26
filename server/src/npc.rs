@@ -50,6 +50,7 @@ pub mod look {
     pub const OFFICE: u8 = 2;
     pub const GUARD: u8 = 3;
     pub const POLICE: u8 = 4;
+    pub const CLEANER: u8 = 5;
 }
 
 pub mod lines {
@@ -98,6 +99,8 @@ pub enum Role {
     Guard,
     /// Comes by patrol car when called (not placed in the building).
     Police,
+    /// Evening round: collects the mugs left lying around (cleaning.rs).
+    Cleaner,
 }
 
 impl Role {
@@ -110,6 +113,7 @@ impl Role {
             "ceo" => Some(Role::Ceo),
             "cofounder" => Some(Role::CoFounder),
             "guard" => Some(Role::Guard),
+            "cleaner" => Some(Role::Cleaner),
             _ => None,
         }
     }
@@ -120,6 +124,7 @@ impl Role {
             Role::Receptionist | Role::Hr | Role::Cashier | Role::Ceo | Role::CoFounder => look::OFFICE,
             Role::Guard => look::GUARD,
             Role::Police => look::POLICE,
+            Role::Cleaner => look::CLEANER,
         }
     }
 }
@@ -160,6 +165,8 @@ pub enum Event {
     Caught { npc: u16, player: u16 },
     /// A chase was given up (too long, or the player left the building).
     Escaped { npc: u16, player: u16 },
+    /// Got where `go_to` sent it.
+    Arrived { npc: u16 },
 }
 
 enum State {
@@ -167,6 +174,8 @@ enum State {
     Escorting { guest: u16, walker: Walker, waited: u32 },
     Returning { walker: Walker },
     Chasing { target: u16, walker: Option<Walker>, ticks: u32 },
+    /// Walking somewhere for the server (`go_to`); then idle there.
+    Errand { walker: Walker },
 }
 
 pub struct Npc {
@@ -197,7 +206,11 @@ impl Npc {
     fn new(b: &Building, id: u16, floor: u8, def: &NpcDef, role: Role) -> Npc {
         let pos = Pos::tile_center(def.home.x, def.home.y);
         let mut body = Body::at(floor, pos);
-        body.access = access::CARD; // staff: walks through the gates
+        body.access = match role {
+            // The cleaner has the keys to everything (service rooms, board).
+            Role::Cleaner => access::CARD | access::SERVICE | access::BOARD,
+            _ => access::CARD, // staff: walks through the gates
+        };
         Npc {
             id,
             name: def.name.clone(),
@@ -225,6 +238,26 @@ impl Npc {
     /// Run after `target` (shoplifter).
     pub fn chase(&mut self, target: u16) {
         self.state = State::Chasing { target, walker: None, ticks: 0 };
+    }
+
+    /// Walk to `goal` (the server's errand); false if it can't be reached.
+    pub fn go_to(&mut self, b: &Building, goal: Place) -> bool {
+        match Walker::to(b, &self.body, goal) {
+            Some(walker) => {
+                self.state = State::Errand { walker };
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// Back to its post.
+    pub fn return_home(&mut self, b: &Building) {
+        self.go_home(b);
+    }
+
+    pub fn at_home(&self) -> bool {
+        self.is_idle() && self.body.floor == self.home.0 && self.body.pos == Pos::tile_center(self.home.1.x, self.home.1.y)
     }
 
     pub fn chasing(&self) -> Option<u16> {
@@ -276,6 +309,10 @@ impl Npc {
         if matches!(self.role, Role::Ceo | Role::CoFounder) {
             return vec![Event::Meeting { npc: self.id, player }];
         }
+        if self.role == Role::Cleaner {
+            let line = if self.at_home() { crate::cleaning::lines::HELLO } else { crate::cleaning::lines::BUSY };
+            return vec![say(line)];
+        }
         if matches!(self.role, Role::Guard | Role::Police) {
             let line = match (self.role, self.chasing().is_some()) {
                 (Role::Police, _) => lines::POLICE_BUSY,
@@ -325,7 +362,7 @@ impl Npc {
             State::Escorting { guest, .. } if *guest == player => vec![say(l.on_the_way)],
             State::Escorting { .. } => vec![say(lines::BUSY)],
             State::Returning { .. } => vec![say(l.back_soon)],
-            State::Chasing { .. } => vec![],
+            State::Chasing { .. } | State::Errand { .. } => vec![],
         }
     }
 
@@ -368,7 +405,7 @@ impl Npc {
                     }
                 }
             }
-            State::Returning { .. } => walk = true,
+            State::Returning { .. } | State::Errand { .. } => walk = true,
             State::Chasing { target, walker, ticks } => {
                 let target = *target;
                 *ticks += 1;
@@ -397,11 +434,14 @@ impl Npc {
         if walk {
             self.walk_steps(b);
             let finished = match &self.state {
-                State::Escorting { walker, .. } | State::Returning { walker } => walker.done(),
+                State::Escorting { walker, .. } | State::Returning { walker } | State::Errand { walker } => walker.done(),
                 State::Idle | State::Chasing { .. } => false,
             };
             if finished {
-                if let State::Escorting { guest, .. } = self.state {
+                if let State::Errand { .. } = self.state {
+                    self.state = State::Idle;
+                    events.push(Event::Arrived { npc: self.id });
+                } else if let State::Escorting { guest, .. } = self.state {
                     events.push(Event::Say { npc: self.id, text: l.arrived.into(), to: Some(guest) });
                     self.go_home(b);
                 } else {
@@ -424,7 +464,7 @@ impl Npc {
 
     fn walk_steps(&mut self, b: &Building) {
         let (walker, steps) = match &mut self.state {
-            State::Escorting { walker, .. } | State::Returning { walker } => (walker, STEPS_PER_TICK),
+            State::Escorting { walker, .. } | State::Returning { walker } | State::Errand { walker } => (walker, STEPS_PER_TICK),
             State::Chasing { walker: Some(walker), .. } => (walker, CHASE_STEPS_PER_TICK),
             _ => return,
         };
@@ -626,6 +666,7 @@ mod tests {
                 (Role::Porter, "Portier", look::PORTER),
                 (Role::Cashier, "Kasa", look::OFFICE),
                 (Role::Guard, "Ochrona", look::GUARD),
+                (Role::Cleaner, "Pani Krysia", look::CLEANER),
                 (Role::Receptionist, "Recepcja", look::OFFICE),
                 (Role::Hr, "HR", look::OFFICE),
                 (Role::Ceo, "Prezes", look::OFFICE),
@@ -633,7 +674,7 @@ mod tests {
             ]
         );
         let ids: Vec<u16> = npcs.iter().map(|n| n.id).collect();
-        assert_eq!(ids, (0..7).map(|i| NPC_ID_BASE + i).collect::<Vec<_>>());
+        assert_eq!(ids, (0..8).map(|i| NPC_ID_BASE + i).collect::<Vec<_>>());
     }
 
     #[test]
