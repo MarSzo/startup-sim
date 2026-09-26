@@ -5,7 +5,7 @@
 //! `tests/golden/packets.json`.
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 17;
+pub const VERSION: u8 = 18;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
 pub const MAX_PACKET: usize = 1200;
@@ -203,6 +203,10 @@ pub const NO_FLOOR: u8 = 255;
 
 /// `EntityState::flags` bit: walks slowly (exhausted / needs the toilet).
 pub const FLAG_SLOW: u8 = 0x40;
+/// `EntityState::flags` bit 3 for players (NPC looks use bits 3-5): an open
+/// umbrella (outdoors in the rain).
+pub const FLAG_UMBRELLA: u8 = 0x08;
+
 /// `EntityState::flags` bit: low hygiene (a smell cloud others can see).
 pub const FLAG_SMELLY: u8 = 0x80;
 /// `Stats::flags` bit: dirty hands (after the toilet, until washed).
@@ -377,6 +381,8 @@ pub enum Packet {
         mode: u8,
         depart: u16,
         money: u32,
+        /// `weather::kind` (1 sun, 2 clouds, 3 rain, 4 storm, 5 fog).
+        weather: u8,
     },
     /// Morning choice of how to get to work (before the departure).
     CommuteChoice { token: u32, mode: u8 },
@@ -751,7 +757,7 @@ impl Packet {
                 w.u8(*shelf);
                 w.u8(*kind);
             }
-            Packet::Clock { day, minute, night, place, arrive, pay, pay_minutes, today_minutes, mode, depart, money } => {
+            Packet::Clock { day, minute, night, place, arrive, pay, pay_minutes, today_minutes, mode, depart, money, weather } => {
                 w.u16(*day);
                 w.u16(*minute);
                 w.u8(*night as u8);
@@ -763,6 +769,7 @@ impl Packet {
                 w.u8(*mode);
                 w.u16(*depart);
                 w.u32(*money);
+                w.u8(*weather);
             }
             Packet::CommuteChoice { token, mode } => {
                 w.u32(*token);
@@ -1010,6 +1017,7 @@ impl Packet {
                 mode: r.u8()?,
                 depart: r.u16()?,
                 money: r.u32()?,
+                weather: r.u8()?,
             },
             ty::COMMUTE_CHOICE => Packet::CommuteChoice { token: r.u32()?, mode: r.u8()? },
             ty::CHAT => {
@@ -1251,6 +1259,7 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
                 mode: 2,
                 depart: 8 * 60 + 40,
                 money: 186_00,
+                weather: 3,
             },
         ),
         ("commute_choice", Packet::CommuteChoice { token: 0x01020304, mode: 5 }),

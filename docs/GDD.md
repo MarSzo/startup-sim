@@ -177,7 +177,7 @@ Kolejność realizacji: (1) tworzenie postaci → (2) pulpit, portal, rozmowa �
 podpisaniu umowy, kanapki, przekąski, napoje, fast food, alkohol, papierosy
 (potrzebne do palenia) — zob. 10.20.
 
-**Czas i dni** — *zrobione (10.21), bez pogody*
+**Czas i dni** — *zrobione (10.21, pogoda 10.23)*
 - Zegar gry (aktualna godzina na ekranie), pory dnia (światło), **zmienna
   pogoda** na zewnątrz.
 - Rozgrywka podzielona na **dni**: pierwszy dzień — pełnoekranowa plansza
@@ -646,7 +646,7 @@ Zastępuje prosty portal z 10.8. Po połączeniu gracz widzi pulpit komputera
   podpisaniu umowy), wypłacana o 22:00. Zaliczka 200 zł zostaje na start.
 - **Oświetlenie**: świt fioletowo-chłodny, dzień biały, wieczór złoty, a
   przed 22:00 granatowy.
-- Do zrobienia z tej grupy: **pogoda** (backlog 9b).
+- Pogoda: 10.23.
 - Poranny przyjazd zależy teraz od wybranego dojazdu (10.22).
 
 ### 10.22 Dojazd do pracy
@@ -669,6 +669,23 @@ Zastępuje prosty portal z 10.8. Po połączeniu gracz widzi pulpit komputera
   zewnątrz widzą auto, taksówkę, tramwaj czy rower. Przed budynkiem jest ulica,
   torowisko z peronem i stojak na rowery.
 - **Spóźnienie po 9:00**: stres +10 i „Spóźnienie… Oby nikt nie zauważył.”
+
+### 10.23 Pogoda
+
+- Wspólna dla serwera: **słonecznie, pochmurno, deszcz, burza, mgła**; zmienia
+  się co 1–3 godziny gry z sensownymi przejściami (deszcz zwykle po chmurach,
+  burza tylko z deszczu). Widać ją w zegarze HUD i rano przy wyborze dojazdu.
+- **Na zewnątrz** (chodnik, ulica, parkingi, strefa palenia): krople deszczu,
+  ulewa z błyskawicami, mgła, ciemniejsze niebo; w środku biura światło mniej
+  się zmienia, a błyski widać przez okna.
+- **Deszcz moczy**: higiena spada (~0,5 pkt/s, w burzy 2×), stres rośnie
+  („Ale leje! Przemoczenie gwarantowane.”); **słońce** lekko odpręża.
+- **Parasol** (sklep, stojak przy wejściu: 25 zł, mieści się w kieszeni):
+  chroni przed deszczem na zewnątrz i w drodze pieszo; rozłożony widać nad
+  głową.
+- **Dojazd w deszczu**: pieszo bez parasola i rowerem — przemoczenie (higiena
+  −12, w burzy −20; stres +5 / +8); samochód — dodatkowe korki (+10 / +20 min);
+  tramwaj i taksówka bez zmian.
 
 ### 10.6 Stan implementacji
 
@@ -706,6 +723,8 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Ekwipunek**: kieszenie i ręce, przedmioty (przepustka, karta, laptop,
   kawa), upuszczanie / podnoszenie / podawanie, dostęp z przedmiotów (10.13);
   protokół v8.
+- **Pogoda**: słońce, chmury, deszcz, burza, mgła; moknięcie, parasol, wpływ na
+  dojazd, efekty na ekranie (10.23); protokół v18.
 - **Dojazd do pracy**: poranny wybór pięciu sposobów, czas, koszt, wpływ na
   potrzeby, pojazdy z przyjazdem na parking / stojak / przystanek, spóźnienia
   (10.22); protokół v17.
@@ -734,12 +753,12 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Sieć mobilna**: serwer dual-stack IPv4/IPv6; gracz identyfikowany tokenem
   (zmiana adresu w trakcie gry przenosi sesję); klient przepina gniazdo po
   ciszy/powrocie z tła i sam łączy się ponownie po utracie sesji.
-- **Testy**: 79 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
+- **Testy**: 81 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
   zależna od uprawnień, bramki, ruch/kolizje, schody, winda, nawigacja,
-  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, zegar, protokół), 2 golden, 19 e2e serwera
+  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, zegar, dojazd, pogoda, protokół), 2 golden, 20 e2e serwera
   (m.in. portal: odrzucenie → przyjęcie → spawn; całe wdrożenie aż do karty;
   niewidoczność między piętrami; zgodność stanu serwera z predykcją) —
-  łącznie 100 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 i porannego dojazdu samochodem); 136 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
+  łącznie 103 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 porannego dojazdu samochodem i moknięcia w deszczu); 136 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
   adresów).
 
 #### Pomiary (MacBook, wszystko lokalnie)

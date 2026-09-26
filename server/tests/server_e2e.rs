@@ -42,6 +42,11 @@ fn start_server_full(start_access: u8, skip_recruitment: bool) -> (SocketAddr, u
     start_server_cfg(start_access, skip_recruitment, false)
 }
 
+thread_local! {
+    /// Fixed weather for servers started on this test thread (None = changing).
+    static WEATHER: std::cell::Cell<Option<u8>> = const { std::cell::Cell::new(Some(game::weather::kind::CLOUDY)) };
+}
+
 fn start_server_cfg(start_access: u8, skip_recruitment: bool, start_employed: bool) -> (SocketAddr, u32) {
     start_server_at(start_access, skip_recruitment, start_employed, 8 * 60, 1)
 }
@@ -67,6 +72,7 @@ fn start_server_at(start_access: u8, skip_recruitment: bool, start_employed: boo
         needs_speed: 1,
         start_minute,
         time_scale,
+        weather: WEATHER.with(|w| w.get()),
     };
     let mut server = Server::new(map, cfg).unwrap();
     let port = server.local_addr().port();
@@ -1134,4 +1140,26 @@ fn morning_commute_choice_ride_and_arrival() {
     });
     let (tx, ty) = out.expect("got out");
     assert!((41..=43).contains(&ty) && tx < 31, "on the outside car park: ({tx},{ty})");
+}
+
+#[test]
+fn rain_soaks_you_outdoors() {
+    WEATHER.with(|w| w.set(Some(game::weather::kind::RAIN)));
+    let (addr, _) = start_server_with(0); // spawns on the sidewalk: outdoors
+    let (ola, _) = Client::connect(addr, "Ola");
+    let hygiene = |c: &Client| wait_for(c, &[], Duration::from_millis(1200), |p| if let Packet::Stats { hygiene, .. } = p { Some(*hygiene) } else { None });
+    let soaked = wait_for(&ola, &[], Duration::from_millis(1500), |p| {
+        matches!(p, Packet::Say { text, .. } if text == game::weather::lines::SOAKED).then_some(())
+    });
+    assert!(soaked.is_some(), "told it's pouring");
+    let before = hygiene(&ola).unwrap();
+    let weather = wait_for(&ola, &[], Duration::from_millis(1500), |p| if let Packet::Clock { weather, .. } = p { Some(*weather) } else { None });
+    assert_eq!(weather, Some(game::weather::kind::RAIN));
+    std::thread::sleep(Duration::from_millis(100));
+    ola.ping();
+    let after = wait_for(&ola, &[], Duration::from_millis(3000), |p| match p {
+        Packet::Stats { hygiene, .. } if *hygiene + 1 < before => Some(*hygiene),
+        _ => None,
+    });
+    assert!(after.is_some(), "hygiene drops in the rain (was {before})");
 }

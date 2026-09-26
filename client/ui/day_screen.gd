@@ -142,7 +142,7 @@ func _render() -> void:
 			if clock.arrive == Protocol.NO_TIME:
 				# Still at home: choose how to get there.
 				_sub.text = "Jak dziś dojeżdżasz? Wyjazd o %s" % hhmm(clock.depart)
-				_info.text = "Teraz %s · w portfelu %d,%02d zł · wybrano: %s" % [hhmm(clock.minute), clock.money / 100, clock.money % 100, name.to_lower()]
+				_info.text = "Teraz %s · pogoda: %s · w portfelu %d,%02d zł · wybrano: %s" % [hhmm(clock.minute), Protocol.WEATHER_NAMES.get(clock.weather, "?"), clock.money / 100, clock.money % 100, name.to_lower()]
 				_render_modes()
 			else:
 				_sub.text = "W drodze (%s)… przyjazd o %s" % [name.to_lower(), hhmm(clock.arrive)]
@@ -154,7 +154,7 @@ func _render() -> void:
 			_title.text = "Dzień %d" % clock.day
 			if place == Protocol.PLACE_PORTAL:
 				_sub.text = "Szukasz pracy — przejrzyj ogłoszenia w przeglądarce."
-			elif clock.day == 2:
+			elif clock.day <= 2:
 				_sub.text = "Pierwszy dzień w pracy!"
 			else:
 				_sub.text = "Kolejny dzień w pracy."

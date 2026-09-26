@@ -23,6 +23,7 @@ const ElevatorDoorView = preload("res://game/elevator_door_view.gd")
 const RideMask = preload("res://game/ride_mask.gd")
 const ShelfWindow = preload("res://ui/shelf_window.gd")
 const VehicleView = preload("res://game/vehicle_view.gd")
+const WeatherFx = preload("res://ui/weather_fx.gd")
 
 const ZOOM := 3.0
 ## Remote players are rendered this far in the past (2 snapshots at 20 Hz).
@@ -73,6 +74,9 @@ var ride_mask := RideMask.new()
 var clock_label := Label.new()
 var daylight := CanvasModulate.new()   # time-of-day tint of the world
 var game_minute := 8 * 60
+var weather := Protocol.WEATHER_SUNNY
+var weather_fx := WeatherFx.new()
+var weather_layer := CanvasLayer.new()
 var shelf_window := ShelfWindow.new()
 var _shelf_at := Vector2.ZERO     # where the shelf window was opened (walk away = close)
 var depts := {}          # id -> department (after the contract)
@@ -233,6 +237,9 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 	cp.add_child(clock_label)
 	status_layer.add_child(cp)
 	add_child(daylight)
+	weather_layer.layer = 5  # over the world, under the HUD
+	add_child(weather_layer)
+	weather_layer.add_child(weather_fx)
 	status_layer.add_child(shelf_window)
 	shelf_window.take.connect(func(shelf: int, kind: int): if net.is_playing(): net.send(Protocol.encode_shop_take(net.token, shelf, kind)))
 	screen_layer.layer = 12
@@ -477,6 +484,7 @@ func _process(delta: float) -> void:
 	if have_state:
 		_update_stall_doors()
 		_update_ride()
+		_update_weather()
 	for id in vehicles.keys():
 		if latest_tick - vehicles[id].last_seen_tick > REMOTE_TIMEOUT_TICKS:
 			vehicles[id].queue_free()
@@ -524,8 +532,9 @@ func _on_packet(p: Dictionary) -> void:
 		Protocol.T_CLOCK:
 			game_minute = p.minute
 			var part := "noc" if p.night else ("rano" if p.minute < 10 * 60 else ("dzień" if p.minute < 18 * 60 else "wieczór"))
-			clock_label.text = "Dzień %d · %02d:%02d · %s" % [p.day, p.minute / 60, p.minute % 60, part]
-			daylight.color = daylight_color(p.minute)
+			weather = p.weather
+			clock_label.text = "Dzień %d · %02d:%02d · %s · %s" % [p.day, p.minute / 60, p.minute % 60, part, Protocol.WEATHER_NAMES.get(weather, "")]
+			_update_light()
 		Protocol.T_STATS:
 			stats_hud.update_stats(p)
 			me.set_smelly(p.hygiene < 25)
@@ -651,6 +660,7 @@ func _on_snapshot(p: Dictionary) -> void:
 		r.push_sample(tick, Vector2(e.x, e.y) / float(Movement.SUBPIXELS), e.flags)
 		r.set_status(e.activity, (e.flags & Protocol.FLAG_SLOW) != 0)
 		r.set_smelly((e.flags & Protocol.FLAG_SMELLY) != 0)
+		r.set_umbrella(e.kind == Protocol.KIND_PLAYER and (e.flags & Protocol.FLAG_UMBRELLA) != 0)
 		r.set_held(e.held)
 		kinds[e.id] = e.kind
 		if not nicks.has(e.id) and now - info_requested.get(e.id, -100000) > 500:
@@ -809,6 +819,33 @@ func _update_hint() -> void:
 					text = "Bramka wymaga przepustki — porozmawiaj z portierem (portiernia)" if (need & MapData.ACCESS_GUEST) else "Wstęp tylko dla obsługi"
 	hint_label.text = text
 	hint_label.visible = text != ""
+
+
+## Outdoors: rain / fog on screen, an umbrella if you carry one, a darker
+## sky; indoors the lights are on (the weather tints less).
+func _update_weather() -> void:
+	var m = building.get_floor(pred.floor)
+	var outdoors: bool = m != null and m.room_outdoor.has(room_id)
+	var wet := weather == Protocol.WEATHER_RAIN or weather == Protocol.WEATHER_STORM
+	var carries := false
+	for s in inventory:
+		carries = carries or s.kind == ItemArt.UMBRELLA
+	me.set_umbrella(outdoors and wet and carries and me.status != Protocol.ACT_RIDING)
+	if outdoors != weather_fx.outdoors or weather != weather_fx.weather:
+		weather_fx.set_state(weather, outdoors)
+		_update_light()
+
+
+func _update_light() -> void:
+	var tint := Color(1, 1, 1)
+	match weather:
+		Protocol.WEATHER_CLOUDY: tint = Color(0.88, 0.88, 0.92)
+		Protocol.WEATHER_RAIN: tint = Color(0.74, 0.76, 0.84)
+		Protocol.WEATHER_STORM: tint = Color(0.6, 0.62, 0.72)
+		Protocol.WEATHER_FOG: tint = Color(0.9, 0.9, 0.92)
+	if not weather_fx.outdoors:
+		tint = tint.lerp(Color(1, 1, 1), 0.6)  # the office lights are on
+	daylight.color = daylight_color(game_minute) * tint
 
 
 ## World tint by the time of day: warm dawn, white day, golden evening,

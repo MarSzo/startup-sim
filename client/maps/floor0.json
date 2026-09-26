@@ -179,8 +179,8 @@
   "Fv#================#.K....D______________#...............#vF",
   "Fv#==XXX======XXX==#.K....D______________D...............#vF",
   "Fv#==XXX======XXX==#.K....#______________D...............#vF",
-  "Fv#================#......#______________#.........KKKKK.#vF",
-  "Fv#================#......#P____________P#...............#vF",
+  "Fv#================#......#______________#.H.......KKKKK.#vF",
+  "Fv#================#......#P____________P#.H.............#vF",
   "Fv######ggggg##################GGGGG######################vF",
   "Fpppppp=======ppppppppppppppppppppppppppbbbbpppppppppppppppF",
   "Fpppppp=======pppppppppppppppppppppppppppppppppppppppppppppF",
@@ -252,6 +252,7 @@
    "id": 1,
    "name": "Na zewnątrz",
    "type": "outside",
+   "outdoor": true,
    "see": [
     "R"
    ]
@@ -306,6 +307,7 @@
    "id": 7,
    "name": "Parking zewnętrzny",
    "type": "parking",
+   "outdoor": true,
    "see": [
     "O"
    ]
@@ -313,7 +315,8 @@
   "M": {
    "id": 8,
    "name": "Strefa palenia",
-   "type": "smoking"
+   "type": "smoking",
+   "outdoor": true
   }
  },
  "links": [

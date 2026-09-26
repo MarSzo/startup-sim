@@ -30,6 +30,7 @@ pub mod kind {
     pub const BEER: u8 = 21;
     pub const WINE: u8 = 22;
     pub const CIGARETTES: u8 = 23;
+    pub const UMBRELLA: u8 = 24;
 }
 
 pub const POCKETS: usize = 3;
@@ -39,7 +40,7 @@ pub fn is_small(k: u8) -> bool {
         kind::GUEST_PASS | kind::EMPLOYEE_CARD | kind::FRUIT => true,
         // Shop goods fit in a pocket, except the bulky ones.
         kind::BURGER | kind::FRIES | kind::WINE => false,
-        10..=23 => true,
+        10..=24 => true,
         _ => false,
     }
 }

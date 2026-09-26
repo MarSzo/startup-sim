@@ -1,4 +1,4 @@
-# Protokół sieciowy (wersja 17)
+# Protokół sieciowy (wersja 18)
 
 Własny binarny protokół na UDP. Implementacje:
 - serwer: `server/src/protocol.rs` (źródło prawdy),
@@ -23,7 +23,7 @@ przez `cargo test` i czytane przez `client/tests/run_tests.gd`.
 | pole    | typ | wartość |
 |---------|-----|---------|
 | magic   | u16 | `0x5354` (bajty `54 53`, „TS”) |
-| version | u8  | `17` |
+| version | u8  | `18` |
 | type    | u8  | typ pakietu (niżej) |
 
 ## Jednostki
@@ -118,7 +118,7 @@ Encja (14 B): `id u16 | kind u8 | x i32 | y i32 | flags u8 | held u8 | activity 
 - `flags`: bity 0–1 kierunek (0 dół, 1 góra, 2 lewo, 3 prawo), bit 2 „w ruchu”,
   bity 3–5 wygląd (0 gracz, 1 portier — mundur z czapką, 2 pracownik biurowy —
   koszula z krawatem), bit 6 wolny chód (zmęczenie / pilna toaleta), bit 7
-  niska higiena (chmurka).
+  niska higiena (chmurka). U graczy (nie NPC) bit 3 = rozłożony parasol.
   Dla laptopa (`kind` 3): bit 0 zablokowany, bit 1 ktoś przy nim siedzi.
 
 **Interest management**: lista zawiera tylko encje z tym samym `(floor, room)` co
@@ -291,7 +291,8 @@ pracy, 3 na portalu), `arrive u16` (minuta przyjazdu albo 0xFFFF), `pay u32` i
 `pay_minutes u16` (ostatnia wypłata: grosze, minuty gry w pracy),
 `today_minutes u16` (minuty gry przepracowane dziś), `mode u8` (dojazd: 1
 pieszo, 2 rower, 3 samochód, 4 taksówka, 5 tramwaj), `depart u16` (minuta
-wyjazdu albo 0xFFFF), `money u32` (portfel — także w domu). Rano `place` = 2 i
+wyjazdu albo 0xFFFF), `money u32` (portfel — także w domu), `weather u8`
+(1 słonecznie, 2 pochmurno, 3 deszcz, 4 burza, 5 mgła). Rano `place` = 2 i
 `arrive` = 0xFFFF oznacza „jeszcze w domu, wybierz dojazd”; po wyjeździe
 `arrive` = minuta przyjazdu.
 
@@ -375,6 +376,7 @@ szyfrowaniem.
 
 ## Historia wersji
 
+- **18** — pogoda: `Clock` + `weather`, flaga parasola (bit 3 u graczy), przedmiot 24 = parasol.
 - **17** — dojazd: `Clock` + `mode`, `depart`, `money`; `CommuteChoice`; encja pojazdu; czynność 7 (jedzie).
 - **16** — zegar i dni: `Clock`.
 - **15** — sklep: `Stats` + `money`, `Shelf`, `ShopTake`, przedmioty 10–23.

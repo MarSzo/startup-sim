@@ -77,8 +77,11 @@ class Floor:
         self.spawns = []
         self.npcs = []
 
-    def room(self, key, rid, name, kind, see=None, gender=None):
+    def room(self, key, rid, name, kind, see=None, gender=None, outdoor=False):
         self.rooms[key] = {"id": rid, "name": name, "type": kind}
+        if outdoor:
+            # Under the open sky: weather (rain, sun) applies here.
+            self.rooms[key]["outdoor"] = True
         if gender:
             # Bathrooms: "female" / "male" (using the other one is allowed,
             # but embarrassing).
@@ -146,7 +149,7 @@ def elevator_and_stairs(f, hall_room):
 
 def floor0():
     f = Floor(0, "v", "O")
-    f.room("O", 1, "Na zewnątrz", "outside", see=["R"])
+    f.room("O", 1, "Na zewnątrz", "outside", see=["R"], outdoor=True)
     # Map edge fence
     f.area(0, 0, W - 1, 0, "F", "-")
     f.area(0, H - 1, W - 1, H - 1, "F", "-")
@@ -191,6 +194,7 @@ def floor0():
         f.put(45, y, 54, y, "H")                         # shelves
     f.put(51, 31, 55, 31, "K")                           # checkout counter
     f.put(56, 23, 56, 27, "H")                           # alcohol & cigarettes
+    f.put(43, 31, 43, 32, "H")                           # umbrella stand
     for x, y in [(27, 22), (40, 22), (27, 32), (40, 32), (20, 14), (56, 14), (42, 22)]:
         f.put(x, y, x, y, "P")                           # potted plants
 
@@ -198,7 +202,7 @@ def floor0():
     f.area(1, 34, W - 2, 36, "p", "O")                   # sidewalk
     f.area(7, 34, 13, 37, "=", "O")                      # driveway
     f.area(3, 38, 30, 45, "=", "R")
-    f.room("R", 7, "Parking zewnętrzny", "parking", see=["O"])
+    f.room("R", 7, "Parking zewnętrzny", "parking", see=["O"], outdoor=True)
     for x in (4, 9, 14, 19, 24):
         f.put(x, 39, x + 2, 40, "X")                     # parked (row 43-44: free for players)
     f.area(1, 37, W - 2, 37, "r", "O")                   # street
@@ -206,7 +210,7 @@ def floor0():
     f.area(32, 45, 40, 45, "p", "O")                     # tram stop platform
     f.put(40, 34, 43, 34, "b")                           # bike rack by the entrance
     f.area(42, 39, 54, 45, "z", "M")
-    f.room("M", 8, "Strefa palenia", "smoking")
+    f.room("M", 8, "Strefa palenia", "smoking", outdoor=True)
     f.put(44, 41, 46, 41, "N")                           # bench
     f.put(50, 43, 50, 43, "A")                           # ashtray
 

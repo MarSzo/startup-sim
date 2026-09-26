@@ -326,6 +326,13 @@ impl Needs {
         pts(self.hygiene) < SMELLY
     }
 
+    /// Weather outdoors (per tick, `SCALE` units).
+    pub fn weather(&mut self, hygiene: i32, stress: i32) {
+        self.hygiene += hygiene;
+        self.stress += stress;
+        self.clamp();
+    }
+
     /// Eating / drinking shop goods.
     pub fn apply(&mut self, e: crate::shop::Effect) {
         self.hunger += e.hunger * SCALE;

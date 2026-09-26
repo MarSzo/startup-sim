@@ -24,13 +24,14 @@ const JUICE := 20
 const BEER := 21
 const WINE := 22
 const CIGARETTES := 23
+const UMBRELLA := 24
 
 const NAMES := {GUEST_PASS: "Przepustka gościa", EMPLOYEE_CARD: "Karta pracownika", LAPTOP: "Laptop", COFFEE: "Kawa", FRUIT: "Owoc",
 	SANDWICH_CHEESE: "Kanapka z serem", SANDWICH_HAM: "Kanapka z szynką", WRAP: "Wrap wege", BURGER: "Hamburger",
 	FRIES: "Frytki", BUN: "Drożdżówka", BAR: "Batonik", CHIPS: "Chipsy", WATER: "Woda", ENERGY_DRINK: "Energetyk",
-	JUICE: "Sok pomarańczowy", BEER: "Piwo", WINE: "Wino", CIGARETTES: "Papierosy"}
+	JUICE: "Sok pomarańczowy", BEER: "Piwo", WINE: "Wino", CIGARETTES: "Papierosy", UMBRELLA: "Parasol"}
 const SMALL := [GUEST_PASS, EMPLOYEE_CARD, FRUIT, SANDWICH_CHEESE, SANDWICH_HAM, WRAP, BUN, BAR, CHIPS, WATER,
-	ENERGY_DRINK, JUICE, BEER, CIGARETTES]
+	ENERGY_DRINK, JUICE, BEER, CIGARETTES, UMBRELLA]
 
 
 static func item_name(kind: int) -> String:
@@ -133,6 +134,14 @@ static func draw(c: CanvasItem, kind: int, o: Vector2, s: float) -> void:
 			r.call(7, 1, 2, 4, Color("#2c3e50"))
 			r.call(6, 5, 4, 10, Color("#6d1a36"))
 			r.call(7, 8, 2, 3, Color("#f4f1ea"))
+		UMBRELLA:
+			# Folded umbrella: canopy strap, shaft, J handle.
+			r.call(6, 1, 4, 10, Color("#1c1c24"))
+			r.call(7, 2, 2, 8, Color("#2e6bd9"))
+			r.call(7, 5, 2, 1, Color("#8fb7ff"))
+			r.call(7, 10, 2, 3, Color("#5c6570"))
+			r.call(5, 12, 4, 2, Color("#6b4a2e"))
+			r.call(5, 11, 1, 2, Color("#6b4a2e"))
 		CIGARETTES:
 			r.call(3, 3, 10, 11, Color("#1c1c24"))
 			r.call(4, 4, 8, 9, Color("#ecf0f1"))

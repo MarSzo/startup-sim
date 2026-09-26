@@ -20,6 +20,7 @@ use crate::recruitment::{Attempt, Recruitment};
 use crate::sim::{self, Body, Pos};
 use crate::shop::{self, Shelf};
 use crate::stalls::{self, Stall};
+use crate::weather::{self, Weather};
 
 pub const TICK_HZ: u32 = 20;
 pub const TICK: Duration = Duration::from_millis(1000 / TICK_HZ as u64);
@@ -54,6 +55,8 @@ pub struct Config {
     pub start_minute: u32,
     /// Daytime clock speed multiplier (dev / testing; 1 = 1 game hour per 5 min).
     pub time_scale: u32,
+    /// Fixed weather (`weather::kind`; dev / tests), None = changing.
+    pub weather: Option<u8>,
 }
 
 /// Where a connected player is in the game.
@@ -171,6 +174,8 @@ struct Player {
     depart_at: Option<u32>,
     /// Riding a vehicle to work (its handle): hidden, no input.
     riding: Option<u16>,
+    /// Already told "it's pouring" (until back indoors).
+    soaked_said: bool,
     /// Sofa / toilet / smoke break, and where it started (moving ends it).
     rest: Option<(Rest, u8, Pos)>,
     /// Messenger spam guard / retry dedupe.
@@ -223,6 +228,9 @@ pub struct Server {
     clock: Clock,
     /// Vehicles bringing people to work (and parked cars / bikes).
     vehicles: Vec<Vehicle>,
+    weather: Weather,
+    /// (floor, room) under the open sky.
+    outdoor_rooms: Vec<(u8, u16)>,
     /// Send `Clock` to everyone this tick (a day started / ended, someone arrived).
     clock_dirty: bool,
     /// A stall door changed: send `Doors` to everyone this tick.
@@ -271,6 +279,11 @@ impl Server {
             lift_was_moving: false,
             clock: Clock::new(cfg.start_minute, cfg.time_scale),
             vehicles: Vec::new(),
+            weather: Weather::new(0),
+            outdoor_rooms: building
+                .active_floors()
+                .flat_map(|(f, m)| m.rooms.iter().filter(|r| r.outdoor).map(move |r| (f, r.id)))
+                .collect(),
             clock_dirty: true,
             doors_dirty: false,
             computers: Vec::new(),
@@ -292,6 +305,10 @@ impl Server {
             started: Instant::now(),
         };
         server.sync_elevator_doors(); // doors start closed
+        server.weather = match server.cfg.weather {
+            Some(k) => Weather::fixed(k),
+            None => Weather::new(server.clock.total_minutes()),
+        };
         server.cashier = server.npcs.iter().find(|n| n.role == npc::Role::Cashier).map(|n| n.id);
         Ok(server)
     }
@@ -573,6 +590,7 @@ impl Server {
             commute_mode: commute::mode::TRAM,
             depart_at: None,
             riding: None,
+            soaked_said: false,
             rest: None,
             last_chat_tick: None,
             last_chat_nonce: 0,
@@ -1051,6 +1069,10 @@ impl Server {
     fn tick_clock(&mut self) {
         let rate = self.clock.rate() as u64;
         let transition = self.clock.tick();
+        if self.weather.tick(self.clock.total_minutes(), &mut self.rng) {
+            self.log(format!("* weather: {}", weather::name(self.weather.now)));
+            self.clock_dirty = true;
+        }
         if !self.clock.is_night() {
             for p in self.players.values_mut() {
                 if p.contract && matches!(p.stage, Stage::Working) {
@@ -1099,7 +1121,13 @@ impl Server {
                 p.commute_mode = m.id;
             }
             p.money -= m.cost;
-            let minutes = m.minutes + if m.id == commute::mode::CAR { traffic } else { 0 };
+            // Rain and storms make the jams worse.
+            let weather_jam = match self.weather.now {
+                weather::kind::RAIN => 10,
+                weather::kind::STORM => 20,
+                _ => 0,
+            };
+            let minutes = m.minutes + if m.id == commute::mode::CAR { traffic + weather_jam } else { 0 };
             p.stage = Stage::Home { arrive_at: Some(now + minutes) };
             self.clock_dirty = true;
         }
@@ -1169,6 +1197,24 @@ impl Server {
             p.needs.apply(shop::Effect { hunger: 0, energy: e.energy, stress: e.stress, bladder: 0 });
             p.needs.hygiene = (p.needs.hygiene + e.hygiene * needs::SCALE).clamp(0, needs::MAX);
         }
+        // Rain on the way: soaked on foot or by bike (an umbrella helps on foot).
+        if weather::wet(self.weather.now) {
+            let umbrella = p.inventory.has(item_kind::UMBRELLA);
+            let storm = self.weather.now == weather::kind::STORM;
+            let soaked = match p.commute_mode {
+                commute::mode::BIKE => true,
+                commute::mode::WALK => !umbrella,
+                _ => false,
+            };
+            if soaked {
+                let h = if storm { 20 } else { 12 };
+                p.needs.hygiene = (p.needs.hygiene - h * needs::SCALE).max(0);
+                p.needs.add_stress(if storm { 8 } else { 5 });
+                self.pending_says.push((pid, weather::lines::SOAKED_ON_THE_WAY.to_string(), None));
+            } else if p.commute_mode == commute::mode::WALK {
+                self.pending_says.push((pid, weather::lines::UMBRELLA.to_string(), None));
+            }
+        }
         if late {
             p.needs.add_stress(10);
             self.pending_says.push((pid, commute::lines::LATE.to_string(), None));
@@ -1229,6 +1275,7 @@ impl Server {
             mode: p.commute_mode,
             depart: p.depart_at.map_or(proto::NO_TIME, |t| (t % clock::MIN_PER_DAY) as u16),
             money: p.money.clamp(0, u32::MAX as i64) as u32,
+            weather: self.weather.now,
         }
     }
 
@@ -1790,8 +1837,24 @@ impl Server {
                 };
                 coffee_says.push((p.id, line.to_string(), None));
             }
+            // Weather under the open sky.
+            let outdoors = self.outdoor_rooms.contains(&(p.body.floor, p.room));
+            let umbrella = p.inventory.has(item_kind::UMBRELLA);
+            let mut umbrella_open = false;
+            if outdoors {
+                let (h, s) = weather::outdoor_effect(self.weather.now, umbrella);
+                p.needs.weather(h, s);
+                umbrella_open = umbrella && weather::wet(self.weather.now);
+                if weather::wet(self.weather.now) && !umbrella && !p.soaked_said {
+                    p.soaked_said = true;
+                    coffee_says.push((p.id, weather::lines::SOAKED.to_string(), None));
+                }
+            } else {
+                p.soaked_said = false;
+            }
             p.body.slow = p.needs.slow();
-            p.flags = (p.flags & 0x3f)
+            p.flags = (p.flags & 0x37)
+                | if umbrella_open { proto::FLAG_UMBRELLA } else { 0 }
                 | if p.body.slow { proto::FLAG_SLOW } else { 0 }
                 | if p.needs.smelly() { proto::FLAG_SMELLY } else { 0 };
         }

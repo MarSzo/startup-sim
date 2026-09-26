@@ -96,6 +96,9 @@ pub struct RoomDef {
     /// Bathrooms: "female" / "male".
     #[serde(default)]
     pub gender: Option<String>,
+    /// Under the open sky (weather applies).
+    #[serde(default)]
+    pub outdoor: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

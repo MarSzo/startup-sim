@@ -38,6 +38,7 @@ const ACT_WASHING := 6
 
 var slow := false
 var smelly := false
+var umbrella := false
 var status := 0
 ## Item in hands (ItemArt kinds), visible to everyone.
 var held := 0
@@ -154,6 +155,13 @@ func _place_bubble() -> void:
 func set_held(k: int) -> void:
 	if k != held:
 		held = k
+		queue_redraw()
+
+
+## Open umbrella over the head (outdoors in the rain).
+func set_umbrella(on: bool) -> void:
+	if on != umbrella:
+		umbrella = on
 		queue_redraw()
 
 
@@ -358,6 +366,15 @@ func _draw_status(top: float, ty: float, side: bool, dir: int) -> void:
 			var k := float((ms + i * 400) % 1200) / 1200.0
 			var sx := -6.0 + i * 5.0 + sin(k * TAU + i) * 1.5
 			_r(sx, top + 2 - k * 10, 2, 2, Color(0.45, 0.75, 0.2, 0.75 * (1.0 - k)))
+	if umbrella:
+		# Open umbrella: canopy with ribs over the head, shaft to the hand.
+		var cy := top - 6
+		draw_rect(Rect2(-1, cy, 1, 12), Color("#5c6570"))
+		var canopy := PackedVector2Array([Vector2(-10, cy + 2), Vector2(0, cy - 5), Vector2(10, cy + 2)])
+		draw_colored_polygon(canopy, Color("#2e6bd9"))
+		for i in 4:
+			draw_rect(Rect2(-10 + i * 5, cy + 1, 5, 2), Color("#2e6bd9") if i % 2 == 0 else Color("#8fb7ff"))
+		draw_rect(Rect2(-1, cy - 6, 1, 1), Color("#1c1c24"))
 	if slow:
 		# A drop of sweat.
 		if (ms / 500) % 2 == 0:

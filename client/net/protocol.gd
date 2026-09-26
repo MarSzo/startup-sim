@@ -3,7 +3,7 @@
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 17
+const VERSION := 18
 const MAX_PACKET := 1200
 const MAX_NICK_BYTES := 16
 const MAX_SAY_BYTES := 240
@@ -94,6 +94,15 @@ const ACT_RIDING := 7
 const FLAG_SLOW := 0x40
 # Entity flags bit 7: low hygiene (smell cloud).
 const FLAG_SMELLY := 0x80
+# Entity flags bit 3 (players only; NPC looks use bits 3-5): open umbrella.
+const FLAG_UMBRELLA := 0x08
+# Clock.weather
+const WEATHER_SUNNY := 1
+const WEATHER_CLOUDY := 2
+const WEATHER_RAIN := 3
+const WEATHER_STORM := 4
+const WEATHER_FOG := 5
+const WEATHER_NAMES := {1: "słonecznie", 2: "pochmurno", 3: "deszcz", 4: "burza", 5: "mgła"}
 # Stats.flags bit 0: dirty hands.
 const STATS_DIRTY_HANDS := 1
 # Doors.lift_target: the elevator isn't heading anywhere.
@@ -437,6 +446,7 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			p.mode = r.u8()
 			p.depart = r.u16()
 			p.money = r.u32()
+			p.weather = r.u8()
 		T_SHELF:
 			p.shelf = r.u8()
 			p.title = r.str16(MAX_TEXT_BYTES)

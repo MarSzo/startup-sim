@@ -57,6 +57,7 @@ pub const PRODUCTS: &[Product] = &[
     Product { kind: kind::BEER, name: "Piwo", price: 7_00, effect: e(0, -5, -15, 20), count: 1, line: "Piwko… w pracy? Cicho sza." },
     Product { kind: kind::WINE, name: "Wino", price: 25_00, effect: e(0, -10, -25, 10), count: 1, line: "Wino. To był ciężki dzień." },
     Product { kind: kind::CIGARETTES, name: "Papierosy", price: 18_00, effect: e(0, 0, 0, 0), count: 20, line: "" },
+    Product { kind: kind::UMBRELLA, name: "Parasol", price: 25_00, effect: e(0, 0, 0, 0), count: 1, line: "" },
 ];
 
 pub fn product(k: u8) -> Option<&'static Product> {
@@ -82,6 +83,7 @@ pub fn shelves() -> Vec<Shelf> {
         Shelf { id: 3, title: "Przekąski", floor: 0, area: r(45, 27, 5, 1), goods: &[BUN, BAR, CHIPS] },
         Shelf { id: 4, title: "Napoje", floor: 0, area: r(50, 27, 5, 1), goods: &[WATER, ENERGY_DRINK, JUICE] },
         Shelf { id: 5, title: "Alkohol i papierosy", floor: 0, area: r(56, 23, 1, 5), goods: &[BEER, WINE, CIGARETTES] },
+        Shelf { id: 6, title: "Parasole", floor: 0, area: r(43, 31, 1, 2), goods: &[UMBRELLA] },
     ]
 }
 

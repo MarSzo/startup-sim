@@ -19,3 +19,4 @@ pub mod server;
 pub mod shop;
 pub mod sim;
 pub mod stalls;
+pub mod weather;
