@@ -23,7 +23,7 @@ pub use golden::{golden_samples, to_hex};
 pub use snapshot::{snapshot_fragments, SelfState};
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 28;
+pub const VERSION: u8 = 29;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
 pub const MAX_PACKET: usize = 1200;
@@ -92,6 +92,7 @@ pub mod ty {
     pub const LIGHTS: u8 = 41;
     pub const FRIDGE: u8 = 42;
     pub const FRIDGE_ACTION: u8 = 43;
+    pub const SKIP_WAIT: u8 = 44;
 }
 
 /// `ItemAction::action`.
@@ -212,6 +213,8 @@ pub mod activity {
     pub const WASHING: u8 = 6;
     /// Riding a vehicle to work (hidden; the camera follows).
     pub const RIDING: u8 = 7;
+    /// Stopped by the guard / the police (can't move for a moment).
+    pub const HELD: u8 = 8;
 }
 
 /// `Clock::place`: where the receiver is.
@@ -447,6 +450,9 @@ pub enum Packet {
         founded: bool,
         /// Fire alarm in the building: 1 = evacuate (fire.rs).
         alarm: u8,
+        /// Skipping the wait at home: 0 no, 1 asked (waiting for the others
+        /// at home), 2 time is flying.
+        skip: u8,
     },
     /// Morning choice of how to get to work (before the departure).
     CommuteChoice { token: u32, mode: u8 },
@@ -484,6 +490,9 @@ pub enum Packet {
     Fridge { items: Vec<(u8, String)>, milk: u8, water: u8, juice: u8 },
     /// Take / put / pour milk (`kitchen::action`), `arg` = stored item index.
     FridgeAction { token: u32, action: u8, arg: u8 },
+    /// At home: "skip the waiting" (to the morning / departure; once
+    /// everybody at home asked).
+    SkipWait { token: u32 },
     /// Closed doors (locked toilet stalls, elevator doors) on the receiver's
     /// floor: solid for the simulation. Plus the elevator: the floor it is at
     /// and where it is heading (`NO_FLOOR` = standing). Sent on change and

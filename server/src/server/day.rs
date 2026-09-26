@@ -126,6 +126,9 @@ impl Server {
     /// that drops them off (see `tick_vehicles`).
     pub(super) fn arrive(&mut self, pid: u16) {
         let Some(mode) = self.players.get(&pid).map(|p| p.commute_mode) else { return };
+        if let Some(p) = self.players.get_mut(&pid) {
+            p.skip_wait = false;
+        }
         let handle = self.alloc_handle();
         let kind_of = |m: u8| Vehicle::for_mode(m, 0, 0, 0).map(|v| v.kind);
         let slot = self.vehicles.iter().filter(|v| v.parks && Some(v.kind) == kind_of(mode)).count();
@@ -244,6 +247,7 @@ impl Server {
             company: self.company.name.clone(),
             founded: self.company.founder.is_some(),
             alarm: self.alarm.is_some() as u8,
+            skip: if self.clock.skip { 2 } else { p.skip_wait as u8 },
         }
     }
 }

@@ -14,6 +14,8 @@ const MODES := {1: ["Pieszo", 45, 0], 2: ["Rower", 25, 0], 3: ["Samochód", 20, 
 const MODE_NOTES := {1: "zmęczy, ale odpręży", 2: "szybko, ale spocisz się", 3: "+ korki do 20 min", 4: "wygodnie", 5: "tłok, stres"}
 
 signal choose_commute(mode: int)
+## "Pomiń czekanie" (SkipWait).
+signal skip_wait
 
 var clock := {}           # last Clock packet
 var _day := 0             # personal day already announced
@@ -25,6 +27,7 @@ var _info := Label.new()
 var _sky := Control.new()
 var _modes := HBoxContainer.new()
 var _mode_buttons := {}   # mode -> Button
+var _skip := Ink.button("Pomiń czekanie  »", true)
 
 
 func _ready() -> void:
@@ -62,6 +65,13 @@ func _ready() -> void:
 		_modes.add_child(b)
 		_mode_buttons[id] = b
 	_modes.visible = false
+	var skip_row := CenterContainer.new()
+	col.add_child(skip_row)
+	_skip.custom_minimum_size = Vector2(260, 48)
+	_skip.focus_mode = Control.FOCUS_NONE
+	_skip.pressed.connect(func(): skip_wait.emit())
+	skip_row.add_child(_skip)
+	_skip.visible = false
 	_fit()
 
 
@@ -123,6 +133,12 @@ func _render() -> void:
 	if clock.is_empty():
 		return
 	_modes.visible = clock.place == Protocol.PLACE_COMMUTING and clock.arrive == Protocol.NO_TIME
+	# Skip the waiting (home / before leaving / on the way): once everybody
+	# at home asked, time flies.
+	_skip.visible = clock.place in [Protocol.PLACE_HOME, Protocol.PLACE_COMMUTING]
+	var skip: int = clock.get("skip", 0)
+	_skip.disabled = skip != 0
+	_skip.text = ["Pomiń czekanie  »", "Czekam na pozostałych…", "Czas leci…  »»"][clampi(skip, 0, 2)]
 	var place: int = clock.place
 	var now := Time.get_ticks_msec() / 1000.0
 	match place:

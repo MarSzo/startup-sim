@@ -49,8 +49,24 @@ impl Server {
     /// Everybody's at home (nobody at work, on the way or job hunting): the
     /// rest of the day passes as fast as a night.
     pub(super) fn update_fast_forward(&mut self) {
-        let fast = !self.players.is_empty()
+        let waiting = |p: &super::player::Player| matches!(p.stage, Stage::Home { .. });
+        let all_home = !self.players.is_empty() && self.players.values().all(waiting);
+        self.clock.fast = all_home
             && self.players.values().all(|p| matches!(p.stage, Stage::Home { arrive_at: None }) && p.depart_at.is_none());
-        self.clock.fast = fast;
+        // "Skip the waiting": everybody is at home (or on the way) and asked.
+        let skip = all_home && self.players.values().all(|p| p.skip_wait);
+        if skip != self.clock.skip {
+            self.clock.skip = skip;
+            self.clock_dirty = true;
+        }
+    }
+
+    /// `SkipWait`: only at home; cleared on arrival at work.
+    pub(super) fn handle_skip_wait(&mut self, pid: u16) {
+        let Some(p) = self.players.get_mut(&pid) else { return };
+        if matches!(p.stage, Stage::Home { .. }) && !p.skip_wait {
+            p.skip_wait = true;
+            self.clock_dirty = true;
+        }
     }
 }

@@ -237,6 +237,7 @@ impl Packet {
                 company: r.str16(64)?,
                 founded: r.u8()? != 0,
                 alarm: r.u8()?,
+                skip: r.u8()?,
             },
             ty::FRIDGE => {
                 let n = r.u8()? as usize;
@@ -249,6 +250,7 @@ impl Packet {
                 }
                 Packet::Fridge { items, milk: r.u8()?, water: r.u8()?, juice: r.u8()? }
             }
+            ty::SKIP_WAIT => Packet::SkipWait { token: r.u32()? },
             ty::FRIDGE_ACTION => Packet::FridgeAction { token: r.u32()?, action: r.u8()?, arg: r.u8()? },
             ty::LIGHTS => {
                 let floor = r.u8()?;

@@ -53,7 +53,16 @@ impl Server {
                 continue;
             }
             let old_room = p.room;
-            apply_inputs(p, &self.building, &mut steps.presses);
+            if tick < p.held_until {
+                // Stopped by the guard / the police: inputs acknowledged, ignored.
+                if let Some(&(seq, _)) = p.inputs.back() {
+                    p.last_processed_seq = seq;
+                }
+                p.inputs.clear();
+                p.flags &= !FLAG_MOVING;
+            } else {
+                apply_inputs(p, &self.building, &mut steps.presses);
+            }
             p.room = self.building.room_at(p.body.floor, p.body.pos);
             if p.room != old_room {
                 if self.shop_rooms.contains(&(p.body.floor, old_room)) && p.inventory.items().any(|i| i.unpaid) {

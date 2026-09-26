@@ -757,6 +757,12 @@ fn going_home_early_from_the_tram_stop_pays_and_speeds_the_day_up() {
     let _ = wait_for(&ola, &[], Duration::from_millis(2500), |_| None::<()>); // keeps pinging
     let later = clock_until(&ola, Duration::from_millis(1500), |_, _, _, _, _| true).expect("clock");
     assert!(later.1 >= m0 + 15, "fast forward: {} -> {}", m0, later.1);
+    // "Skip the waiting": straight to the next morning's commute.
+    ola.sock.send(&Packet::SkipWait { token: ola.token }.encode()).unwrap();
+    let skipping = wait_for(&ola, &[], Duration::from_millis(1000), |p| matches!(p, Packet::Clock { skip: 2, .. }).then_some(()));
+    assert!(skipping.is_some(), "time flies");
+    let morning = clock_until(&ola, Duration::from_millis(9000), |day, _, pl, _, _| pl == place::COMMUTING && day >= 2);
+    assert!(morning.is_some(), "the next morning in a few seconds");
 }
 
 #[test]
@@ -1305,6 +1311,20 @@ fn shop_take_from_shelf_alarm_and_pay() {
     assert!(wait_for(&ola, &[], wait, said(|t| t == sl::ALARM)).is_some());
     assert!(wait_for(&ola, &[], Duration::from_millis(3000), said(|t| t == security::lines::GUARD_CAUGHT)).is_some());
     assert!(inventory(&ola).is_some_and(|s| s.iter().all(|s| s.kind != item_kind::SANDWICH_HAM)));
+    // Caught: can't walk for a moment (inputs acknowledged, ignored).
+    let held_at = wait_for(&ola, &[], wait, |p| match p {
+        Packet::Snapshot { self_x, self_y, self_activity, .. } if *self_activity == proto::activity::HELD => Some((*self_x, *self_y)),
+        _ => None,
+    })
+    .expect("held by the guard");
+    ola.send_inputs(sim::IN_LEFT, 6);
+    let after = wait_for(&ola, &[], Duration::from_millis(300), |p| match p {
+        Packet::Snapshot { self_x, self_y, last_input_seq, .. } if *last_input_seq == ola.seq => Some((*self_x, *self_y)),
+        _ => None,
+    });
+    assert_eq!(after, Some(held_at), "no walking while held");
+    let _ = wait_for(&ola, &[], Duration::from_millis(3200), |_| None::<()>); // let go after 3 s
+    let out = Body { pos: Pos { x: held_at.0, y: held_at.1 }, ..out };
 
     // Back in, take it again, pay at the till, eat it.
     let body = ola.walk_to(&b, out, (0, Tile { x: 47, y: 25 }), &[]);

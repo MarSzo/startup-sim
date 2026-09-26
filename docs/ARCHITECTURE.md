@@ -336,7 +336,10 @@ przy `go_home`), taksówka i tramwaj odjeżdżają (`Gone`).
 Powrót przed 22:00 (`server/leave.rs`): E przy własnym pojeździe
 (`Vehicle::depart` — odjazd ulicą) lub w `commute::home_spot` dla trybu,
 dwa naciśnięcia w `CONFIRM_TICKS` → `go_home` (wypłata). Gdy wszyscy gracze
-są w domu i nikt nie jedzie, `Clock::fast` = tempo nocne.
+są w domu i nikt nie jedzie, `Clock::fast` = tempo nocne; gdy wszyscy w domu
+/ w drodze wysłali `SkipWait`, `Clock::skip` = `SKIP_DS_PER_TICK` (zerowane
+przy przyjeździe). Złapany gracz ma `held_until` (inputy potwierdzane,
+ignorowane; aktywność `HELD`). Eskorta NPC po dojściu: `State::Lingering`.
 
 **Sklep** (`shop.rs`): lista towarów (`PRODUCTS`: rodzaj przedmiotu, nazwa,
 cena w groszach, efekt na potrzeby, liczba sztuk) i półek (prostokąty kafli

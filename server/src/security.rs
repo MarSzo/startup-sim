@@ -13,6 +13,9 @@ pub const FINE: i64 = 30_000;
 pub const GUARD_STRESS: i32 = 10;
 pub const POLICE_STRESS: i32 = 25;
 /// The second theft of the day goes straight to the police.
+/// Caught: can't move for a moment (3 s by the guard, 6 s by the police).
+pub const GUARD_HOLD_TICKS: u32 = 60;
+pub const POLICE_HOLD_TICKS: u32 = 120;
 pub const THEFTS_FOR_POLICE: u8 = 2;
 
 /// Where the officer gets out of the patrol car (sidewalk by the entrance).

@@ -159,7 +159,7 @@ func say(text: String) -> void:
 	bubble_label.text = text
 	bubble.reset_size()
 	bubble.visible = true
-	_bubble_time = 3.0 + text.length() * 0.05
+	_bubble_time = 4.0 + text.length() * 0.07
 	_place_bubble()
 
 

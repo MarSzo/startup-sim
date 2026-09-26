@@ -47,6 +47,7 @@ impl Packet {
             Packet::Lights { .. } => ty::LIGHTS,
             Packet::Fridge { .. } => ty::FRIDGE,
             Packet::FridgeAction { .. } => ty::FRIDGE_ACTION,
+            Packet::SkipWait { .. } => ty::SKIP_WAIT,
             Packet::Doors { .. } => ty::DOORS,
             Packet::DoorAction { .. } => ty::DOOR_ACTION,
         }
@@ -297,6 +298,7 @@ impl Packet {
                 company,
                 founded,
                 alarm,
+                skip,
             } => {
                 w.u16(*day);
                 w.u16(*minute);
@@ -313,6 +315,7 @@ impl Packet {
                 w.str16(company, 64);
                 w.u8(*founded as u8);
                 w.u8(*alarm);
+                w.u8(*skip);
             }
             Packet::Fridge { items, milk, water, juice } => {
                 w.u8(items.len().min(16) as u8);
@@ -324,6 +327,7 @@ impl Packet {
                 w.u8(*water);
                 w.u8(*juice);
             }
+            Packet::SkipWait { token } => w.u32(*token),
             Packet::FridgeAction { token, action, arg } => {
                 w.u32(*token);
                 w.u8(*action);

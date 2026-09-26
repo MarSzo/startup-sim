@@ -121,6 +121,10 @@ pub(super) struct Player {
     pub(super) alarm_nag: u32,
     /// Asked "going home?" - a second E before this tick confirms.
     pub(super) home_ask_until: u32,
+    /// Stopped by the guard / the police until this tick (no walking).
+    pub(super) held_until: u32,
+    /// At home: asked to skip the waiting (`SkipWait`).
+    pub(super) skip_wait: bool,
     /// Salary, grosze per game hour (raises from the CEO).
     pub(super) pay_rate: i64,
     /// World day of the last raise request (cooldown).
@@ -188,6 +192,8 @@ impl Player {
             smoke_said: false,
             alarm_nag: 0,
             home_ask_until: 0,
+            held_until: 0,
+            skip_wait: false,
             pay_rate: clock::PAY_PER_MIN * 60,
             last_raise_day: None,
             talk: None,
@@ -223,10 +229,13 @@ impl Player {
 }
 
 /// What others see the player doing (one at a time, most visible first).
-pub(super) fn activity(p: &Player) -> u8 {
+pub(super) fn activity(p: &Player, tick: u32) -> u8 {
     use proto::activity as a;
     if p.riding.is_some() {
         return a::RIDING;
+    }
+    if tick < p.held_until {
+        return a::HELD;
     }
     match (p.at_computer, p.rest.map(|r| r.0)) {
         (Some(_), _) => a::COMPUTER,

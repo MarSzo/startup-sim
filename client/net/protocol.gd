@@ -3,7 +3,7 @@
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 28
+const VERSION := 29
 const MAX_PACKET := 1200
 const MAX_NICK_BYTES := 16
 const MAX_SAY_BYTES := 240
@@ -54,6 +54,7 @@ const T_SMOKE := 40
 const T_LIGHTS := 41
 const T_FRIDGE := 42
 const T_FRIDGE_ACTION := 43
+const T_SKIP_WAIT := 44
 # FridgeAction.action (server/src/kitchen.rs)
 const FRIDGE_TAKE := 1
 const FRIDGE_PUT := 2
@@ -131,6 +132,7 @@ const ACT_TOILET := 4
 const ACT_SMOKING := 5
 const ACT_WASHING := 6
 const ACT_RIDING := 7
+const ACT_HELD := 8  # stopped by the guard / the police
 # Entity flags bit 6: walks slowly (exhausted / needs the toilet).
 const FLAG_SLOW := 0x40
 # Entity flags bit 7: low hygiene (smell cloud).
@@ -310,6 +312,12 @@ static func encode_company_action(token: int, action: int, target: int, value: i
 	b.put_u16(target)
 	b.put_u8(value)
 	_put_str16(b, text, MAX_TEXT_BYTES)
+	return b.data_array
+
+
+static func encode_skip_wait(token: int) -> PackedByteArray:
+	var b := _writer(T_SKIP_WAIT)
+	b.put_u32(token)
 	return b.data_array
 
 
@@ -533,6 +541,7 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			p.company = r.str16(64)
 			p.founded = r.u8() != 0
 			p.alarm = r.u8()
+			p.skip = r.u8()
 		T_FRIDGE:
 			var n := r.u8()
 			if n > 16:

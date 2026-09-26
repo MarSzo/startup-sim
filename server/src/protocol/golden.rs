@@ -178,6 +178,7 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
                 company: "Pixel Pierogi sp. z o.o.".into(),
                 founded: true,
                 alarm: 1,
+                skip: 1,
             },
         ),
         ("commute_choice", Packet::CommuteChoice { token: 0x01020304, mode: 5 }),
@@ -225,6 +226,7 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
         ("lights", Packet::Lights { floor: 1, rooms: vec![5, 12] }),
         ("fridge", Packet::Fridge { items: vec![(11, "Kanapka z szynką (Ola)".into())], milk: 7, water: 4, juice: 2 }),
         ("fridge_action", Packet::FridgeAction { token: 0x01020304, action: 2, arg: 0 }),
+        ("skip_wait", Packet::SkipWait { token: 0x01020304 }),
         (
             "chat",
             Packet::Chat {

@@ -63,10 +63,14 @@ static func theme() -> Theme:
 	for st in ["normal", "hover", "pressed", "disabled", "focus"]:
 		t.set_stylebox(st, "Button", button_box(st, false))
 		t.set_stylebox(st, "OptionButton", button_box(st, false))
-	for k in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
-		t.set_color(k, "Button", TEXT_INK)
-		t.set_color(k, "OptionButton", TEXT_INK)
+	for k in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color", "font_hover_pressed_color"]:
+		for c in ["Button", "OptionButton", "CheckBox", "CheckButton"]:
+			t.set_color(k, c, TEXT_INK)
 	t.set_color("font_disabled_color", "Button", TEXT_MUTED)
+	# Check boxes: just the tick box and the text, no button frame.
+	for c in ["CheckBox", "CheckButton"]:
+		for st in ["normal", "hover", "pressed", "focus", "hover_pressed", "disabled"]:
+			t.set_stylebox(st, c, StyleBoxEmpty.new())
 	for st in ["normal", "read_only"]:
 		t.set_stylebox(st, "LineEdit", box("input"))
 		t.set_stylebox(st, "TextEdit", box("input"))

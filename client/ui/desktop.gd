@@ -69,7 +69,6 @@ func _ready() -> void:
 	visibility_changed.connect(_fit)
 	_fit()
 	_build_desktop()
-	_open_window("browser")
 
 
 func _fit() -> void:
@@ -97,7 +96,6 @@ func reset() -> void:
 	visible = true
 	for w in _windows.keys():
 		_close_window(w)
-	_open_window("browser")
 	_refresh_mail_badge()
 
 
@@ -415,7 +413,9 @@ func _render_form(body: VBoxContainer, o: Dictionary) -> void:
 		var k := _label(row[0] + ":", 15, Color("#4a5566"))
 		k.custom_minimum_size = Vector2(130, 0)
 		h.add_child(k)
-		h.add_child(_label(str(row[1]), 15))
+		var v := _label(str(row[1]), 15)
+		v.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		h.add_child(v)
 		box.add_child(h)
 	box.add_child(_label("Dlaczego chcesz u nas pracować? (opcjonalnie)", 15, Color("#4a5566")))
 	if _motivation.get_parent():
@@ -426,7 +426,10 @@ func _render_form(body: VBoxContainer, o: Dictionary) -> void:
 	box.add_child(_motivation)
 	var consent := CheckBox.new()
 	consent.text = "Wyrażam zgodę na przetwarzanie moich danych i mojej osoby w procesie rekrutacji."
-	consent.add_theme_color_override("font_color", Color("#1c2430"))
+	consent.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	consent.custom_minimum_size = Vector2(300, 0)
+	for k in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color", "font_hover_pressed_color"]:
+		consent.add_theme_color_override(k, Color("#1c2430"))
 	box.add_child(consent)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)

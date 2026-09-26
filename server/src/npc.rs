@@ -31,6 +31,9 @@ const FOLLOW_RADIUS: i32 = 64 * SUBPIXELS;
 const STEPS_PER_TICK: usize = 3;
 /// An escort gives up waiting after this many ticks (30 s).
 const GIVE_UP_TICKS: u32 = 600;
+/// After bringing the guest, the escort stays a moment (6 s) before walking
+/// back (time to read what it said).
+const LINGER_TICKS: u32 = 120;
 /// An escort reminds a lagging guest every this many ticks (6 s).
 const NAG_TICKS: u32 = 120;
 /// Chasing: a bit faster than a player (4 steps per tick instead of 3).
@@ -176,6 +179,8 @@ pub enum Event {
 enum State {
     Idle,
     Escorting { guest: u16, walker: Walker, waited: u32 },
+    /// Brought the guest; stands there for a moment, then goes back.
+    Lingering { ticks: u32 },
     Returning { walker: Walker },
     Chasing { target: u16, walker: Option<Walker>, ticks: u32 },
     /// Walking somewhere for the server (`go_to`); then idle there.
@@ -380,7 +385,7 @@ impl Npc {
             }
             State::Escorting { guest, .. } if *guest == player => vec![say(l.on_the_way)],
             State::Escorting { .. } => vec![say(lines::BUSY)],
-            State::Returning { .. } => vec![say(l.back_soon)],
+            State::Returning { .. } | State::Lingering { .. } => vec![say(l.back_soon)],
             State::Chasing { .. } | State::Errand { .. } => vec![],
         }
     }
@@ -425,6 +430,12 @@ impl Npc {
                 }
             }
             State::Returning { .. } | State::Errand { .. } => walk = true,
+            State::Lingering { ticks } => {
+                *ticks += 1;
+                if *ticks >= LINGER_TICKS {
+                    self.go_home(b);
+                }
+            }
             State::Chasing { target, walker, ticks } => {
                 let target = *target;
                 *ticks += 1;
@@ -454,7 +465,7 @@ impl Npc {
             self.walk_steps(b);
             let finished = match &self.state {
                 State::Escorting { walker, .. } | State::Returning { walker } | State::Errand { walker } => walker.done(),
-                State::Idle | State::Chasing { .. } => false,
+                State::Idle | State::Chasing { .. } | State::Lingering { .. } => false,
             };
             if finished {
                 if let State::Errand { .. } = self.state {
@@ -462,7 +473,7 @@ impl Npc {
                     events.push(Event::Arrived { npc: self.id });
                 } else if let State::Escorting { guest, .. } = self.state {
                     events.push(Event::Say { npc: self.id, text: l.arrived.into(), to: Some(guest) });
-                    self.go_home(b);
+                    self.state = State::Lingering { ticks: 0 };
                 } else {
                     self.state = State::Idle;
                     self.body.pos = Pos::tile_center(self.home.1.x, self.home.1.y);

@@ -65,6 +65,7 @@ func _ready() -> void:
 	add_child(day_layer)
 	day_layer.add_child(day_screen)
 	day_screen.choose_commute.connect(func(m: int): net.send(Protocol.encode_commute_choice(net.token, m)))
+	day_screen.skip_wait.connect(func(): net.send(Protocol.encode_skip_wait(net.token)))
 	portal.auto_offer = int(args.get("auto-recruit", "0"))
 	portal.auto_delay = float(args.get("auto-recruit-delay", "0"))
 	portal.apply.connect(func(offer, motivation): net.send(Protocol.encode_apply(net.token, offer, motivation)))

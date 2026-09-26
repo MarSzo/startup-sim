@@ -62,7 +62,7 @@ impl Server {
         }
         // Riders are inside their vehicle: not shown.
         for p in self.players.values().filter(|p| p.in_building() && p.riding.is_none()) {
-            let e = entity(p.id, proto::kind::PLAYER, p.body.pos, p.flags, p.inventory.held_kind(), activity(p));
+            let e = entity(p.id, proto::kind::PLAYER, p.body.pos, p.flags, p.inventory.held_kind(), activity(p, self.tick));
             put((p.body.floor, p.room), e);
         }
         for n in &self.npcs {
@@ -106,7 +106,7 @@ impl Server {
                 prev_input: p.body.prev_input,
                 access: p.body.access,
                 slow: p.body.slow,
-                activity: activity(p),
+                activity: activity(p, self.tick),
             };
             let addr = p.addr;
             let mut queue = |packet: Packet| out.push((addr, id, packet));

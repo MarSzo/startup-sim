@@ -975,6 +975,22 @@ pełnym ekranie — zastąpiona stylem inspirowanym Don't Starve:
   dopiero następnego ranka (zwykły dojazd). Gdy **wszyscy** gracze są w domu
   (i nikt nie jest w drodze), zegar leci w tempie nocnym.
 - Nie da się wyjść w nocy ani bez umowy (kandydaci, portal).
+- **„Pomiń czekanie”** na ekranie domu / wyboru dojazdu / w drodze: gdy
+  poprosili o to wszyscy gracze (a wszyscy są w domu lub w drodze), zegar
+  pędzi (10 min gry na tick) aż do przyjazdu do biura; inaczej przycisk
+  pokazuje „Czekam na pozostałych…”.
+
+### 10.37 Poprawki: pulpit, zatrzymanie, eskorta
+
+- Pierwszy dzień (szukanie pracy): sam pulpit, przeglądarkę otwiera się ikoną.
+- Formularz zgłoszeniowy: wartości w jednej linii, zgoda czytelna (ciemny
+  tekst także po najechaniu / zaznaczeniu, bez ramki przycisku).
+- **Złapany** przez ochroniarza stoi 3 s, przez policję 6 s (status
+  „zatrzymany”, ruch ignorowany).
+- Portier i recepcjonistka po doprowadzeniu gościa stoją jeszcze 6 s (czas na
+  przeczytanie dymka), dymki wiszą dłużej.
+- Podpowiedzi w aneksie: najbliższa rzecz (ekspres, owoce, płyn nie są już
+  opisywane jako szafka / zlew / lodówka).
 
 ### 10.6 Stan implementacji
 
@@ -1078,7 +1094,7 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
   portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, zegar, dojazd, pogoda, zarząd, słodycze, obiady, wakaty, firma, ochrona i policja, kubki, dym, balkon, protokół), 2 golden, 30 e2e serwera
   (m.in. portal: odrzucenie → przyjęcie → spawn; całe wdrożenie aż do karty;
   niewidoczność między piętrami; zgodność stanu serwera z predykcją) —
-  łącznie 135 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 porannego dojazdu samochodem moknięcia w deszczu spotkania z Prezesem tacy ze słodyczami obiadu z odbiorem na recepcji, obsadzonego stanowiska, panelu założyciela kradzieży w sklepie z ochroną i policją , kubka zebranego przez sprzątaczkę oraz papierosa, który uruchamia alarm pożarowy, wcześniejszego powrotu do domu z przystanku); 149 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
+  łącznie 135 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 porannego dojazdu samochodem moknięcia w deszczu spotkania z Prezesem tacy ze słodyczami obiadu z odbiorem na recepcji, obsadzonego stanowiska, panelu założyciela kradzieży w sklepie z ochroną i policją , kubka zebranego przez sprzątaczkę oraz papierosa, który uruchamia alarm pożarowy, wcześniejszego powrotu do domu z przystanku i pomijania czekania, zatrzymania przez ochronę); 150 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
   adresów).
 
 #### Pomiary (MacBook, wszystko lokalnie)

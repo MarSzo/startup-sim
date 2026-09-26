@@ -359,6 +359,12 @@ Dym papierosowy na piętrze odbiorcy (co 1 s, tylko w budynku): `floor u8`, n
 u8 (≤ 64) × {`room u16`, `level u8` 1–255}. Pokoi spoza listy nie ma dymu.
 Czujki dymu są w danych mapy (`room_defs.*.detector`), klient rysuje je sam.
 
+### 44 `SkipWait` (C→S)
+
+token u32. „Pomiń czekanie” — tylko w domu / w drodze. Gdy poprosili wszyscy
+gracze (i wszyscy są w domu lub w drodze), zegar pędzi aż do przyjazdu;
+stan w `Clock::skip` (0 nie, 1 czekam na innych, 2 czas pędzi).
+
 ### 42 `Fridge` (S→C), 43 `FridgeAction` (C→S)
 
 Lodówka w aneksie (E przy niej, i po każdej zmianie): n u8 (≤ 16) × {`kind
@@ -447,6 +453,7 @@ szyfrowaniem.
 
 ## Historia wersji
 
+- **29** — `SkipWait` (44, C→S: token u32) — „Pomiń czekanie” w domu; `Clock` + `skip` u8 (0 nie, 1 poproszono, 2 czas pędzi); aktywność 8 = zatrzymany (ochrona / policja).
 - **28** — aneks kuchenny: `Fridge` (42), `FridgeAction` (43); przedmioty 35 kubek (czysty), 36 mleko (karton), 37 kawa z mlekiem; 34 = brudny kubek.
 - **27** — światło: pakiet `Lights` (41); w mapie `room_defs.*.light` / `switch` / `lit_by` / `windows`.
 - **26** — dym i straż: `Clock` + `alarm`, pakiet `Smoke` (40), wygląd NPC 6 (strażak), pojazd 6 (wóz strażacki).

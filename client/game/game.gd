@@ -405,7 +405,7 @@ func _refresh_own_label() -> void:
 
 
 func _sample_input(delta: float) -> int:
-	if input_blocked or me.status == Protocol.ACT_RIDING:
+	if input_blocked or me.status in [Protocol.ACT_RIDING, Protocol.ACT_HELD]:
 		return 0
 	if not goto_legs.is_empty() or not _goto_path.is_empty():
 		var g := _goto_input(delta)  # dev script also drives the computer screen / dialogs
@@ -917,6 +917,10 @@ func _item_action(action: int, slot: int) -> void:
 ## gate that needs a pass.
 func _update_hint() -> void:
 	var text := ""
+	if me.status == Protocol.ACT_HELD:
+		hint_label.text = "Zatrzymano cię — chwilę stoisz w miejscu…"
+		hint_label.visible = true
+		return
 	var map = building.get_floor(pred.floor)
 	var t := Movement.tile_of_pos(pred.pos)
 	var link: Dictionary = map.link_at(t.x, t.y) if map else {}
@@ -957,12 +961,14 @@ func _update_hint() -> void:
 				if kx < 0 or ky < 0 or kx >= map.width or ky >= map.height:
 					continue
 				var ktype: String = map.legend.get(map.tile_chars[ky * map.width + kx], {}).get("type", "")
-				if not kitchen_names.has(ktype):
+				# The machine, fruit bowl and sanitizer stand in the same row:
+				# nearer than a cupboard, they get their own hint (below).
+				if not kitchen_names.has(ktype) and not ktype in ["coffee_machine", "fruit_bowl", "sanitizer"]:
 					continue
 				var kd: float = ((Vector2(kx, ky) + Vector2(0.5, 0.5)) * map.tile_px).distance_to(Movement.to_px(pred.pos))
 				if kd <= map.tile_px * 1.5 and kd < best_d:
 					best_d = kd
-					text = kitchen_names[ktype]
+					text = kitchen_names.get(ktype, "")
 	if text == "" and map and pred.floor == 0:
 		# The way home (like the server): our car / bike, or the spot on foot /
 		# at the tram stop / taxi stand.

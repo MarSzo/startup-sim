@@ -14,6 +14,8 @@ pub const MIN_PER_DAY: u32 = 24 * 60;
 pub const DAY_DS_PER_TICK: u32 = 6;
 /// Night (8 game hours) in one real minute (1 200 ticks).
 pub const NIGHT_DS_PER_TICK: u32 = 8 * 60 * DS_PER_MIN / 1200;
+/// Skipping the wait at home: 10 game minutes per tick (a night in ~5 s).
+pub const SKIP_DS_PER_TICK: u32 = 10 * DS_PER_MIN;
 pub const OPEN_MIN: u32 = 6 * 60;
 pub const CLOSE_MIN: u32 = 22 * 60;
 /// Morning arrivals: 7:00 - 10:00 (minutes after opening).
@@ -40,11 +42,13 @@ pub struct Clock {
     pub scale: u32,
     /// Everybody is at home: the daytime runs at the night rate.
     pub fast: bool,
+    /// Everybody at home asked to skip the waiting: faster still.
+    pub skip: bool,
 }
 
 impl Clock {
     pub fn new(start_min: u32, scale: u32) -> Clock {
-        Clock { day: 1, ds: (start_min % MIN_PER_DAY) * DS_PER_MIN, scale: scale.max(1), fast: false }
+        Clock { day: 1, ds: (start_min % MIN_PER_DAY) * DS_PER_MIN, scale: scale.max(1), fast: false, skip: false }
     }
 
     pub fn minute(&self) -> u32 {
@@ -63,7 +67,9 @@ impl Clock {
 
     /// Game deciseconds that pass per tick right now.
     pub fn rate(&self) -> u32 {
-        if self.is_night() || self.fast {
+        if self.skip {
+            SKIP_DS_PER_TICK
+        } else if self.is_night() || self.fast {
             NIGHT_DS_PER_TICK
         } else {
             DAY_DS_PER_TICK * self.scale

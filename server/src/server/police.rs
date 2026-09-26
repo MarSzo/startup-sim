@@ -92,6 +92,7 @@ impl Server {
         let Some(role) = self.npcs.iter().find(|n| n.id == npc_id).map(|n| n.role) else { return };
         if role == npc::Role::Police {
             let Some(fine) = self.police_fine(pid) else { return };
+            self.hold(pid, security::POLICE_HOLD_TICKS);
             self.says.push(Say::addressed(npc_id, security::lines::police_fine(fine), pid));
             self.says.push(Say::new(pid, security::lines::SHAME));
             let nick = self.players.get(&pid).map_or("?", |p| p.nick.as_str());
@@ -104,6 +105,7 @@ impl Server {
             return;
         }
         p.inventory.remove_unpaid();
+        p.held_until = self.tick + security::GUARD_HOLD_TICKS;
         p.needs.add_stress(security::GUARD_STRESS);
         refresh(p);
         let again = p.thefts_today >= security::THEFTS_FOR_POLICE;
@@ -111,6 +113,13 @@ impl Server {
         if again {
             self.says.push(Say::addressed(npc_id, security::lines::GUARD_POLICE_AGAIN, pid));
             self.call_police(pid);
+        }
+    }
+
+    /// Caught: no walking for `ticks`.
+    fn hold(&mut self, pid: u16, ticks: u32) {
+        if let Some(p) = self.players.get_mut(&pid) {
+            p.held_until = self.tick + ticks;
         }
     }
 
