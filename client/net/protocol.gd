@@ -3,7 +3,7 @@
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 6
+const VERSION := 7
 const MAX_PACKET := 1200
 const MAX_NICK_BYTES := 16
 const MAX_SAY_BYTES := 240
@@ -27,6 +27,13 @@ const T_APPLY := 13
 const T_QUESTION := 14
 const T_ANSWER := 15
 const T_RECRUIT_RESULT := 16
+const T_MAIL := 17
+const T_PORTAL_ACTION := 18
+
+const PORTAL_NONE := 0
+const PORTAL_JOIN_INTERVIEW := 1
+const PORTAL_GO_TO_OFFICE := 2
+const MAX_MAIL_BYTES := 600
 
 const KIND_PLAYER := 0
 const KIND_NPC := 1
@@ -123,10 +130,19 @@ static func encode_ping(token: int, client_time: int) -> PackedByteArray:
 	return b.data_array
 
 
-static func encode_apply(token: int, offer: int) -> PackedByteArray:
+static func encode_apply(token: int, offer: int, motivation: String) -> PackedByteArray:
 	var b := _writer(T_APPLY)
 	b.put_u32(token)
 	b.put_u8(offer)
+	_put_str16(b, motivation, MAX_TEXT_BYTES)
+	return b.data_array
+
+
+static func encode_portal_action(token: int, action: int, arg: int) -> PackedByteArray:
+	var b := _writer(T_PORTAL_ACTION)
+	b.put_u32(token)
+	b.put_u8(action)
+	b.put_u8(arg)
 	return b.data_array
 
 
@@ -252,7 +268,8 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 				return {}
 			var offers := []
 			for i in n:
-				offers.append({"id": r.u8(), "department": r.u8(), "title": r.str16(MAX_TEXT_BYTES), "description": r.str16(MAX_TEXT_BYTES)})
+				offers.append({"id": r.u8(), "department": r.u8(), "applied": r.u8() != 0, "company": r.str16(MAX_TEXT_BYTES),
+					"title": r.str16(MAX_TEXT_BYTES), "description": r.str16(MAX_TEXT_BYTES)})
 			p.offers = offers
 		T_QUESTION:
 			p.attempt = r.u8()
@@ -275,6 +292,13 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			p.score = r.u8()
 			p.total = r.u8()
 			p.department = r.u8()
+		T_MAIL:
+			p.id = r.u8()
+			p.from = r.str16(MAX_TEXT_BYTES)
+			p.subject = r.str16(MAX_TEXT_BYTES)
+			p.body = r.str16(MAX_MAIL_BYTES)
+			p.action = r.u8()
+			p.arg = r.u8()
 		_:
 			return {}
 	if not r.ok or not r.at_end():

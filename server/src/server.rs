@@ -41,11 +41,50 @@ pub struct Config {
 
 /// Where a connected player is in the game.
 enum Stage {
-    /// On the job portal (not in the world yet); `attempt` = quiz in progress.
-    Portal { attempt: Option<Attempt> },
-    /// Hired: in the building.
+    /// At home, on the computer desktop: job portal, mail, online interview.
+    /// Not in the world yet.
+    Portal(Box<Desk>),
+    /// Hired and in the building.
     Working,
 }
+
+/// Desktop state of a candidate (GDD 9a, step 2).
+#[derive(Default)]
+struct Desk {
+    /// Offers applied for (shown as "applied" on the portal).
+    applied: Vec<u8>,
+    /// Replies to send: (offer, due tick).
+    pending: Vec<(u8, u32)>,
+    /// Offers with an interview invitation.
+    invited: Vec<u8>,
+    /// Online interview in progress.
+    attempt: Option<Attempt>,
+    /// Passed an interview: department, waiting for "go to the office".
+    hired: Option<u8>,
+    inbox: Vec<MailMsg>,
+    next_mail: u8,
+}
+
+struct MailMsg {
+    id: u8,
+    from: String,
+    subject: String,
+    body: String,
+    action: u8,
+    arg: u8,
+}
+
+impl Desk {
+    fn mail(&mut self, from: &str, subject: String, body: String, action: u8, arg: u8) {
+        self.next_mail = self.next_mail.wrapping_add(1).max(1);
+        self.inbox.push(MailMsg { id: self.next_mail, from: from.into(), subject, body, action, arg });
+        if self.inbox.len() > 12 {
+            self.inbox.remove(0);
+        }
+    }
+}
+
+const RECRUITER: &str = "Startup Sim — Rekrutacja";
 
 /// Resend the current portal screen this often (ticks) - UDP may drop it.
 const PORTAL_RESEND_TICKS: u32 = 20;
@@ -204,7 +243,8 @@ impl Server {
             | Packet::Ping { token, .. }
             | Packet::Disconnect { token, .. }
             | Packet::Apply { token, .. }
-            | Packet::Answer { token, .. } => *token,
+            | Packet::Answer { token, .. }
+            | Packet::PortalAction { token, .. } => *token,
             _ => return,
         };
         let Some(&id) = self.by_token.get(&token) else {
@@ -259,6 +299,7 @@ impl Server {
                 self.remove_player(id, "left");
             }
             Packet::Apply { offer, .. } => self.handle_apply(id, offer),
+            Packet::PortalAction { action, arg, .. } => self.handle_portal_action(id, action, arg),
             Packet::Answer { attempt, index, choice, .. } => self.handle_answer(id, attempt, index, choice),
             _ => {}
         }
@@ -302,7 +343,7 @@ impl Server {
         let player = Player {
             id,
             profile,
-            stage: if skip { Stage::Working } else { Stage::Portal { attempt: None } },
+            stage: if skip { Stage::Working } else { Stage::Portal(Box::default()) },
             department: 0,
             contract: false,
             attempts: 0,
@@ -328,75 +369,191 @@ impl Server {
         let welcome = self.welcome(id);
         self.send(addr, &welcome);
         if !skip {
-            self.send_portal(id);
+            self.send_portal(id, true);
         }
     }
 
-    /// (Re)send the portal screen a player is on: offers or current question.
-    fn send_portal(&mut self, id: u16) {
+    /// (Re)send the desktop state: portal offers, current interview
+    /// question and (with `mails`) the whole inbox. Clients dedupe.
+    fn send_portal(&mut self, id: u16, mails: bool) {
         let Some(p) = self.players.get(&id) else { return };
-        let packet = match &p.stage {
-            Stage::Working => return,
-            Stage::Portal { attempt: None } => Packet::JobOffers { offers: self.cfg.recruitment.portal() },
-            Stage::Portal { attempt: Some(a) } => match a.current(&self.cfg.recruitment) {
-                Some(q) => Packet::Question { attempt: a.number, index: q.index, total: q.total, text: q.text, options: q.options },
-                None => return,
-            },
-        };
+        let Stage::Portal(desk) = &p.stage else { return };
+        let r = &self.cfg.recruitment;
+        // Offers may not fit one datagram: split them (the client merges by id).
+        let mut packets = Vec::new();
+        let mut chunk = Vec::new();
+        let mut size = proto::HEADER_LEN + 1;
+        for offer in r.portal(|o| desk.applied.contains(&o)) {
+            let len = 3 + 6 + offer.company.len() + offer.title.len() + offer.description.len();
+            if size + len > proto::MAX_PACKET && !chunk.is_empty() {
+                packets.push(Packet::JobOffers { offers: std::mem::take(&mut chunk) });
+                size = proto::HEADER_LEN + 1;
+            }
+            size += len;
+            chunk.push(offer);
+        }
+        packets.push(Packet::JobOffers { offers: chunk });
+        if let Some(q) = desk.attempt.as_ref().and_then(|a| a.current(r).map(|q| (a.number, q))) {
+            let (attempt, q) = q;
+            packets.push(Packet::Question { attempt, index: q.index, total: q.total, text: q.text, options: q.options });
+        }
+        if mails {
+            for m in &desk.inbox {
+                packets.push(Packet::Mail {
+                    id: m.id,
+                    from: m.from.clone(),
+                    subject: m.subject.clone(),
+                    body: m.body.clone(),
+                    action: m.action,
+                    arg: m.arg,
+                });
+            }
+        }
         let addr = p.addr;
-        self.send(addr, &packet);
+        for packet in packets {
+            self.send(addr, &packet);
+        }
+    }
+
+    fn desk(&mut self, id: u16) -> Option<&mut Desk> {
+        match &mut self.players.get_mut(&id)?.stage {
+            Stage::Portal(d) => Some(d),
+            Stage::Working => None,
+        }
     }
 
     fn handle_apply(&mut self, id: u16, offer: u8) {
-        let p = self.players.get_mut(&id).unwrap();
-        if !matches!(p.stage, Stage::Portal { .. }) {
+        let due = self.tick + self.cfg.recruitment.invite_delay_secs * TICK_HZ;
+        let Some(o) = self.cfg.recruitment.offer(offer).map(|o| (o.hiring, o.reply.is_some())) else { return };
+        let Some(desk) = self.desk(id) else { return };
+        if desk.applied.contains(&offer) || desk.hired.is_some() {
+            return; // duplicate (resent) application
+        }
+        desk.applied.push(offer);
+        if o.0 || o.1 {
+            desk.pending.push((offer, due)); // other companies without a reply: silence
+        }
+        self.send_portal(id, false);
+    }
+
+    /// Replies that are due: interview invitations / other companies' answers.
+    fn deliver_replies(&mut self, id: u16) {
+        let tick = self.tick;
+        let Some(p) = self.players.get_mut(&id) else { return };
+        let nick = p.nick.clone();
+        let Stage::Portal(desk) = &mut p.stage else { return };
+        let due: Vec<u8> = desk.pending.iter().filter(|(_, t)| *t <= tick).map(|(o, _)| *o).collect();
+        if due.is_empty() {
             return;
         }
-        p.attempts = p.attempts.wrapping_add(1);
-        let Some(attempt) = self.cfg.recruitment.start(offer, p.attempts, &mut self.rng) else { return };
-        p.stage = Stage::Portal { attempt: Some(attempt) };
-        self.send_portal(id);
+        desk.pending.retain(|(_, t)| *t > tick);
+        for offer in due {
+            let Some(o) = self.cfg.recruitment.offer(offer) else { continue };
+            if o.hiring {
+                desk.invited.push(offer);
+                desk.mail(
+                    RECRUITER,
+                    format!("Zaproszenie na rozmowę: {}", o.title),
+                    format!(
+                        "Cześć {nick}!\n\nDziękujemy za zgłoszenie na stanowisko {}. Zapraszamy na krótką rozmowę online — \
+                         kilka pytań, zero stresu (prawie). Kliknij „Dołącz do rozmowy”, kiedy tylko możesz.\n\nZespół Startup Sim",
+                        o.title
+                    ),
+                    proto::portal_action::JOIN_INTERVIEW,
+                    offer,
+                );
+            } else if let Some(reply) = &o.reply {
+                desk.mail(&o.company, format!("Re: {}", o.title), reply.clone(), proto::portal_action::NONE, 0);
+            }
+        }
+        self.send_portal(id, true);
+    }
+
+    fn handle_portal_action(&mut self, id: u16, action: u8, arg: u8) {
+        match action {
+            proto::portal_action::JOIN_INTERVIEW => {
+                let p = self.players.get_mut(&id).unwrap();
+                let Stage::Portal(desk) = &mut p.stage else { return };
+                if !desk.invited.contains(&arg) || desk.attempt.is_some() || desk.hired.is_some() {
+                    return;
+                }
+                p.attempts = p.attempts.wrapping_add(1);
+                desk.attempt = self.cfg.recruitment.start(arg, p.attempts, &mut self.rng);
+                self.send_portal(id, false);
+            }
+            proto::portal_action::GO_TO_OFFICE => {
+                let p = self.players.get_mut(&id).unwrap();
+                let Stage::Portal(desk) = &p.stage else { return };
+                let Some(dept) = desk.hired else { return };
+                p.stage = Stage::Working;
+                p.department = dept;
+                let msg = format!(
+                    "* player {id} '{}' goes to the office: {}",
+                    p.nick,
+                    self.cfg.recruitment.department_name(dept).unwrap_or("?")
+                );
+                self.log(msg);
+            }
+            _ => {}
+        }
     }
 
     fn handle_answer(&mut self, id: u16, attempt_no: u8, index: u8, choice: u8) {
         let p = self.players.get_mut(&id).unwrap();
-        let Stage::Portal { attempt: Some(a) } = &mut p.stage else { return };
+        let nick = p.nick.clone();
+        let addr = p.addr;
+        let Stage::Portal(desk) = &mut p.stage else { return };
+        let Some(a) = desk.attempt.as_mut() else { return };
         if a.number != attempt_no || !a.answer(index, choice) {
             return; // stale / duplicate: the resend loop shows the current state
         }
         if !a.finished() {
-            self.send_portal(id);
+            self.send_portal(id, false);
             return;
         }
         let r = &self.cfg.recruitment;
         let (score, total, offer) = (a.score(), a.total(), a.offer);
         let passed = score >= r.pass_score;
-        let department = r.offer(offer).map_or(0, |o| o.department);
+        let o = r.offer(offer).expect("attempt for a known offer");
         let result = Packet::RecruitResult {
             attempt: attempt_no,
             passed,
             score: score as u8,
             total: total as u8,
-            department: if passed { department } else { 0 },
+            department: if passed { o.department } else { 0 },
         };
-        let addr = p.addr;
+        desk.attempt = None;
+        desk.invited.retain(|x| *x != offer);
         if passed {
-            p.stage = Stage::Working;
-            p.department = department;
-            let msg = format!(
-                "* player {id} '{}' hired: {} ({score}/{total})",
-                p.nick,
-                r.department_name(department).unwrap_or("?")
+            desk.hired = Some(o.department);
+            desk.mail(
+                RECRUITER,
+                "Zaproszenie na dzień próbny".into(),
+                format!(
+                    "Gratulacje, {nick}!\n\nRozmowa na stanowisko {} poszła świetnie ({score}/{total}). Zapraszamy na dzień \
+                     próbny do biura: zgłoś się na portierni — portier zaprowadzi Cię na recepcję, a w HR podpiszesz umowę \
+                     i odbierzesz kartę.\n\nDo zobaczenia!",
+                    o.title
+                ),
+                proto::portal_action::GO_TO_OFFICE,
+                0,
             );
-            self.log(msg);
         } else {
-            p.stage = Stage::Portal { attempt: None };
+            desk.applied.retain(|x| *x != offer); // may apply again
+            desk.mail(
+                RECRUITER,
+                format!("Dziękujemy za rozmowę: {}", o.title),
+                format!(
+                    "Cześć {nick},\n\ndziękujemy za rozmowę ({score}/{total}). Tym razem szukamy kogoś innego, ale nie \
+                     przejmuj się — zapraszamy do ponownej aplikacji. Pytania będą inne!\n\nZespół Startup Sim"
+                ),
+                proto::portal_action::NONE,
+                0,
+            );
         }
         self.send(addr, &result);
         self.send(addr, &result); // tiny packet; a duplicate makes loss unlikely
-        if !passed {
-            self.send_portal(id);
-        }
+        self.send_portal(id, true);
     }
 
     /// Name (and official department) of a player or NPC.
@@ -495,9 +652,7 @@ impl Server {
         for p in self.players.values_mut() {
             if !matches!(p.stage, Stage::Working) {
                 p.inputs.clear(); // not in the world yet
-                if self.tick % PORTAL_RESEND_TICKS == 0 {
-                    portal_resend.push(p.id);
-                }
+                portal_resend.push(p.id);
                 continue;
             }
             let mut moved = false;
@@ -527,7 +682,10 @@ impl Server {
         }
 
         for id in portal_resend {
-            self.send_portal(id);
+            self.deliver_replies(id);
+            if self.tick % PORTAL_RESEND_TICKS == 0 {
+                self.send_portal(id, self.tick % (2 * PORTAL_RESEND_TICKS) == 0);
+            }
         }
 
         // 3. NPCs: conversations, then their own behaviour.

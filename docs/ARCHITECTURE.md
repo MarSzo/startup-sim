@@ -55,7 +55,7 @@ client/                 projekt Godota 4.7
   game/player_view.gd   pixel-artowa postać z animacją chodu + nick + dymek
   game/remote_player.gd bufor snapshotów + interpolacja
   ui/character_screen.gd tworzenie postaci (dane + wygląd z podglądem)
-  ui/portal.gd          portal z ofertami, pytania, wynik rekrutacji
+  ui/desktop.gd         pulpit komputera: przeglądarka (portal, formularz), poczta, rozmowa online
   ui/debug_overlay.gd   F3
   tests/run_tests.gd    testy headless (parytet z Rustem)
   tests/render_maps.gd  narzędzie: zapis grafiki pięter do PNG (headless)
@@ -130,9 +130,11 @@ wygląd, sprawdzane w `validate_profile` (wiek 18–70, format e-maila, wygląd 
 zakresie palet) — inaczej `Reject(4)`. Wiek, miejscowość i e-mail zostają na
 serwerze; `PlayerInfo` niesie imię, płeć i wygląd.
 
-**Etapy gracza** (`Stage`): `Portal` (po połączeniu — portal z ofertami i
-quiz; poza światem: brak snapshotów, inputy ignorowane, ekran ponawiany co
-20 ticków) → `Working` (po przyjęciu: spawn przed budynkiem). Rekrutacja
+**Etapy gracza** (`Stage`): `Portal(Desk)` (po połączeniu — w domu przy
+komputerze; poza światem: brak snapshotów, inputy ignorowane; stan pulpitu
+ponawiany co 20 ticków) → `Working` (po „Idę do biura”: spawn przed
+budynkiem). `Desk` trzyma: zgłoszenia, zaplanowane odpowiedzi (mail po
+`invite_delay_secs`), zaproszenia, trwającą rozmowę, wynik i skrzynkę. Rekrutacja
 (`recruitment.rs`) losuje 3 pytania oferty i tasuje odpowiedzi; odpowiedź
 jest sprawdzana na serwerze. Dział z oferty trafia do umowy: HR emituje
 `Event::Contract`, serwer ustawia `contract` i rozsyła `PlayerInfo` z działem
@@ -188,10 +190,13 @@ i w górę) jest generowany przez Rust i odtwarzany w Godocie.
 
 ## Klient
 
-**Portal** (`ui/portal.gd`, osobna warstwa nad grą): pokazuje ostatni ekran
-wysłany przez serwer (oferty / pytanie / wynik), ponawia swoją ostatnią akcję,
-gdy serwer pokaże ten sam ekran (zgubiony UDP), i znika po „Idę do biura”
-albo gdy przyjdą pierwsze snapshoty. Dopóki jest widoczny, postać nie
+**Pulpit** (`ui/desktop.gd`, osobna warstwa nad grą): „StartOS” z ikonami
+Przeglądarka / Poczta / Kosz, paskiem zadań i zegarem; okna (przeciągane):
+przeglądarka z portalem i formularzem zgłoszeniowym (dane postaci + „Dlaczego
+chcesz u nas pracować?” + zgoda), poczta (lista, podgląd, przyciski akcji),
+rozmowa online (kafelki wideo: rekruterka i Twoja postać, pytania). Pokazuje
+stan z serwera, ponawia swoje akcje, gdy serwer ich nie odnotował, i znika,
+gdy przyjdą pierwsze snapshoty. Dopóki jest widoczny, postać nie
 dostaje inputu. Dział gracza widać przy nicku („Ala · IT”, po umowie) i w F3.
 
 **Połączenie** (`net_client.gd`): parsowanie adresów z IPv6, rozwiązywanie

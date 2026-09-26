@@ -46,7 +46,8 @@ func test_protocol(path: String) -> void:
 		"input": Protocol.encode_input(0x01020304, 1200, 99, PackedByteArray([0, 1, 9, 6])),
 		"info_request": Protocol.encode_info_request(0x01020304, [3, 4, 500]),
 		"ping": Protocol.encode_ping(0x01020304, 777000),
-		"apply": Protocol.encode_apply(0x01020304, 2),
+		"apply": Protocol.encode_apply(0x01020304, 2, "Lubię kawę i wyzwania."),
+		"portal_action": Protocol.encode_portal_action(0x01020304, Protocol.PORTAL_GO_TO_OFFICE, 0),
 		"answer": Protocol.encode_answer(0x01020304, 3, 1, 2),
 	}
 	for name in enc:
@@ -73,8 +74,12 @@ func test_protocol(path: String) -> void:
 		and pi.players[0].gender == 0 and pi.players[0].appearance.hair_style == 1 and pi.players[0].appearance.hair_color == 3
 		and pi.players[1].nick == "bot_07" and pi.players[1].id == 4 and pi.players[1].department == 0, "decode player_info %s" % pi)
 	var jo := Protocol.decode(golden["job_offers"].hex_decode())
-	expect(jo.get("offers", []).size() == 2 and jo.offers[1].title == "Marketing i sprzedaż" and jo.offers[1].department == 2
+	expect(jo.get("offers", []).size() == 2 and jo.offers[1].title == "Dostawca/Dostawczyni" and jo.offers[1].department == 0
+		and jo.offers[1].company == "Pizzeria u Stefana" and jo.offers[0].applied == true and jo.offers[1].applied == false
 		and jo.offers[0].description == "Owocowe czwartki.", "decode job_offers %s" % jo)
+	var ml := Protocol.decode(golden["mail"].hex_decode())
+	expect(ml.get("id") == 2 and ml.from == "Startup Sim — Rekrutacja" and ml.subject == "Zaproszenie na rozmowę"
+		and ml.action == Protocol.PORTAL_JOIN_INTERVIEW and ml.arg == 1 and ml.body.begins_with("Cześć Ola"), "decode mail %s" % ml)
 	var q := Protocol.decode(golden["question"].hex_decode())
 	expect(q.get("attempt") == 3 and q.index == 1 and q.total == 3 and q.text == "Co oznacza kod HTTP 404?"
 		and q.options.size() == 3 and q.options[1] == "Skończyła się kawa", "decode question %s" % q)

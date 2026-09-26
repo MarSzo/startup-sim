@@ -48,7 +48,11 @@ fn start_server_full(start_access: u8, skip_recruitment: bool) -> (SocketAddr, u
         stats_every: Duration::from_secs(3600),
         client_timeout: Duration::from_millis(600),
         start_access,
-        recruitment: Recruitment::load(&default_recruitment_path()).unwrap(),
+        recruitment: {
+            let mut r = Recruitment::load(&default_recruitment_path()).unwrap();
+            r.invite_delay_secs = 0; // replies arrive on the next tick in tests
+            r
+        },
         skip_recruitment,
     };
     let mut server = Server::new(map, cfg).unwrap();
@@ -401,18 +405,19 @@ fn onboarding_porter_reception_hr_card() {
 }
 
 #[test]
-fn job_portal_rejects_then_hires_and_spawns() {
+fn desktop_portal_mail_interview_and_office() {
+    use proto::portal_action as act;
     let (addr, _) = start_server_full(0, false);
     let bank = Recruitment::load(&default_recruitment_path()).unwrap();
     let (c, _) = Client::connect(addr, "Kandydat");
 
-    // Next packets: the portal. No snapshots while not hired.
-    let recv_until = |pred: &dyn Fn(&Packet) -> bool| -> Packet {
-        let deadline = Instant::now() + Duration::from_secs(2);
+    // Wait for a packet matching `pred`; no world snapshots before being hired.
+    let recv_until = |pred: &dyn Fn(&Packet) -> bool, allow_world: bool| -> Packet {
+        let deadline = Instant::now() + Duration::from_secs(3);
         while Instant::now() < deadline {
             c.ping();
             if let Some(p) = c.recv() {
-                assert!(!matches!(p, Packet::Snapshot { .. }), "no world before being hired");
+                assert!(allow_world || !matches!(p, Packet::Snapshot { .. }), "no world before going to the office");
                 if pred(&p) {
                     return p;
                 }
@@ -420,15 +425,40 @@ fn job_portal_rejects_then_hires_and_spawns() {
         }
         panic!("expected packet not received");
     };
-    let Packet::JobOffers { offers } = recv_until(&|p| matches!(p, Packet::JobOffers { .. })) else { unreachable!() };
-    let titles: Vec<&str> = offers.iter().map(|o| o.title.as_str()).collect();
-    assert_eq!(titles, vec!["Programista/ka", "Marketing i sprzedaż"]);
+    // The offer list comes in several datagrams; merge them by id.
+    let mut offers = std::collections::BTreeMap::new();
+    while offers.len() < bank.offers.len() {
+        let Packet::JobOffers { offers: part } = recv_until(&|p| matches!(p, Packet::JobOffers { .. }), false) else { unreachable!() };
+        for o in part {
+            offers.insert(o.id, o);
+        }
+    }
+    assert!(offers.len() >= 7, "several companies on the portal");
+    assert!(offers.values().filter(|o| o.company == "Startup Sim sp. z o.o.").count() == 4);
 
-    // Answers: wrong on purpose, then right (the data's first option is correct).
-    let answer_all = |want_correct: bool| -> Packet {
-        c.sock.send(&Packet::Apply { token: c.token, offer: 1 }.encode()).unwrap();
+    // Another company answers with a (funny) rejection; a silent one never does.
+    let apply = |offer: u8| {
+        c.sock.send(&Packet::Apply { token: c.token, offer, motivation: "Bo lubię kawę.".into() }.encode()).unwrap();
+    };
+    apply(12);
+    apply(11);
+    let Packet::Mail { action, body, .. } = recv_until(&|p| matches!(p, Packet::Mail { from, .. } if from == "Pizzeria u Stefana"), false)
+    else {
+        unreachable!()
+    };
+    assert_eq!(action, act::NONE);
+    assert!(body.contains("rowerem"));
+
+    // Our startup: application -> invitation mail -> online interview.
+    let interview = |want_correct: bool| -> Packet {
+        apply(1);
+        let Packet::Mail { action, arg, .. } = recv_until(&|p| matches!(p, Packet::Mail { action, .. } if *action == act::JOIN_INTERVIEW), false)
+        else {
+            unreachable!()
+        };
+        c.sock.send(&Packet::PortalAction { token: c.token, action, arg }.encode()).unwrap();
         loop {
-            match recv_until(&|p| matches!(p, Packet::Question { .. } | Packet::RecruitResult { .. })) {
+            match recv_until(&|p| matches!(p, Packet::Question { .. } | Packet::RecruitResult { .. }), false) {
                 Packet::Question { attempt, index, text, options, .. } => {
                     let q = bank.offer(1).unwrap().questions.iter().find(|q| q.text == text).expect("known question");
                     let right = options.iter().position(|o| *o == q.options[0]).unwrap() as u8;
@@ -439,24 +469,23 @@ fn job_portal_rejects_then_hires_and_spawns() {
             }
         }
     };
-    let failed = answer_all(false);
-    assert!(matches!(failed, Packet::RecruitResult { passed: false, score: 0, total: 3, department: 0, .. }), "{failed:?}");
-    recv_until(&|p| matches!(p, Packet::JobOffers { .. })); // back on the portal
-    let hired = answer_all(true);
+    let failed = interview(false);
+    assert!(matches!(failed, Packet::RecruitResult { passed: false, score: 0, total: 3, .. }), "{failed:?}");
+    recv_until(&|p| matches!(p, Packet::Mail { subject, .. } if subject.starts_with("Dziękujemy za rozmowę")), false);
+    let hired = interview(true);
     assert!(matches!(hired, Packet::RecruitResult { passed: true, score: 3, total: 3, department: 1, .. }), "{hired:?}");
 
-    // Now in the world: outside, in front of the building, no pass yet.
+    // Invitation to the trial day -> "go to the office" -> in the world.
+    let Packet::Mail { action, .. } = recv_until(&|p| matches!(p, Packet::Mail { action, .. } if *action == act::GO_TO_OFFICE), false)
+    else {
+        unreachable!()
+    };
+    c.sock.send(&Packet::PortalAction { token: c.token, action, arg: 0 }.encode()).unwrap();
     let b = building();
-    let deadline = Instant::now() + Duration::from_secs(1);
-    let mut spawned = None;
-    while Instant::now() < deadline && spawned.is_none() {
-        c.ping();
-        if let Some(Packet::Snapshot { floor, room, self_access, .. }) = c.recv() {
-            spawned = Some((floor, room, self_access));
-        }
-    }
-    let (floor, room, access) = spawned.expect("snapshots after hiring");
-    assert_eq!((floor, b.floor(0).unwrap().room_name(room), access), (0, "Na zewnątrz", 0));
+    let Packet::Snapshot { floor, room, self_access, .. } = recv_until(&|p| matches!(p, Packet::Snapshot { .. }), true) else {
+        unreachable!()
+    };
+    assert_eq!((floor, b.floor(0).unwrap().room_name(room), self_access), (0, "Na zewnątrz", 0));
 }
 
 #[test]

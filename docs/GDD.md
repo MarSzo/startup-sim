@@ -439,6 +439,23 @@ koszula (10), spodnie (5) — z podglądem na żywo („Obróć”, „Losuj wyg
 Serwer sprawdza dane; innym graczom pokazuje tylko imię, płeć i wygląd.
 Ostatnia postać jest zapamiętywana lokalnie.
 
+### 10.12 Pulpit, portal, poczta i rozmowa online (etap 2 z 9a)
+
+Zastępuje prosty portal z 10.8. Po połączeniu gracz widzi pulpit komputera
+(„StartOS”): Przeglądarka, Poczta, Kosz, pasek zadań z zegarem.
+- **Przeglądarka** → portal „praca.example”: nasz startup szuka na 4
+  stanowiska (Programista/ka, Designer/ka — IT / Produkt; Specjalista/ka ds.
+  sprzedaży, ds. marketingu — Biznes) + 4 fikcyjne firmy (Korpo-Bank S.A.,
+  Mega Software Inc., Pizzeria u Stefana, Agencja Kreatywna BUZZ) z
+  humorystycznymi ogłoszeniami. Formularz: dane postaci, „Dlaczego chcesz u
+  nas pracować?”, zgoda na przetwarzanie danych.
+- **Poczta**: po ~4 s zaproszenie na rozmowę (albo zabawna odmowa od innej
+  firmy — lub cisza); powiadomienie i licznik nieprzeczytanych.
+- **Rozmowa online**: okno wideorozmowy (Kasia z HR i Twoja postać), 3
+  pytania z puli stanowiska (po 6–8, humorystyczne odpowiedzi), wynik → mail:
+  zaproszenie na dzień próbny z przyciskiem „Idę do biura” albo podziękowanie
+  (można aplikować ponownie).
+
 ### 10.6 Stan implementacji
 
 *Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie,
@@ -466,9 +483,10 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
   gościa, odprowadza na recepcję), recepcja (odprowadza do HR), HR (umowa →
   karta pracownika); dymki wypowiedzi, podpowiedzi, wygląd NPC; protokół v3
   (uprawnienia w snapshocie, pakiet `Say`, encje NPC).
-- **Portal i rekrutacja**: oferty, quiz oceniany na serwerze (3 pytania,
-  2 poprawne), ponawianie ekranu przy stratach UDP, przydział do działu z
-  umową w HR, dział przy nicku; protokół v4.
+- **Pulpit i rekrutacja**: pulpit komputera z przeglądarką (portal kilku
+  firm, formularz), pocztą i rozmową online; quiz oceniany na serwerze
+  (3 pytania, 2 poprawne); przydział do działu z umową w HR, dział przy
+  nicku (10.12); protokół v7.
 - **Grafika**: proceduralny pixel art otoczenia, mebli i postaci (10.9).
 - **Tworzenie postaci**: dane postaci i edytor wyglądu (10.11); protokół v6.
 - **Ekspres do kawy**: parzenie, kubek w ręce widoczny dla innych, jedna
@@ -484,7 +502,7 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
   portier, recepcja, HR, rekrutacja, ekspres, protokół), 2 golden, 10 e2e serwera
   (m.in. portal: odrzucenie → przyjęcie → spawn; całe wdrożenie aż do karty;
   niewidoczność między piętrami; zgodność stanu serwera z predykcją) —
-  łącznie 65 (w tym e2e ekspresu i profilu postaci); 113 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
+  łącznie 65 (w tym e2e ekspresu, profilu postaci i pulpitu: odmowa innej firmy, rozmowa, zaproszenie, biuro); 115 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
   adresów).
 
 #### Pomiary (MacBook, wszystko lokalnie)

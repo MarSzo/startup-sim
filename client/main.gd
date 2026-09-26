@@ -9,7 +9,7 @@ const NetClient = preload("res://net/net_client.gd")
 const Building = preload("res://map/building.gd")
 const Game = preload("res://game/game.gd")
 const CharacterScreen = preload("res://ui/character_screen.gd")
-const Portal = preload("res://ui/portal.gd")
+const Desktop = preload("res://ui/desktop.gd")
 const Protocol = preload("res://net/protocol.gd")
 
 const BUILDING_PATH := "res://maps/building.json"
@@ -21,7 +21,7 @@ var start := CharacterScreen.new()
 var profile := {}
 var game: Node = null
 var portal_layer := CanvasLayer.new()
-var portal := Portal.new()
+var portal := Desktop.new()
 
 
 func _ready() -> void:
@@ -42,9 +42,9 @@ func _ready() -> void:
 	portal_layer.add_child(portal)
 	portal.auto_offer = int(args.get("auto-recruit", "0"))
 	portal.auto_delay = float(args.get("auto-recruit-delay", "0"))
-	portal.apply.connect(func(offer): net.send(Protocol.encode_apply(net.token, offer)))
+	portal.apply.connect(func(offer, motivation): net.send(Protocol.encode_apply(net.token, offer, motivation)))
 	portal.answer.connect(func(a, i, c): net.send(Protocol.encode_answer(net.token, a, i, c)))
-	portal.done.connect(_on_portal_done)
+	portal.portal_action.connect(func(action, arg): net.send(Protocol.encode_portal_action(net.token, action, arg)))
 	var ui := CanvasLayer.new()
 	add_child(ui)
 	ui.add_child(start)
@@ -111,6 +111,7 @@ func _on_connected(welcome: Dictionary) -> void:
 ## New session: the server starts us on the job portal (unless it runs with
 ## --skip-recruitment, then snapshots arrive and the portal closes itself).
 func _show_portal() -> void:
+	portal.set_profile(net.nick, profile)
 	portal.reset()
 	_sync_portal()
 
@@ -120,10 +121,6 @@ func _sync_portal() -> void:
 	if game:
 		game.input_blocked = portal.visible
 		game.set_job(portal.job_title, portal.department)
-
-
-func _on_portal_done() -> void:
-	_sync_portal()
 
 
 func _on_packet(p: Dictionary) -> void:

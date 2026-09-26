@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
-use crate::protocol::{OfferInfo, MAX_OPTIONS, MAX_TEXT_BYTES};
+use crate::protocol::{OfferInfo, MAX_MAIL_BYTES, MAX_OPTIONS, MAX_TEXT_BYTES};
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct Department {
@@ -28,10 +28,23 @@ pub struct Question {
 #[derive(Debug, Deserialize, Clone)]
 pub struct Offer {
     pub id: u8,
+    pub company: String,
+    /// Only our startup hires; other companies just reply (or don't).
+    #[serde(default = "yes")]
+    pub hiring: bool,
+    #[serde(default)]
     pub department: u8,
     pub title: String,
     pub description: String,
+    #[serde(default)]
     pub questions: Vec<Question>,
+    /// Non-hiring companies: the reply mail (None = they never answer).
+    #[serde(default)]
+    pub reply: Option<String>,
+}
+
+fn yes() -> bool {
+    true
 }
 
 #[derive(Debug, Deserialize)]
@@ -39,6 +52,8 @@ pub struct Recruitment {
     version: u32,
     pub questions_per_attempt: usize,
     pub pass_score: usize,
+    /// Delay between the application and the reply mail.
+    pub invite_delay_secs: u32,
     pub departments: Vec<Department>,
     pub offers: Vec<Offer>,
 }
@@ -56,7 +71,7 @@ impl Recruitment {
     }
 
     fn validate(&self) -> Result<(), String> {
-        if self.version != 1 {
+        if self.version != 2 {
             return Err(format!("unsupported recruitment version {}", self.version));
         }
         if self.pass_score == 0 || self.pass_score > self.questions_per_attempt {
@@ -66,15 +81,21 @@ impl Recruitment {
             return Err("no job offers".into());
         }
         for o in &self.offers {
+            let too_long = |s: &str| s.len() > MAX_TEXT_BYTES;
+            if too_long(&o.title) || too_long(&o.description) || too_long(&o.company) {
+                return Err(format!("offer {}: text longer than {MAX_TEXT_BYTES} bytes", o.id));
+            }
+            if !o.hiring {
+                if o.reply.as_deref().is_some_and(|r| r.len() > MAX_MAIL_BYTES) {
+                    return Err(format!("offer {}: reply too long", o.id));
+                }
+                continue;
+            }
             if self.department_name(o.department).is_none() {
                 return Err(format!("offer {}: unknown department {}", o.id, o.department));
             }
             if o.questions.len() < self.questions_per_attempt {
                 return Err(format!("offer {}: needs at least {} questions", o.id, self.questions_per_attempt));
-            }
-            let too_long = |s: &str| s.len() > MAX_TEXT_BYTES;
-            if too_long(&o.title) || too_long(&o.description) {
-                return Err(format!("offer {}: text longer than {MAX_TEXT_BYTES} bytes", o.id));
             }
             for q in &o.questions {
                 if !(2..=MAX_OPTIONS).contains(&q.options.len()) {
@@ -96,17 +117,25 @@ impl Recruitment {
         self.departments.iter().find(|d| d.id == id).map(|d| d.name.as_str())
     }
 
-    /// Offers as shown on the job portal.
-    pub fn portal(&self) -> Vec<OfferInfo> {
+    /// Offers as shown on the job portal; `applied(id)` marks the ones this
+    /// player has already applied for.
+    pub fn portal(&self, applied: impl Fn(u8) -> bool) -> Vec<OfferInfo> {
         self.offers
             .iter()
-            .map(|o| OfferInfo { id: o.id, department: o.department, title: o.title.clone(), description: o.description.clone() })
+            .map(|o| OfferInfo {
+                id: o.id,
+                department: o.department,
+                applied: applied(o.id),
+                company: o.company.clone(),
+                title: o.title.clone(),
+                description: o.description.clone(),
+            })
             .collect()
     }
 
     /// Start an attempt: random questions of the offer, options shuffled.
     pub fn start(&self, offer_id: u8, number: u8, rng: &mut fastrand::Rng) -> Option<Attempt> {
-        let offer = self.offer(offer_id)?;
+        let offer = self.offer(offer_id).filter(|o| o.hiring)?;
         let mut picks: Vec<usize> = (0..offer.questions.len()).collect();
         rng.shuffle(&mut picks);
         let items = picks
@@ -204,11 +233,29 @@ mod tests {
     }
 
     #[test]
-    fn loads_two_offers_matching_gdd_departments() {
+    fn our_startup_hires_four_positions_others_only_reply() {
         let r = r();
-        let names: Vec<_> = r.offers.iter().map(|o| (o.title.as_str(), r.department_name(o.department).unwrap())).collect();
-        assert_eq!(names, vec![("Programista/ka", "IT / Produkt"), ("Marketing i sprzedaż", "Biznes")]);
+        let ours: Vec<_> = r
+            .offers
+            .iter()
+            .filter(|o| o.hiring)
+            .map(|o| (o.company.as_str(), o.title.as_str(), r.department_name(o.department).unwrap()))
+            .collect();
+        assert_eq!(
+            ours,
+            vec![
+                ("Startup Sim sp. z o.o.", "Programista/ka", "IT / Produkt"),
+                ("Startup Sim sp. z o.o.", "Designer/ka", "IT / Produkt"),
+                ("Startup Sim sp. z o.o.", "Specjalista/ka ds. sprzedaży", "Biznes"),
+                ("Startup Sim sp. z o.o.", "Specjalista/ka ds. marketingu", "Biznes"),
+            ]
+        );
+        let others: Vec<_> = r.offers.iter().filter(|o| !o.hiring).collect();
+        assert!(others.len() >= 3);
+        assert!(others.iter().any(|o| o.reply.is_some()) && others.iter().any(|o| o.reply.is_none()), "some reply, some stay silent");
+        assert!(others.iter().all(|o| o.company != "Startup Sim sp. z o.o."));
         assert_eq!((r.questions_per_attempt, r.pass_score), (3, 2));
+        assert!(r.start(10, 1, &mut fastrand::Rng::new()).is_none(), "no interview at other companies");
     }
 
     #[test]

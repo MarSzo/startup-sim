@@ -17,9 +17,11 @@ cd server && cargo run --release --bin bots -- --count 50 --room "Chill room" --
 
 Sterowanie: WASD / strzałki, **E** — rozmowa z NPC / winda (stojąc w kabinie) / ekspres do kawy, **F3** — overlay debug.
 Na starcie tworzysz postać (imię, płeć, wiek, miejscowość, e-mail postaci,
-wygląd z podglądem; zapamiętywana lokalnie). Po połączeniu widać **portal z ofertami pracy**: wybierz stanowisko i odpowiedz
-na 3 pytania (2 poprawne = przyjęcie; nie wyszło — spróbuj jeszcze raz).
-Przyjęty gracz startuje przed budynkiem bez przepustki: bramki w holu go nie wpuszczą,
+wygląd z podglądem; zapamiętywana lokalnie). Po połączeniu siedzisz w domu przy komputerze: w **przeglądarce** jest portal z
+ogłoszeniami (kilka firm; zatrudnia tylko nasz startup), wypełniasz formularz,
+po chwili w **Poczcie** czeka zaproszenie na **rozmowę online** (3 pytania,
+2 poprawne = przyjęcie), a potem zaproszenie na dzień próbny — „Idę do biura”.
+Na miejscu startujesz przed budynkiem bez przepustki: bramki w holu go nie wpuszczą,
 więc trzeba podejść do portierni i porozmawiać z portierem (E) — da przepustkę
 gościa i zaprowadzi na recepcję na piętrze 1 (schodami). Recepcja (E) zaprowadzi
 do HR, a HR (E) podpisze umowę i wyda kartę pracownika.

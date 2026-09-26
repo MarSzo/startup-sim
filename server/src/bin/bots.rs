@@ -240,9 +240,16 @@ impl Bot {
             // Job portal: apply for a random offer, answer at random; the
             // server resends the screen, so answering each one we see is enough.
             Packet::JobOffers { offers } => {
-                if let Some(o) = offers.get(fastrand::usize(..offers.len().max(1))) {
-                    let _ = self.sock.send(&Packet::Apply { token: self.token, offer: o.id }.encode());
+                // Apply for a random position at our startup unless already done.
+                let ours: Vec<_> = offers.iter().filter(|o| o.department != 0).collect();
+                if !ours.is_empty() && !ours.iter().any(|o| o.applied) {
+                    let o = ours[fastrand::usize(..ours.len())];
+                    let apply = Packet::Apply { token: self.token, offer: o.id, motivation: "Jestem botem, ale pracowitym.".into() };
+                    let _ = self.sock.send(&apply.encode());
                 }
+            }
+            Packet::Mail { action, arg, .. } if action != proto::portal_action::NONE => {
+                let _ = self.sock.send(&Packet::PortalAction { token: self.token, action, arg }.encode());
             }
             Packet::Question { attempt, index, options, .. } => {
                 let choice = fastrand::u8(..options.len().max(1) as u8);

@@ -1,43 +1,324 @@
 {
- "version": 1,
+ "version": 2,
  "questions_per_attempt": 3,
  "pass_score": 2,
+ "invite_delay_secs": 4,
  "departments": [
-  {"id": 1, "name": "IT / Produkt"},
-  {"id": 2, "name": "Biznes"}
+  {
+   "id": 1,
+   "name": "IT / Produkt"
+  },
+  {
+   "id": 2,
+   "name": "Biznes"
+  }
  ],
  "offers": [
   {
    "id": 1,
+   "company": "Startup Sim sp. z o.o.",
+   "hiring": true,
    "department": 1,
    "title": "Programista/ka",
    "description": "Rozwijasz nasz produkt. Oferujemy: owocowe czwartki, elastyczne godziny (głównie w nocy) i pełen dostęp do produkcji od pierwszego dnia.",
    "questions": [
-    {"q": "Produkcja leży w piątek o 16:55. Co robisz?", "options": ["Sprawdzam logi i monitoring, informuję zespół", "Wychodzę — w poniedziałek też jest dzień", "Robię force-push na main, żeby było jak rano", "Zmieniam status na Slacku na „w podróży”"]},
-    {"q": "Co oznacza kod HTTP 404?", "options": ["Nie znaleziono zasobu", "Serwer się przegrzał", "Skończyła się kawa", "Wszystko w porządku"]},
-    {"q": "Po co robi się code review?", "options": ["Żeby wyłapać błędy i dzielić się wiedzą", "Żeby mieć na kogo zrzucić winę", "Żeby PR poleżał tydzień", "Żeby napisać „LGTM” bez czytania"]},
-    {"q": "Twój kod działa, ale nie wiesz dlaczego. Co dalej?", "options": ["Piszę test i próbuję zrozumieć", "Nie dotykam i nazywam plik final_v2_ostateczny", "Dodaję komentarz „magia, nie ruszać”", "Usuwam — na pewno coś jest nie tak"]},
-    {"q": "Co robi `git commit`?", "options": ["Zapisuje zmiany w lokalnym repozytorium", "Wysyła kod prosto na produkcję", "Zobowiązuje do pracy po godzinach", "Kasuje historię zmian"]},
-    {"q": "Najlepsze miejsce na hasło do produkcyjnej bazy danych?", "options": ["Menedżer sekretów lub zmienne środowiskowe", "README w publicznym repozytorium", "Karteczka na monitorze", "Nazwa firmowej sieci Wi-Fi"]},
-    {"q": "Zadanie „na 5 minut” zwykle oznacza:", "options": ["Nie wiadomo ile — warto je rozbić i oszacować", "Dokładnie 5 minut", "5 sprintów", "Że ktoś już je zrobił"]},
-    {"q": "Czym jest pętla nieskończona?", "options": ["Pętlą, która nigdy się nie kończy", "Spotkaniem, które mogło być mailem", "Kolejką do ekspresu o 9:00", "Pętlą, która wykonuje się 1000 razy"]}
+    {
+     "q": "Produkcja leży w piątek o 16:55. Co robisz?",
+     "options": [
+      "Sprawdzam logi i monitoring, informuję zespół",
+      "Wychodzę — w poniedziałek też jest dzień",
+      "Robię force-push na main, żeby było jak rano",
+      "Zmieniam status na Slacku na „w podróży”"
+     ]
+    },
+    {
+     "q": "Co oznacza kod HTTP 404?",
+     "options": [
+      "Nie znaleziono zasobu",
+      "Serwer się przegrzał",
+      "Skończyła się kawa",
+      "Wszystko w porządku"
+     ]
+    },
+    {
+     "q": "Po co robi się code review?",
+     "options": [
+      "Żeby wyłapać błędy i dzielić się wiedzą",
+      "Żeby mieć na kogo zrzucić winę",
+      "Żeby PR poleżał tydzień",
+      "Żeby napisać „LGTM” bez czytania"
+     ]
+    },
+    {
+     "q": "Twój kod działa, ale nie wiesz dlaczego. Co dalej?",
+     "options": [
+      "Piszę test i próbuję zrozumieć",
+      "Nie dotykam i nazywam plik final_v2_ostateczny",
+      "Dodaję komentarz „magia, nie ruszać”",
+      "Usuwam — na pewno coś jest nie tak"
+     ]
+    },
+    {
+     "q": "Co robi `git commit`?",
+     "options": [
+      "Zapisuje zmiany w lokalnym repozytorium",
+      "Wysyła kod prosto na produkcję",
+      "Zobowiązuje do pracy po godzinach",
+      "Kasuje historię zmian"
+     ]
+    },
+    {
+     "q": "Najlepsze miejsce na hasło do produkcyjnej bazy danych?",
+     "options": [
+      "Menedżer sekretów lub zmienne środowiskowe",
+      "README w publicznym repozytorium",
+      "Karteczka na monitorze",
+      "Nazwa firmowej sieci Wi-Fi"
+     ]
+    },
+    {
+     "q": "Zadanie „na 5 minut” zwykle oznacza:",
+     "options": [
+      "Nie wiadomo ile — warto je rozbić i oszacować",
+      "Dokładnie 5 minut",
+      "5 sprintów",
+      "Że ktoś już je zrobił"
+     ]
+    },
+    {
+     "q": "Czym jest pętla nieskończona?",
+     "options": [
+      "Pętlą, która nigdy się nie kończy",
+      "Spotkaniem, które mogło być mailem",
+      "Kolejką do ekspresu o 9:00",
+      "Pętlą, która wykonuje się 1000 razy"
+     ]
+    }
    ]
   },
   {
    "id": 2,
-   "department": 2,
-   "title": "Marketing i sprzedaż",
-   "description": "Sprzedajesz produkt, który IT właśnie skończy (prawie). Oferujemy: nielimitowane spotkania, prowizję od sukcesów i własny kubek z logo.",
+   "company": "Startup Sim sp. z o.o.",
+   "hiring": true,
+   "department": 1,
+   "title": "Designer/ka",
+   "description": "Projektujesz produkt, który programiści zrobią „prawie tak samo”. Oferujemy: dwa monitory, zapas żółtych karteczek i prawo weta wobec Comic Sansa.",
    "questions": [
-    {"q": "Klient pyta o funkcję, której nie mamy. Co odpowiadasz?", "options": ["Dopytuję o potrzebę i sprawdzam z zespołem produktu", "Że mamy, a IT zrobi to do jutra", "Że to słaby pomysł", "Zmieniam temat na pogodę"]},
-    {"q": "Co oznacza skrót CRM?", "options": ["Customer Relationship Management", "Ciągle Robimy Meetingi", "Co Robi Marketing?", "Cały Rok Marketingu"]},
-    {"q": "Kampania ma 0 kliknięć. Pierwszy krok?", "options": ["Sprawdzam, czy link i targetowanie działają", "Podwajam budżet", "Obwiniam algorytm", "Ogłaszam sukces — zero reklamacji"]},
-    {"q": "Najlepszy moment na follow-up po spotkaniu z klientem?", "options": ["W ciągu 1–2 dni, z podsumowaniem ustaleń", "Za pół roku", "Nigdy — klient sam wróci", "O 3 w nocy, żeby się wyróżnić"]},
-    {"q": "Co to jest lejek sprzedażowy?", "options": ["Etapy drogi klienta od zainteresowania do zakupu", "Sprzęt do nalewania kawy w kuchni", "Wykres, który zawsze rośnie", "Lista osób, które nie odbierają telefonu"]},
-    {"q": "Konkurencja obniżyła ceny o 50%. Co robisz?", "options": ["Analizuję wartość naszej oferty i rozmawiam z kluczowymi klientami", "Obniżam o 60%", "Piszę złośliwy komentarz na LinkedInie", "Udaję, że tego nie widziałem"]},
-    {"q": "Klient jest niezadowolony. Od czego zaczynasz?", "options": ["Słucham i dopytuję, co poszło nie tak", "Wysyłam rabat na wszystko", "Przekierowuję do IT", "Proponuję, żeby spróbował jutro"]},
-    {"q": "KPI to:", "options": ["Mierzalny wskaźnik realizacji celu", "Kawa Po Irlandzku", "Kolejne Pilne Inicjatywy", "Konkurs Popularności Influencerów"]}
+    {
+     "q": "Klient prosi: „logo ma być większe, ale mniejsze”. Co robisz?",
+     "options": [
+      "Dopytuję o cel i pokazuję kilka wariantów",
+      "Robię logo średnie",
+      "Zmieniam kolor na neonowy",
+      "Udaję, że nie słyszę"
+     ]
+    },
+    {
+     "q": "Czym jest UX?",
+     "options": [
+      "Doświadczeniem użytkownika z produktem",
+      "Nową konsolą do gier",
+      "Rozszerzeniem pliku z grafiką",
+      "Rodzajem czcionki"
+     ]
+    },
+    {
+     "q": "Ile krojów pisma na jednym ekranie to dobry pomysł?",
+     "options": [
+      "Zwykle 1–2, używane konsekwentnie",
+      "Każda litera innym krojem",
+      "Comic Sans do wszystkiego",
+      "Minimum dwanaście"
+     ]
+    },
+    {
+     "q": "Klient mówi: „coś tu nie gra, ale nie wiem co”. Pierwszy krok?",
+     "options": [
+      "Dopytuję i patrzę, jak korzysta z projektu",
+      "Zmieniam wszystko",
+      "Dodaję więcej gradientów",
+      "Obwiniam jego monitor"
+     ]
+    },
+    {
+     "q": "Po co robi się testy z użytkownikami?",
+     "options": [
+      "Żeby sprawdzić, czy ludzie rozumieją projekt",
+      "Żeby zebrać komplementy",
+      "Żeby projekt trwał dłużej",
+      "Bo tak jest w umowie"
+     ]
+    },
+    {
+     "q": "Kontrast tekstu do tła powinien być:",
+     "options": [
+      "Wystarczający, żeby każdy mógł go przeczytać",
+      "Jak najmniejszy — tak jest elegancko",
+      "Jasnoszary na białym",
+      "Niewidzialny — minimalizm"
+     ]
+    }
    ]
+  },
+  {
+   "id": 3,
+   "company": "Startup Sim sp. z o.o.",
+   "hiring": true,
+   "department": 2,
+   "title": "Specjalista/ka ds. sprzedaży",
+   "description": "Sprzedajesz produkt, który IT właśnie skończy (prawie). Oferujemy: prowizję od sukcesów, nielimitowane spotkania i własny kubek z logo.",
+   "questions": [
+    {
+     "q": "Klient pyta o funkcję, której nie mamy. Co odpowiadasz?",
+     "options": [
+      "Dopytuję o potrzebę i sprawdzam z zespołem produktu",
+      "Że mamy, a IT zrobi to do jutra",
+      "Że to słaby pomysł",
+      "Zmieniam temat na pogodę"
+     ]
+    },
+    {
+     "q": "Co oznacza skrót CRM?",
+     "options": [
+      "Customer Relationship Management",
+      "Ciągle Robimy Meetingi",
+      "Co Robi Marketing?",
+      "Cały Rok Marketingu"
+     ]
+    },
+    {
+     "q": "Najlepszy moment na follow-up po spotkaniu z klientem?",
+     "options": [
+      "W ciągu 1–2 dni, z podsumowaniem ustaleń",
+      "Za pół roku",
+      "Nigdy — klient sam wróci",
+      "O 3 w nocy, żeby się wyróżnić"
+     ]
+    },
+    {
+     "q": "Co to jest lejek sprzedażowy?",
+     "options": [
+      "Etapy drogi klienta od zainteresowania do zakupu",
+      "Sprzęt do nalewania kawy w kuchni",
+      "Wykres, który zawsze rośnie",
+      "Lista osób, które nie odbierają telefonu"
+     ]
+    },
+    {
+     "q": "Konkurencja obniżyła ceny o 50%. Co robisz?",
+     "options": [
+      "Analizuję wartość naszej oferty i rozmawiam z kluczowymi klientami",
+      "Obniżam o 60%",
+      "Piszę złośliwy komentarz na LinkedInie",
+      "Udaję, że tego nie widziałem"
+     ]
+    },
+    {
+     "q": "Klient jest niezadowolony. Od czego zaczynasz?",
+     "options": [
+      "Słucham i dopytuję, co poszło nie tak",
+      "Wysyłam rabat na wszystko",
+      "Przekierowuję do IT",
+      "Proponuję, żeby spróbował jutro"
+     ]
+    }
+   ]
+  },
+  {
+   "id": 4,
+   "company": "Startup Sim sp. z o.o.",
+   "hiring": true,
+   "department": 2,
+   "title": "Specjalista/ka ds. marketingu",
+   "description": "Opowiadasz światu, że nasz produkt jest rewolucyjny. Oferujemy: budżet na kampanie (mały) i swobodę twórczą (dużą).",
+   "questions": [
+    {
+     "q": "Kampania ma 0 kliknięć. Pierwszy krok?",
+     "options": [
+      "Sprawdzam, czy link i targetowanie działają",
+      "Podwajam budżet",
+      "Obwiniam algorytm",
+      "Ogłaszam sukces — zero reklamacji"
+     ]
+    },
+    {
+     "q": "KPI to:",
+     "options": [
+      "Mierzalny wskaźnik realizacji celu",
+      "Kawa Po Irlandzku",
+      "Kolejne Pilne Inicjatywy",
+      "Konkurs Popularności Influencerów"
+     ]
+    },
+    {
+     "q": "Grupa docelowa to:",
+     "options": [
+      "Konkretni ludzie, do których kierujemy komunikat",
+      "Wszyscy na Ziemi",
+      "Szef i jego mama",
+      "Obserwujący konkurencji"
+     ]
+    },
+    {
+     "q": "Post firmowy wrzucony o 3 w nocy dostał 2 polubienia. Wniosek?",
+     "options": [
+      "Sprawdzam, kiedy nasi odbiorcy są aktywni",
+      "Kupuję polubienia",
+      "Następny wrzucam o 4",
+      "Zmieniam logo"
+     ]
+    },
+    {
+     "q": "Test A/B to:",
+     "options": [
+      "Porównanie dwóch wersji, żeby sprawdzić, która działa lepiej",
+      "Sprawdzian ze znajomości alfabetu",
+      "Wybór między kawą A i kawą B",
+      "Dwa zebrania zamiast jednego"
+     ]
+    },
+    {
+     "q": "Co jest najważniejsze w reklamie?",
+     "options": [
+      "Jasny przekaz i korzyść dla odbiorcy",
+      "Dużo emotikon",
+      "Logo na całą stronę",
+      "Słowo „rewolucyjny” co drugi wyraz"
+     ]
+    }
+   ]
+  },
+  {
+   "id": 10,
+   "company": "Korpo-Bank S.A.",
+   "hiring": false,
+   "title": "Młodszy analityk Excela",
+   "description": "Wymagania: 7 lat doświadczenia w Excelu 2031, gotowość do pracy w piątek po 18:00. Oferujemy: owocowe czwartki (co drugi kwartał).",
+   "reply": "Szanowna Pani / Szanowny Panie, dziękujemy za aplikację. Po wnikliwej analizie Pani/Pana kandydatury nasz system zdecydował, że komórka A1 jest już zajęta. Z poważaniem, Dział Kadr."
+  },
+  {
+   "id": 11,
+   "company": "Mega Software Inc.",
+   "hiring": false,
+   "title": "Senior Developer (junior)",
+   "description": "Szukamy seniora z 15-letnim doświadczeniem w technologii, która powstała 3 lata temu. Wynagrodzenie: konkurencyjne (dla stażysty).",
+   "reply": null
+  },
+  {
+   "id": 12,
+   "company": "Pizzeria u Stefana",
+   "hiring": false,
+   "title": "Dostawca/Dostawczyni",
+   "description": "Rozwozisz pizzę po mieście. Wymagany własny rower i odporność na pytania „a gdzie moje zamówienie?”.",
+   "reply": "Cześć! Szukaliśmy kogoś z rowerem, a w formularzu nie było o rowerze ani słowa. Pozdrawiamy, Stefan (i pizza)."
+  },
+  {
+   "id": 13,
+   "company": "Agencja Kreatywna BUZZ",
+   "hiring": false,
+   "title": "Stażysta/ka ds. wszystkiego",
+   "description": "Bezpłatny staż z możliwością bezpłatnego przedłużenia. Oferujemy doświadczenie, ekspozycję i darmową wodę z kranu.",
+   "reply": "Twoja aplikacja była za mało kreatywna. Następnym razem wyślij ją w formie tańca interpretacyjnego. Zespół BUZZ"
   }
  ]
 }

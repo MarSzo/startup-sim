@@ -5,7 +5,7 @@
 //! `tests/golden/packets.json`.
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 6;
+pub const VERSION: u8 = 7;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
 pub const MAX_PACKET: usize = 1200;
@@ -13,6 +13,8 @@ pub const MAX_NICK_BYTES: usize = 16;
 /// Max UTF-8 bytes of longer texts (speech, offers, questions, options).
 pub const MAX_TEXT_BYTES: usize = 240;
 pub const MAX_SAY_BYTES: usize = MAX_TEXT_BYTES;
+/// Max UTF-8 bytes of a mail body.
+pub const MAX_MAIL_BYTES: usize = 600;
 /// Max answer options of a recruitment question.
 pub const MAX_OPTIONS: usize = 4;
 /// Max inputs carried in one Input packet.
@@ -41,6 +43,17 @@ pub mod ty {
     pub const QUESTION: u8 = 14;
     pub const ANSWER: u8 = 15;
     pub const RECRUIT_RESULT: u8 = 16;
+    pub const MAIL: u8 = 17;
+    pub const PORTAL_ACTION: u8 = 18;
+}
+
+/// `Mail::action` / `PortalAction::action`.
+pub mod portal_action {
+    pub const NONE: u8 = 0;
+    /// Join the online interview for offer `arg`.
+    pub const JOIN_INTERVIEW: u8 = 1;
+    /// Hired: go to the office (spawn in the world).
+    pub const GO_TO_OFFICE: u8 = 2;
 }
 
 pub mod reject {
@@ -147,6 +160,9 @@ pub struct PlayerInfoEntry {
 pub struct OfferInfo {
     pub id: u8,
     pub department: u8,
+    /// This player has already applied (pending, invited or answered).
+    pub applied: bool,
+    pub company: String,
     pub title: String,
     pub description: String,
 }
@@ -186,13 +202,18 @@ pub enum Packet {
     Say { id: u16, text: String },
     /// Job portal: the offers (resent every second while on the portal).
     JobOffers { offers: Vec<OfferInfo> },
-    /// Candidate applies for an offer: starts a new attempt.
-    Apply { token: u32, offer: u8 },
+    /// Application form sent for an offer (`motivation`: free text).
+    Apply { token: u32, offer: u8, motivation: String },
     /// Current recruitment question (resent every second until answered).
     Question { attempt: u8, index: u8, total: u8, text: String, options: Vec<String> },
     Answer { token: u32, attempt: u8, index: u8, choice: u8 },
-    /// Outcome of an attempt. On success the player spawns in the world.
+    /// Outcome of an interview (a mail follows).
     RecruitResult { attempt: u8, passed: bool, score: u8, total: u8, department: u8 },
+    /// A message in the in-game mailbox (resent while on the desktop; the
+    /// client dedupes by `id`). `action`: `portal_action::*` button.
+    Mail { id: u8, from: String, subject: String, body: String, action: u8, arg: u8 },
+    /// Desktop button pressed (join interview / go to the office).
+    PortalAction { token: u32, action: u8, arg: u8 },
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -312,6 +333,8 @@ impl Packet {
             Packet::Question { .. } => ty::QUESTION,
             Packet::Answer { .. } => ty::ANSWER,
             Packet::RecruitResult { .. } => ty::RECRUIT_RESULT,
+            Packet::Mail { .. } => ty::MAIL,
+            Packet::PortalAction { .. } => ty::PORTAL_ACTION,
         }
     }
 
@@ -425,13 +448,16 @@ impl Packet {
                 for o in offers.iter().take(16) {
                     w.u8(o.id);
                     w.u8(o.department);
+                    w.u8(o.applied as u8);
+                    w.str16(&o.company, MAX_TEXT_BYTES);
                     w.str16(&o.title, MAX_TEXT_BYTES);
                     w.str16(&o.description, MAX_TEXT_BYTES);
                 }
             }
-            Packet::Apply { token, offer } => {
+            Packet::Apply { token, offer, motivation } => {
                 w.u32(*token);
                 w.u8(*offer);
+                w.str16(motivation, MAX_TEXT_BYTES);
             }
             Packet::Question { attempt, index, total, text, options } => {
                 w.u8(*attempt);
@@ -455,6 +481,19 @@ impl Packet {
                 w.u8(*score);
                 w.u8(*total);
                 w.u8(*department);
+            }
+            Packet::Mail { id, from, subject, body, action, arg } => {
+                w.u8(*id);
+                w.str16(from, MAX_TEXT_BYTES);
+                w.str16(subject, MAX_TEXT_BYTES);
+                w.str16(body, MAX_MAIL_BYTES);
+                w.u8(*action);
+                w.u8(*arg);
+            }
+            Packet::PortalAction { token, action, arg } => {
+                w.u32(*token);
+                w.u8(*action);
+                w.u8(*arg);
             }
         }
         w.0
@@ -569,13 +608,15 @@ impl Packet {
                     offers.push(OfferInfo {
                         id: r.u8()?,
                         department: r.u8()?,
+                        applied: r.u8()? != 0,
+                        company: r.str16(MAX_TEXT_BYTES)?,
                         title: r.str16(MAX_TEXT_BYTES)?,
                         description: r.str16(MAX_TEXT_BYTES)?,
                     });
                 }
                 Packet::JobOffers { offers }
             }
-            ty::APPLY => Packet::Apply { token: r.u32()?, offer: r.u8()? },
+            ty::APPLY => Packet::Apply { token: r.u32()?, offer: r.u8()?, motivation: r.str16(MAX_TEXT_BYTES)? },
             ty::QUESTION => {
                 let (attempt, index, total) = (r.u8()?, r.u8()?, r.u8()?);
                 let text = r.str16(MAX_TEXT_BYTES)?;
@@ -599,6 +640,15 @@ impl Packet {
                 };
                 Packet::RecruitResult { attempt, passed, score: r.u8()?, total: r.u8()?, department: r.u8()? }
             }
+            ty::MAIL => Packet::Mail {
+                id: r.u8()?,
+                from: r.str16(MAX_TEXT_BYTES)?,
+                subject: r.str16(MAX_TEXT_BYTES)?,
+                body: r.str16(MAX_MAIL_BYTES)?,
+                action: r.u8()?,
+                arg: r.u8()?,
+            },
+            ty::PORTAL_ACTION => Packet::PortalAction { token: r.u32()?, action: r.u8()?, arg: r.u8()? },
             other => return Err(DecodeError::UnknownType(other)),
         };
         if r.pos != b.len() {
@@ -719,12 +769,26 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
             "job_offers",
             Packet::JobOffers {
                 offers: vec![
-                    OfferInfo { id: 1, department: 1, title: "Programista/ka".into(), description: "Owocowe czwartki.".into() },
-                    OfferInfo { id: 2, department: 2, title: "Marketing i sprzedaż".into(), description: "Kubek z logo.".into() },
+                    OfferInfo {
+                        id: 1,
+                        department: 1,
+                        applied: true,
+                        company: "Startup Sim sp. z o.o.".into(),
+                        title: "Programista/ka".into(),
+                        description: "Owocowe czwartki.".into(),
+                    },
+                    OfferInfo {
+                        id: 12,
+                        department: 0,
+                        applied: false,
+                        company: "Pizzeria u Stefana".into(),
+                        title: "Dostawca/Dostawczyni".into(),
+                        description: "Własny rower.".into(),
+                    },
                 ],
             },
         ),
-        ("apply", Packet::Apply { token: 0x01020304, offer: 2 }),
+        ("apply", Packet::Apply { token: 0x01020304, offer: 2, motivation: "Lubię kawę i wyzwania.".into() }),
         (
             "question",
             Packet::Question {
@@ -737,6 +801,18 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
         ),
         ("answer", Packet::Answer { token: 0x01020304, attempt: 3, index: 1, choice: 2 }),
         ("recruit_result", Packet::RecruitResult { attempt: 3, passed: true, score: 2, total: 3, department: 1 }),
+        (
+            "mail",
+            Packet::Mail {
+                id: 2,
+                from: "Startup Sim — Rekrutacja".into(),
+                subject: "Zaproszenie na rozmowę".into(),
+                body: "Cześć Ola! Zapraszamy na rozmowę online.".into(),
+                action: portal_action::JOIN_INTERVIEW,
+                arg: 1,
+            },
+        ),
+        ("portal_action", Packet::PortalAction { token: 0x01020304, action: portal_action::GO_TO_OFFICE, arg: 0 }),
     ]
 }
 
@@ -794,7 +870,7 @@ mod tests {
                 b[0] = 0x54;
                 b[1] = 0x53;
                 b[2] = VERSION;
-                b[3] = rng.u8(1..=16);
+                b[3] = rng.u8(1..=18);
             }
             let _ = Packet::decode(&b);
         }

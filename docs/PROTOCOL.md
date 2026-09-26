@@ -1,4 +1,4 @@
-# Protokół sieciowy (wersja 6)
+# Protokół sieciowy (wersja 7)
 
 Własny binarny protokół na UDP. Implementacje:
 - serwer: `server/src/protocol.rs` (źródło prawdy),
@@ -23,7 +23,7 @@ przez `cargo test` i czytane przez `client/tests/run_tests.gd`.
 | pole    | typ | wartość |
 |---------|-----|---------|
 | magic   | u16 | `0x5354` (bajty `54 53`, „TS”) |
-| version | u8  | `6` |
+| version | u8  | `7` |
 | type    | u8  | typ pakietu (niżej) |
 
 ## Jednostki
@@ -168,26 +168,34 @@ Wypowiedź pokazywana w dymku nad postacią i w logu na dole ekranu. Trafia do
 wszystkich w tym samym `(piętro, pokój)` co mówiący oraz do gracza, do którego
 jest skierowana. Bez retransmisji (zgubiona linia przepada — to tylko dialog).
 
-### 12–16 Portal z ofertami i rekrutacja
+### 12–18 Pulpit: portal z ofertami, poczta, rozmowa online
 
 Nowy gracz po `Welcome` **nie jest jeszcze w świecie** (nie dostaje
-snapshotów, jego inputy są ignorowane): jest na portalu z ofertami. Serwer
-**co 1 s ponawia bieżący ekran** (oferty albo aktualne pytanie), więc zgubiony
-pakiet nie blokuje rekrutacji; klient, widząc ponownie ekran, na który już
-odpowiedział, wysyła swoją odpowiedź jeszcze raz.
+snapshotów, jego inputy są ignorowane): siedzi w domu przy komputerze. Serwer
+**co 1 s ponawia stan pulpitu** — listę ofert (z flagą „zaaplikowano”) i
+bieżące pytanie rozmowy, a co 2 s całą skrzynkę odbiorczą — więc zgubiony
+pakiet niczego nie blokuje; klient ponawia swoją ostatnią akcję, jeśli stan
+serwera pokazuje, że do niego nie dotarła.
+
+Przebieg: `Apply` (formularz) → po `invite_delay_secs` `Mail` z zaproszeniem
+(`action` 1, `arg` = oferta) → `PortalAction(1)` → `Question`/`Answer` ×3 →
+`RecruitResult` + `Mail` (sukces: zaproszenie na dzień próbny, `action` 2;
+porażka: podziękowanie, można aplikować ponownie) → `PortalAction(2)` →
+gracz pojawia się przed budynkiem. Inne firmy odpowiadają `Mail` z odmową
+(bez akcji) albo milczą.
 
 | typ | kierunek | treść |
 |-----|----------|-------|
-| 12 `JobOffers` | S→C | n u8, n × {`id u8`, `department u8`, `title` u16 len + UTF-8, `description` u16 len + UTF-8} |
-| 13 `Apply` | C→S | token u32, offer u8 — zaczyna nową próbę (losowe pytania oferty) |
+| 12 `JobOffers` | S→C | n u8, n × {`id u8`, `department u8` (0 = inna firma), `applied u8`, `company` str16, `title` str16, `description` str16} — lista może przyjść w kilku pakietach (≤ 1200 B każdy); klient scala po `id` |
+| 13 `Apply` | C→S | token u32, offer u8, `motivation` str16 („Dlaczego chcesz u nas pracować?”) |
 | 14 `Question` | S→C | attempt u8, index u8, total u8, `text` str16, n u8 (≤ 4), n × `option` str16 (kolejność potasowana) |
 | 15 `Answer` | C→S | token u32, attempt u8, index u8, choice u8 — odpowiedzi nieaktualne (inna próba / pytanie) są ignorowane |
 | 16 `RecruitResult` | S→C | attempt u8, passed u8 (0/1), score u8, total u8, department u8 — wysyłany 2× |
+| 17 `Mail` | S→C | id u8, `from` str16, `subject` str16, `body` str16 (≤ 600 B), action u8 (0 brak, 1 dołącz do rozmowy, 2 idę do biura), arg u8 |
+| 18 `PortalAction` | C→S | token u32, action u8, arg u8 — przycisk z maila |
 
-Zasady (`server/data/recruitment.json`): 3 losowe pytania z puli oferty, 2
-poprawne = przyjęcie. Poprawne odpowiedzi zna tylko serwer. Po przyjęciu
-gracz pojawia się przed budynkiem (pierwszy `Snapshot` = potwierdzenie, nawet
-gdy `RecruitResult` zginie); po porażce wraca na listę ofert.
+Zasady (`server/data/recruitment.json`): 3 losowe pytania z puli stanowiska, 2
+poprawne = przyjęcie. Poprawne odpowiedzi zna tylko serwer.
 
 ## Połączenie i timeouty
 
@@ -247,6 +255,7 @@ szyfrowaniem.
 
 ## Historia wersji
 
+- **7** — pulpit: firmy i flaga `applied` w `JobOffers` (dzielonych na pakiety), `motivation` w `Apply`, `Mail`, `PortalAction`.
 - **6** — profil postaci w `Connect` (płeć, wiek, wygląd, miejscowość, e-mail); płeć i wygląd w `PlayerInfo`; `Reject(4)`.
 - **5** — `self_status` w snapshocie, bity czynności 6–7 we `flags` encji; `Say` także od graczy.
 - **4** — portal i rekrutacja (typy 12–16); `department` w `PlayerInfo`.
