@@ -200,7 +200,7 @@ spotkanie umawia się w kalendarzu (aplikacja na komputerze).
 słodycze** w ograniczonej ilości (teraz decyduje NPC/serwer, w przyszłości
 gracze).
 
-**Obiady** — aplikacja na komputerze do **zamawiania obiadu** w trakcie pracy
+**Obiady** — *zrobione (10.26)*. Aplikacja na komputerze do **zamawiania obiadu** w trakcie pracy
 (dostawa do biura).
 
 **Model biznesowy (przyszłość)**
@@ -724,6 +724,22 @@ Zastępuje prosty portal z 10.8. Po połączeniu gracz widzi pulpit komputera
   pkt/s, w HUD czerwone ostrzeżenie. Kto nie zdąży do toalety w ~30 s, ma
   „wpadkę”; toaleta leczy żołądek.
 
+### 10.26 Zamawianie obiadów
+
+- **Aplikacja „Obiady”** — trzecia zakładka na komputerze. Sześć dań z
+  fikcyjnych lokali: pierogi ruskie (Pierogarnia u Zosi, 24 zł), pizza
+  margherita (Pizza Bella, 32 zł), zestaw sushi (Sushi Koi, 45 zł), schabowy
+  (Bar Mleczny „Pod Kogutem”, 22 zł), sałatka z kurczakiem (Zielona Miska,
+  27 zł), kebab (Kebab u Ahmeda, 25 zł) — każde z czasem dostawy (25–50 min)
+  i działaniem: mocno syci, zwykle trochę usypia, obniża stres.
+- **Zamówienia 10:00–15:00**, jedno naraz; płaci **konto właściciela
+  komputera** (z cudzego odblokowanego laptopa można więc komuś zamówić
+  obiad na jego koszt).
+- **Dostawa na recepcję** (piętro 1) po czasie dostawy ±10 min, w deszczu +15
+  min. Recepcja daje znać zamawiającemu („Kurier był! Kebab czeka na
+  recepcji.”), E przy recepcji = pudełko do rąk (trzeba mieć wolne ręce), F =
+  zjedz. Nieodebrane obiady wieczorem trafiają do kosza.
+
 ### 10.6 Stan implementacji
 
 *Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie,
@@ -760,6 +776,9 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Ekwipunek**: kieszenie i ręce, przedmioty (przepustka, karta, laptop,
   kawa), upuszczanie / podnoszenie / podawanie, dostęp z przedmiotów (10.13);
   protokół v8.
+- **Zamawianie obiadów**: aplikacja z menu 6 dań, płatność z konta
+  właściciela komputera, dostawa na recepcję z powiadomieniem (10.26);
+  protokół v21.
 - **Słodycze i nieświeże owoce**: losowe tace w chill roomie z ogłoszeniem na
   #ogólny, rozstrój żołądka po nieświeżym owocu (10.25); protokół v20.
 - **Kalendarz i zarząd**: Prezes i Wspólniczka, drzwi otwierane na spotkanie,
@@ -795,12 +814,12 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Sieć mobilna**: serwer dual-stack IPv4/IPv6; gracz identyfikowany tokenem
   (zmiana adresu w trakcie gry przenosi sesję); klient przepina gniazdo po
   ciszy/powrocie z tła i sam łączy się ponownie po utracie sesji.
-- **Testy**: 86 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
+- **Testy**: 87 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
   zależna od uprawnień, bramki, ruch/kolizje, schody, winda, nawigacja,
-  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, zegar, dojazd, pogoda, zarząd, słodycze, protokół), 2 golden, 22 e2e serwera
+  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, zegar, dojazd, pogoda, zarząd, słodycze, obiady, protokół), 2 golden, 23 e2e serwera
   (m.in. portal: odrzucenie → przyjęcie → spawn; całe wdrożenie aż do karty;
   niewidoczność między piętrami; zgodność stanu serwera z predykcją) —
-  łącznie 110 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 porannego dojazdu samochodem moknięcia w deszczu spotkania z Prezesem i tacy ze słodyczami); 140 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
+  łącznie 112 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 porannego dojazdu samochodem moknięcia w deszczu spotkania z Prezesem tacy ze słodyczami i obiadu z odbiorem na recepcji); 142 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
   adresów).
 
 #### Pomiary (MacBook, wszystko lokalnie)

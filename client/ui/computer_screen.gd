@@ -5,11 +5,14 @@
 extends Control
 
 const Protocol = preload("res://net/protocol.gd")
+const ItemArt = preload("res://game/item_art.gd")
 
 ## ComputerAction to send: action, conversation, argument, text.
 signal action(action: int, conv: int, arg: int, text: String)
 ## Calendar: book `start` for `topic` (0 = cancel).
 signal book(start: int, topic: int)
+## Lunch app: order `dish`.
+signal order(dish: int)
 
 const SYNC_MSEC := 1000
 const RESEND_MSEC := 800
@@ -57,6 +60,12 @@ var _cal_list := VBoxContainer.new()
 var _tab_chat: Button
 var _tab_cal: Button
 var _cal_sig := ""
+var lunch := {}                 # last LunchMenu packet
+var _lunch_view := VBoxContainer.new()
+var _lunch_status := Label.new()
+var _lunch_list := VBoxContainer.new()
+var _lunch_sig := ""
+var _tab_lunch: Button
 
 
 func _ready() -> void:
@@ -205,6 +214,10 @@ func dev_command(cmd: String) -> void:
 		"unlock": action.emit(Protocol.PC_UNLOCK, 0, 0, "")
 		"take": action.emit(Protocol.PC_TAKE, 0, 0, "")
 		"close": action.emit(Protocol.PC_CLOSE, 0, 0, "")
+		"lunch":  # lunch:<dish kind>
+			_set_tab("lunch")
+			if parts.size() > 1:
+				order.emit(int(parts[1]))
 		"cal":  # cal:<hh*60+mm>:<topic>
 			_set_tab("calendar")
 			if parts.size() > 2:
@@ -276,6 +289,9 @@ func _build() -> void:
 	_tab_cal = _button("Kalendarz", false)
 	_tab_cal.pressed.connect(func(): _set_tab("calendar"))
 	row.add_child(_tab_cal)
+	_tab_lunch = _button("Obiady", false)
+	_tab_lunch.pressed.connect(func(): _set_tab("lunch"))
+	row.add_child(_tab_lunch)
 	_style_label(_as_owner, 14, Color("#ffcf6e"))
 	_as_owner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(_as_owner)
@@ -395,6 +411,26 @@ func _build() -> void:
 	_cal_view.add_child(cs)
 	cal_pad.name = "cal_pad"
 
+	# Lunch app.
+	var lunch_pad := MarginContainer.new()
+	lunch_pad.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	for sd in ["left", "right", "top", "bottom"]:
+		lunch_pad.add_theme_constant_override("margin_" + sd, 18)
+	lunch_pad.name = "lunch_pad"
+	_lunch_view.add_theme_constant_override("separation", 10)
+	lunch_pad.add_child(_lunch_view)
+	_screen.add_child(lunch_pad)
+	var lh := Label.new()
+	_style_label(lh, 20, Color("#1c2430"))
+	lh.text = "Obiady do biura — dostawa na recepcję (piętro 1)"
+	_lunch_view.add_child(lh)
+	_style_label(_lunch_status, 15, Color("#3d5a86"))
+	_lunch_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_lunch_status.custom_minimum_size = Vector2(600, 0)
+	_lunch_view.add_child(_lunch_status)
+	_lunch_list.add_theme_constant_override("separation", 6)
+	_lunch_view.add_child(_lunch_list)
+
 	# Lock screen.
 	_lock_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_lock_view.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -436,6 +472,9 @@ func _render() -> void:
 	_as_owner.text = "" if mine else "Uwaga: piszesz jako %s!" % owner_name
 	_chat_view.visible = not state.locked and tab == "chat"
 	_screen.get_node("cal_pad").visible = not state.locked and tab == "calendar"
+	_screen.get_node("lunch_pad").visible = not state.locked and tab == "lunch"
+	_tab_lunch.visible = not state.locked
+	_tab_lunch.modulate = Color(1, 1, 1, 1.0 if tab == "lunch" else 0.6)
 	_tab_chat.visible = not state.locked
 	_tab_cal.visible = not state.locked
 	_tab_chat.modulate = Color(1, 1, 1, 1.0 if tab == "chat" else 0.6)
@@ -450,6 +489,9 @@ func _render() -> void:
 	if tab == "calendar":
 		_render_calendar()
 		return
+	if tab == "lunch":
+		_render_lunch()
+		return
 	_render_sidebar()
 	var c := _conv(current)
 	_conv_title.text = c.get("title", "")
@@ -460,7 +502,70 @@ func _render() -> void:
 func _set_tab(t: String) -> void:
 	tab = t
 	_cal_sig = ""
+	_lunch_sig = ""
 	_render()
+
+
+func on_lunch(p: Dictionary) -> void:
+	lunch = p
+	if visible and tab == "lunch":
+		_render_lunch()
+
+
+func _render_lunch() -> void:
+	if lunch.is_empty():
+		_lunch_status.text = "Ładowanie menu…"
+		return
+	var sig := JSON.stringify(lunch)
+	if sig == _lunch_sig:
+		return
+	_lunch_sig = sig
+	var dish_name := ""
+	for d in lunch.dishes:
+		if d.kind == lunch.dish:
+			dish_name = d.name
+	match lunch.state:
+		Protocol.LUNCH_ORDERED:
+			_lunch_status.text = "Zamówione: %s — kurier będzie ok. %s." % [dish_name, _hhmm(lunch.arrives)]
+		Protocol.LUNCH_WAITING:
+			_lunch_status.text = "%s czeka na recepcji — odbierz przy biurku recepcji (E)." % dish_name
+		Protocol.LUNCH_CLOSED:
+			_lunch_status.text = "Zamówienia przyjmujemy od 10:00 do 15:00."
+		_:
+			_lunch_status.text = "Wybierz danie — płaci konto właściciela komputera (%s)." % name_of.call(state.get("owner", 0))
+	for c in _lunch_list.get_children():
+		c.queue_free()
+	for d in lunch.dishes:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 12)
+		var icon := Control.new()
+		icon.custom_minimum_size = Vector2(32, 32)
+		var k: int = d.kind
+		icon.draw.connect(func(): ItemArt.draw(icon, k, Vector2.ZERO, 2.0))
+		row.add_child(icon)
+		var info := VBoxContainer.new()
+		info.custom_minimum_size = Vector2(320, 0)
+		info.add_theme_constant_override("separation", 0)
+		var n := Label.new()
+		_style_label(n, 16, Color("#1c2430"))
+		n.text = d.name
+		info.add_child(n)
+		var r := Label.new()
+		_style_label(r, 13, Color("#8a93a3"))
+		r.text = "%s · ok. %d min" % [d.restaurant, d.eta]
+		info.add_child(r)
+		row.add_child(info)
+		var price := Label.new()
+		_style_label(price, 16, Color("#8f5a1a"))
+		price.text = "%d,%02d zł" % [d.price / 100, d.price % 100]
+		price.custom_minimum_size = Vector2(90, 0)
+		row.add_child(price)
+		var b := _button("Zamów", true)
+		b.disabled = lunch.state != Protocol.LUNCH_NONE
+		b.modulate = Color(1, 1, 1, 0.4 if b.disabled else 1.0)
+		b.pressed.connect(func(): order.emit(k))
+		row.add_child(b)
+		_lunch_list.add_child(row)
 
 
 func on_calendar(p: Dictionary) -> void:

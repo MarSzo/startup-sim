@@ -35,6 +35,13 @@ pub mod kind {
     pub const DONUT: u8 = 25;
     pub const COOKIE: u8 = 26;
     pub const CHEESECAKE: u8 = 27;
+    // Lunch boxes (ordered in the app, see `lunch`).
+    pub const PIEROGI: u8 = 28;
+    pub const PIZZA: u8 = 29;
+    pub const SUSHI: u8 = 30;
+    pub const SCHNITZEL: u8 = 31;
+    pub const SALAD: u8 = 32;
+    pub const KEBAB: u8 = 33;
 }
 
 pub const POCKETS: usize = 3;
@@ -45,6 +52,7 @@ pub fn is_small(k: u8) -> bool {
         // Shop goods fit in a pocket, except the bulky ones.
         kind::BURGER | kind::FRIES | kind::WINE => false,
         10..=27 => true,
+        28..=33 => false, // lunch boxes: both hands
         _ => false,
     }
 }

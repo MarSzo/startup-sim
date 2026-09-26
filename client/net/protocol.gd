@@ -3,7 +3,7 @@
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 20
+const VERSION := 21
 const MAX_PACKET := 1200
 const MAX_NICK_BYTES := 16
 const MAX_SAY_BYTES := 240
@@ -45,6 +45,13 @@ const T_CALENDAR := 31
 const T_CALENDAR_BOOK := 32
 const T_DIALOG := 33
 const T_DIALOG_ANSWER := 34
+const T_LUNCH_MENU := 35
+const T_LUNCH_ORDER := 36
+# LunchMenu.state
+const LUNCH_NONE := 0
+const LUNCH_ORDERED := 1
+const LUNCH_WAITING := 2
+const LUNCH_CLOSED := 3
 # Calendar slot states, meeting topics (server/src/board.rs).
 const SLOT_FREE := 0
 const SLOT_TAKEN := 1
@@ -274,6 +281,13 @@ static func encode_calendar_book(token: int, start: int, topic: int) -> PackedBy
 	return b.data_array
 
 
+static func encode_lunch_order(token: int, dish: int) -> PackedByteArray:
+	var b := _writer(T_LUNCH_ORDER)
+	b.put_u32(token)
+	b.put_u8(dish)
+	return b.data_array
+
+
 static func encode_dialog_answer(token: int, id: int, choice: int) -> PackedByteArray:
 	var b := _writer(T_DIALOG_ANSWER)
 	b.put_u32(token)
@@ -486,6 +500,17 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			for i in n:
 				slots.append({"start": r.u16(), "state": r.u8()})
 			p.slots = slots
+		T_LUNCH_MENU:
+			p.state = r.u8()
+			p.dish = r.u8()
+			p.arrives = r.u16()
+			var n := r.u8()
+			if n > 12:
+				return {}
+			var dishes := []
+			for i in n:
+				dishes.append({"kind": r.u8(), "price": r.u32(), "eta": r.u8(), "name": r.str16(64), "restaurant": r.str16(64)})
+			p.dishes = dishes
 		T_DIALOG:
 			p.id = r.u8()
 			p.npc = r.u16()

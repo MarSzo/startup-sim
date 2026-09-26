@@ -28,12 +28,20 @@ const UMBRELLA := 24
 const DONUT := 25
 const COOKIE := 26
 const CHEESECAKE := 27
+const PIEROGI := 28
+const PIZZA := 29
+const SUSHI := 30
+const SCHNITZEL := 31
+const SALAD := 32
+const KEBAB := 33
 
 const NAMES := {GUEST_PASS: "Przepustka gościa", EMPLOYEE_CARD: "Karta pracownika", LAPTOP: "Laptop", COFFEE: "Kawa", FRUIT: "Owoc",
 	SANDWICH_CHEESE: "Kanapka z serem", SANDWICH_HAM: "Kanapka z szynką", WRAP: "Wrap wege", BURGER: "Hamburger",
 	FRIES: "Frytki", BUN: "Drożdżówka", BAR: "Batonik", CHIPS: "Chipsy", WATER: "Woda", ENERGY_DRINK: "Energetyk",
 	JUICE: "Sok pomarańczowy", BEER: "Piwo", WINE: "Wino", CIGARETTES: "Papierosy", UMBRELLA: "Parasol",
-	DONUT: "Pączek", COOKIE: "Ciastko", CHEESECAKE: "Kawałek sernika"}
+	DONUT: "Pączek", COOKIE: "Ciastko", CHEESECAKE: "Kawałek sernika",
+	PIEROGI: "Pierogi ruskie", PIZZA: "Pizza margherita", SUSHI: "Zestaw sushi", SCHNITZEL: "Schabowy z ziemniakami",
+	SALAD: "Sałatka z kurczakiem", KEBAB: "Kebab"}
 const SMALL := [GUEST_PASS, EMPLOYEE_CARD, FRUIT, SANDWICH_CHEESE, SANDWICH_HAM, WRAP, BUN, BAR, CHIPS, WATER,
 	ENERGY_DRINK, JUICE, BEER, CIGARETTES, UMBRELLA, DONUT, COOKIE, CHEESECAKE]
 
@@ -155,6 +163,26 @@ static func draw(c: CanvasItem, kind: int, o: Vector2, s: float) -> void:
 			r.call(3, 6, 10, 7, Color("#f4e3b5"))
 			r.call(3, 11, 10, 2, Color("#b5824a"))
 			r.call(3, 6, 10, 1, Color("#e8c77a"))
+		PIZZA:
+			# Pizza box.
+			r.call(1, 3, 14, 11, Color("#1c1c24"))
+			r.call(2, 4, 12, 9, Color("#e8d3a0"))
+			r.call(4, 6, 8, 5, Color("#c0392b"))
+			r.call(5, 7, 2, 1, Color("#f7f1e3"))
+			r.call(9, 8, 2, 1, Color("#f7f1e3"))
+		SUSHI:
+			r.call(1, 5, 14, 8, Color("#1c1c24"))
+			r.call(2, 6, 12, 6, Color("#2c2f36"))
+			for sx in [3, 7, 11]:
+				r.call(sx, 7, 3, 3, Color("#f4f1ea"))
+				r.call(sx + 1, 8, 1, 1, Color("#e67e22"))
+		PIEROGI, SCHNITZEL, SALAD, KEBAB:
+			# Takeaway box with a coloured sticker.
+			var sticker: Color = {PIEROGI: Color("#f1c40f"), SCHNITZEL: Color("#c0392b"), SALAD: Color("#27ae60"), KEBAB: Color("#e67e22")}[kind]
+			r.call(2, 4, 12, 10, Color("#1c1c24"))
+			r.call(3, 5, 10, 8, Color("#d9d2c4"))
+			r.call(3, 5, 10, 2, Color("#b8ad99"))
+			r.call(6, 8, 4, 3, sticker)
 		UMBRELLA:
 			# Folded umbrella: canopy strap, shaft, J handle.
 			r.call(6, 1, 4, 10, Color("#1c1c24"))

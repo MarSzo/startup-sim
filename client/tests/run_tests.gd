@@ -54,6 +54,7 @@ func test_protocol(path: String) -> void:
 		"commute_choice": Protocol.encode_commute_choice(0x01020304, 5),
 		"calendar_book": Protocol.encode_calendar_book(0x01020304, 840, 2),
 		"dialog_answer": Protocol.encode_dialog_answer(0x01020304, 3, 1),
+		"lunch_order": Protocol.encode_lunch_order(0x01020304, 29),
 		"computer_action": Protocol.encode_computer_action(0x01020304, Protocol.PC_SEND, 17, 42, "Kto zjadł mój jogurt?"),
 		"answer": Protocol.encode_answer(0x01020304, 3, 1, 2),
 	}
@@ -90,6 +91,9 @@ func test_protocol(path: String) -> void:
 	var cal := Protocol.decode(golden["calendar"].hex_decode())
 	expect(cal.get("type") == Protocol.T_CALENDAR and cal.mine_start == 840 and cal.mine_topic == 1 and cal.slots.size() == 4
 		and cal.slots[3].state == Protocol.SLOT_MINE and cal.slots[1].start == 630, "decode calendar %s" % cal)
+	var lm := Protocol.decode(golden["lunch_menu"].hex_decode())
+	expect(lm.get("type") == Protocol.T_LUNCH_MENU and lm.state == Protocol.LUNCH_ORDERED and lm.dish == 28 and lm.arrives == 760
+		and lm.dishes.size() == 1 and lm.dishes[0].price == 2400 and lm.dishes[0].restaurant == "Pierogarnia u Zosi", "decode lunch menu %s" % lm)
 	var dl := Protocol.decode(golden["dialog"].hex_decode())
 	expect(dl.get("type") == Protocol.T_DIALOG and dl.id == 3 and dl.npc == 61444 and dl.options.size() == 2
 		and dl.text.begins_with("Podwyżka"), "decode dialog %s" % dl)

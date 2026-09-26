@@ -251,6 +251,7 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 	screen.my_id = net.player_id
 	screen.name_of = func(id: int) -> String: return nick if id == net.player_id else nicks.get(id, "?")
 	screen.action.connect(_computer_action)
+	screen.order.connect(func(dish: int): if net.is_playing(): net.send(Protocol.encode_lunch_order(net.token, dish)))
 	screen.book.connect(func(start: int, topic: int): if net.is_playing(): net.send(Protocol.encode_calendar_book(net.token, start, topic)))
 	status_layer.add_child(dialog)
 	dialog.name_of = func(id: int) -> String: return nicks.get(id, "?")
@@ -560,6 +561,8 @@ func _on_packet(p: Dictionary) -> void:
 			screen.on_computer(p)
 		Protocol.T_CALENDAR:
 			screen.on_calendar(p)
+		Protocol.T_LUNCH_MENU:
+			screen.on_lunch(p)
 		Protocol.T_DIALOG:
 			dialog.on_dialog(p)
 		Protocol.T_CHAT:

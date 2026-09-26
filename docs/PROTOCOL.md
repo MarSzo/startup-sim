@@ -1,4 +1,4 @@
-# Protokół sieciowy (wersja 20)
+# Protokół sieciowy (wersja 21)
 
 Własny binarny protokół na UDP. Implementacje:
 - serwer: `server/src/protocol.rs` (źródło prawdy),
@@ -23,7 +23,7 @@ przez `cargo test` i czytane przez `client/tests/run_tests.gd`.
 | pole    | typ | wartość |
 |---------|-----|---------|
 | magic   | u16 | `0x5354` (bajty `54 53`, „TS”) |
-| version | u8  | `20` |
+| version | u8  | `21` |
 | type    | u8  | typ pakietu (niżej) |
 
 ## Jednostki
@@ -324,6 +324,16 @@ Rozmowa z NPC (spotkanie z zarządem): `id u8` (0 = zamknij okno), `npc u16`,
 `DialogAnswer`: token u32, id u8, choice u8 — odpowiedzi na nieaktualne `id`
 są ignorowane. Odpowiedzi NPC idą jako `Say`.
 
+### 35 `LunchMenu` (S→C), 36 `LunchOrder` (C→S)
+
+Aplikacja obiadowa dla konta komputera, przy którym siedzi odbiorca (co 1 s):
+`state u8` (0 można zamawiać, 1 zamówione, 2 czeka na recepcji, 3 poza
+godzinami 10–15), `dish u8`, `arrives u16` (minuta przyjazdu albo 0xFFFF), n u8
+× {`kind u8`, `price u32` (grosze), `eta u8` (min), `name` str16, `restaurant`
+str16}. `LunchOrder`: token u32, dish u8. Dania to przedmioty 28 pierogi, 29
+pizza, 30 sushi, 31 schabowy, 32 sałatka, 33 kebab (tylko w rękach). Odbiór:
+E przy NPC „Recepcja”.
+
 ### 27 `Shelf` (S→C), 28 `ShopTake` (C→S)
 
 `Shelf` — odpowiedź na E przy półce sklepowej: shelf u8, title str16, n u8 (≤ 16),
@@ -395,6 +405,7 @@ szyfrowaniem.
 
 ## Historia wersji
 
+- **21** — obiady: `LunchMenu`, `LunchOrder`, przedmioty 28–33.
 - **20** — słodycze: encja tacy (`kind` 5: `held` = słodycz, `activity` = liczba sztuk), przedmioty 25 pączek, 26 ciastko, 27 sernik, `Stats.flags` bit 1 = rozstrój żołądka.
 - **19** — zarząd: `Calendar`, `CalendarBook`, `Dialog`, `DialogAnswer`, uprawnienie 8 (drzwi zarządu).
 - **18** — pogoda: `Clock` + `weather`, flaga parasola (bit 3 u graczy), przedmiot 24 = parasol.

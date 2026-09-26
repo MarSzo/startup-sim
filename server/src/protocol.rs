@@ -5,7 +5,7 @@
 //! `tests/golden/packets.json`.
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 20;
+pub const VERSION: u8 = 21;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
 pub const MAX_PACKET: usize = 1200;
@@ -65,6 +65,8 @@ pub mod ty {
     pub const CALENDAR_BOOK: u8 = 32;
     pub const DIALOG: u8 = 33;
     pub const DIALOG_ANSWER: u8 = 34;
+    pub const LUNCH_MENU: u8 = 35;
+    pub const LUNCH_ORDER: u8 = 36;
 }
 
 /// `ItemAction::action`.
@@ -260,6 +262,18 @@ pub struct ShelfItem {
     pub name: String,
 }
 
+/// A dish in the lunch app.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Dish {
+    pub kind: u8,
+    /// Grosze.
+    pub price: u32,
+    /// Typical delivery, game minutes.
+    pub eta: u8,
+    pub name: String,
+    pub restaurant: String,
+}
+
 /// One messenger message.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChatEntry {
@@ -414,6 +428,11 @@ pub enum Packet {
     /// no conversation (close the window). Resent while open.
     Dialog { id: u8, npc: u16, text: String, options: Vec<String> },
     DialogAnswer { token: u32, id: u8, choice: u8 },
+    /// Lunch app (for the account of the computer the receiver sits at):
+    /// order state (`lunch::state`), the dish ordered, its arrival (minute
+    /// of the day or `NO_TIME`), and the menu.
+    LunchMenu { state: u8, dish: u8, arrives: u16, dishes: Vec<Dish> },
+    LunchOrder { token: u32, dish: u8 },
     /// Closed doors (locked toilet stalls, elevator doors) on the receiver's
     /// floor: solid for the simulation. Plus the elevator: the floor it is at
     /// and where it is heading (`NO_FLOOR` = standing). Sent on change and
@@ -556,6 +575,8 @@ impl Packet {
             Packet::CalendarBook { .. } => ty::CALENDAR_BOOK,
             Packet::Dialog { .. } => ty::DIALOG,
             Packet::DialogAnswer { .. } => ty::DIALOG_ANSWER,
+            Packet::LunchMenu { .. } => ty::LUNCH_MENU,
+            Packet::LunchOrder { .. } => ty::LUNCH_ORDER,
             Packet::Doors { .. } => ty::DOORS,
             Packet::DoorAction { .. } => ty::DOOR_ACTION,
         }
@@ -835,6 +856,23 @@ impl Packet {
                 w.u8(*id);
                 w.u8(*choice);
             }
+            Packet::LunchMenu { state, dish, arrives, dishes } => {
+                w.u8(*state);
+                w.u8(*dish);
+                w.u16(*arrives);
+                w.u8(dishes.len().min(12) as u8);
+                for d in dishes.iter().take(12) {
+                    w.u8(d.kind);
+                    w.u32(d.price);
+                    w.u8(d.eta);
+                    w.str16(&d.name, MAX_NICK_BYTES * 4);
+                    w.str16(&d.restaurant, MAX_NICK_BYTES * 4);
+                }
+            }
+            Packet::LunchOrder { token, dish } => {
+                w.u32(*token);
+                w.u8(*dish);
+            }
             Packet::Chat { conv, messages } => {
                 w.u16(*conv);
                 w.u8(messages.len().min(255) as u8);
@@ -1106,6 +1144,25 @@ impl Packet {
                 Packet::Dialog { id, npc, text, options }
             }
             ty::DIALOG_ANSWER => Packet::DialogAnswer { token: r.u32()?, id: r.u8()?, choice: r.u8()? },
+            ty::LUNCH_MENU => {
+                let (state, dish, arrives) = (r.u8()?, r.u8()?, r.u16()?);
+                let n = r.u8()? as usize;
+                if n > 12 {
+                    return Err(DecodeError::Invalid("too many dishes"));
+                }
+                let mut dishes = Vec::with_capacity(n);
+                for _ in 0..n {
+                    dishes.push(Dish {
+                        kind: r.u8()?,
+                        price: r.u32()?,
+                        eta: r.u8()?,
+                        name: r.str16(MAX_NICK_BYTES * 4)?,
+                        restaurant: r.str16(MAX_NICK_BYTES * 4)?,
+                    });
+                }
+                Packet::LunchMenu { state, dish, arrives, dishes }
+            }
+            ty::LUNCH_ORDER => Packet::LunchOrder { token: r.u32()?, dish: r.u8()? },
             ty::CHAT => {
                 let conv = r.u16()?;
                 let n = r.u8()? as usize;
@@ -1365,6 +1422,16 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
         ),
         ("dialog_answer", Packet::DialogAnswer { token: 0x01020304, id: 3, choice: 1 }),
         (
+            "lunch_menu",
+            Packet::LunchMenu {
+                state: 1,
+                dish: 28,
+                arrives: 12 * 60 + 40,
+                dishes: vec![Dish { kind: 28, price: 24_00, eta: 40, name: "Pierogi ruskie".into(), restaurant: "Pierogarnia u Zosi".into() }],
+            },
+        ),
+        ("lunch_order", Packet::LunchOrder { token: 0x01020304, dish: 29 }),
+        (
             "chat",
             Packet::Chat {
                 conv: 17,
@@ -1431,7 +1498,7 @@ mod tests {
                 b[0] = 0x54;
                 b[1] = 0x53;
                 b[2] = VERSION;
-                b[3] = rng.u8(1..=34);
+                b[3] = rng.u8(1..=36);
             }
             let _ = Packet::decode(&b);
         }

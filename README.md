@@ -43,7 +43,7 @@ Np. RTT ~100 ms i 2% strat: `cargo run --release -- --lag-ms 50 --jitter-ms 10 -
 kroki: kafel / pokój na bieżącym piętrze, `E` = wciśnij E, `wait:N` = czekaj —
 tu: rozmowa z portierem, potem schodami do recepcji; też `item:take0|put|drop|give|use` i
 `L` = zamknij/otwórz kabinę, ekran komputera: `pc:say:general|dept|dm:<imię>:<tekst>`, `pc:open:…`, `pc:lock`, `pc:unlock`,
-`pc:take`, `pc:close`, kalendarz `pc:cal:<minuta>:<temat>`; `dlg:<nr>` — odpowiedz w oknie rozmowy),
+`pc:take`, `pc:close`, kalendarz `pc:cal:<minuta>:<temat>`, obiad `pc:lunch:<danie>`; `dlg:<nr>` — odpowiedz w oknie rozmowy),
 `--screenshot=/tmp/x.png --screenshot-delay=5` (zapis klatki i wyjście; kilka czasów
 `--screenshot-delay=5,12,20` zapisuje `x_1.png`, `x_2.png`, … i wychodzi po ostatnim).
 

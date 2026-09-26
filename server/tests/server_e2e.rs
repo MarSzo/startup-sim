@@ -1255,3 +1255,45 @@ fn sweets_tray_in_the_chill_room() {
         assert_eq!(after, Some(pieces - 1), "one piece fewer");
     }
 }
+
+#[test]
+fn lunch_ordered_in_the_app_and_picked_up_at_the_reception() {
+    use game::inventory::kind as item_kind;
+    use proto::computer_action as ca;
+    // 10:30, daytime 30x faster: the courier comes in a few seconds.
+    let (addr, _) = start_server_at(0, true, true, 10 * 60 + 30, 30);
+    let b = building();
+    let (mut ola, _) = Client::connect(addr, "Ola"); // IT, at her desk, 200 zł
+    let ws = game::computer::find_workstations(&b);
+    let w = ws.iter().find(|w| w.room_name == "IT / Produkt").unwrap();
+    let body = Body { access: access::CARD, ..Body::at(w.floor, Pos::tile_center(w.tile.x, w.tile.y + 1)) };
+    let body = ola.press_e(&b, body);
+    std::thread::sleep(Duration::from_millis(150));
+    let body = ola.press_e(&b, body);
+    let dishes = wait_for(&ola, &[], Duration::from_millis(1500), |p| match p {
+        Packet::LunchMenu { state: 0, dishes, .. } => Some(dishes.len()),
+        _ => None,
+    });
+    assert_eq!(dishes, Some(6), "the lunch app with the menu");
+    ola.sock.send(&Packet::LunchOrder { token: ola.token, dish: item_kind::KEBAB }.encode()).unwrap();
+    let ordered = wait_for(&ola, &[], Duration::from_millis(1500), |p| match p {
+        Packet::LunchMenu { state: 1, dish, .. } => Some(*dish),
+        _ => None,
+    });
+    assert_eq!(ordered, Some(item_kind::KEBAB));
+    let money = wait_for(&ola, &[], Duration::from_millis(1500), |p| if let Packet::Stats { money, .. } = p { Some(*money) } else { None });
+    assert_eq!(money, Some(200_00 - 25_00));
+    ola.sock.send(&Packet::ComputerAction { token: ola.token, action: ca::CLOSE, conv: 0, arg: 0, text: String::new() }.encode()).unwrap();
+    // To the reception while the courier is on the way; told when it's there.
+    let body = ola.walk_to(&b, body, (1, Tile { x: 32, y: 18 }), &[]);
+    let told = wait_for(&ola, &[], Duration::from_millis(8000), |p| {
+        matches!(p, Packet::Say { text, .. } if text.starts_with("Kurier był! Kebab")).then_some(())
+    });
+    assert!(told.is_some(), "the reception says the courier came");
+    ola.press_e(&b, body);
+    let got = wait_for(&ola, &[], Duration::from_millis(2500), |p| match p {
+        Packet::Inventory { slots } if slots[0].kind == item_kind::KEBAB => Some(()),
+        _ => None,
+    });
+    assert!(got.is_some(), "the lunch box in her hands");
+}

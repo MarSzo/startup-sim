@@ -9,6 +9,7 @@ pub mod elevator;
 pub mod commute;
 pub mod computer;
 pub mod inventory;
+pub mod lunch;
 pub mod map;
 pub mod needs;
 pub mod nav;

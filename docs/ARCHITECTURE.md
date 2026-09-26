@@ -32,6 +32,7 @@ server/                 crate Rusta (lib `game` + binarki)
   src/coffee.rs         ekspresy do kawy (parzenie → kawa jako przedmiot)
   src/inventory.rs      przedmioty, kieszenie i ręce, uprawnienia z przedmiotów
   src/computer.rs       stanowiska (biurka działów), laptopy na biurkach, komunikator
+  src/lunch.rs          zamawianie obiadów: menu, zamówienia, dostawa na recepcję
   src/treats.rs         słodycze w chill roomie (taca, ogłoszenie), nieświeże owoce
   src/board.rs          zarząd: sloty kalendarza, spotkania, dialogi i ich skutki
   src/weather.rs        pogoda: stany, przejścia, wpływ na zewnątrz
@@ -171,6 +172,12 @@ poranek → `day += 1` wszystkim, a domownicy dostają losowy `arrive_at`
 (7:00–10:00); o tej minucie `arrive()` stawia postać przed budynkiem. Wszystko
 poza `Working` (portal, dom) jest poza światem: bez snapshotów i bez udziału w
 symulacji. `--start-time hh:mm`, `--time-scale N` do testów.
+
+**Obiady** (`lunch.rs`): menu = produkty sklepu (rodzaje 28–33) spoza półek;
+`Order { owner, dish, arrives, delivered }` w `Server::lunch_orders`. Zamawia
+się dla konta komputera (jak kalendarz), płatność od razu; `tick_lunch`
+oznacza dostarczone i recepcja mówi zamawiającemu. E przy NPC recepcji z
+czekającym obiadem → `pick_up_lunch` (zamiast zwykłej rozmowy).
 
 **Słodycze** (`treats.rs`): rano `schedule_treats` losuje 1–2 godziny tac
 (9–16); `put_tray` stawia `Tray` (encja `kind` 5) i ogłasza na #ogólny przez

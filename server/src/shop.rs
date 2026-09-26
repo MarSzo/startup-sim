@@ -62,6 +62,13 @@ pub const PRODUCTS: &[Product] = &[
     Product { kind: kind::DONUT, name: "Pączek", price: 0, effect: e(-12, 6, -5, 0), count: 1, line: "Pączek z różą. Niebo." },
     Product { kind: kind::COOKIE, name: "Ciastko", price: 0, effect: e(-6, 4, -4, 0), count: 1, line: "Ciastko do kawy — idealnie." },
     Product { kind: kind::CHEESECAKE, name: "Kawałek sernika", price: 0, effect: e(-15, 3, -6, 0), count: 1, line: "Sernik jak u babci." },
+    // Lunch (ordered in the app, delivered to the reception - see `lunch`).
+    Product { kind: kind::PIEROGI, name: "Pierogi ruskie", price: 24_00, effect: e(-55, -5, -5, 0), count: 1, line: "Pierogi jak u mamy." },
+    Product { kind: kind::PIZZA, name: "Pizza margherita", price: 32_00, effect: e(-60, -8, -6, 0), count: 1, line: "Pizza! Kawałek dla kolegi? Nie." },
+    Product { kind: kind::SUSHI, name: "Zestaw sushi", price: 45_00, effect: e(-45, 2, -8, 5), count: 1, line: "Sushi, pałeczki, elegancja." },
+    Product { kind: kind::SCHNITZEL, name: "Schabowy z ziemniakami", price: 22_00, effect: e(-65, -10, -4, 0), count: 1, line: "Schabowy. Teraz by się drzemka przydała…" },
+    Product { kind: kind::SALAD, name: "Sałatka z kurczakiem", price: 27_00, effect: e(-40, 4, -3, 0), count: 1, line: "Sałatka — lekko i zdrowo." },
+    Product { kind: kind::KEBAB, name: "Kebab", price: 25_00, effect: e(-60, -8, -5, 0), count: 1, line: "Kebab, ostry sos. Warto było." },
 ];
 
 pub fn product(k: u8) -> Option<&'static Product> {
@@ -155,7 +162,8 @@ mod tests {
         check(&b).unwrap();
         let mut sold: Vec<u8> = shelves().iter().flat_map(|s| s.goods.iter().copied()).collect();
         sold.sort();
-        let mut all: Vec<u8> = PRODUCTS.iter().filter(|p| p.price > 0).map(|p| p.kind).collect();
+        let lunch: Vec<u8> = crate::lunch::MENU.iter().map(|m| m.0).collect();
+        let mut all: Vec<u8> = PRODUCTS.iter().filter(|p| p.price > 0 && !lunch.contains(&p.kind)).map(|p| p.kind).collect();
         all.sort();
         assert_eq!(sold, all);
     }

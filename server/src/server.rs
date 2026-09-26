@@ -20,6 +20,7 @@ use crate::protocol::{self as proto, EntityState, Packet, PlayerInfoEntry, Profi
 use crate::recruitment::{Attempt, Recruitment};
 use crate::sim::{self, Body, Pos};
 use crate::shop::{self, Shelf};
+use crate::lunch;
 use crate::stalls::{self, Stall};
 use crate::treats::{self, Tray};
 use crate::weather::{self, Weather};
@@ -253,6 +254,8 @@ pub struct Server {
     weather: Weather,
     /// Board meetings (calendar).
     meetings: Vec<Meeting>,
+    /// Lunch orders (the app on the computer).
+    lunch_orders: Vec<lunch::Order>,
     /// Sweets on the chill-room table, and when the next trays come today.
     tray: Option<Tray>,
     treat_drops: Vec<u32>,
@@ -313,6 +316,7 @@ impl Server {
             weather: Weather::new(0),
             meetings: Vec::new(),
             tray: None,
+            lunch_orders: Vec::new(),
             treat_drops: Vec::new(),
             board_room,
             outdoor_rooms: building
@@ -505,7 +509,8 @@ impl Server {
             | Packet::ShopTake { token, .. }
             | Packet::CommuteChoice { token, .. }
             | Packet::CalendarBook { token, .. }
-            | Packet::DialogAnswer { token, .. } => *token,
+            | Packet::DialogAnswer { token, .. }
+            | Packet::LunchOrder { token, .. } => *token,
             _ => return,
         };
         let Some(&id) = self.by_token.get(&token) else {
@@ -567,6 +572,7 @@ impl Server {
             Packet::ShopTake { shelf, kind, .. } => self.handle_shop_take(id, shelf, kind),
             Packet::CalendarBook { start, topic, .. } => self.handle_calendar_book(id, start as u32, topic),
             Packet::DialogAnswer { id: dialog, choice, .. } => self.handle_dialog_answer(id, dialog, choice),
+            Packet::LunchOrder { dish, .. } => self.handle_lunch_order(id, dish),
             Packet::CommuteChoice { mode, .. } => {
                 let p = self.players.get_mut(&id).unwrap();
                 if commute::mode(mode).is_some() && matches!(p.stage, Stage::Home { arrive_at: None }) {
@@ -1134,6 +1140,7 @@ impl Server {
         }
         match transition {
             Some(Transition::Evening) => {
+                self.lunch_orders.clear(); // uncollected boxes go in the bin
                 let ids: Vec<u16> = self.players.values().filter(|p| matches!(p.stage, Stage::Working)).map(|p| p.id).collect();
                 for pid in ids {
                     self.go_home(pid);
@@ -1381,6 +1388,107 @@ impl Server {
         let (nick, left) = (p.nick.clone(), p.money);
         self.log(format!("* shop: {nick} paid {}", shop::zl(total)));
         Some(shop::lines::paid(total, left))
+    }
+
+    // ------------------------------------------------------------- lunch
+
+    fn lunch_packet(&self, pid: u16) -> Option<Packet> {
+        let account = self.calendar_account(pid)?;
+        let now = self.clock.minute();
+        let order = self.lunch_orders.iter().find(|o| o.owner == account);
+        let (state, dish, arrives) = match order {
+            Some(o) if o.delivered => (lunch::state::WAITING, o.dish, proto::NO_TIME),
+            Some(o) => (lunch::state::ORDERED, o.dish, (o.arrives % clock::MIN_PER_DAY) as u16),
+            None if !(lunch::ORDER_FROM..=lunch::ORDER_TO).contains(&now) => (lunch::state::CLOSED, 0, proto::NO_TIME),
+            None => (lunch::state::NONE, 0, proto::NO_TIME),
+        };
+        let dishes = lunch::MENU
+            .iter()
+            .filter_map(|(k, restaurant, eta)| {
+                shop::product(*k).map(|p| proto::Dish {
+                    kind: *k,
+                    price: p.price as u32,
+                    eta: *eta as u8,
+                    name: p.name.into(),
+                    restaurant: (*restaurant).into(),
+                })
+            })
+            .collect();
+        Some(Packet::LunchMenu { state, dish, arrives, dishes })
+    }
+
+    fn send_lunch(&mut self, pid: u16) {
+        if let Some(pk) = self.lunch_packet(pid) {
+            let addr = self.players[&pid].addr;
+            self.send(addr, &pk);
+        }
+    }
+
+    /// Order in the app: paid from the computer owner's wallet.
+    fn handle_lunch_order(&mut self, pid: u16, dish: u8) {
+        let Some(account) = self.calendar_account(pid) else { return };
+        let now = self.clock.minute();
+        let Some(&(_, _, eta)) = lunch::menu_entry(dish) else { return };
+        let Some(price) = shop::product(dish).map(|p| p.price) else { return };
+        let busy = self.lunch_orders.iter().any(|o| o.owner == account);
+        let open = (lunch::ORDER_FROM..=lunch::ORDER_TO).contains(&now);
+        let Some(p) = self.players.get_mut(&account) else { return };
+        if busy || !open || p.money < price {
+            self.send_lunch(pid);
+            return;
+        }
+        p.money -= price;
+        let spread = self.rng.u32(0..=2 * lunch::ETA_SPREAD);
+        let rain = if weather::wet(self.weather.now) { lunch::RAIN_DELAY } else { 0 };
+        let minutes = (eta + spread).saturating_sub(lunch::ETA_SPREAD) + rain;
+        let arrives = self.clock.total_minutes() + minutes;
+        self.lunch_orders.push(lunch::Order { owner: account, dish, arrives, delivered: false });
+        let who = if pid == account { String::new() } else { format!(" (zamówione przez {})", self.players[&pid].nick) };
+        let name = shop::product(dish).map_or("?", |p| p.name);
+        self.log(format!("* lunch: {} orders {name}, arrives {}{who}", self.players[&account].nick, clock::hhmm(arrives % clock::MIN_PER_DAY)));
+        self.send_lunch(pid);
+    }
+
+    /// The courier arrives: the receptionist tells the owner.
+    fn tick_lunch(&mut self) {
+        let now = self.clock.total_minutes();
+        let receptionist = self.npcs.iter().find(|n| n.role == npc::Role::Receptionist).map(|n| n.id);
+        let mut arrived = Vec::new();
+        for o in &mut self.lunch_orders {
+            if !o.delivered && now >= o.arrives {
+                o.delivered = true;
+                arrived.push((o.owner, o.dish));
+            }
+        }
+        for (owner, dish) in arrived {
+            let name = shop::product(dish).map_or("?", |p| p.name);
+            if let Some(r) = receptionist {
+                self.pending_says.push((r, lunch::lines::arrived(name), Some(owner)));
+            }
+        }
+    }
+
+    /// E at the reception with a box waiting.
+    fn pick_up_lunch(&mut self, pid: u16) -> String {
+        let Some(i) = self.lunch_orders.iter().position(|o| o.owner == pid && o.delivered) else { return String::new() };
+        if !self.players[&pid].inventory.hands_free() {
+            return lunch::lines::HANDS_FULL.into();
+        }
+        let o = self.lunch_orders.remove(i);
+        let name = shop::product(o.dish).map_or("?", |p| p.name);
+        let item = Item {
+            id: self.next_item_id,
+            kind: o.dish,
+            label: format!("{name} (na wynos)"),
+            expires: None,
+            owner: 0,
+            count: 1,
+            unpaid: false,
+            stale: false,
+        };
+        self.next_item_id += 1;
+        self.give(pid, item);
+        lunch::lines::handed_over(&name.to_lowercase())
     }
 
     // ------------------------------------------------------------ treats
@@ -2072,6 +2180,7 @@ impl Server {
             // a desk, card lent to someone, anything on the floor.
             self.computers.retain(|c| c.owner() != id);
             self.vehicles.retain(|v| v.owner != id);
+            self.lunch_orders.retain(|o| o.owner != id);
             self.dropped.retain(|d| d.item.owner != id);
             for other in self.players.values_mut() {
                 let before = other.inventory.clone();
@@ -2259,6 +2368,7 @@ impl Server {
 
         // 3. NPCs: conversations, then their own behaviour.
         let mut events = Vec::new();
+        let mut lunch_pickups: Vec<(u16, u16)> = Vec::new();
         for (pid, body) in talks {
             let p = &self.players[&pid];
             let dept = self.cfg.recruitment.department_name(p.department).map(str::to_string);
@@ -2270,7 +2380,10 @@ impl Server {
                 // the guest he just brought mustn't shadow the receptionist).
                 .min_by_key(|n| (!n.is_idle(), (n.body.pos.x - body.pos.x).abs() + (n.body.pos.y - body.pos.y).abs()));
             let hands_free = p.inventory.hands_free();
-            if let Some(n) = nearest {
+            let lunch_waiting = self.lunch_orders.iter().any(|o| o.owner == pid && o.delivered);
+            if let Some(n) = nearest.as_ref().filter(|n| n.role == npc::Role::Receptionist && lunch_waiting) {
+                lunch_pickups.push((pid, n.id)); // the courier left a box for you
+            } else if let Some(n) = nearest {
                 events.extend(n.interact(&self.building, pid, body.access, dept.as_deref(), hands_free));
             } else if let Some(i) = coffee::machine_in_reach(&self.machines, &body) {
                 let p = self.players.get_mut(&pid).unwrap();
@@ -2307,7 +2420,12 @@ impl Server {
         self.tick_elevators();
         self.tick_vehicles();
         self.tick_meetings();
+        self.tick_lunch();
 
+        for (pid, npc_id) in lunch_pickups {
+            let line = self.pick_up_lunch(pid);
+            coffee_says.push((npc_id, line, Some(pid)));
+        }
         let bodies: HashMap<u16, Body> =
             self.players.values().filter(|p| matches!(p.stage, Stage::Working)).map(|p| (p.id, p.body)).collect();
         for n in &mut self.npcs {
@@ -2487,6 +2605,9 @@ impl Server {
                     outgoing.push((p.addr, id, pk));
                 }
                 if let Some(pk) = self.dialog_packet(id) {
+                    outgoing.push((p.addr, id, pk));
+                }
+                if let Some(pk) = self.lunch_packet(id) {
                     outgoing.push((p.addr, id, pk));
                 }
             }
