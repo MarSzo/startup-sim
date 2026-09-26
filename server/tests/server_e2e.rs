@@ -539,8 +539,8 @@ fn a_mug_left_in_the_chill_room_is_collected_by_the_cleaner() {
     use game::coffee::lines as coffee_lines;
     use game::inventory::kind as item_kind;
     use proto::item_action as act;
-    // 10:00, the cleaner comes at 10:04 (20 s).
-    CLEANING_AT.with(|c| c.set(10 * 60 + 4));
+    // 10:00, the cleaner comes at 10:05 (25 s).
+    CLEANING_AT.with(|c| c.set(10 * 60 + 5));
     let (addr, _) = start_server_at(access::CARD, true, true, 10 * 60, 1);
     let b = building();
     let (mut ola, _) = Client::connect(addr, "Ola");
@@ -555,17 +555,25 @@ fn a_mug_left_in_the_chill_room_is_collected_by_the_cleaner() {
         })
         .is_some()
     };
-    // A coffee, drunk: an empty mug in hands (the laptop stays at the desk).
+    // A mug from the cupboard, a coffee, drunk: a dirty mug in hands (the
+    // laptop stays at the desk).
     action(&ola, act::DROP);
     std::thread::sleep(Duration::from_millis(100));
-    let at = ola.walk_to(&b, body, (1, Tile { x: 36, y: 27 }), &[]);
+    let at = ola.walk_to(&b, body, (1, Tile { x: 35, y: 27 }), &[]);
+    let at = ola.press_e(&b, at);
+    assert!(hands(&ola, item_kind::CUP), "a clean mug from the cupboard");
+    let at = ola.walk_to(&b, at, (1, Tile { x: 36, y: 27 }), &[]);
     let at = ola.press_e(&b, at);
     assert!(ola.wait_for_line(coffee_lines::READY, Duration::from_secs(5)).is_some());
     action(&ola, act::USE);
-    assert!(hands(&ola, item_kind::EMPTY_CUP), "empty mug after the coffee");
-    // The same mug back under the spout, drunk again, left on the floor.
+    assert!(hands(&ola, item_kind::EMPTY_CUP), "dirty mug after the coffee");
+    // Washed up at the kitchen sink, another coffee, the mug left on the floor.
+    let at = ola.walk_to(&b, at, (1, Tile { x: 38, y: 27 }), &[]);
     let at = ola.press_e(&b, at);
-    assert!(ola.wait_for_line(cl::REFILL, Duration::from_millis(800)).is_some());
+    assert!(ola.wait_for_line(game::kitchen::lines::WASHED, Duration::from_millis(800)).is_some());
+    assert!(hands(&ola, item_kind::CUP));
+    let at = ola.walk_to(&b, at, (1, Tile { x: 36, y: 27 }), &[]);
+    let at = ola.press_e(&b, at);
     assert!(ola.wait_for_line(coffee_lines::READY, Duration::from_secs(5)).is_some());
     action(&ola, act::USE);
     assert!(hands(&ola, item_kind::EMPTY_CUP));
@@ -659,6 +667,74 @@ fn the_light_switch_turns_the_room_lamp_on_and_off_for_everybody() {
 }
 
 #[test]
+fn kitchenette_mugs_dishwasher_and_fridge() {
+    use game::coffee::lines as coffee_lines;
+    use game::inventory::kind as item_kind;
+    use game::kitchen::{action as fa, lines as kl};
+    use proto::item_action as act;
+    let (addr, _) = start_server_cfg(access::CARD, true, true);
+    let b = building();
+    let (mut ola, _) = Client::connect(addr, "Ola");
+    let ws = game::computer::find_workstations(&b);
+    let w = ws.iter().find(|w| w.room_name == "IT / Produkt").unwrap();
+    let body = Body { access: access::CARD, ..Body::at(w.floor, Pos::tile_center(w.tile.x, w.tile.y + 1)) };
+    let action = |c: &Client, a: u8| c.sock.send(&Packet::ItemAction { token: c.token, action: a, slot: 0 }.encode()).unwrap();
+    let hands = |c: &Client, k: u8| {
+        wait_for(c, &[], Duration::from_millis(2500), |p| match p {
+            Packet::Inventory { slots } if slots[0].kind == k => Some(()),
+            _ => None,
+        })
+        .is_some()
+    };
+    let fridge = |c: &Client, a: u8| c.sock.send(&Packet::FridgeAction { token: c.token, action: a, arg: 0 }.encode()).unwrap();
+    action(&ola, act::DROP); // the laptop stays at the desk
+    std::thread::sleep(Duration::from_millis(100));
+    // No mug, no coffee.
+    let at = ola.walk_to(&b, body, (1, Tile { x: 36, y: 27 }), &[]);
+    let at = ola.press_e(&b, at);
+    assert!(ola.wait_for_line(kl::NEED_MUG, Duration::from_millis(800)).is_some());
+    // Mug -> coffee -> dirty mug -> dishwasher, switched on.
+    let at = ola.walk_to(&b, at, (1, Tile { x: 35, y: 27 }), &[]);
+    let at = ola.press_e(&b, at);
+    assert!(hands(&ola, item_kind::CUP));
+    let at = ola.walk_to(&b, at, (1, Tile { x: 36, y: 27 }), &[]);
+    let at = ola.press_e(&b, at);
+    assert!(ola.wait_for_line(coffee_lines::READY, Duration::from_secs(5)).is_some());
+    action(&ola, act::USE);
+    assert!(hands(&ola, item_kind::EMPTY_CUP));
+    let at = ola.press_e(&b, at);
+    assert!(ola.wait_for_line(kl::DIRTY_MUG, Duration::from_millis(800)).is_some(), "no coffee into a dirty mug");
+    let at = ola.walk_to(&b, at, (1, Tile { x: 39, y: 27 }), &[]);
+    let at = ola.press_e(&b, at);
+    assert!(ola.wait_for_line(&kl::loaded(1), Duration::from_millis(800)).is_some());
+    let at = ola.press_e(&b, at);
+    assert!(ola.wait_for_line(kl::DW_STARTED, Duration::from_millis(800)).is_some());
+    // Another coffee, with milk from the fridge; a free water.
+    let at = ola.walk_to(&b, at, (1, Tile { x: 35, y: 27 }), &[]);
+    let at = ola.press_e(&b, at);
+    assert!(hands(&ola, item_kind::CUP));
+    let at = ola.walk_to(&b, at, (1, Tile { x: 36, y: 27 }), &[]);
+    let at = ola.press_e(&b, at);
+    assert!(ola.wait_for_line(coffee_lines::READY, Duration::from_secs(5)).is_some());
+    let at = ola.walk_to(&b, at, (1, Tile { x: 41, y: 27 }), &[]);
+    while ola.recv().is_some() {}
+    ola.press_e(&b, at);
+    let opened = wait_for(&ola, &[], Duration::from_millis(800), |p| match p {
+        Packet::Fridge { milk, water, juice, .. } => Some((*milk, *water, *juice)),
+        _ => None,
+    });
+    assert_eq!(opened, Some((5, 4, 2)));
+    fridge(&ola, fa::MILK);
+    assert!(hands(&ola, item_kind::LATTE), "coffee with milk");
+    fridge(&ola, fa::TAKE_WATER);
+    let after = wait_for(&ola, &[], Duration::from_millis(800), |p| match p {
+        Packet::Fridge { milk: 4, water: 3, .. } => Some(()),
+        _ => None,
+    });
+    assert!(after.is_some());
+}
+
+#[test]
 fn coffee_machine_brews_one_cup_at_a_time() {
     use game::coffee::lines as coffee_lines;
     use game::inventory::kind as item_kind;
@@ -670,9 +746,15 @@ fn coffee_machine_brews_one_cup_at_a_time() {
         let s = b.spawns()[i];
         Body { access: access::CARD, ..Body::at(s.0, Pos::tile_center(s.1.x, s.1.y)) }
     };
-    // Both walk up to the chill room, in front of the machine (36,26).
-    let at_a = a.walk_to(&b, spawn(0), (1, Tile { x: 36, y: 27 }), &[&c]);
+    // Both take a mug from the cupboard (35,26) and go to the machine (36,26).
+    let at_a = a.walk_to(&b, spawn(0), (1, Tile { x: 35, y: 27 }), &[&c]);
+    let at_a = a.press_e(&b, at_a);
+    assert!(a.wait_for_line(&game::kitchen::lines::took_mug(7), Duration::from_millis(800)).is_some());
+    let at_a = a.walk_to(&b, at_a, (1, Tile { x: 36, y: 27 }), &[&c]);
     let at_c = c.walk_to(&b, spawn(1), (1, Tile { x: 35, y: 27 }), &[&a]);
+    let at_c = c.press_e(&b, at_c);
+    assert!(c.wait_for_line(&game::kitchen::lines::took_mug(6), Duration::from_millis(800)).is_some());
+    let at_c = c.walk_to(&b, at_c, (1, Tile { x: 37, y: 27 }), &[&a]);
 
     // A presses E: brewing starts; A's own bubble says so.
     a.press_e(&b, at_a);
@@ -975,7 +1057,7 @@ fn needs_fruit_sofa_and_the_wrong_bathroom() {
     // Laptop down first (hands free), then fruit from the bowl in the chill room.
     body = ola.press_e(&b, body);
     assert!(wait_for(&ola, &[], wait, said(game::computer::lines::PLACED)).is_some());
-    body = ola.walk_to(&b, body, (1, Tile { x: 39, y: 27 }), &[]);
+    body = ola.walk_to(&b, body, (1, Tile { x: 40, y: 27 }), &[]);
     body = ola.press_e(&b, body);
     assert!(wait_for(&ola, &[], wait, said(nl::FRUIT)).is_some());
     let slot = wait_for(&ola, &[], wait, |p| match p {

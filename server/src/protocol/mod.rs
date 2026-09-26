@@ -23,7 +23,7 @@ pub use golden::{golden_samples, to_hex};
 pub use snapshot::{snapshot_fragments, SelfState};
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 27;
+pub const VERSION: u8 = 28;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
 pub const MAX_PACKET: usize = 1200;
@@ -90,6 +90,8 @@ pub mod ty {
     pub const COMPANY_ACTION: u8 = 39;
     pub const SMOKE: u8 = 40;
     pub const LIGHTS: u8 = 41;
+    pub const FRIDGE: u8 = 42;
+    pub const FRIDGE_ACTION: u8 = 43;
 }
 
 /// `ItemAction::action`.
@@ -477,6 +479,11 @@ pub enum Packet {
     Smoke { floor: u8, rooms: Vec<(u16, u8)> },
     /// Lamps switched on on the receiver's floor (rooms); every second.
     Lights { floor: u8, rooms: Vec<u16> },
+    /// The fridge (E at it, and after every change while open): what's
+    /// stored (item kind, label), portions of milk, free water and juice.
+    Fridge { items: Vec<(u8, String)>, milk: u8, water: u8, juice: u8 },
+    /// Take / put / pour milk (`kitchen::action`), `arg` = stored item index.
+    FridgeAction { token: u32, action: u8, arg: u8 },
     /// Closed doors (locked toilet stalls, elevator doors) on the receiver's
     /// floor: solid for the simulation. Plus the elevator: the floor it is at
     /// and where it is heading (`NO_FLOOR` = standing). Sent on change and

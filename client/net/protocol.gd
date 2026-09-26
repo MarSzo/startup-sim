@@ -3,7 +3,7 @@
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 27
+const VERSION := 28
 const MAX_PACKET := 1200
 const MAX_NICK_BYTES := 16
 const MAX_SAY_BYTES := 240
@@ -52,6 +52,14 @@ const T_COMPANY_PEOPLE := 38
 const T_COMPANY_ACTION := 39
 const T_SMOKE := 40
 const T_LIGHTS := 41
+const T_FRIDGE := 42
+const T_FRIDGE_ACTION := 43
+# FridgeAction.action (server/src/kitchen.rs)
+const FRIDGE_TAKE := 1
+const FRIDGE_PUT := 2
+const FRIDGE_WATER := 3
+const FRIDGE_JUICE := 4
+const FRIDGE_MILK := 5
 # CompanyAction.action (server/src/company.rs)
 const CO_FOUND := 1
 const CO_RENAME := 2
@@ -305,6 +313,14 @@ static func encode_company_action(token: int, action: int, target: int, value: i
 	return b.data_array
 
 
+static func encode_fridge_action(token: int, action: int, arg: int) -> PackedByteArray:
+	var b := _writer(T_FRIDGE_ACTION)
+	b.put_u32(token)
+	b.put_u8(action)
+	b.put_u8(arg)
+	return b.data_array
+
+
 static func encode_lunch_order(token: int, dish: int) -> PackedByteArray:
 	var b := _writer(T_LUNCH_ORDER)
 	b.put_u32(token)
@@ -517,6 +533,17 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			p.company = r.str16(64)
 			p.founded = r.u8() != 0
 			p.alarm = r.u8()
+		T_FRIDGE:
+			var n := r.u8()
+			if n > 16:
+				return {}
+			var items := []
+			for i in n:
+				items.append({"kind": r.u8(), "label": r.str16(64)})
+			p.items = items
+			p.milk = r.u8()
+			p.water = r.u8()
+			p.juice = r.u8()
 		T_LIGHTS:
 			p.floor = r.u8()
 			var n := r.u8()

@@ -238,6 +238,18 @@ impl Packet {
                 founded: r.u8()? != 0,
                 alarm: r.u8()?,
             },
+            ty::FRIDGE => {
+                let n = r.u8()? as usize;
+                if n > 16 {
+                    return Err(DecodeError::Invalid("too many fridge items"));
+                }
+                let mut items = Vec::with_capacity(n);
+                for _ in 0..n {
+                    items.push((r.u8()?, r.str16(64)?));
+                }
+                Packet::Fridge { items, milk: r.u8()?, water: r.u8()?, juice: r.u8()? }
+            }
+            ty::FRIDGE_ACTION => Packet::FridgeAction { token: r.u32()?, action: r.u8()?, arg: r.u8()? },
             ty::LIGHTS => {
                 let floor = r.u8()?;
                 let n = r.u8()? as usize;

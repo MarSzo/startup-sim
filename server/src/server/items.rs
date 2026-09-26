@@ -46,6 +46,7 @@ impl Server {
             item_kind::LAPTOP => format!("Laptop: {}", p.nick),
             item_kind::COFFEE => "Gorąca, z ekspresu".into(),
             item_kind::EMPTY_CUP => "Po kawie".into(),
+            item_kind::CUP => "Z kuchennej szafki".into(),
             _ => String::new(),
         }
     }
@@ -187,15 +188,20 @@ impl Server {
         let Some(p) = self.players.get_mut(&id) else { return };
         let Some(held) = &p.inventory.hands else { return };
         let line = match held.kind {
-            item_kind::COFFEE => {
+            item_kind::COFFEE | item_kind::LATTE => {
+                let latte = held.kind == item_kind::LATTE;
                 p.inventory.take_hands();
                 p.needs.drink_coffee();
+                if latte {
+                    p.needs.add_stress(-4); // smoother
+                }
                 refresh(p);
                 self.says.push(Say::new(id, coffee::lines::DRUNK));
                 self.give_new(id, item_kind::EMPTY_CUP);
                 return;
             }
-            item_kind::EMPTY_CUP => "Pusty kubek. Można go umyć przy umywalce albo nalać kawy przy ekspresie.".into(),
+            item_kind::EMPTY_CUP => "Brudny kubek. Do zlewu albo do zmywarki w kuchni.".into(),
+            item_kind::CUP => "Czysty kubek — pod ekspres i gotowe.".into(),
             item_kind::FRUIT if p.needs.is_full() => needs::lines::NOT_HUNGRY.into(),
             item_kind::FRUIT => {
                 let what = held.label.to_lowercase();

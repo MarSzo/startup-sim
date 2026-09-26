@@ -36,6 +36,9 @@ const SCHNITZEL := 31
 const SALAD := 32
 const KEBAB := 33
 const EMPTY_CUP := 34
+const CUP := 35
+const MILK := 36
+const LATTE := 37
 
 const NAMES := {GUEST_PASS: "Przepustka gościa", EMPLOYEE_CARD: "Karta pracownika", LAPTOP: "Laptop", COFFEE: "Kawa", FRUIT: "Owoc",
 	SANDWICH_CHEESE: "Kanapka z serem", SANDWICH_HAM: "Kanapka z szynką", WRAP: "Wrap wege", BURGER: "Hamburger",
@@ -43,9 +46,10 @@ const NAMES := {GUEST_PASS: "Przepustka gościa", EMPLOYEE_CARD: "Karta pracowni
 	JUICE: "Sok pomarańczowy", BEER: "Piwo", WINE: "Wino", CIGARETTES: "Papierosy", UMBRELLA: "Parasol",
 	DONUT: "Pączek", COOKIE: "Ciastko", CHEESECAKE: "Kawałek sernika",
 	PIEROGI: "Pierogi ruskie", PIZZA: "Pizza margherita", SUSHI: "Zestaw sushi", SCHNITZEL: "Schabowy z ziemniakami",
-	SALAD: "Sałatka z kurczakiem", KEBAB: "Kebab", EMPTY_CUP: "Pusty kubek"}
+	SALAD: "Sałatka z kurczakiem", KEBAB: "Kebab", EMPTY_CUP: "Brudny kubek", CUP: "Kubek", MILK: "Mleko (karton)",
+	LATTE: "Kawa z mlekiem"}
 const SMALL := [GUEST_PASS, EMPLOYEE_CARD, FRUIT, SANDWICH_CHEESE, SANDWICH_HAM, WRAP, BUN, BAR, CHIPS, WATER,
-	ENERGY_DRINK, JUICE, BEER, CIGARETTES, UMBRELLA, DONUT, COOKIE, CHEESECAKE]
+	ENERGY_DRINK, JUICE, BEER, CIGARETTES, UMBRELLA, DONUT, COOKIE, CHEESECAKE, MILK]
 
 
 static func item_name(kind: int) -> String:
@@ -105,18 +109,26 @@ static func draw(c: CanvasItem, kind: int, o: Vector2, s: float) -> void:
 			c.draw_rect(Rect2(P.call(3.6, 3.4), Vector2(8.8, 6.2) * s), Color("#8fb9d3"))
 			ln.call(4.4, 4.4, 7.4, 4.4, Color(1, 1, 1, 0.6), 0.7)
 			poly.call([Vector2(1.2, 11), Vector2(14.8, 11), Vector2(15.6, 13.8), Vector2(0.4, 13.8)], Color("#9aa1a6"))
-		COFFEE, EMPTY_CUP:
+		COFFEE, EMPTY_CUP, CUP, LATTE:
 			poly.call([Vector2(3.4, 5.6), Vector2(11.6, 5.6), Vector2(10.8, 14.4), Vector2(4.2, 14.4)], Color("#f1ece2"))
 			c.draw_arc(P.call(12.2, 9.6), 2.2 * s, -PI / 2, PI / 2, 10, INK, 1.6 * s, true)
 			c.draw_arc(P.call(12.2, 9.6), 2.2 * s, -PI / 2, PI / 2, 10, Color("#f1ece2"), 0.8 * s, true)
-			if kind == COFFEE:
+			if kind == COFFEE or kind == LATTE:
 				c.draw_set_transform(o + Vector2(7.5, 6.3) * s, 0.0, Vector2(1.0, 0.35))
-				c.draw_circle(Vector2.ZERO, 3.6 * s, Color("#6b4a2e"))
+				c.draw_circle(Vector2.ZERO, 3.6 * s, Color("#6b4a2e") if kind == COFFEE else Color("#c49a6c"))
 				c.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 				for k in 2:
 					c.draw_arc(P.call(6 + k * 3, 3.2), 1.0 * s, PI * 0.6, PI * 1.6, 6, Color(INK, 0.5), 0.6 * s, true)
-			else:
+			elif kind == EMPTY_CUP:
 				ln.call(5.2, 12.6, 9.8, 12.6, Color("#9c7b5b"), 0.8)
+				dot.call(6.5, 10, 0.5, Color("#9c7b5b"))
+			else:  # clean: a little sparkle
+				ln.call(6, 8, 6, 11, Color(1, 1, 1, 0.8), 0.7)
+				ln.call(4.5, 9.5, 7.5, 9.5, Color(1, 1, 1, 0.8), 0.7)
+		MILK:
+			poly.call([Vector2(4, 5), Vector2(8, 1.4), Vector2(12, 5), Vector2(12, 14.6), Vector2(4, 14.6)], Color("#f4f4ee"))
+			c.draw_rect(Rect2(P.call(4.5, 8), Vector2(7, 3.5) * s), Color("#4f86c0"))
+			dot.call(8, 3.8, 0.7, Color("#4f86c0"))
 		FRUIT:
 			circ.call(8, 9.5, 5.4, Color("#c9463a"))
 			dot.call(6.2, 7.4, 1.4, Color(1, 1, 1, 0.35))

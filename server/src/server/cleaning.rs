@@ -136,6 +136,11 @@ impl Server {
             let name = self.npcs[ci].name.clone();
             self.messenger.post_system(computer::conv::GENERAL, cleaner, &name, &text);
         }
+        // The mugs go in the dishwasher, and on it goes.
+        let now = self.clock.total_minutes();
+        if let Some(k) = self.kitchen.as_mut() {
+            k.cleaner_load(u8::try_from(n).unwrap_or(u8::MAX), now);
+        }
         self.npcs[ci].return_home(&self.building);
         self.log(format!("* cleaning round done: {n} mugs"));
     }

@@ -55,6 +55,9 @@ impl Server {
                 }
                 self.schedule_treats();
                 self.open_vacancy();
+                if let Some(k) = self.kitchen.as_mut() {
+                    k.restock();
+                }
                 self.log(format!("* day {} starts", self.clock.day));
                 self.clock_dirty = true;
             }

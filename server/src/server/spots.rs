@@ -1,6 +1,5 @@
 //! Sofas, toilets, ashtrays, sinks and the fruit bowl.
 
-use crate::cleaning;
 use crate::inventory::{self, kind as item_kind, Item};
 use crate::needs::{self, Rest, SpotKind};
 use crate::protocol as proto;
@@ -54,9 +53,13 @@ impl Server {
                 needs::lines::SMOKE.into()
             }
             SpotKind::Sink if p.inventory.held_kind() == item_kind::EMPTY_CUP => {
-                p.inventory.take_hands();
+                // Washed up by hand: a clean mug again.
+                if let Some(cup) = p.inventory.hands.as_mut() {
+                    cup.kind = item_kind::CUP;
+                    cup.label = "Umyty".into();
+                }
                 refresh(p);
-                cleaning::lines::WASHED.into()
+                crate::kitchen::lines::WASHED.into()
             }
             SpotKind::Sink => {
                 p.rest = Some((Rest::Washing { until: self.tick + needs::WASH_TICKS }, floor, pos));

@@ -402,7 +402,8 @@ func _tile_object(x: int, y: int) -> void:
 # ------------------------------------------------------------------- props
 
 const PROP_TYPES := ["desk", "counter", "shelf", "sofa", "table", "plant", "rack", "bench", "ashtray", "toilet", "sink",
-	"car", "coffee_machine", "kitchen_counter", "fruit_bowl", "partition", "sanitizer", "bike_rack"]
+	"car", "coffee_machine", "kitchen_counter", "fruit_bowl", "partition", "sanitizer", "bike_rack",
+	"cupboard", "dishwasher", "kitchen_sink", "fridge"]
 
 
 ## Connected tiles of the same furniture char = one object.
@@ -457,6 +458,10 @@ func _prop(t: String, tr: Rect2i, index: int) -> void:
 		"partition": _partition(r)
 		"sanitizer": _sanitizer(r)
 		"bike_rack": _bike_rack(r)
+		"cupboard": _cupboard(r)
+		"dishwasher": _dishwasher(r)
+		"kitchen_sink": _kitchen_sink(r)
+		"fridge": _fridge(r)
 
 
 func _chair(c: Vector2, facing_up: bool) -> void:
@@ -694,3 +699,44 @@ func _bike_rack(r: Rect2) -> void:
 		_stroke(Vector2(tx + 4.4, y + 8), Vector2(tx + 4.4, y + 13), Color("#aab0b3"), 1.1)
 		_stroke(Vector2(tx + 11.6, y + 8), Vector2(tx + 11.6, y + 13), Color("#aab0b3"), 1.1)
 		tx += TP
+
+
+## Kitchenette: worktop units along the wall (seen from above, front edge
+## towards the room).
+func _worktop(r: Rect2, fill: Color) -> Rect2:
+	var top := Rect2(r.position + Vector2(0, 0.5), r.size - Vector2(0, 3.5))
+	_shadow(top)
+	_box(Rect2(top.position.x, top.end.y - 1, top.size.x, 3.2), fill.darkened(0.3), true, 0.4)
+	_box(top, fill, true, 0.8)
+	return top
+
+
+func _cupboard(r: Rect2) -> void:
+	var top := _worktop(r, Color("#9c7650"))
+	# Open shelf of mugs seen from above: a row of round mugs.
+	for i in 3:
+		_disc(top.position + Vector2(3.5 + i * 4.5, 5.5), 1.6, [Color("#f1ece2"), Color("#4f7fb0"), Color("#d98a3e")][i], true, 0.4)
+	draw_line(top.position + Vector2(2, 9.5), top.position + Vector2(top.size.x - 2, 9.5), INK, 0.5)
+
+
+func _dishwasher(r: Rect2) -> void:
+	var top := _worktop(r, Color("#bfc4c6"))
+	_box(Rect2(top.position + Vector2(2, 2), Vector2(top.size.x - 4, 3)), Color("#8f959b"), true, 0.3, 0.45)  # control panel
+	draw_circle(top.position + Vector2(top.size.x - 4, 3.5), 0.6, Color("#6fd06b"))
+	draw_line(top.position + Vector2(3, 9), top.position + Vector2(top.size.x - 3, 9), Color("#8f959b"), 1.0)  # handle
+
+
+func _kitchen_sink(r: Rect2) -> void:
+	var top := _worktop(r, Color("#d6cfbf"))
+	_box(Rect2(top.position + Vector2(2.5, 2.5), Vector2(top.size.x - 5, 7)), Color("#b8c6cc"), true, 1.6)
+	draw_circle(top.position + Vector2(top.size.x / 2, 6), 0.7, Color("#6f757a"))
+	_stroke(top.position + Vector2(top.size.x / 2, 1), top.position + Vector2(top.size.x / 2, 3.2), Color("#8f959b"), 1.0)
+
+
+func _fridge(r: Rect2) -> void:
+	var body := Rect2(r.position + Vector2(0.5, -1), r.size - Vector2(1, 1.5))
+	_shadow(body)
+	_box(body, Color("#ecebe4"), true, 1.2)
+	draw_line(body.position + Vector2(1.5, 5), Vector2(body.end.x - 1.5, body.position.y + 5), Color("#b9b8b0"), 0.6)
+	_box(Rect2(body.end.x - 3.2, body.position.y + 6.5, 1.2, 5), Color("#9aa3a8"), true, 0.3, 0.35)  # handle
+	_disc(body.position + Vector2(4, 9), 1.2, Color("#d98a3e"), true, 0.35)  # a magnet

@@ -34,6 +34,7 @@ mod day;
 mod doors;
 mod interact;
 mod items;
+mod kitchen;
 mod lunch;
 mod movement;
 mod player;
@@ -63,6 +64,7 @@ use crate::computer::{self, Computer, Messenger, Workstation};
 use crate::elevator::{self, Elevator};
 use crate::fire::{Alarm, Smoke};
 use crate::inventory::Item;
+use crate::kitchen::Kitchen;
 use crate::lights::{self, Lights, Switch};
 use crate::net::{LinkConditions, Net};
 use crate::needs::{self, Spot};
@@ -213,6 +215,8 @@ pub struct Server {
     alarm: Option<Alarm>,
     /// Lamps switched on, and where the switches are.
     lights: Lights,
+    /// The chill-room kitchenette (mugs, dishwasher, fridge).
+    kitchen: Option<Kitchen>,
     switches: Vec<Switch>,
     /// The cleaner's afternoon round.
     cleaning: Cleaning,
@@ -294,6 +298,7 @@ impl Server {
             smoke: Smoke::new(&building),
             alarm: None,
             lights: Lights::default(),
+            kitchen: Kitchen::find(&building),
             switches: lights::switches(&building),
             cleaning: Cleaning::default(),
             next_crew_id: 0,
@@ -403,6 +408,7 @@ impl Server {
         self.tick_vehicles();
         self.tick_police();
         self.tick_cleaning();
+        self.tick_kitchen();
         self.tick_meetings();
         self.tick_lunch();
         self.tick_company();

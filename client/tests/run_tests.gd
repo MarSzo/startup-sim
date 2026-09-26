@@ -56,6 +56,7 @@ func test_protocol(path: String) -> void:
 		"dialog_answer": Protocol.encode_dialog_answer(0x01020304, 3, 1),
 		"lunch_order": Protocol.encode_lunch_order(0x01020304, 29),
 		"company_action": Protocol.encode_company_action(0x01020304, Protocol.CO_SET_PLACES, 1, 2, ""),
+		"fridge_action": Protocol.encode_fridge_action(0x01020304, Protocol.FRIDGE_PUT, 0),
 		"computer_action": Protocol.encode_computer_action(0x01020304, Protocol.PC_SEND, 17, 42, "Kto zjadł mój jogurt?"),
 		"answer": Protocol.encode_answer(0x01020304, 3, 1, 2),
 	}
@@ -89,6 +90,9 @@ func test_protocol(path: String) -> void:
 		and ck.place == Protocol.PLACE_COMMUTING and ck.arrive == 545 and ck.pay == 23000 and ck.pay_minutes == 460
 		and ck.today_minutes == 0 and ck.mode == 2 and ck.depart == 520 and ck.money == 18600
 		and ck.weather == Protocol.WEATHER_RAIN and ck.company == "Pixel Pierogi sp. z o.o." and ck.founded and ck.alarm == 1, "decode clock %s" % ck)
+	var fr := Protocol.decode(golden["fridge"].hex_decode())
+	expect(fr.get("type") == Protocol.T_FRIDGE and fr.items.size() == 1 and fr.items[0].kind == 11
+		and fr.items[0].label == "Kanapka z szynką (Ola)" and fr.milk == 7 and fr.water == 4 and fr.juice == 2, "decode fridge %s" % fr)
 	var li := Protocol.decode(golden["lights"].hex_decode())
 	expect(li.get("type") == Protocol.T_LIGHTS and li.floor == 1 and li.rooms == [5, 12], "decode lights %s" % li)
 	var sm := Protocol.decode(golden["smoke"].hex_decode())

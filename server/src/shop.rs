@@ -54,6 +54,7 @@ pub const PRODUCTS: &[Product] = &[
     Product { kind: kind::WATER, name: "Woda", price: 4_00, effect: e(0, 3, -1, 10), count: 1, line: "Woda. Nawodnienie to podstawa." },
     Product { kind: kind::ENERGY_DRINK, name: "Energetyk", price: 8_00, effect: e(0, 30, 8, 10), count: 1, line: "Energetyk! Serce przyspiesza…" },
     Product { kind: kind::JUICE, name: "Sok pomarańczowy", price: 6_00, effect: e(-5, 5, 0, 8), count: 1, line: "Sok pomarańczowy." },
+    Product { kind: kind::MILK, name: "Mleko (karton)", price: 4_50, effect: e(-5, 2, 0, 6), count: 1, line: "Łyk mleka prosto z kartonu. Nikt nie widział." },
     Product { kind: kind::BEER, name: "Piwo", price: 7_00, effect: e(0, -5, -15, 20), count: 1, line: "Piwko… w pracy? Cicho sza." },
     Product { kind: kind::WINE, name: "Wino", price: 25_00, effect: e(0, -10, -25, 10), count: 1, line: "Wino. To był ciężki dzień." },
     Product { kind: kind::CIGARETTES, name: "Papierosy", price: 18_00, effect: e(0, 0, 0, 0), count: 20, line: "" },
@@ -92,7 +93,7 @@ pub fn shelves() -> Vec<Shelf> {
         Shelf { id: 1, title: "Kanapki", floor: 0, area: r(45, 24, 5, 1), goods: &[SANDWICH_CHEESE, SANDWICH_HAM, WRAP] },
         Shelf { id: 2, title: "Fast food", floor: 0, area: r(50, 24, 5, 1), goods: &[BURGER, FRIES] },
         Shelf { id: 3, title: "Przekąski", floor: 0, area: r(45, 27, 5, 1), goods: &[BUN, BAR, CHIPS] },
-        Shelf { id: 4, title: "Napoje", floor: 0, area: r(50, 27, 5, 1), goods: &[WATER, ENERGY_DRINK, JUICE] },
+        Shelf { id: 4, title: "Napoje", floor: 0, area: r(50, 27, 5, 1), goods: &[WATER, ENERGY_DRINK, JUICE, MILK] },
         Shelf { id: 5, title: "Alkohol i papierosy", floor: 0, area: r(56, 23, 1, 5), goods: &[BEER, WINE, CIGARETTES] },
         Shelf { id: 6, title: "Parasole", floor: 0, area: r(43, 31, 1, 2), goods: &[UMBRELLA] },
     ]

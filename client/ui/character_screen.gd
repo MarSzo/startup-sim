@@ -9,6 +9,7 @@ const PlayerView = preload("res://game/player_view.gd")
 
 ## Emitted with a validated character; `address` = server "host:port".
 signal connect_pressed(nick: String, profile: Dictionary, address: String)
+signal back_pressed
 
 const SAVE_PATH := "user://character.cfg"
 const GENDERS := ["Kobieta", "Mężczyzna", "Inna"]
@@ -67,6 +68,10 @@ func _ready() -> void:
 	for k in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
 		button.add_theme_color_override(k, Color.WHITE)
 	outer.add_child(button)
+	var back := Ink.button("Wróć do menu")
+	back.custom_minimum_size = Vector2(0, 40)
+	back.pressed.connect(func(): back_pressed.emit())
+	outer.add_child(back)
 	status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	status.custom_minimum_size = Vector2(0, 24)

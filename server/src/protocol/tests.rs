@@ -48,7 +48,7 @@ fn random_bytes_never_panic() {
             b[0] = 0x54;
             b[1] = 0x53;
             b[2] = VERSION;
-            b[3] = rng.u8(1..=41);
+            b[3] = rng.u8(1..=43);
         }
         let _ = Packet::decode(&b);
     }

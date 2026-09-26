@@ -45,6 +45,8 @@ impl Packet {
             Packet::CompanyAction { .. } => ty::COMPANY_ACTION,
             Packet::Smoke { .. } => ty::SMOKE,
             Packet::Lights { .. } => ty::LIGHTS,
+            Packet::Fridge { .. } => ty::FRIDGE,
+            Packet::FridgeAction { .. } => ty::FRIDGE_ACTION,
             Packet::Doors { .. } => ty::DOORS,
             Packet::DoorAction { .. } => ty::DOOR_ACTION,
         }
@@ -311,6 +313,21 @@ impl Packet {
                 w.str16(company, 64);
                 w.u8(*founded as u8);
                 w.u8(*alarm);
+            }
+            Packet::Fridge { items, milk, water, juice } => {
+                w.u8(items.len().min(16) as u8);
+                for (k, label) in items.iter().take(16) {
+                    w.u8(*k);
+                    w.str16(label, 64);
+                }
+                w.u8(*milk);
+                w.u8(*water);
+                w.u8(*juice);
+            }
+            Packet::FridgeAction { token, action, arg } => {
+                w.u32(*token);
+                w.u8(*action);
+                w.u8(*arg);
             }
             Packet::Lights { floor, rooms } => {
                 w.u8(*floor);

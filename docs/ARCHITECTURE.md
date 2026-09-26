@@ -242,6 +242,18 @@ przełącza; wieczorem gasi wszystko; `Lights` co 1 s. `LightView` (warstwa
 z `windows` od zewnątrz, drzwi, meble jako spójne grupy kafli), wykonany raz
 w `SubViewport` (`UPDATE_ONCE`, 3×, MSAA) i pokazany jako tekstura.
 
+**Aneks kuchenny** (`kitchen.rs`, `server/kitchen.rs`): `Kitchen` (pozycje
+szafki / zlewu / zmywarki / lodówki z mapy, czyste kubki w szafce, zmywarka:
+brudne, umyte, koniec cyklu; lodówka: rzeczy, mleko, darmowe napoje).
+`use_kitchen` bierze najbliższą rzecz aneksu, ustępując ekspresowi i
+bliższym miejscom (`spots`); ekspres wymaga `CUP` w rękach; zlew zamienia
+`EMPTY_CUP` → `CUP`. `FridgeAction` → `handle_fridge_action`. Rano `restock`,
+sprzątaczka `cleaner_load`, wyjście gracza `return_mugs_of`.
+
+**Menu** (klient): `ui/title_screen.gd` (ekran tytułowy), `ui/pause_menu.gd`
+(Esc — `main.gd::_input`, jeśli `game.window_open()` jest fałszem),
+`ui/settings_panel.gd` + `ui/settings.gd` (`user://settings.cfg`).
+
 **Balkon**: `RoomDef::below` (nazwy pomieszczeń piętra niżej) →
 `Building::below(floor, room)`; snapshot odbiorcy na balkonie zawiera też
 encje z tych pomieszczeń, a mowa stamtąd też do niego dociera. Encje nie mają

@@ -109,7 +109,7 @@ pub fn find_spots(b: &Building) -> Vec<Spot> {
                     Some("toilet") => SpotKind::Toilet,
                     Some("ashtray") => SpotKind::Ashtray,
                     Some("fruit_bowl") => SpotKind::FruitBowl,
-                    Some("sink") => SpotKind::Sink,
+                    Some("sink") | Some("kitchen_sink") => SpotKind::Sink,
                     Some("sanitizer") => SpotKind::Sanitizer,
                     _ => continue,
                 };

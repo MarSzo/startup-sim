@@ -20,6 +20,7 @@ pub mod computer;
 pub mod elevator;
 pub mod fire;
 pub mod inventory;
+pub mod kitchen;
 pub mod lights;
 pub mod lunch;
 pub mod map;

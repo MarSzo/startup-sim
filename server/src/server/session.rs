@@ -81,6 +81,7 @@ impl Server {
             Packet::CalendarBook { start, topic, .. } => self.handle_calendar_book(id, u32::from(start), topic),
             Packet::DialogAnswer { id: dialog, choice, .. } => self.handle_dialog_answer(id, dialog, choice),
             Packet::LunchOrder { dish, .. } => self.handle_lunch_order(id, dish),
+            Packet::FridgeAction { action, arg, .. } => self.handle_fridge_action(id, action, arg),
             Packet::CompanyAction { action, target, value, text, .. } => self.handle_company_action(id, action, target, value, &text),
             Packet::CommuteChoice { mode, .. } => self.handle_commute_choice(id, mode),
             _ => {}
@@ -258,6 +259,7 @@ impl Server {
         }
         // Other people's things they carried stay in the building...
         let carried: Vec<Item> = std::mem::take(&mut p.inventory).items().cloned().collect();
+        self.return_mugs_of(&carried);
         for item in carried.into_iter().filter(|i| i.owner != 0 && i.owner != id) {
             self.drop_at(p.body.floor, p.body.pos, item);
         }
@@ -311,6 +313,7 @@ fn session_token(packet: &Packet) -> Option<u32> {
         | Packet::CalendarBook { token, .. }
         | Packet::DialogAnswer { token, .. }
         | Packet::LunchOrder { token, .. }
+        | Packet::FridgeAction { token, .. }
         | Packet::CompanyAction { token, .. } => Some(*token),
         _ => None,
     }

@@ -934,6 +934,34 @@ pełnym ekranie — zastąpiona stylem inspirowanym Don't Starve:
   przedmiotów (ekwipunek, półki, obiady, rzeczy w rękach i na podłodze)
   narysowane w tym samym stylu z konturem tuszu.
 
+### 10.35 Aneks kuchenny, menu startowe i menu gry
+
+- **Aneks kuchenny** w chill roomie (wzdłuż północnej ściany): szafka z
+  kubkami, ekspres, blat, zlew, zmywarka, misa z owocami, lodówka, płyn do
+  dezynfekcji.
+- **Kubki są policzone**: biuro ma 8 kubków. Kawa leci tylko do czystego kubka
+  w rękach — najpierw E przy szafce. Wypita (albo wystygła) kawa = brudny
+  kubek. Czysty kubek można odłożyć do szafki; brudny:
+  - umyć w zlewie (kuchennym albo w łazience) — od razu czysty w rękach;
+  - włożyć do zmywarki (do 8); E z pustymi rękami włącza ją (30 min gry),
+    potem trzeba ją rozładować (E) — czyste kubki wracają do szafki.
+  Gdy szafka jest pusta, a brudne kubki stoją po biurze — trzeba pozmywać.
+  Sprzątaczka zebrane kubki wkłada do zmywarki i ją włącza; kubki gracza,
+  który wyszedł z gry, wracają do szafki.
+- **Lodówka** (E — okno): przechowanie jedzenia i napojów (do 10 rzeczy, z
+  podpisem właściciela — każdy może wziąć każdą), **mleko do kawy** („Dolej do
+  kawy” → kawa z mlekiem, trochę mniej stresu; karton mleka ze sklepu
+  uzupełnia 10 porcji) i **firmowe napoje za darmo** (4 wody, 2 soki, co rano
+  nowe).
+- **Menu startowe**: ekran tytułowy (miasto o zmierzchu, zapalające się okna,
+  chmury) — Graj (→ tworzenie postaci), Ustawienia (pełny ekran, efekt tuszu,
+  przybliżenie kamery; zapisywane w `user://settings.cfg`), Autorzy, Wyjdź.
+  Z tworzenia postaci — „Wróć do menu”.
+- **Menu gry pod Esc** (gdy nie jest otwarte żadne okno): Wróć do gry,
+  Ustawienia, Wyjdź do menu (rozłącza), Wyjdź z gry. Gra na serwerze toczy się
+  dalej; postać w tym czasie stoi. Na pulpicie w domu to samo pod przyciskiem
+  „StartOS”.
+
 ### 10.6 Stan implementacji
 
 *Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie,
@@ -970,6 +998,9 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Ekwipunek**: kieszenie i ręce, przedmioty (przepustka, karta, laptop,
   kawa), upuszczanie / podnoszenie / podawanie, dostęp z przedmiotów (10.13);
   protokół v8.
+- **Aneks kuchenny i menu**: policzone kubki, zlew, zmywarka, lodówka z
+  mlekiem i darmowymi napojami; ekran tytułowy z ustawieniami, menu pod Esc z
+  wyjściem (10.35); protokół v28.
 - **Okna, światło, kamera, nowa mapa**: okna, włączniki i jasność
   pomieszczeń, zoom kamery, ręcznie rysowane podłogi, ściany i meble (10.34);
   protokół v27.
@@ -1028,9 +1059,9 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Sieć mobilna**: serwer dual-stack IPv4/IPv6; gracz identyfikowany tokenem
   (zmiana adresu w trakcie gry przenosi sesję); klient przepina gniazdo po
   ciszy/powrocie z tła i sam łączy się ponownie po utracie sesji.
-- **Testy**: 95 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
+- **Testy**: 103 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
   zależna od uprawnień, bramki, ruch/kolizje, schody, winda, nawigacja,
-  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, zegar, dojazd, pogoda, zarząd, słodycze, obiady, wakaty, firma, ochrona i policja, kubki, dym, balkon, protokół), 2 golden, 28 e2e serwera
+  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, zegar, dojazd, pogoda, zarząd, słodycze, obiady, wakaty, firma, ochrona i policja, kubki, dym, balkon, protokół), 2 golden, 29 e2e serwera
   (m.in. portal: odrzucenie → przyjęcie → spawn; całe wdrożenie aż do karty;
   niewidoczność między piętrami; zgodność stanu serwera z predykcją) —
   łącznie 122 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 porannego dojazdu samochodem moknięcia w deszczu spotkania z Prezesem tacy ze słodyczami obiadu z odbiorem na recepcji, obsadzonego stanowiska, panelu założyciela kradzieży w sklepie z ochroną i policją , kubka zebranego przez sprzątaczkę oraz papierosa, który uruchamia alarm pożarowy); 146 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie

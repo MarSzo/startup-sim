@@ -359,6 +359,15 @@ Dym papierosowy na piętrze odbiorcy (co 1 s, tylko w budynku): `floor u8`, n
 u8 (≤ 64) × {`room u16`, `level u8` 1–255}. Pokoi spoza listy nie ma dymu.
 Czujki dymu są w danych mapy (`room_defs.*.detector`), klient rysuje je sam.
 
+### 42 `Fridge` (S→C), 43 `FridgeAction` (C→S)
+
+Lodówka w aneksie (E przy niej, i po każdej zmianie): n u8 (≤ 16) × {`kind
+u8`, `label` str16 — np. „Kanapka z szynką (Ola)”}, `milk u8` (porcje),
+`water u8`, `juice u8` (darmowe). `FridgeAction`: token u32, `action u8` (1
+weź `arg`-tą rzecz, 2 włóż to, co w rękach — karton mleka = +10 porcji, 3 weź
+wodę, 4 weź sok, 5 dolej mleka do kawy w rękach), `arg u8`. Tylko stojąc przy
+lodówce. Szafka z kubkami i zmywarka działają przez E (odpowiedzi jako `Say`).
+
 ### 41 `Lights` (S→C)
 
 Lampy zapalone na piętrze odbiorcy (co 1 s, tylko w budynku): `floor u8`, n u8
@@ -438,6 +447,7 @@ szyfrowaniem.
 
 ## Historia wersji
 
+- **28** — aneks kuchenny: `Fridge` (42), `FridgeAction` (43); przedmioty 35 kubek (czysty), 36 mleko (karton), 37 kawa z mlekiem; 34 = brudny kubek.
 - **27** — światło: pakiet `Lights` (41); w mapie `room_defs.*.light` / `switch` / `lit_by` / `windows`.
 - **26** — dym i straż: `Clock` + `alarm`, pakiet `Smoke` (40), wygląd NPC 6 (strażak), pojazd 6 (wóz strażacki).
 - **25** — kubki i sprzątaczka: przedmiot 34 = pusty kubek, wygląd NPC 5 (sprzątaczka); bez nowych pakietów.

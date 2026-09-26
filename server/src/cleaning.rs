@@ -55,8 +55,6 @@ pub mod lines {
         s.push_str(" — Pani Krysia");
         s
     }
-    pub const WASHED: &str = "Kubek umyty, stoi na suszarce.";
-    pub const REFILL: &str = "Dolewka do tego samego kubka.";
     fn capitalize(s: &str) -> String {
         let mut c = s.chars();
         c.next().map_or(String::new(), |f| f.to_uppercase().collect::<String>() + c.as_str())

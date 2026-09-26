@@ -22,12 +22,14 @@ const StallDoorView = preload("res://game/stall_door_view.gd")
 const ElevatorDoorView = preload("res://game/elevator_door_view.gd")
 const RideMask = preload("res://game/ride_mask.gd")
 const ShelfWindow = preload("res://ui/shelf_window.gd")
+const FridgeWindow = preload("res://ui/fridge_window.gd")
 const VehicleView = preload("res://game/vehicle_view.gd")
 const WeatherFx = preload("res://ui/weather_fx.gd")
 const DialogWindow = preload("res://ui/dialog_window.gd")
 const TrayView = preload("res://game/tray_view.gd")
 const SmokeView = preload("res://game/smoke_view.gd")
 const LightView = preload("res://game/light_view.gd")
+const Settings = preload("res://ui/settings.gd")
 const Ink = preload("res://ui/ink_ui.gd")
 
 const ZOOM := 3.0
@@ -99,6 +101,8 @@ var weather_layer := CanvasLayer.new()
 var dialog := DialogWindow.new()
 var shelf_window := ShelfWindow.new()
 var _shelf_at := Vector2.ZERO     # where the shelf window was opened (walk away = close)
+var fridge_window := FridgeWindow.new()
+var _fridge_at := Vector2.ZERO
 var depts := {}          # id -> department (after the contract)
 var appearances := {}    # id -> appearance dict (from PlayerInfo)
 var own_appearance := {}
@@ -272,7 +276,8 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 	var mat := ShaderMaterial.new()
 	mat.shader = load("res://game/mood.gdshader")
 	mood.material = mat
-	mood.visible = not args.has("no-mood")
+	Settings.load_once()
+	mood.visible = Settings.mood and not args.has("no-mood")
 	mood_layer.add_child(mood)
 	alarm_tint.set_anchors_preset(Control.PRESET_FULL_RECT)
 	alarm_tint.color = Color(0.9, 0.05, 0.05, 0.0)
@@ -294,6 +299,8 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 	add_child(weather_layer)
 	weather_layer.add_child(weather_fx)
 	status_layer.add_child(shelf_window)
+	status_layer.add_child(fridge_window)
+	fridge_window.action.connect(func(act: int, arg: int): if net.is_playing(): net.send(Protocol.encode_fridge_action(net.token, act, arg)))
 	shelf_window.take.connect(func(shelf: int, kind: int): if net.is_playing(): net.send(Protocol.encode_shop_take(net.token, shelf, kind)))
 	screen_layer.layer = 12
 	add_child(screen_layer)
@@ -310,8 +317,7 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 	dialog.answer.connect(func(id: int, choice: int): if net.is_playing(): net.send(Protocol.encode_dialog_answer(net.token, id, choice)))
 	screen_layer.add_child(screen)
 	_show_floor(0)
-	if args.has("zoom"):
-		set_zoom_level.call_deferred(float(args["zoom"]))  # dev / screenshots
+	set_zoom_level.call_deferred(float(args["zoom"]) if args.has("zoom") else Settings.zoom)
 
 
 func _show_floor(f: int) -> void:
@@ -450,6 +456,14 @@ func _goto_input(delta: float) -> int:
 			net.send(Protocol.encode_shop_take(net.token, int(leg.get_slice(":", 1)), int(leg.get_slice(":", 2))))
 			goto_delay = 0.4
 			return 0
+		if leg == "esc":  # dev: press Esc (the game menu)
+			var ev := InputEventKey.new()
+			ev.keycode = KEY_ESCAPE
+			ev.physical_keycode = KEY_ESCAPE
+			ev.pressed = true
+			Input.parse_input_event(ev)
+			goto_delay = 0.3
+			return 0
 		if leg == "L":  # lock / unlock the stall
 			net.send(Protocol.encode_door_action(net.token))
 			goto_delay = 0.3
@@ -558,6 +572,8 @@ func _process(delta: float) -> void:
 			floor_items.erase(id)
 	if shelf_window.visible and have_state and Movement.to_px(pred.pos).distance_to(_shelf_at) > 20.0:
 		shelf_window.close()  # walked away from the shelf
+	if fridge_window.visible and have_state and Movement.to_px(pred.pos).distance_to(_fridge_at) > 20.0:
+		fridge_window.close()
 	if have_state:
 		_update_stall_doors()
 		_update_ride()
@@ -600,6 +616,7 @@ func _on_packet(p: Dictionary) -> void:
 			inventory = p.slots
 			hud.update_slots(inventory)
 			me.set_held(inventory[0].kind if not inventory.is_empty() else 0)
+			fridge_window.set_held(inventory[0].kind if not inventory.is_empty() else 0)
 		Protocol.T_DOORS:
 			var dm = building.get_floor(p.floor)
 			if dm:
@@ -610,6 +627,10 @@ func _on_packet(p: Dictionary) -> void:
 		Protocol.T_SHELF:
 			shelf_window.show_shelf(p)
 			_shelf_at = Movement.to_px(pred.pos)
+		Protocol.T_FRIDGE:
+			if not fridge_window.visible:
+				_fridge_at = Movement.to_px(pred.pos)
+			fridge_window.show_fridge(p)
 		Protocol.T_SMOKE:
 			smoke_view.on_smoke(p)
 		Protocol.T_LIGHTS:
@@ -815,6 +836,17 @@ func _reconcile(server_body: Dictionary, ack: int) -> void:
 		_refresh_own_label()
 
 
+## Something in the game takes Esc itself (a window is open).
+func window_open() -> bool:
+	return screen.visible or shelf_window.visible or fridge_window.visible or dialog.visible
+
+
+## Settings changed in the Esc menu.
+func apply_settings() -> void:
+	mood.visible = Settings.mood
+	set_zoom_level(Settings.zoom)
+
+
 ## Camera zoom (mouse wheel, + / -): a multiplier of ZOOM.
 const ZOOM_MIN := 0.6
 const ZOOM_MAX := 2.0
@@ -912,6 +944,23 @@ func _update_hint() -> void:
 		if best_id >= 0:
 			var who: String = nicks.get(best_id, "?")
 			text = "[E] Kasa — zapłać za zakupy" if who == "Kasa" else "[E] Porozmawiaj: %s" % who
+	if text == "" and map:
+		# Kitchenette things (the nearest within 1.5 tiles).
+		var kitchen_names := {"cupboard": "[E] Szafka z kubkami", "dishwasher": "[E] Zmywarka", "fridge": "[E] Lodówka", "kitchen_sink": "[E] Zlew"}
+		var best_d := INF
+		for dy in range(-2, 3):
+			for dx in range(-2, 3):
+				var kx: int = t.x + dx
+				var ky: int = t.y + dy
+				if kx < 0 or ky < 0 or kx >= map.width or ky >= map.height:
+					continue
+				var ktype: String = map.legend.get(map.tile_chars[ky * map.width + kx], {}).get("type", "")
+				if not kitchen_names.has(ktype):
+					continue
+				var kd: float = ((Vector2(kx, ky) + Vector2(0.5, 0.5)) * map.tile_px).distance_to(Movement.to_px(pred.pos))
+				if kd <= map.tile_px * 1.5 and kd < best_d:
+					best_d = kd
+					text = kitchen_names[ktype]
 	if text == "" and map:
 		# Light switch within reach (1 tile, like the server).
 		var me_c := Movement.to_px(pred.pos)

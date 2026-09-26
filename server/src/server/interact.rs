@@ -3,7 +3,6 @@
 
 use std::collections::HashMap;
 
-use crate::cleaning;
 use crate::coffee;
 use crate::computer;
 use crate::inventory::kind as item_kind;
@@ -61,7 +60,7 @@ impl Server {
             }
             return;
         }
-        if self.use_coffee_machine(pid, body, hands_free) || self.use_desk_and_say(pid, body) {
+        if self.use_kitchen(pid, body) || self.use_coffee_machine(pid, body) || self.use_desk_and_say(pid, body) {
             return;
         }
         if let Some(line) = self.take_treat(pid, body) {
@@ -87,21 +86,28 @@ impl Server {
         true
     }
 
-    /// E at a coffee machine; `false` = none in reach.
-    fn use_coffee_machine(&mut self, pid: u16, body: &Body, hands_free: bool) -> bool {
+    /// E at a coffee machine; `false` = none in reach. Coffee goes into a
+    /// clean mug from the cupboard, held in your hands.
+    fn use_coffee_machine(&mut self, pid: u16, body: &Body) -> bool {
         let Some(i) = coffee::machine_in_reach(&self.machines, body) else { return false };
         let Some(p) = self.players.get_mut(&pid) else { return true };
-        // Your own empty mug goes under the spout.
-        let mug = p.inventory.held_kind() == item_kind::EMPTY_CUP;
-        let line = match coffee::use_machine(&mut self.machines, i, &mut p.cup, hands_free || mug, self.tick) {
-            coffee::Outcome::Started if mug => {
-                p.inventory.take_hands();
-                refresh(p);
-                cleaning::lines::REFILL
-            }
-            coffee::Outcome::Started => coffee::lines::BREWING,
-            coffee::Outcome::Busy => coffee::lines::BUSY,
-            coffee::Outcome::HandsFull => coffee::lines::HANDS_FULL,
+        let line = match p.inventory.held_kind() {
+            item_kind::CUP => match coffee::use_machine(&mut self.machines, i, &mut p.cup, true, self.tick) {
+                coffee::Outcome::Started => {
+                    p.inventory.take_hands(); // the mug goes under the spout
+                    refresh(p);
+                    coffee::lines::BREWING
+                }
+                coffee::Outcome::Busy => coffee::lines::BUSY,
+                coffee::Outcome::HandsFull => coffee::lines::HANDS_FULL,
+            },
+            item_kind::EMPTY_CUP => crate::kitchen::lines::DIRTY_MUG,
+            _ if self.kitchen.is_some() => crate::kitchen::lines::NEED_MUG,
+            _ => match coffee::use_machine(&mut self.machines, i, &mut p.cup, p.inventory.hands_free(), self.tick) {
+                coffee::Outcome::Started => coffee::lines::BREWING,
+                coffee::Outcome::Busy => coffee::lines::BUSY,
+                coffee::Outcome::HandsFull => coffee::lines::HANDS_FULL,
+            },
         };
         self.says.push(Say::new(pid, line));
         true

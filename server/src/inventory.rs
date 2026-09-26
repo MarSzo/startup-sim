@@ -44,6 +44,12 @@ pub mod kind {
     pub const KEBAB: u8 = 33;
     /// What's left of a coffee (cleaning.rs).
     pub const EMPTY_CUP: u8 = 34;
+    /// A clean mug from the kitchen cupboard (kitchen.rs).
+    pub const CUP: u8 = 35;
+    /// A carton of milk (shop) - tops up the fridge.
+    pub const MILK: u8 = 36;
+    /// Coffee with milk (the fridge's milk).
+    pub const LATTE: u8 = 37;
 }
 
 pub const POCKETS: usize = 3;
@@ -54,6 +60,7 @@ pub fn is_small(k: u8) -> bool {
         // Shop goods fit in a pocket, except the bulky ones.
         kind::BURGER | kind::FRIES | kind::WINE => false,
         10..=27 => true,
+        kind::MILK => true,
         28..=33 => false, // lunch boxes: both hands
         _ => false,
     }
@@ -65,7 +72,9 @@ pub fn display_name(k: u8) -> &'static str {
         kind::EMPLOYEE_CARD => "Karta pracownika",
         kind::LAPTOP => "Laptop",
         kind::COFFEE => "Kawa",
-        kind::EMPTY_CUP => "Pusty kubek",
+        kind::EMPTY_CUP => "Brudny kubek",
+        kind::CUP => "Kubek",
+        kind::LATTE => "Kawa z mlekiem",
         kind::FRUIT => "Owoc",
         k => crate::shop::product(k).map_or("?", |p| p.name),
     }

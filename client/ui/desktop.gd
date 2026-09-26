@@ -14,6 +14,8 @@ signal answer(attempt: int, index: int, choice: int)
 signal portal_action(action: int, arg: int)
 ## "Załóż firmę" (CompanyAction FOUND).
 signal found_company(name: String)
+## StartOS button: the game menu (settings, leave).
+signal menu_requested
 
 const DEPT_NAMES := {1: "IT / Produkt", 2: "Biznes", 3: "Zarząd"}
 const RESEND_MSEC := 1500
@@ -143,7 +145,9 @@ func _build_desktop() -> void:
 	_root.add_child(bar)
 	var row := HBoxContainer.new()
 	bar.add_child(row)
-	var start_btn := _label("  ◆ StartOS  ", 16, Color("#8fb7ff"), false)
+	var start_btn := Ink.button("◆ StartOS")
+	start_btn.tooltip_text = "Menu gry: ustawienia, wyjście"
+	start_btn.pressed.connect(func(): menu_requested.emit())
 	row.add_child(start_btn)
 	_taskbar.add_theme_constant_override("separation", 6)
 	_taskbar.size_flags_horizontal = Control.SIZE_EXPAND_FILL

@@ -15,6 +15,9 @@ const Ink = preload("res://ui/ink_ui.gd")
 const Desktop = preload("res://ui/desktop.gd")
 const Protocol = preload("res://net/protocol.gd")
 const DayScreen = preload("res://ui/day_screen.gd")
+const TitleScreen = preload("res://ui/title_screen.gd")
+const PauseMenu = preload("res://ui/pause_menu.gd")
+const Settings = preload("res://ui/settings.gd")
 
 const BUILDING_PATH := "res://maps/building.json"
 
@@ -28,6 +31,11 @@ var portal_layer := CanvasLayer.new()
 var portal := Desktop.new()
 var day_layer := CanvasLayer.new()
 var day_screen := DayScreen.new()
+var title_layer := CanvasLayer.new()
+var title := TitleScreen.new()
+var pause_layer := CanvasLayer.new()
+var pause := PauseMenu.new()
+var _leaving := false  # "Wyjdź do menu": the disconnect goes to the title
 
 
 func _ready() -> void:
@@ -40,6 +48,8 @@ func _ready() -> void:
 		var kv: PackedStringArray = a.trim_prefix("--").split("=", true, 1)
 		args[kv[0]] = kv[1] if kv.size() > 1 else ""
 	get_tree().auto_accept_quit = false
+	Settings.load_once()
+	Settings.apply_window()
 	building = Building.new()
 	building.load_path(BUILDING_PATH)
 	add_child(net)
@@ -66,6 +76,26 @@ func _ready() -> void:
 	add_child(ui)
 	ui.add_child(start)
 	start.connect_pressed.connect(_on_connect_pressed)
+	start.back_pressed.connect(_show_title)
+	# Title screen (skipped by the dev --nick / --autoconnect) and the Esc menu.
+	title_layer.layer = 40
+	add_child(title_layer)
+	title_layer.add_child(title)
+	title.play.connect(func():
+		title_layer.visible = false
+		start.get_parent().visible = true)
+	title.quit.connect(_quit)
+	pause_layer.layer = 50
+	add_child(pause_layer)
+	pause_layer.add_child(pause)
+	pause.to_menu.connect(_leave_to_menu)
+	pause.quit.connect(_quit)
+	pause.settings_changed.connect(func(): if game: game.apply_settings())
+	portal.menu_requested.connect(func(): pause.open())
+	if args.has("nick") or args.has("autoconnect"):
+		title_layer.visible = false
+	else:
+		ui.visible = false
 	if args.has("nick") or args.has("autoconnect"):
 		start.set_defaults(args.get("nick", "Gracz%d" % randi_range(100, 999)), args.get("server", ""))
 	elif args.has("server"):
@@ -121,6 +151,7 @@ func _on_connected(welcome: Dictionary) -> void:
 		game.reset_session(welcome)  # auto-reconnect: keep the world, new session
 		return
 	start.get_parent().visible = false
+	get_viewport().gui_release_focus()  # the nick field must not keep eating keys
 	get_window().title = "Startup Sim — %s" % net.nick
 	game = Game.new()
 	add_child(game)
@@ -141,7 +172,7 @@ func _show_portal() -> void:
 func _sync_portal() -> void:
 	portal_layer.visible = portal.visible
 	if game:
-		game.input_blocked = portal.visible or day_screen.blocking()
+		game.input_blocked = portal.visible or day_screen.blocking() or pause.visible
 		game.set_job(portal.job_title, portal.department)
 
 
@@ -160,16 +191,58 @@ func _on_packet(p: Dictionary) -> void:
 		_sync_portal()
 
 
+func _process(_d: float) -> void:
+	if game:
+		game.input_blocked = portal.visible or day_screen.blocking() or pause.visible  # no walking under the menu
+
+
+func _show_title() -> void:
+	start.get_parent().visible = false
+	title_layer.visible = true
+
+
+## Esc: the game menu (unless a game window wants the key to close itself).
+func _input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE:
+		if game and not pause.visible and not title_layer.visible and not game.window_open():
+			pause.open()
+			get_viewport().set_input_as_handled()
+
+
+## "Wyjdź do menu": leave the server, back to the title.
+func _leave_to_menu() -> void:
+	_leaving = true
+	net.close()
+	_end_game()
+	start.set_busy(false)
+	start.set_status("")
+	_show_title()
+	_leaving = false
+
+
+func _end_game() -> void:
+	portal_layer.visible = false
+	day_screen.visible = false
+	if game:
+		game.queue_free()
+		game = null
+	get_window().title = "Startup Sim"
+
+
+func _quit() -> void:
+	net.close()
+	get_tree().quit()
+
+
 func _on_reconnecting(reason: String) -> void:
 	if game:
 		game.on_reconnecting(reason)
 
 
 func _on_disconnected(reason: String) -> void:
-	portal_layer.visible = false
-	if game:
-		game.queue_free()
-		game = null
+	if _leaving:
+		return
+	_end_game()
 	start.get_parent().visible = true
 	start.set_busy(false)
 	start.set_status(reason, true)

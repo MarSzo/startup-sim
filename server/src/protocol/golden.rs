@@ -223,6 +223,8 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
         ("company_action", Packet::CompanyAction { token: 0x01020304, action: 3, target: 1, value: 2, text: String::new() }),
         ("smoke", Packet::Smoke { floor: 1, rooms: vec![(9, 40), (33, 200)] }),
         ("lights", Packet::Lights { floor: 1, rooms: vec![5, 12] }),
+        ("fridge", Packet::Fridge { items: vec![(11, "Kanapka z szynką (Ola)".into())], milk: 7, water: 4, juice: 2 }),
+        ("fridge_action", Packet::FridgeAction { token: 0x01020304, action: 2, arg: 0 }),
         (
             "chat",
             Packet::Chat {
