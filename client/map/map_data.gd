@@ -9,7 +9,8 @@ const NO_ROOM := 0
 const ACCESS_GUEST := 1
 const ACCESS_CARD := 2
 const ACCESS_SERVICE := 4
-const ACCESS_REQUIRED := {"card": ACCESS_GUEST | ACCESS_CARD, "service": ACCESS_SERVICE}
+const ACCESS_BOARD := 8
+const ACCESS_REQUIRED := {"card": ACCESS_GUEST | ACCESS_CARD, "service": ACCESS_SERVICE, "board": ACCESS_BOARD}
 
 # Movement directions (map::dir in Rust).
 const DIR_UP := 1

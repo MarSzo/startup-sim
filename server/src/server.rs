@@ -5,6 +5,7 @@ use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::net::SocketAddr;
 use std::time::{Duration, Instant};
 
+use crate::board::{self, Meeting};
 use crate::building::Building;
 use crate::clock::{self, Clock, Transition};
 use crate::coffee::{self, Cup, Machine};
@@ -125,6 +126,15 @@ const GIVE_RADIUS: i32 = sim::TILE_UNITS * 2;
 /// Resend the inventory this often (ticks).
 const INVENTORY_RESEND_TICKS: u32 = 40;
 
+/// A conversation with a board member.
+#[derive(Debug, Clone, Copy)]
+struct Talk {
+    meeting: usize,
+    npc: u16,
+    id: u8,
+    good: u32,
+}
+
 /// Resend the game time this often (ticks).
 const CLOCK_RESEND_TICKS: u32 = 20;
 
@@ -176,6 +186,13 @@ struct Player {
     riding: Option<u16>,
     /// Already told "it's pouring" (until back indoors).
     soaked_said: bool,
+    /// Salary, grosze per game hour (raises from the CEO).
+    pay_rate: i64,
+    /// World day of the last raise request (cooldown).
+    last_raise_day: Option<u32>,
+    /// Talking to a board member: meeting index, NPC, dialog id, good answers.
+    talk: Option<Talk>,
+    next_dialog_id: u8,
     /// Sofa / toilet / smoke break, and where it started (moving ends it).
     rest: Option<(Rest, u8, Pos)>,
     /// Messenger spam guard / retry dedupe.
@@ -229,6 +246,10 @@ pub struct Server {
     /// Vehicles bringing people to work (and parked cars / bikes).
     vehicles: Vec<Vehicle>,
     weather: Weather,
+    /// Board meetings (calendar).
+    meetings: Vec<Meeting>,
+    /// (floor, room) of the board room.
+    board_room: Option<(u8, u16)>,
     /// (floor, room) under the open sky.
     outdoor_rooms: Vec<(u8, u16)>,
     /// Send `Clock` to everyone this tick (a day started / ended, someone arrived).
@@ -262,6 +283,8 @@ pub struct Server {
 impl Server {
     pub fn new(building: Building, cfg: Config) -> std::io::Result<Server> {
         let net = Net::bind(cfg.bind, cfg.link)?;
+        let board_room =
+            building.active_floors().find_map(|(f, m)| m.rooms.iter().find(|r| r.kind == "management").map(|r| (f, r.id)));
         let mut server = Server {
             npcs: Npc::spawn_all(&building),
             machines: coffee::find_machines(&building),
@@ -280,6 +303,8 @@ impl Server {
             clock: Clock::new(cfg.start_minute, cfg.time_scale),
             vehicles: Vec::new(),
             weather: Weather::new(0),
+            meetings: Vec::new(),
+            board_room,
             outdoor_rooms: building
                 .active_floors()
                 .flat_map(|(f, m)| m.rooms.iter().filter(|r| r.outdoor).map(move |r| (f, r.id)))
@@ -464,7 +489,9 @@ impl Server {
             | Packet::ComputerAction { token, .. }
             | Packet::DoorAction { token }
             | Packet::ShopTake { token, .. }
-            | Packet::CommuteChoice { token, .. } => *token,
+            | Packet::CommuteChoice { token, .. }
+            | Packet::CalendarBook { token, .. }
+            | Packet::DialogAnswer { token, .. } => *token,
             _ => return,
         };
         let Some(&id) = self.by_token.get(&token) else {
@@ -524,6 +551,8 @@ impl Server {
             Packet::ComputerAction { action, conv, arg, text, .. } => self.handle_computer_action(id, action, conv, arg, &text),
             Packet::DoorAction { .. } => self.handle_door_action(id),
             Packet::ShopTake { shelf, kind, .. } => self.handle_shop_take(id, shelf, kind),
+            Packet::CalendarBook { start, topic, .. } => self.handle_calendar_book(id, start as u32, topic),
+            Packet::DialogAnswer { id: dialog, choice, .. } => self.handle_dialog_answer(id, dialog, choice),
             Packet::CommuteChoice { mode, .. } => {
                 let p = self.players.get_mut(&id).unwrap();
                 if commute::mode(mode).is_some() && matches!(p.stage, Stage::Home { arrive_at: None }) {
@@ -591,6 +620,10 @@ impl Server {
             depart_at: None,
             riding: None,
             soaked_said: false,
+            pay_rate: clock::PAY_PER_MIN * 60,
+            last_raise_day: None,
+            talk: None,
+            next_dialog_id: 0,
             rest: None,
             last_chat_tick: None,
             last_chat_nonce: 0,
@@ -1150,7 +1183,7 @@ impl Server {
         p.rest = None;
         p.riding = None;
         let minutes = (p.worked_ds / clock::DS_PER_MIN as u64) as u32;
-        let pay = minutes as i64 * clock::PAY_PER_MIN;
+        let pay = minutes as i64 * p.pay_rate / 60;
         p.money += pay;
         p.last_pay = (pay, minutes);
         p.worked_ds = 0;
@@ -1323,6 +1356,244 @@ impl Server {
         let (nick, left) = (p.nick.clone(), p.money);
         self.log(format!("* shop: {nick} paid {}", shop::zl(total)));
         Some(shop::lines::paid(total, left))
+    }
+
+    // ------------------------------------------------------------- board
+
+    /// The account whose calendar the player sees: the owner of the unlocked
+    /// computer they sit at.
+    fn calendar_account(&self, pid: u16) -> Option<u16> {
+        let h = self.players.get(&pid)?.at_computer?;
+        let c = self.computers.iter().find(|c| c.handle == h && !c.locked)?;
+        self.players.get(&c.owner()).filter(|o| o.contract).map(|o| o.id)
+    }
+
+    fn calendar_packet(&self, pid: u16) -> Option<Packet> {
+        let account = self.calendar_account(pid)?;
+        let (day, now) = (self.clock.day, self.clock.minute());
+        let mine = self
+            .meetings
+            .iter()
+            .find(|m| m.day == day && m.owner == account && matches!(m.state, board::State::Booked | board::State::Talking(_)));
+        let slots = board::slots()
+            .map(|start| {
+                let taken = self.meetings.iter().find(|m| {
+                    m.day == day && m.start == start && matches!(m.state, board::State::Booked | board::State::Talking(_))
+                });
+                let state = match taken {
+                    Some(m) if m.owner == account => proto::slot::MINE,
+                    Some(_) => proto::slot::TAKEN,
+                    None if start < now + board::BOOK_AHEAD => proto::slot::PAST,
+                    None => proto::slot::FREE,
+                };
+                (start as u16, state)
+            })
+            .collect();
+        Some(Packet::Calendar {
+            mine_start: mine.map_or(proto::NO_TIME, |m| m.start as u16),
+            mine_topic: mine.map_or(board::topic::NONE, |m| m.topic),
+            slots,
+        })
+    }
+
+    fn send_calendar(&mut self, pid: u16) {
+        if let Some(pk) = self.calendar_packet(pid) {
+            let addr = self.players[&pid].addr;
+            self.send(addr, &pk);
+        }
+    }
+
+    /// Book / change / cancel (topic 0) the account's meeting for today.
+    fn handle_calendar_book(&mut self, pid: u16, start: u32, topic: u8) {
+        let Some(account) = self.calendar_account(pid) else { return };
+        let (day, now) = (self.clock.day, self.clock.minute());
+        let is_mine = |m: &Meeting| m.day == day && m.owner == account && m.state == board::State::Booked;
+        if topic == board::topic::NONE {
+            self.meetings.retain(|m| !is_mine(m));
+        } else {
+            let valid_slot = board::slots().any(|s| s == start) && start >= now + board::BOOK_AHEAD;
+            let free = !self.meetings.iter().any(|m| {
+                m.day == day && m.start == start && m.owner != account && matches!(m.state, board::State::Booked | board::State::Talking(_))
+            });
+            if !valid_slot || !free || board::steps(topic).is_empty() {
+                self.send_calendar(pid);
+                return;
+            }
+            self.meetings.retain(|m| !is_mine(m));
+            self.meetings.push(Meeting { day, start, owner: account, topic, state: board::State::Booked });
+            let who = if pid == account { String::new() } else { format!(" (wpisane przez {})", self.players[&pid].nick) };
+            self.log(format!("* calendar: {} books {} at {}{who}", self.players[&account].nick, board::topic_name(topic), clock::hhmm(start)));
+        }
+        self.send_calendar(pid);
+    }
+
+    /// Door, missed meetings, old days.
+    fn tick_meetings(&mut self) {
+        let (day, now) = (self.clock.day, self.clock.minute());
+        self.meetings.retain(|m| m.day + 1 >= day);
+        // The board-room door lets in whoever has a meeting now.
+        for p in self.players.values_mut() {
+            let open = self.meetings.iter().any(|m| m.owner == p.id && m.door_open(day, now));
+            p.body.access = p.inventory.access() | if open { crate::map::access::BOARD } else { 0 };
+        }
+        let ceo = self.npcs.iter().find(|n| n.role == npc::Role::Ceo).map(|n| n.id);
+        let mut missed = Vec::new();
+        for m in &mut self.meetings {
+            if m.day == day && m.state == board::State::Booked && now > m.start + board::GRACE {
+                m.state = board::State::Missed;
+                missed.push((m.owner, m.start));
+            }
+        }
+        for (owner, start) in missed {
+            if let Some(p) = self.players.get_mut(&owner) {
+                p.needs.add_stress(5);
+            }
+            if let Some(c) = ceo {
+                self.pending_says.push((c, board::lines::missed(start), Some(owner)));
+            }
+        }
+        // Leaving the board room ends the conversation.
+        let board_room = self.board_room;
+        let left: Vec<u16> = self
+            .players
+            .values()
+            .filter(|p| p.talk.is_some() && Some((p.body.floor, p.room)) != board_room)
+            .map(|p| p.id)
+            .collect();
+        for pid in left {
+            self.end_talk(pid, None);
+        }
+    }
+
+    /// E at the CEO / co-founder.
+    fn start_meeting(&mut self, npc_id: u16, pid: u16) -> Option<String> {
+        let role = self.npcs.iter().find(|n| n.id == npc_id)?.role;
+        let who = if role == npc::Role::CoFounder { board::Who::CoFounder } else { board::Who::Ceo };
+        let (day, now) = (self.clock.day, self.clock.minute());
+        if self.players.get(&pid)?.talk.is_some() {
+            self.send_dialog(pid);
+            return None;
+        }
+        let Some(i) = self.meetings.iter().position(|m| m.day == day && m.owner == pid && m.state == board::State::Booked) else {
+            return Some(board::lines::NO_MEETING.into());
+        };
+        let m = &self.meetings[i];
+        if board::who(m.topic) != who {
+            let other = if who == board::Who::Ceo { "ze Wspólniczką" } else { "z Prezesem" };
+            return Some(format!("Twoje spotkanie jest {other}."));
+        }
+        if !m.can_talk(day, now) {
+            return Some(board::lines::NOT_YET.into());
+        }
+        self.meetings[i].state = board::State::Talking(0);
+        let p = self.players.get_mut(&pid)?;
+        p.next_dialog_id = p.next_dialog_id.wrapping_add(1).max(1);
+        p.talk = Some(Talk { meeting: i, npc: npc_id, id: p.next_dialog_id, good: 0 });
+        self.send_dialog(pid);
+        None
+    }
+
+    fn dialog_packet(&self, pid: u16) -> Option<Packet> {
+        let t = self.players.get(&pid)?.talk.as_ref()?;
+        let m = self.meetings.get(t.meeting)?;
+        let board::State::Talking(step) = m.state else { return None };
+        let s = board::steps(m.topic).get(step)?;
+        Some(Packet::Dialog { id: t.id, npc: t.npc, text: s.text.into(), options: s.options.iter().map(|o| o.to_string()).collect() })
+    }
+
+    fn send_dialog(&mut self, pid: u16) {
+        if let Some(pk) = self.dialog_packet(pid) {
+            let addr = self.players[&pid].addr;
+            self.send(addr, &pk);
+        }
+    }
+
+    fn handle_dialog_answer(&mut self, pid: u16, dialog: u8, choice: u8) {
+        let Some(t) = self.players.get(&pid).and_then(|p| p.talk) else { return };
+        if t.id != dialog {
+            return; // stale (resend of an answered question)
+        }
+        let Some(m) = self.meetings.get(t.meeting).cloned() else { return };
+        let board::State::Talking(step) = m.state else { return };
+        let steps = board::steps(m.topic);
+        let Some(s) = steps.get(step) else { return };
+        let choice = (choice as usize).min(2);
+        let good = t.good + (choice == s.good) as u32;
+        self.pending_says.push((t.npc, s.replies[choice].to_string(), Some(pid)));
+        if step + 1 < steps.len() {
+            self.meetings[t.meeting].state = board::State::Talking(step + 1);
+            let p = self.players.get_mut(&pid).unwrap();
+            p.next_dialog_id = p.next_dialog_id.wrapping_add(1).max(1);
+            p.talk = Some(Talk { id: p.next_dialog_id, good, ..t });
+            self.send_dialog(pid);
+            return;
+        }
+        let outcome = self.meeting_outcome(pid, &m, good, t.npc);
+        self.end_talk(pid, Some(outcome));
+    }
+
+    /// What the meeting achieved.
+    fn meeting_outcome(&mut self, pid: u16, m: &Meeting, good: u32, npc_id: u16) -> String {
+        let day = self.clock.day;
+        let chance_roll = self.rng.u32(0..100);
+        let p = self.players.get_mut(&pid).unwrap();
+        match m.topic {
+            board::topic::RAISE => {
+                if p.last_raise_day.is_some_and(|d| day < d + board::RAISE_COOLDOWN_DAYS) {
+                    return board::lines::RAISE_TOO_SOON.into();
+                }
+                p.last_raise_day = Some(day);
+                let days_worked = p.day.saturating_sub(1);
+                if chance_roll < board::raise_chance(days_worked, good > 0) {
+                    p.pay_rate += board::RAISE_STEP;
+                    board::lines::RAISE_YES.into()
+                } else {
+                    board::lines::RAISE_NO.into()
+                }
+            }
+            board::topic::IDEA => match good {
+                2 => {
+                    p.needs.add_stress(-10);
+                    let nick = p.nick.clone();
+                    let name = self.npcs.iter().find(|n| n.id == npc_id).map_or("Zarząd".into(), |n| n.name.clone());
+                    let text = format!("Brawa dla {nick} za świetny pomysł na produkt! Wdrażamy.");
+                    self.messenger.post_system(computer::conv::GENERAL, npc_id, &name, &text);
+                    board::lines::IDEA_GREAT.into()
+                }
+                1 => {
+                    p.needs.add_stress(-3);
+                    board::lines::IDEA_OK.into()
+                }
+                _ => {
+                    p.needs.add_stress(3);
+                    board::lines::IDEA_BAD.into()
+                }
+            },
+            board::topic::COMPLAINT => {
+                p.needs.add_stress(-8);
+                board::lines::THANKS.into()
+            }
+            _ => {
+                p.needs.add_stress(-5);
+                board::lines::THANKS.into()
+            }
+        }
+    }
+
+    /// Close the conversation (optionally with the last line).
+    fn end_talk(&mut self, pid: u16, last: Option<String>) {
+        let Some(p) = self.players.get_mut(&pid) else { return };
+        let Some(t) = p.talk.take() else { return };
+        if let Some(m) = self.meetings.get_mut(t.meeting) {
+            m.state = board::State::Done;
+        }
+        if let Some(line) = last {
+            self.pending_says.push((t.npc, line, Some(pid)));
+        }
+        let addr = p.addr;
+        let close = Packet::Dialog { id: 0, npc: t.npc, text: String::new(), options: Vec::new() };
+        self.send(addr, &close);
+        self.send(addr, &close);
     }
 
     // ------------------------------------------------------------ stalls
@@ -1945,6 +2216,7 @@ impl Server {
         self.check_stalls();
         self.tick_elevators();
         self.tick_vehicles();
+        self.tick_meetings();
 
         let bodies: HashMap<u16, Body> =
             self.players.values().filter(|p| matches!(p.stage, Stage::Working)).map(|p| (p.id, p.body)).collect();
@@ -1963,6 +2235,11 @@ impl Server {
                     }
                 }
                 npc::Event::Say { npc, text, to } => says.push((npc, text, to)),
+                npc::Event::Meeting { npc, player } => {
+                    if let Some(line) = self.start_meeting(npc, player) {
+                        says.push((npc, line, Some(player)));
+                    }
+                }
                 npc::Event::Checkout { npc, player } => {
                     if let Some(line) = self.checkout(player) {
                         says.push((npc, line, Some(player)));
@@ -2100,6 +2377,12 @@ impl Server {
             }
             if tick % COMPUTER_RESEND_TICKS == 0 {
                 if let Some(pk) = self.computer_packet(id) {
+                    outgoing.push((p.addr, id, pk));
+                }
+                if let Some(pk) = self.calendar_packet(id) {
+                    outgoing.push((p.addr, id, pk));
+                }
+                if let Some(pk) = self.dialog_packet(id) {
                     outgoing.push((p.addr, id, pk));
                 }
             }

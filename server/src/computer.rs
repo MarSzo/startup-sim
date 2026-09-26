@@ -267,6 +267,18 @@ impl Messenger {
         }
     }
 
+    /// A message from the company itself (an NPC) to a channel.
+    pub fn post_system(&mut self, conv: u16, from: u16, nick: &str, text: &str) -> Msg {
+        self.next_id += 1;
+        let msg = Msg { id: self.next_id, from, nick: nick.into(), text: text.into() };
+        let q = self.convs.entry(Key::Channel(conv)).or_default();
+        q.push_back(msg.clone());
+        while q.len() > HISTORY {
+            q.pop_front();
+        }
+        msg
+    }
+
     /// A player left: their private conversations go (ids get reused).
     pub fn forget(&mut self, id: u16) {
         self.convs.retain(|k, _| !matches!(k, Key::Dm(a, b) if *a == id || *b == id));

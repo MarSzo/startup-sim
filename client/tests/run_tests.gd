@@ -52,6 +52,8 @@ func test_protocol(path: String) -> void:
 		"door_action": Protocol.encode_door_action(0x01020304),
 		"shop_take": Protocol.encode_shop_take(0x01020304, 1, 11),
 		"commute_choice": Protocol.encode_commute_choice(0x01020304, 5),
+		"calendar_book": Protocol.encode_calendar_book(0x01020304, 840, 2),
+		"dialog_answer": Protocol.encode_dialog_answer(0x01020304, 3, 1),
 		"computer_action": Protocol.encode_computer_action(0x01020304, Protocol.PC_SEND, 17, 42, "Kto zjadł mój jogurt?"),
 		"answer": Protocol.encode_answer(0x01020304, 3, 1, 2),
 	}
@@ -85,6 +87,12 @@ func test_protocol(path: String) -> void:
 		and ck.place == Protocol.PLACE_COMMUTING and ck.arrive == 545 and ck.pay == 23000 and ck.pay_minutes == 460
 		and ck.today_minutes == 0 and ck.mode == 2 and ck.depart == 520 and ck.money == 18600
 		and ck.weather == Protocol.WEATHER_RAIN, "decode clock %s" % ck)
+	var cal := Protocol.decode(golden["calendar"].hex_decode())
+	expect(cal.get("type") == Protocol.T_CALENDAR and cal.mine_start == 840 and cal.mine_topic == 1 and cal.slots.size() == 4
+		and cal.slots[3].state == Protocol.SLOT_MINE and cal.slots[1].start == 630, "decode calendar %s" % cal)
+	var dl := Protocol.decode(golden["dialog"].hex_decode())
+	expect(dl.get("type") == Protocol.T_DIALOG and dl.id == 3 and dl.npc == 61444 and dl.options.size() == 2
+		and dl.text.begins_with("Podwyżka"), "decode dialog %s" % dl)
 	var sh := Protocol.decode(golden["shelf"].hex_decode())
 	expect(sh.get("type") == Protocol.T_SHELF and sh.shelf == 1 and sh.title == "Kanapki" and sh.goods.size() == 2
 		and sh.goods[1].name == "Kanapka z szynką" and sh.goods[1].price == 1400 and sh.goods[0].kind == 10, "decode shelf %s" % sh)

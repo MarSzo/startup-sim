@@ -1163,3 +1163,55 @@ fn rain_soaks_you_outdoors() {
     });
     assert!(after.is_some(), "hygiene drops in the rain (was {before})");
 }
+
+#[test]
+fn calendar_meeting_with_the_ceo() {
+    use game::board::topic;
+    use proto::computer_action as ca;
+    // 9:49: book the 10:00 slot; the board-room door opens from 9:50.
+    let (addr, _) = start_server_at(0, true, true, 9 * 60 + 49, 1);
+    let b = building();
+    let (mut ola, _) = Client::connect(addr, "Ola"); // IT, at her desk upstairs
+    let wait = Duration::from_millis(800);
+    let access = |c: &Client| wait_for(c, &[], wait, |p| if let Packet::Snapshot { self_access, .. } = p { Some(*self_access) } else { None });
+    let ws = game::computer::find_workstations(&b);
+    let w = ws.iter().find(|w| w.room_name == "IT / Produkt").unwrap();
+    let body = Body { access: access::CARD, ..Body::at(w.floor, Pos::tile_center(w.tile.x, w.tile.y + 1)) };
+    // Laptop on the desk, sit down: the calendar comes with the screen.
+    let body = ola.press_e(&b, body);
+    std::thread::sleep(Duration::from_millis(150));
+    let body = ola.press_e(&b, body);
+    let slots = wait_for(&ola, &[], Duration::from_millis(1500), |p| match p {
+        Packet::Calendar { slots, .. } => Some(slots.clone()),
+        _ => None,
+    })
+    .expect("calendar");
+    assert_eq!(slots.first(), Some(&(600, proto::slot::FREE)), "10:00 is free");
+    ola.sock.send(&Packet::CalendarBook { token: ola.token, start: 600, topic: topic::CHAT }.encode()).unwrap();
+    let mine = wait_for(&ola, &[], wait, |p| match p {
+        Packet::Calendar { mine_start, mine_topic, .. } if *mine_start == 600 => Some(*mine_topic),
+        _ => None,
+    });
+    assert_eq!(mine, Some(topic::CHAT));
+    ola.sock.send(&Packet::ComputerAction { token: ola.token, action: ca::CLOSE, conv: 0, arg: 0, text: String::new() }.encode()).unwrap();
+    assert_eq!(access(&ola).map(|a| a & access::BOARD), Some(0), "9:49: the door is still closed");
+    // By 9:50 the door lets her in: walk into the board room, talk to the CEO.
+    let open = wait_for(&ola, &[], Duration::from_millis(8000), |p| match p {
+        Packet::Snapshot { self_access, .. } if self_access & access::BOARD != 0 => Some(()),
+        _ => None,
+    });
+    assert!(open.is_some(), "door open around the meeting");
+    let body = Body { access: access::CARD | access::BOARD, ..body };
+    let body = ola.walk_to(&b, body, (1, Tile { x: 49, y: 19 }), &[]);
+    while ola.recv().is_some() {}
+    ola.press_e(&b, body);
+    let dialog = wait_for(&ola, &[], wait, |p| match p {
+        Packet::Dialog { id, options, .. } if *id != 0 => Some((*id, options.len())),
+        _ => None,
+    });
+    let (id, n) = dialog.expect("the CEO talks");
+    assert_eq!(n, 3);
+    ola.sock.send(&Packet::DialogAnswer { token: ola.token, id, choice: 0 }.encode()).unwrap();
+    let closed = wait_for(&ola, &[], wait, |p| matches!(p, Packet::Dialog { id: 0, .. }).then_some(()));
+    assert!(closed.is_some(), "meeting over");
+}

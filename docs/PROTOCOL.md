@@ -1,4 +1,4 @@
-# Protokół sieciowy (wersja 18)
+# Protokół sieciowy (wersja 19)
 
 Własny binarny protokół na UDP. Implementacje:
 - serwer: `server/src/protocol.rs` (źródło prawdy),
@@ -23,7 +23,7 @@ przez `cargo test` i czytane przez `client/tests/run_tests.gd`.
 | pole    | typ | wartość |
 |---------|-----|---------|
 | magic   | u16 | `0x5354` (bajty `54 53`, „TS”) |
-| version | u8  | `18` |
+| version | u8  | `19` |
 | type    | u8  | typ pakietu (niżej) |
 
 ## Jednostki
@@ -305,6 +305,25 @@ tramwaj; `flags` kierunek + ruch). Poza budynkiem (w domu /
 w drodze) serwer nie wysyła snapshotów; przyjazd = znowu snapshoty, postać
 przed budynkiem.
 
+### 31 `Calendar` (S→C), 32 `CalendarBook` (C→S)
+
+Kalendarz zarządu na dziś dla konta komputera, przy którym siedzi odbiorca
+(odblokowanego; co 1 s): `mine_start u16` (minuta albo 0xFFFF), `mine_topic
+u8`, n u8, n × {`start u16`, `state u8`: 0 wolne, 1 zajęte, 2 moje, 3 minione}.
+`CalendarBook`: token u32, start u16, topic u8 (1 podwyżka, 2 pomysł, 3 skarga,
+4 luźna rozmowa; 0 = odwołaj). Rezerwacja zastępuje poprzednią tego konta.
+
+Uprawnienie **8 (zarząd)** w `self_access`: dostaje je osoba z umówionym
+spotkaniem od 10 min przed do 10 min po jego początku; drzwi zarządu (kafel
+`board_door`, `access: "board"`, wyjście w dół wolne).
+
+### 33 `Dialog` (S→C), 34 `DialogAnswer` (C→S)
+
+Rozmowa z NPC (spotkanie z zarządem): `id u8` (0 = zamknij okno), `npc u16`,
+`text` str16, n u8 (≤ 4) × `option` str16; ponawiane co 1 s, dopóki trwa.
+`DialogAnswer`: token u32, id u8, choice u8 — odpowiedzi na nieaktualne `id`
+są ignorowane. Odpowiedzi NPC idą jako `Say`.
+
 ### 27 `Shelf` (S→C), 28 `ShopTake` (C→S)
 
 `Shelf` — odpowiedź na E przy półce sklepowej: shelf u8, title str16, n u8 (≤ 16),
@@ -376,6 +395,7 @@ szyfrowaniem.
 
 ## Historia wersji
 
+- **19** — zarząd: `Calendar`, `CalendarBook`, `Dialog`, `DialogAnswer`, uprawnienie 8 (drzwi zarządu).
 - **18** — pogoda: `Clock` + `weather`, flaga parasola (bit 3 u graczy), przedmiot 24 = parasol.
 - **17** — dojazd: `Clock` + `mode`, `depart`, `money`; `CommuteChoice`; encja pojazdu; czynność 7 (jedzie).
 - **16** — zegar i dni: `Clock`.

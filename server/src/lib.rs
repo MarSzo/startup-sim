@@ -1,6 +1,7 @@
 //! Shared game logic: used by the server binary and by the load-test bots.
 
 pub mod args;
+pub mod board;
 pub mod building;
 pub mod clock;
 pub mod coffee;

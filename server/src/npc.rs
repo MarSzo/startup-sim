@@ -71,6 +71,9 @@ pub enum Role {
     Hr,
     /// Shop till: E = pay for what you took off the shelves.
     Cashier,
+    /// The board: meetings booked in the calendar.
+    Ceo,
+    CoFounder,
 }
 
 impl Role {
@@ -80,6 +83,8 @@ impl Role {
             "receptionist" => Some(Role::Receptionist),
             "hr" => Some(Role::Hr),
             "cashier" => Some(Role::Cashier),
+            "ceo" => Some(Role::Ceo),
+            "cofounder" => Some(Role::CoFounder),
             _ => None,
         }
     }
@@ -87,7 +92,7 @@ impl Role {
     fn look(self) -> u8 {
         match self {
             Role::Porter => look::PORTER,
-            Role::Receptionist | Role::Hr | Role::Cashier => look::OFFICE,
+            Role::Receptionist | Role::Hr | Role::Cashier | Role::Ceo | Role::CoFounder => look::OFFICE,
         }
     }
 }
@@ -122,6 +127,8 @@ pub enum Event {
     Contract { player: u16 },
     /// At the till: the server charges the unpaid goods and answers as `npc`.
     Checkout { npc: u16, player: u16 },
+    /// Board member: the server runs the meeting (calendar) as `npc`.
+    Meeting { npc: u16, player: u16 },
 }
 
 enum State {
@@ -211,6 +218,9 @@ impl Npc {
         let has_pass = player_access & access::GUEST != 0;
         if self.role == Role::Cashier {
             return vec![Event::Checkout { npc: self.id, player }];
+        }
+        if matches!(self.role, Role::Ceo | Role::CoFounder) {
+            return vec![Event::Meeting { npc: self.id, player }];
         }
         if self.role == Role::Hr {
             return if has_card {
@@ -486,11 +496,13 @@ mod tests {
                 (Role::Porter, "Portier", look::PORTER),
                 (Role::Cashier, "Kasa", look::OFFICE),
                 (Role::Receptionist, "Recepcja", look::OFFICE),
-                (Role::Hr, "HR", look::OFFICE)
+                (Role::Hr, "HR", look::OFFICE),
+                (Role::Ceo, "Prezes", look::OFFICE),
+                (Role::CoFounder, "Wspólniczka", look::OFFICE)
             ]
         );
         let ids: Vec<u16> = npcs.iter().map(|n| n.id).collect();
-        assert_eq!(ids, (0..4).map(|i| NPC_ID_BASE + i).collect::<Vec<_>>());
+        assert_eq!(ids, (0..6).map(|i| NPC_ID_BASE + i).collect::<Vec<_>>());
     }
 
     #[test]

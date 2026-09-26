@@ -5,7 +5,7 @@
 //! `tests/golden/packets.json`.
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 18;
+pub const VERSION: u8 = 19;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
 pub const MAX_PACKET: usize = 1200;
@@ -61,6 +61,10 @@ pub mod ty {
     pub const SHOP_TAKE: u8 = 28;
     pub const CLOCK: u8 = 29;
     pub const COMMUTE_CHOICE: u8 = 30;
+    pub const CALENDAR: u8 = 31;
+    pub const CALENDAR_BOOK: u8 = 32;
+    pub const DIALOG: u8 = 33;
+    pub const DIALOG_ANSWER: u8 = 34;
 }
 
 /// `ItemAction::action`.
@@ -193,6 +197,14 @@ pub mod place {
     pub const COMMUTING: u8 = 2;
     /// At home looking for a job (the portal).
     pub const PORTAL: u8 = 3;
+}
+
+/// `Calendar` slot states.
+pub mod slot {
+    pub const FREE: u8 = 0;
+    pub const TAKEN: u8 = 1;
+    pub const MINE: u8 = 2;
+    pub const PAST: u8 = 3;
 }
 
 /// `Clock::arrive` when there is no arrival time.
@@ -386,6 +398,17 @@ pub enum Packet {
     },
     /// Morning choice of how to get to work (before the departure).
     CommuteChoice { token: u32, mode: u8 },
+    /// The board's calendar for today, as seen by the account of the computer
+    /// the receiver sits at: its own booking (`mine_start` / `mine_topic`,
+    /// `NO_TIME` = none) and every slot (`slot::*`).
+    Calendar { mine_start: u16, mine_topic: u8, slots: Vec<(u16, u8)> },
+    /// Book `start` (minute of today) for `topic` (`board::topic`); topic 0
+    /// cancels the booking.
+    CalendarBook { token: u32, start: u16, topic: u8 },
+    /// A conversation with an NPC (meeting): question and answers. `id` 0 =
+    /// no conversation (close the window). Resent while open.
+    Dialog { id: u8, npc: u16, text: String, options: Vec<String> },
+    DialogAnswer { token: u32, id: u8, choice: u8 },
     /// Closed doors (locked toilet stalls, elevator doors) on the receiver's
     /// floor: solid for the simulation. Plus the elevator: the floor it is at
     /// and where it is heading (`NO_FLOOR` = standing). Sent on change and
@@ -524,6 +547,10 @@ impl Packet {
             Packet::ShopTake { .. } => ty::SHOP_TAKE,
             Packet::Clock { .. } => ty::CLOCK,
             Packet::CommuteChoice { .. } => ty::COMMUTE_CHOICE,
+            Packet::Calendar { .. } => ty::CALENDAR,
+            Packet::CalendarBook { .. } => ty::CALENDAR_BOOK,
+            Packet::Dialog { .. } => ty::DIALOG,
+            Packet::DialogAnswer { .. } => ty::DIALOG_ANSWER,
             Packet::Doors { .. } => ty::DOORS,
             Packet::DoorAction { .. } => ty::DOOR_ACTION,
         }
@@ -775,6 +802,34 @@ impl Packet {
                 w.u32(*token);
                 w.u8(*mode);
             }
+            Packet::Calendar { mine_start, mine_topic, slots } => {
+                w.u16(*mine_start);
+                w.u8(*mine_topic);
+                w.u8(slots.len().min(64) as u8);
+                for (start, state) in slots.iter().take(64) {
+                    w.u16(*start);
+                    w.u8(*state);
+                }
+            }
+            Packet::CalendarBook { token, start, topic } => {
+                w.u32(*token);
+                w.u16(*start);
+                w.u8(*topic);
+            }
+            Packet::Dialog { id, npc, text, options } => {
+                w.u8(*id);
+                w.u16(*npc);
+                w.str16(text, MAX_TEXT_BYTES);
+                w.u8(options.len().min(MAX_OPTIONS) as u8);
+                for o in options.iter().take(MAX_OPTIONS) {
+                    w.str16(o, MAX_TEXT_BYTES);
+                }
+            }
+            Packet::DialogAnswer { token, id, choice } => {
+                w.u32(*token);
+                w.u8(*id);
+                w.u8(*choice);
+            }
             Packet::Chat { conv, messages } => {
                 w.u16(*conv);
                 w.u8(messages.len().min(255) as u8);
@@ -1020,6 +1075,32 @@ impl Packet {
                 weather: r.u8()?,
             },
             ty::COMMUTE_CHOICE => Packet::CommuteChoice { token: r.u32()?, mode: r.u8()? },
+            ty::CALENDAR => {
+                let (mine_start, mine_topic) = (r.u16()?, r.u8()?);
+                let n = r.u8()? as usize;
+                if n > 64 {
+                    return Err(DecodeError::Invalid("too many slots"));
+                }
+                let mut slots = Vec::with_capacity(n);
+                for _ in 0..n {
+                    slots.push((r.u16()?, r.u8()?));
+                }
+                Packet::Calendar { mine_start, mine_topic, slots }
+            }
+            ty::CALENDAR_BOOK => Packet::CalendarBook { token: r.u32()?, start: r.u16()?, topic: r.u8()? },
+            ty::DIALOG => {
+                let (id, npc, text) = (r.u8()?, r.u16()?, r.str16(MAX_TEXT_BYTES)?);
+                let n = r.u8()? as usize;
+                if n > MAX_OPTIONS {
+                    return Err(DecodeError::Invalid("too many options"));
+                }
+                let mut options = Vec::with_capacity(n);
+                for _ in 0..n {
+                    options.push(r.str16(MAX_TEXT_BYTES)?);
+                }
+                Packet::Dialog { id, npc, text, options }
+            }
+            ty::DIALOG_ANSWER => Packet::DialogAnswer { token: r.u32()?, id: r.u8()?, choice: r.u8()? },
             ty::CHAT => {
                 let conv = r.u16()?;
                 let n = r.u8()? as usize;
@@ -1264,6 +1345,21 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
         ),
         ("commute_choice", Packet::CommuteChoice { token: 0x01020304, mode: 5 }),
         (
+            "calendar",
+            Packet::Calendar { mine_start: 14 * 60, mine_topic: 1, slots: vec![(600, slot::PAST), (630, slot::FREE), (660, slot::TAKEN), (840, slot::MINE)] },
+        ),
+        ("calendar_book", Packet::CalendarBook { token: 0x01020304, start: 14 * 60, topic: 2 }),
+        (
+            "dialog",
+            Packet::Dialog {
+                id: 3,
+                npc: 61444,
+                text: "Podwyżka? Proszę mnie przekonać.".into(),
+                options: vec!["Pracuję tu od początku.".into(), "Bo kawa podrożała.".into()],
+            },
+        ),
+        ("dialog_answer", Packet::DialogAnswer { token: 0x01020304, id: 3, choice: 1 }),
+        (
             "chat",
             Packet::Chat {
                 conv: 17,
@@ -1330,7 +1426,7 @@ mod tests {
                 b[0] = 0x54;
                 b[1] = 0x53;
                 b[2] = VERSION;
-                b[3] = rng.u8(1..=30);
+                b[3] = rng.u8(1..=34);
             }
             let _ = Packet::decode(&b);
         }

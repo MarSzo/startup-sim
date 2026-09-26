@@ -8,6 +8,8 @@ const Protocol = preload("res://net/protocol.gd")
 
 ## ComputerAction to send: action, conversation, argument, text.
 signal action(action: int, conv: int, arg: int, text: String)
+## Calendar: book `start` for `topic` (0 = cancel).
+signal book(start: int, topic: int)
 
 const SYNC_MSEC := 1000
 const RESEND_MSEC := 800
@@ -46,6 +48,15 @@ var _lock_owner := Label.new()
 var _lock_hint := Label.new()
 var _unlock_btn: Button
 var _chat_view := VBoxContainer.new()
+var tab := "chat"               # chat / calendar
+var calendar := {}              # last Calendar packet
+var _cal_view := VBoxContainer.new()
+var _cal_mine := Label.new()
+var _cal_topic := OptionButton.new()
+var _cal_list := VBoxContainer.new()
+var _tab_chat: Button
+var _tab_cal: Button
+var _cal_sig := ""
 
 
 func _ready() -> void:
@@ -194,6 +205,10 @@ func dev_command(cmd: String) -> void:
 		"unlock": action.emit(Protocol.PC_UNLOCK, 0, 0, "")
 		"take": action.emit(Protocol.PC_TAKE, 0, 0, "")
 		"close": action.emit(Protocol.PC_CLOSE, 0, 0, "")
+		"cal":  # cal:<hh*60+mm>:<topic>
+			_set_tab("calendar")
+			if parts.size() > 2:
+				book.emit(int(parts[1]), int(parts[2]))
 		"open", "say":
 			if parts.size() < 2 or state.is_empty():
 				return
@@ -255,6 +270,12 @@ func _build() -> void:
 	bar.add_child(row)
 	_style_label(_title, 16, Color.WHITE)
 	row.add_child(_title)
+	_tab_chat = _button("Komunikator", false)
+	_tab_chat.pressed.connect(func(): _set_tab("chat"))
+	row.add_child(_tab_chat)
+	_tab_cal = _button("Kalendarz", false)
+	_tab_cal.pressed.connect(func(): _set_tab("calendar"))
+	row.add_child(_tab_cal)
 	_style_label(_as_owner, 14, Color("#ffcf6e"))
 	_as_owner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(_as_owner)
@@ -340,6 +361,40 @@ func _build() -> void:
 	_send_btn.pressed.connect(_send)
 	in_row.add_child(_send_btn)
 
+	# Calendar (the board's meetings, today).
+	_cal_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_cal_view.add_theme_constant_override("separation", 10)
+	var cal_pad := MarginContainer.new()
+	cal_pad.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	for sd in ["left", "right", "top", "bottom"]:
+		cal_pad.add_theme_constant_override("margin_" + sd, 18)
+	cal_pad.add_child(_cal_view)
+	_screen.add_child(cal_pad)
+	var ch := Label.new()
+	_style_label(ch, 20, Color("#1c2430"))
+	ch.text = "Kalendarz zarządu — spotkania na dziś"
+	_cal_view.add_child(ch)
+	_style_label(_cal_mine, 15, Color("#3d5a86"))
+	_cal_view.add_child(_cal_mine)
+	var trow := HBoxContainer.new()
+	trow.add_theme_constant_override("separation", 10)
+	var tl := Label.new()
+	_style_label(tl, 15, Color("#1c2430"))
+	tl.text = "Temat:"
+	trow.add_child(tl)
+	for t in Protocol.TOPICS:
+		_cal_topic.add_item("%s (%s)" % [Protocol.TOPICS[t], Protocol.TOPIC_WITH[t]], t)
+	trow.add_child(_cal_topic)
+	_cal_view.add_child(trow)
+	var cs := ScrollContainer.new()
+	cs.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	cs.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_cal_list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_cal_list.add_theme_constant_override("separation", 4)
+	cs.add_child(_cal_list)
+	_cal_view.add_child(cs)
+	cal_pad.name = "cal_pad"
+
 	# Lock screen.
 	_lock_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_lock_view.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -379,7 +434,12 @@ func _render() -> void:
 	var mine: bool = state.owner == my_id
 	_title.text = "Komunikator firmowy — konto: %s" % owner_name
 	_as_owner.text = "" if mine else "Uwaga: piszesz jako %s!" % owner_name
-	_chat_view.visible = not state.locked
+	_chat_view.visible = not state.locked and tab == "chat"
+	_screen.get_node("cal_pad").visible = not state.locked and tab == "calendar"
+	_tab_chat.visible = not state.locked
+	_tab_cal.visible = not state.locked
+	_tab_chat.modulate = Color(1, 1, 1, 1.0 if tab == "chat" else 0.6)
+	_tab_cal.modulate = Color(1, 1, 1, 1.0 if tab == "calendar" else 0.6)
 	_lock_view.visible = state.locked
 	_lock_btn.visible = not state.locked
 	if state.locked:
@@ -387,11 +447,82 @@ func _render() -> void:
 		_lock_hint.text = "Przyłóż palec do czytnika, żeby odblokować." if mine else "Tylko %s może go odblokować. Laptop możesz najwyżej zabrać." % owner_name
 		_unlock_btn.visible = mine
 		return
+	if tab == "calendar":
+		_render_calendar()
+		return
 	_render_sidebar()
 	var c := _conv(current)
 	_conv_title.text = c.get("title", "")
 	_render_messages()
 	_render_input()
+
+
+func _set_tab(t: String) -> void:
+	tab = t
+	_cal_sig = ""
+	_render()
+
+
+func on_calendar(p: Dictionary) -> void:
+	calendar = p
+	if visible and tab == "calendar":
+		_render_calendar()
+
+
+static func _hhmm(m: int) -> String:
+	return "%02d:%02d" % [m / 60, m % 60]
+
+
+func _render_calendar() -> void:
+	if calendar.is_empty():
+		_cal_mine.text = "Ładowanie…"
+		return
+	var sig := JSON.stringify(calendar)
+	if sig == _cal_sig:
+		return
+	_cal_sig = sig
+	if calendar.mine_start != Protocol.NO_TIME:
+		_cal_mine.text = "Twoje spotkanie: %s — %s (%s). Drzwi zarządu otworzą się 10 min wcześniej." % [
+			_hhmm(calendar.mine_start), Protocol.TOPICS.get(calendar.mine_topic, "?"), Protocol.TOPIC_WITH.get(calendar.mine_topic, "?")]
+	else:
+		_cal_mine.text = "Nie masz dziś spotkania z zarządem."
+	for c in _cal_list.get_children():
+		c.queue_free()
+	for s in calendar.slots:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 12)
+		var t := Label.new()
+		_style_label(t, 16, Color("#1c2430"))
+		t.text = _hhmm(s.start)
+		t.custom_minimum_size = Vector2(60, 0)
+		row.add_child(t)
+		var st := Label.new()
+		st.custom_minimum_size = Vector2(160, 0)
+		var start: int = s.start
+		match s.state:
+			Protocol.SLOT_FREE:
+				_style_label(st, 15, Color("#27ae60"))
+				st.text = "wolne"
+				row.add_child(st)
+				var b := _button("Umów", true)
+				b.pressed.connect(func(): book.emit(start, _cal_topic.get_selected_id()))
+				row.add_child(b)
+			Protocol.SLOT_TAKEN:
+				_style_label(st, 15, Color("#8a93a3"))
+				st.text = "zajęte"
+				row.add_child(st)
+			Protocol.SLOT_MINE:
+				_style_label(st, 15, Color("#2e6bd9"))
+				st.text = "Twoje spotkanie"
+				row.add_child(st)
+				var b2 := _button("Odwołaj", true)
+				b2.pressed.connect(func(): book.emit(start, 0))
+				row.add_child(b2)
+			_:
+				_style_label(st, 15, Color("#c3c9d1"))
+				st.text = "—"
+				row.add_child(st)
+		_cal_list.add_child(row)
 
 
 func _render_sidebar() -> void:

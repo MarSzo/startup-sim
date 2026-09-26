@@ -24,6 +24,7 @@ const RideMask = preload("res://game/ride_mask.gd")
 const ShelfWindow = preload("res://ui/shelf_window.gd")
 const VehicleView = preload("res://game/vehicle_view.gd")
 const WeatherFx = preload("res://ui/weather_fx.gd")
+const DialogWindow = preload("res://ui/dialog_window.gd")
 
 const ZOOM := 3.0
 ## Remote players are rendered this far in the past (2 snapshots at 20 Hz).
@@ -77,6 +78,7 @@ var game_minute := 8 * 60
 var weather := Protocol.WEATHER_SUNNY
 var weather_fx := WeatherFx.new()
 var weather_layer := CanvasLayer.new()
+var dialog := DialogWindow.new()
 var shelf_window := ShelfWindow.new()
 var _shelf_at := Vector2.ZERO     # where the shelf window was opened (walk away = close)
 var depts := {}          # id -> department (after the contract)
@@ -247,6 +249,10 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 	screen.my_id = net.player_id
 	screen.name_of = func(id: int) -> String: return nick if id == net.player_id else nicks.get(id, "?")
 	screen.action.connect(_computer_action)
+	screen.book.connect(func(start: int, topic: int): if net.is_playing(): net.send(Protocol.encode_calendar_book(net.token, start, topic)))
+	status_layer.add_child(dialog)
+	dialog.name_of = func(id: int) -> String: return nicks.get(id, "?")
+	dialog.answer.connect(func(id: int, choice: int): if net.is_playing(): net.send(Protocol.encode_dialog_answer(net.token, id, choice)))
 	screen_layer.add_child(screen)
 	_show_floor(0)
 
@@ -334,8 +340,10 @@ func _sample_input(delta: float) -> int:
 	if input_blocked or me.status == Protocol.ACT_RIDING:
 		return 0
 	if not goto_legs.is_empty() or not _goto_path.is_empty():
-		var g := _goto_input(delta)  # dev script also drives the computer screen
-		return 0 if screen.visible else g
+		var g := _goto_input(delta)  # dev script also drives the computer screen / dialogs
+		return 0 if screen.visible or dialog.visible else g
+	if dialog.visible:
+		return 0
 	if screen.visible:
 		return 0
 	if autowalk:
@@ -372,6 +380,10 @@ func _goto_input(delta: float) -> int:
 			return Movement.IN_INTERACT
 		if leg.begins_with("wait:"):
 			goto_delay = float(leg.substr(5))
+			return 0
+		if leg.begins_with("dlg:"):  # dlg:<choice> answers the open dialog
+			dialog._choose(int(leg.substr(4)))
+			goto_delay = 0.5
 			return 0
 		if leg.begins_with("shop:"):  # shop:<shelf>:<kind> takes one off a shelf
 			net.send(Protocol.encode_shop_take(net.token, int(leg.get_slice(":", 1)), int(leg.get_slice(":", 2))))
@@ -540,6 +552,10 @@ func _on_packet(p: Dictionary) -> void:
 			me.set_smelly(p.hygiene < 25)
 		Protocol.T_COMPUTER:
 			screen.on_computer(p)
+		Protocol.T_CALENDAR:
+			screen.on_calendar(p)
+		Protocol.T_DIALOG:
+			dialog.on_dialog(p)
 		Protocol.T_CHAT:
 			screen.on_chat(p)
 		Protocol.T_SAY:
@@ -816,7 +832,12 @@ func _update_hint() -> void:
 			for dx in [-1, 0, 1]:
 				var need: int = map.need_at(t.x + dx, t.y + dy)
 				if need != 0 and (pred.access & need) == 0:
-					text = "Bramka wymaga przepustki — porozmawiaj z portierem (portiernia)" if (need & MapData.ACCESS_GUEST) else "Wstęp tylko dla obsługi"
+					if need & MapData.ACCESS_BOARD:
+						text = "Zarząd — wstęp tylko na umówione spotkanie (kalendarz na komputerze)"
+					elif need & MapData.ACCESS_GUEST:
+						text = "Bramka wymaga przepustki — porozmawiaj z portierem (portiernia)"
+					else:
+						text = "Wstęp tylko dla obsługi"
 	hint_label.text = text
 	hint_label.visible = text != ""
 

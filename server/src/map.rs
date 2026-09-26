@@ -21,12 +21,15 @@ pub mod access {
     pub const CARD: u8 = 2;
     /// Staff/service areas (technical room).
     pub const SERVICE: u8 = 4;
+    /// Board room: only during your meeting (calendar).
+    pub const BOARD: u8 = 8;
 
     /// Rights that satisfy a tile's `access` requirement from the legend.
     pub fn required(name: &str) -> Option<u8> {
         match name {
             "card" => Some(GUEST | CARD),
             "service" => Some(SERVICE),
+            "board" => Some(BOARD),
             _ => None,
         }
     }
@@ -506,9 +509,10 @@ mod tests {
                 let target = (f, tile);
                 let guest = b.find_path(spawn, target, access::GUEST).is_some();
                 let nobody = b.find_path(spawn, target, 0).is_some();
-                let staff = b.find_path(spawn, target, access::CARD | access::SERVICE).is_some();
+                let staff = b.find_path(spawn, target, access::CARD | access::SERVICE | access::BOARD).is_some();
                 assert!(staff, "floor {f} {} unreachable even for staff", r.name);
-                assert_eq!(guest, r.kind != "service", "floor {f} {} with a guest pass", r.name);
+                // Board room: only with a meeting (BOARD), service rooms: staff.
+                assert_eq!(guest, !matches!(r.kind.as_str(), "service" | "management"), "floor {f} {} with a guest pass", r.name);
                 let is_public = f == 0 && public.contains(&r.kind.as_str()) && r.name != "Parking wewnętrzny";
                 assert_eq!(nobody, is_public, "floor {f} {} without any pass", r.name);
             }

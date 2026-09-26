@@ -32,6 +32,7 @@ server/                 crate Rusta (lib `game` + binarki)
   src/coffee.rs         ekspresy do kawy (parzenie → kawa jako przedmiot)
   src/inventory.rs      przedmioty, kieszenie i ręce, uprawnienia z przedmiotów
   src/computer.rs       stanowiska (biurka działów), laptopy na biurkach, komunikator
+  src/board.rs          zarząd: sloty kalendarza, spotkania, dialogi i ich skutki
   src/weather.rs        pogoda: stany, przejścia, wpływ na zewnątrz
   src/commute.rs        dojazd: sposoby (czas, koszt, efekty), pojazdy jadące po trasach
   src/clock.rs          zegar gry: doba, biuro 6–22, przewijana noc, pensja za minuty
@@ -68,6 +69,7 @@ client/                 projekt Godota 4.7
   ui/computer_screen.gd ekran komputera: komunikator i ekran blokady
   ui/stats_hud.gd       portfel i paski potrzeb (prawy górny róg)
   game/vehicle_view.gd  pojazd (auto, taksówka, tramwaj, rower)
+  ui/dialog_window.gd   okno rozmowy (spotkania z zarządem)
   ui/weather_fx.gd      deszcz, burza (błyski), mgła na ekranie
   ui/day_screen.gd      plansze dnia: koniec dnia, noc, poranny wybór dojazdu, w drodze
   ui/shelf_window.gd    okno półki sklepowej (towary, ceny, „Weź”)
@@ -167,6 +169,16 @@ poranek → `day += 1` wszystkim, a domownicy dostają losowy `arrive_at`
 (7:00–10:00); o tej minucie `arrive()` stawia postać przed budynkiem. Wszystko
 poza `Working` (portal, dom) jest poza światem: bez snapshotów i bez udziału w
 symulacji. `--start-time hh:mm`, `--time-scale N` do testów.
+
+**Zarząd** (`board.rs`): `Meeting { day, start, owner, topic, state }` w
+`Server::meetings`. Kalendarz (pakiet `Calendar`) i rezerwacje idą przez konto
+właściciela komputera, przy którym siedzi gracz. Co tick `tick_meetings`
+ustawia `Body::access` = przedmioty + `BOARD`, jeśli trwa okno wejścia na jego
+spotkanie (reguła kolizji jak bramki, więc klient to przewiduje), oznacza
+przepadłe spotkania i kończy rozmowę po wyjściu z sali. NPC `Ceo` / `CoFounder`
+zwracają `npc::Event::Meeting`; serwer prowadzi `Talk` (kroki
+`board::steps`, pakiety `Dialog`) i liczy wynik (`pay_rate` przy podwyżce,
+`Messenger::post_system` z pochwałą na #ogólny, stres).
 
 **Pogoda** (`weather.rs`): łańcuch Markowa (wagi przejść), zmiana co 1–3 h
 gry. Pokoje mają w mapie `outdoor: true` (na zewnątrz, parkingi, strefa

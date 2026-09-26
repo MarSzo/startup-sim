@@ -58,6 +58,8 @@ LEGEND = {
     # (locked = solid for everyone; the server tells clients which ones).
     "|": {"type": "partition", "solid": True, "color": "#c3c9d1"},
     "Y": {"type": "sanitizer", "solid": True, "color": "#e8f1f8"},
+    # Board room door: only with a meeting now (calendar); leaving is free.
+    "Z": {"type": "board_door", "solid": False, "color": "#7a4a2a", "access": "board", "free_dir": "down"},
     "k": {"type": "stall_door", "solid": False, "color": "#9fb3c8"},
     "v": {"type": "grass", "solid": False, "color": "#5e8c4a"},
     "p": {"type": "sidewalk", "solid": False, "color": "#a8a8a0"},
@@ -252,6 +254,9 @@ def floor1():
     f.npcs = [
         {"kind": "receptionist", "name": "Recepcja", "home": [32, 15], "escort_to": [1, 43, 8]},
         {"kind": "hr", "name": "HR", "home": [43, 5]},
+        # The board: CEO and co-founder at the meeting table.
+        {"kind": "ceo", "name": "Prezes", "home": [48, 16]},
+        {"kind": "cofounder", "name": "Wspólniczka", "home": [55, 17]},
     ]
     f.area(43, 13, 44, 13, "D", "C")                     # HR <-> reception
 
@@ -259,7 +264,7 @@ def floor1():
     f.room("K", 5, "Korytarz", "corridor")
     f.area(30, 21, 34, 21, "D", "K")                     # reception <-> corridor
     f.area(10, 21, 11, 21, "D", "K")                     # IT <-> corridor
-    f.area(51, 21, 52, 21, "D", "K")                     # board <-> corridor
+    f.area(51, 21, 52, 21, "Z", "K")                     # board <-> corridor (meetings only)
 
     f.box(3, 26, 22, 32, ",", "B")
     f.room("B", 6, "Biznes", "department")

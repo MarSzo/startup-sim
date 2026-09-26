@@ -3,7 +3,7 @@
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 18
+const VERSION := 19
 const MAX_PACKET := 1200
 const MAX_NICK_BYTES := 16
 const MAX_SAY_BYTES := 240
@@ -41,6 +41,17 @@ const T_SHELF := 27
 const T_SHOP_TAKE := 28
 const T_CLOCK := 29
 const T_COMMUTE_CHOICE := 30
+const T_CALENDAR := 31
+const T_CALENDAR_BOOK := 32
+const T_DIALOG := 33
+const T_DIALOG_ANSWER := 34
+# Calendar slot states, meeting topics (server/src/board.rs).
+const SLOT_FREE := 0
+const SLOT_TAKEN := 1
+const SLOT_MINE := 2
+const SLOT_PAST := 3
+const TOPICS := {1: "Prośba o podwyżkę", 2: "Pomysł na produkt", 3: "Skarga / problem", 4: "Luźna rozmowa"}
+const TOPIC_WITH := {1: "z Prezesem", 2: "ze Wspólniczką", 3: "z Prezesem", 4: "z Prezesem"}
 # Clock.place
 const PLACE_BUILDING := 0
 const PLACE_HOME := 1
@@ -253,6 +264,22 @@ static func encode_commute_choice(token: int, mode: int) -> PackedByteArray:
 	return b.data_array
 
 
+static func encode_calendar_book(token: int, start: int, topic: int) -> PackedByteArray:
+	var b := _writer(T_CALENDAR_BOOK)
+	b.put_u32(token)
+	b.put_u16(start)
+	b.put_u8(topic)
+	return b.data_array
+
+
+static func encode_dialog_answer(token: int, id: int, choice: int) -> PackedByteArray:
+	var b := _writer(T_DIALOG_ANSWER)
+	b.put_u32(token)
+	b.put_u8(id)
+	b.put_u8(choice)
+	return b.data_array
+
+
 static func encode_door_action(token: int) -> PackedByteArray:
 	var b := _writer(T_DOOR_ACTION)
 	b.put_u32(token)
@@ -447,6 +474,27 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			p.depart = r.u16()
 			p.money = r.u32()
 			p.weather = r.u8()
+		T_CALENDAR:
+			p.mine_start = r.u16()
+			p.mine_topic = r.u8()
+			var n := r.u8()
+			if n > 64:
+				return {}
+			var slots := []
+			for i in n:
+				slots.append({"start": r.u16(), "state": r.u8()})
+			p.slots = slots
+		T_DIALOG:
+			p.id = r.u8()
+			p.npc = r.u16()
+			p.text = r.str16(MAX_TEXT_BYTES)
+			var n := r.u8()
+			if n > MAX_OPTIONS:
+				return {}
+			var opts := []
+			for i in n:
+				opts.append(r.str16(MAX_TEXT_BYTES))
+			p.options = opts
 		T_SHELF:
 			p.shelf = r.u8()
 			p.title = r.str16(MAX_TEXT_BYTES)

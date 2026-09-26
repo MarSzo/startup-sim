@@ -188,7 +188,7 @@ podpisaniu umowy, kanapki, przekąski, napoje, fast food, alkohol, papierosy
 **Dojazd do pracy** — *zrobione (10.22)*. Wybór: pieszo, rowerem, samochodem (parking), taksówką,
 tramwajem (bilet/taksówka kosztują).
 
-**Zarząd i kalendarz** — do pokoju zarządu nie można wejść bez spotkania;
+**Zarząd i kalendarz** — *zrobione (10.24)*. Do pokoju zarządu nie można wejść bez spotkania;
 spotkanie umawia się w kalendarzu (aplikacja na komputerze).
 
 **Rekrutacja i rozwój firmy**
@@ -687,6 +687,30 @@ Zastępuje prosty portal z 10.8. Po połączeniu gracz widzi pulpit komputera
   −12, w burzy −20; stres +5 / +8); samochód — dodatkowe korki (+10 / +20 min);
   tramwaj i taksówka bez zmian.
 
+### 10.24 Kalendarz i spotkania z zarządem
+
+- **Zarząd** to dwoje NPC: **Prezes** (podwyżki, skargi, luźne rozmowy) i
+  **Wspólniczka** (pomysły na produkt), w pokoju zarządu na piętrze 1.
+- **Drzwi zarządu są zamknięte** — wchodzi tylko osoba z umówionym
+  spotkaniem, **od 10 min przed do 10 min po jego początku**; wyjść można
+  zawsze. Przy drzwiach podpowiedź „wstęp tylko na umówione spotkanie”.
+- **Kalendarz** to druga zakładka na komputerze (obok komunikatora): sloty po
+  30 min, 10:00–17:30, na dziś; wybór tematu, „Umów” / „Odwołaj”; jedno
+  spotkanie dziennie, rezerwacja min. 10 min wcześniej. Kalendarz należy do
+  **właściciela komputera** — z cudzego odblokowanego laptopa można komuś
+  umówić spotkanie (np. „prośbę o podwyżkę” za niego).
+- **Spotkanie**: E przy właściwej osobie → okno rozmowy z trzema odpowiedziami
+  (1–3); NPC odpowiada w dymku.
+  - *Prośba o podwyżkę* (Prezes): szansa rośnie ze stażem i dobrą odpowiedzią;
+    sukces = +5 zł na godzinę (stawka od 30 zł/h); ponownie najwcześniej za 3
+    dni.
+  - *Pomysł na produkt* (Wspólniczka): dwa pytania; dwie dobre odpowiedzi =
+    pochwała na #ogólny i stres −10, jedna = −3, żadna = +3.
+  - *Skarga* (stres −8), *luźna rozmowa* (stres −5) — z humorystycznymi
+    odpowiedziami Prezesa.
+- **Spóźnienie ponad 10 min** — spotkanie przepada, Prezes daje znać („Nie było
+  Cię na spotkaniu o 14:30. Szkoda.”), stres +5.
+
 ### 10.6 Stan implementacji
 
 *Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie,
@@ -723,6 +747,9 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Ekwipunek**: kieszenie i ręce, przedmioty (przepustka, karta, laptop,
   kawa), upuszczanie / podnoszenie / podawanie, dostęp z przedmiotów (10.13);
   protokół v8.
+- **Kalendarz i zarząd**: Prezes i Wspólniczka, drzwi otwierane na spotkanie,
+  kalendarz na komputerze, cztery tematy z dialogami i skutkami (podwyżka,
+  pochwała, stres), przepadające spotkania (10.24); protokół v19.
 - **Pogoda**: słońce, chmury, deszcz, burza, mgła; moknięcie, parasol, wpływ na
   dojazd, efekty na ekranie (10.23); protokół v18.
 - **Dojazd do pracy**: poranny wybór pięciu sposobów, czas, koszt, wpływ na
@@ -753,12 +780,12 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Sieć mobilna**: serwer dual-stack IPv4/IPv6; gracz identyfikowany tokenem
   (zmiana adresu w trakcie gry przenosi sesję); klient przepina gniazdo po
   ciszy/powrocie z tła i sam łączy się ponownie po utracie sesji.
-- **Testy**: 81 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
+- **Testy**: 84 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
   zależna od uprawnień, bramki, ruch/kolizje, schody, winda, nawigacja,
-  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, zegar, dojazd, pogoda, protokół), 2 golden, 20 e2e serwera
+  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, zegar, dojazd, pogoda, zarząd, protokół), 2 golden, 21 e2e serwera
   (m.in. portal: odrzucenie → przyjęcie → spawn; całe wdrożenie aż do karty;
   niewidoczność między piętrami; zgodność stanu serwera z predykcją) —
-  łącznie 103 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 porannego dojazdu samochodem i moknięcia w deszczu); 136 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
+  łącznie 107 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 porannego dojazdu samochodem moknięcia w deszczu i spotkania z Prezesem); 140 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
   adresów).
 
 #### Pomiary (MacBook, wszystko lokalnie)
