@@ -45,6 +45,8 @@ LEGEND = {
     "U": {"type": "toilet", "solid": True, "color": "#f2f2f2"},
     "V": {"type": "sink", "solid": True, "color": "#dfe8ee"},
     "X": {"type": "car", "solid": True, "color": "#b03a2e"},
+    "C": {"type": "coffee_machine", "solid": True, "color": "#2b2b30"},
+    "J": {"type": "kitchen_counter", "solid": True, "color": "#d8d2c4"},
     "v": {"type": "grass", "solid": False, "color": "#5e8c4a"},
     "p": {"type": "sidewalk", "solid": False, "color": "#a8a8a0"},
     "z": {"type": "smoking_area", "solid": False, "color": "#8a7f6a"},
@@ -229,6 +231,8 @@ def floor1():
     f.room("H", 7, "Chill room", "common")
     f.put(27, 28, 29, 29, "Q")                           # sofa
     f.put(36, 30, 39, 30, "T")                           # table
+    f.put(36, 26, 36, 26, "C")                           # coffee machine
+    f.put(37, 26, 39, 26, "J")                           # kitchenette counter
     f.area(32, 25, 34, 25, "D", "K")
 
     f.box(44, 26, 49, 32, ":", "W")

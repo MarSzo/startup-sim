@@ -399,7 +399,7 @@ func _wall_shadows() -> void:
 
 # ------------------------------------------------------------------- props
 
-const PROPS := ["W", "K", "H", "Q", "T", "P", "R", "N", "A", "U", "V", "X"]
+const PROPS := ["W", "K", "H", "Q", "T", "P", "R", "N", "A", "U", "V", "X", "C", "J"]
 
 
 ## Connected components of the same furniture char -> one object each.
@@ -448,6 +448,8 @@ func _prop(c: String, tr: Rect2i, index: int) -> void:
 		"U": _toilet(tr, r)
 		"V": _sink(r)
 		"X": _car(r, index)
+		"C": _coffee_machine(r)
+		"J": _kitchen_counter(r)
 
 
 func _desks(tr: Rect2i, r: Rect2i, index: int) -> void:
@@ -629,3 +631,41 @@ func _car(r: Rect2i, index: int) -> void:
 	_rect(Rect2i(b.end.x - 2, b.end.y - 5, 2, 3), Color("#f7e7a1"))
 	_rect(Rect2i(b.position.x, b.position.y + 2, 2, 3), Color("#d64541"))
 	_rect(Rect2i(b.position.x, b.end.y - 5, 2, 3), Color("#d64541"))
+
+
+func _coffee_machine(r: Rect2i) -> void:
+	var x := r.position.x + 2
+	var y := r.position.y
+	_tint(Rect2i(x + 2, y + 13, 12, 2), Color(0, 0, 0, 0.25))
+	_rect(Rect2i(x, y + 1, 12, 13), Color("#2b2b30"))           # body
+	_rect(Rect2i(x, y + 1, 12, 1), Color("#4a4a52"))
+	_rect(Rect2i(x + 1, y + 2, 10, 3), Color("#6b4a2e"))        # bean hopper
+	_rect(Rect2i(x + 2, y + 2, 8, 1), Color("#8a6040"))
+	_rect(Rect2i(x + 1, y + 6, 10, 6), Color("#b9c2c9"))        # steel front
+	_rect(Rect2i(x + 4, y + 7, 4, 1), Color("#2b2b30"))         # spout
+	_rect(Rect2i(x + 4, y + 9, 4, 3), Color("#f4f1ea"))         # cup
+	_rect(Rect2i(x + 5, y + 9, 2, 1), Color("#6b4a2e"))         # coffee
+	_px(x + 10, y + 7, Color("#e74c3c"))                          # power light
+	_px(x + 10, y + 9, Color("#4cd964"))
+
+
+func _kitchen_counter(r: Rect2i) -> void:
+	var top := Rect2i(r.position.x, r.position.y + 1, r.size.x, r.size.y - 4)
+	_shadow(top)
+	_rect(top, Color("#d8d2c4"))
+	_rect(Rect2i(top.position.x, top.position.y, top.size.x, 1), Color("#ece8de"))
+	_rect(Rect2i(top.position.x, top.end.y, top.size.x, 3), Color("#8f8778"))
+	var x := top.position.x
+	var y := top.position.y
+	# Mugs, a fruit bowl ("owocowe czwartki") and a kettle.
+	for i in 3:
+		var mug: Color = [Color("#f4f1ea"), Color("#2e86de"), Color("#e67e22")][i]
+		_rect(Rect2i(x + 3 + i * 4, y + 4, 3, 3), mug)
+		_px(x + 6 + i * 4, y + 5, mug.darkened(0.3))
+	_rect(Rect2i(x + 19, y + 5, 10, 4), Color("#a0703a"))
+	for f in [[20, 4, "#e74c3c"], [23, 3, "#f1c40f"], [26, 4, "#27ae60"], [22, 5, "#e67e22"]]:
+		_rect(Rect2i(x + f[0], y + f[1], 2, 2), Color(f[2]))
+	if r.size.x >= 48:
+		_rect(Rect2i(x + 36, y + 2, 6, 7), Color("#9aa4ab"))
+		_rect(Rect2i(x + 37, y + 2, 4, 1), Color("#c9d1d7"))
+

@@ -381,7 +381,8 @@ postacie naraz.
   chodnika, trawa z kwiatkami, żwir strefy palenia, żywopłot.
 - Meble: biurka z monitorami i krzesłami (IT, Biznes, HR), lady (portiernia,
   recepcja, kasa sklepu), regały z towarem, sofa i stolik (chill room), stół
-  Zarządu z krzesłami, rośliny, szafy serwerowe (zaplecze), toalety i
+  Zarządu z krzesłami, ekspres do kawy i aneks kuchenny z owocami (chill
+  room), rośliny, szafy serwerowe (zaplecze), toalety i
   umywalki, ławka i popielniczka (strefa palenia), samochody w kolorach.
 - Postacie: fryzura, kolor skóry i ubrań losowane z id gracza, 4 kierunki,
   animacja chodu; portier w mundurze z czapką, recepcja i HR w koszulach z
