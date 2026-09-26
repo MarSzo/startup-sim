@@ -6,11 +6,11 @@ z własnym binarnym protokołem (`docs/PROTOCOL.md`).
 ```
 ┌───────────── client (Godot) ─────────────┐        UDP        ┌──────────── server (Rust) ────────────┐
 │ main.gd        start screen <-> gra      │                   │ main.rs     CLI, start                │
-│ net_client.gd  handshake, ping, timeout  │ ── Input 60 Hz ─▶ │ server.rs   pętla 20 Hz, gracze,      │
+│ net_client.gd  handshake, ping, timeout  │ ── Input 60 Hz ─▶ │ server/     pętla 20 Hz, gracze,      │
 │ game.gd        predykcja + rekoncyliacja │                   │             interest mgmt, snapshoty  │
 │                interpolacja innych       │ ◀─ Snapshot 20 Hz │ net.rs      socket + symulator laga    │
 │ movement.gd ═══════ identyczny algorytm ══════════════════════ sim.rs      ruch, kolizje, piętra     │
-│ protocol.gd ═══════ identyczny format ════════════════════════ protocol.rs kodowanie pakietów        │
+│ protocol.gd ═══════ identyczny format ════════════════════════ protocol/   kodowanie pakietów        │
 │ building.gd ═══╗                         │                   │ building.rs ═╗ piętra, BFS po budynku │
 │ map_data.gd    ║                         │                   │ map.rs       ║ piętro, pokoje, linki   │
 └────────────────║─────────────────────────┘                   └──────────────║────────────────────────┘
@@ -46,9 +46,19 @@ server/                 crate Rusta (lib `game` + binarki)
   src/stalls.rs         kabiny toaletowe: znajdowanie drzwi, zamykanie od środka
   src/needs.rs          potrzeby postaci (głód, energia, stres, toaleta), sofa / toaleta / papieros / owoce
   data/recruitment.json oferty i pule pytań (pierwsza odpowiedź = poprawna)
-  src/protocol.rs       pakiety: encode/decode, fragmentacja snapshotów
+  src/protocol/         pakiety: mod.rs (typy, stałe), codec.rs (bajty), encode.rs / decode.rs,
+                        snapshot.rs (fragmentacja), golden.rs (wektory parytetu z GDScriptem)
   src/net.rs            UdpSocket + symulator opóźnienia/jittera/strat
-  src/server.rs         pętla ticka, handshake, inputy, interest mgmt, statystyki
+  src/server/           autorytatywny serwer: `Server` + jeden plik na funkcję (każdy to `impl Server`)
+    mod.rs              stan świata, Config, pętla `run`, fazy `tick`, typ `Say`
+    session.rs          datagramy, handshake, migracja adresu, timeouty, wyjście gracza
+    movement.rs         inputy → `sim::step`, skutki chodzenia (sklep, łazienka, kawa, pogoda)
+    interact.rs         klawisz E (biurko, NPC, ekspres, miejsca, winda…) i zdarzenia NPC
+    snapshot.rs         interest mgmt, snapshoty, mowa, okresowe stany ekranów
+    player.rs           gracz, etap (portal / praca / dom), walidacja profilu
+    portal.rs, company.rs, items.rs, day.rs, doors.rs, alarm.rs, cleaning.rs,
+    police.rs, shop.rs, lunch.rs, treats.rs, board.rs, spots.rs, computers.rs, stats.rs
+    tests.rs            testy wnętrza serwera (limity, id, spotkania)
   src/args.rs           minimalny parser argumentów CLI
   src/main.rs           binarka `server` (domyślna dla `cargo run`)
   src/bin/bots.rs       binarka `bots` — test obciążeniowy
@@ -60,7 +70,7 @@ client/                 projekt Godota 4.7
   maps/floor0.json      parter + teren zewnętrzny
   maps/floor1.json      piętro 1
   main.gd / main.tscn   wejście: start screen <-> gra, argumenty dev
-  net/protocol.gd       lustro protocol.rs
+  net/protocol.gd       lustro protocol/
   net/net_client.gd     połączenie UDP (PacketPeerUDP)
   sim/movement.gd       lustro sim.rs
   map/building.gd       lustro building.rs (bez BFS)
@@ -112,16 +122,31 @@ tokio nic by nie dało, a pętla jest deterministyczna i łatwa w debugowaniu.
 Pakiety są obsługiwane od razu po odebraniu: `Input` trafia do kolejki gracza,
 `Ping` dostaje `Pong` natychmiast (dokładny RTT), `Connect` tworzy gracza.
 
-**Tick** (`Server::tick`):
-1. Timeout: gracze bez pakietów > 5 s → `Disconnect(timeout)` i usunięcie.
-2. Symulacja: z kolejki inputów każdego gracza max 6 kroków `sim::step`
-   (średnio 3 = 60 Hz / 20 Hz) na jego `Body` (piętro, pozycja, poprzedni
-   input, blokada schodów); aktualizacja pokoju i flag.
-3. Grupowanie encji po `(floor, room)`. Odbiorca dostaje encje swojego pokoju
-   i pokoi wymienionych w `see` jego pokoju (np. portiernia ↔ hol wejściowy —
-   portiera widać przez otwarte drzwi).
-4. Dla każdego gracza snapshot z encji jego grupy (fragmentowany ≤ 1200 B)
-   + `PlayerInfo` dla encji, których nicku jeszcze nie dostał.
+**Tick** (`Server::tick`, `server/mod.rs` — każda faza to osobna metoda):
+1. Zegar gry (`tick_clock`), potem timeouty (`drop_timed_out`): gracze bez
+   pakietów > 5 s → `Disconnect(timeout)` i usunięcie.
+2. Ruch (`simulate_players`, `movement.rs`): z kolejki inputów każdego gracza
+   max 6 kroków `sim::step` (średnio 3 = 60 Hz / 20 Hz) na jego `Body`;
+   aktualizacja pokoju, potrzeb, pogody i flag. Skutki zbierane w `Steps`
+   i obsługiwane po pętli (`react_to_steps`: bramka sklepu, świadek w
+   łazience, gotowa / zimna kawa, dym).
+3. Klawisz E (`handle_interactions`, `interact.rs`), potem zachowanie świata:
+   windy, pojazdy, policja, sprzątaczka, spotkania, obiady, firma, NPC;
+   zdarzenia NPC (`apply_npc_events`).
+4. Wysyłka (`send_updates`, `snapshot.rs`): grupowanie encji po
+   `(floor, room)`; odbiorca dostaje encje swojego pokoju i pokoi z `see`
+   (np. portiernia ↔ hol). Dla każdego gracza snapshot (fragmentowany
+   ≤ 1200 B) + `PlayerInfo` dla nowych encji + okresowe ekrany; potem mowa
+   (`Say` z kolejki `says`) i zegar.
+
+Nowa funkcja gry = nowy moduł w `server/` (`impl Server`): stan jako pole
+`Server`, `tick_*` wołane z `Server::tick`, obsługa pakietu w
+`session::handle_datagram`; czyste reguły i dane w module domenowym
+(`src/<funkcja>.rs`), testowalne bez sieci.
+
+**Przestrzeń id encji** (`u16`): gracze `1..0xE000`, przedmioty na podłodze /
+laptopy / pojazdy / taca `0xE000..0xF000` (max 1024 przedmiotów na podłodze —
+nadmiar najstarszych niczyich znika), NPC od `0xF000`.
 
 **Statystyki** co 5 s (`--stats-secs`): liczba ticków i `missed`, średni i
 maksymalny czas ticka, gracze, max widocznych, transfer na klienta

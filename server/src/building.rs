@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use serde::Deserialize;
 
 use crate::map::{dir, LinkKind, Map, NpcDef, RoomDef, Tile};
+use crate::sim::Pos;
 
 #[derive(Debug, Deserialize)]
 struct FloorEntry {
@@ -105,6 +106,11 @@ impl Building {
         self.floors.get_mut(f as usize).filter(|fl| !fl.locked).and_then(|fl| fl.map.as_mut())
     }
 
+    /// Room at a position on an active floor (0 = no room / no such floor).
+    pub fn room_at(&self, floor: u8, pos: Pos) -> u16 {
+        self.floor(floor).map_or(0, |m| m.room_at(pos.x, pos.y))
+    }
+
     pub fn floor_name(&self, f: u8) -> &str {
         self.floors.get(f as usize).map_or("?", |fl| fl.name.as_str())
     }
@@ -172,7 +178,7 @@ impl Building {
                 return Some(path);
             }
             let (f, t) = cur;
-            let m = self.floor(f).unwrap();
+            let Some(m) = self.floor(f) else { continue };
             for (dx, dy, d) in [(1, 0, dir::RIGHT), (-1, 0, dir::LEFT), (0, 1, dir::DOWN), (0, -1, dir::UP)] {
                 let nt = Tile { x: t.x + dx, y: t.y + dy };
                 if m.blocks(nt.x, nt.y, access, d) {

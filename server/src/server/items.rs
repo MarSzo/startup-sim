@@ -1,0 +1,282 @@
+//! Items: on the floor, in hands and pockets, handing over, using.
+
+use std::collections::HashSet;
+use std::fmt::Write as _;
+
+use crate::coffee;
+use crate::fire;
+use crate::inventory::{self, kind as item_kind, Inventory, Item};
+use crate::needs::{self, Rest};
+use crate::npc;
+use crate::protocol::{self as proto, Packet};
+use crate::shop;
+use crate::sim::{self, Body, Pos};
+use crate::treats;
+
+use super::player::refresh;
+use super::{dist2, Say, Server};
+
+/// An item lying on the floor; `handle` is its entity id in snapshots.
+pub(super) struct Dropped {
+    pub(super) handle: u16,
+    pub(super) item: Item,
+    pub(super) floor: u8,
+    pub(super) pos: Pos,
+}
+
+/// Entity ids of items on the floor, laptops, vehicles and the tray
+/// (players below, NPCs from `NPC_ID_BASE`).
+pub(super) const DROP_HANDLE_BASE: u16 = 0xE000;
+/// At most this many items on the floor; beyond it the oldest nobody's item
+/// goes (someone tidied up). Keeps the handle space from running out and
+/// snapshots small, whatever players do with the fruit bowl.
+const MAX_DROPPED: usize = 1024;
+/// Reach for picking up / handing over items.
+pub(super) const PICKUP_RADIUS: i32 = sim::TILE_UNITS * 5 / 4;
+const GIVE_RADIUS: i32 = sim::TILE_UNITS * 2;
+
+impl Server {
+    fn label_for(&self, pid: u16, k: u8) -> String {
+        let Some(p) = self.players.get(&pid) else { return String::new() };
+        let dept = self.cfg.recruitment.department_name(p.department).unwrap_or("");
+        match k {
+            item_kind::GUEST_PASS => format!("Dzień próbny: {}", p.nick),
+            item_kind::EMPLOYEE_CARD if !dept.is_empty() => format!("{} · {dept}", p.nick),
+            item_kind::EMPLOYEE_CARD => p.nick.clone(),
+            item_kind::LAPTOP => format!("Laptop: {}", p.nick),
+            item_kind::COFFEE => "Gorąca, z ekspresu".into(),
+            item_kind::EMPTY_CUP => "Po kawie".into(),
+            _ => String::new(),
+        }
+    }
+
+    /// Create a new item for `pid` (labelled for them) and hand it over.
+    pub(super) fn give_new(&mut self, pid: u16, k: u8) {
+        let label = self.label_for(pid, k);
+        let coffee = k == item_kind::COFFEE;
+        let item = Item {
+            expires: coffee.then_some(self.tick + coffee::DRINK_TICKS),
+            owner: if coffee { 0 } else { pid },
+            ..self.mint_item(k, label)
+        };
+        self.give(pid, item);
+    }
+
+    /// Put an item into a player's inventory; if it doesn't fit, it lands on
+    /// the floor at their feet.
+    pub(super) fn give(&mut self, pid: u16, item: Item) {
+        let Some(p) = self.players.get_mut(&pid) else { return };
+        match p.inventory.add(item) {
+            Ok(()) => refresh(p),
+            Err(item) => {
+                let (floor, pos) = (p.body.floor, p.body.pos);
+                self.drop_at(floor, pos, item);
+            }
+        }
+    }
+
+    pub(super) fn drop_at(&mut self, floor: u8, pos: Pos, item: Item) {
+        if self.dropped.len() >= MAX_DROPPED {
+            let oldest = self.dropped.iter().position(|d| d.item.owner == 0).unwrap_or(0);
+            self.dropped.remove(oldest);
+        }
+        let handle = self.alloc_handle();
+        self.dropped.push(Dropped { handle, item, floor, pos });
+    }
+
+    /// A free entity id for an item on the floor, a laptop on a desk, a
+    /// vehicle or the tray.
+    pub(super) fn alloc_handle(&mut self) -> u16 {
+        let next = |h: u16| if h + 1 >= npc::NPC_ID_BASE { DROP_HANDLE_BASE } else { h + 1 };
+        let used: HashSet<u16> = self
+            .dropped
+            .iter()
+            .map(|d| d.handle)
+            .chain(self.computers.iter().map(|c| c.handle))
+            .chain(self.vehicles.iter().map(|v| v.handle))
+            .chain(self.tray.as_ref().map(|t| t.handle))
+            .collect();
+        let mut handle = self.next_drop_handle;
+        // Bounded: MAX_DROPPED + laptops + vehicles is far below the span.
+        for _ in DROP_HANDLE_BASE..npc::NPC_ID_BASE {
+            if !used.contains(&handle) {
+                break;
+            }
+            handle = next(handle);
+        }
+        debug_assert!(!used.contains(&handle), "entity handles exhausted");
+        self.next_drop_handle = next(handle);
+        handle
+    }
+
+    pub(super) fn handle_item_action(&mut self, id: u16, action: u8, slot: u8) {
+        let Some(p) = self.players.get_mut(&id) else { return };
+        if !p.in_building() {
+            return;
+        }
+        match action {
+            proto::item_action::TAKE_OUT => match p.inventory.take_out(usize::from(slot)) {
+                Ok(()) => refresh(p),
+                Err(r) => self.says.push(Say::new(id, r.line())),
+            },
+            proto::item_action::PUT_AWAY => match p.inventory.put_away() {
+                Ok(()) => refresh(p),
+                Err(r) => self.says.push(Say::new(id, r.line())),
+            },
+            proto::item_action::DROP => {
+                if let Some(item) = p.inventory.take_hands() {
+                    refresh(p);
+                    let (floor, pos) = (p.body.floor, p.body.pos);
+                    self.drop_at(floor, pos, item);
+                }
+            }
+            proto::item_action::GIVE => self.give_to_nearest(id),
+            proto::item_action::USE => self.use_held(id),
+            _ => {}
+        }
+    }
+
+    /// G: hand what you hold to the nearest person within reach.
+    fn give_to_nearest(&mut self, id: u16) {
+        let Some(p) = self.players.get(&id) else { return };
+        if p.inventory.hands_free() {
+            return;
+        }
+        let (floor, pos) = (p.body.floor, p.body.pos);
+        let target = self
+            .players
+            .values()
+            .filter(|o| o.id != id && o.in_building() && o.body.floor == floor)
+            .map(|o| (o.id, dist2(o.body.pos, pos)))
+            .filter(|&(_, d)| d <= GIVE_RADIUS * GIVE_RADIUS)
+            .min_by_key(|&(_, d)| d)
+            .map(|(t, _)| t);
+        let Some(target) = target else {
+            self.says.push(Say::new(id, "Nie ma nikogo obok."));
+            return;
+        };
+        let Some(item) = self.players.get_mut(&id).and_then(|p| p.inventory.take_hands()) else { return };
+        let name = inventory::display_name(item.kind);
+        let Some(to) = self.players.get_mut(&target) else { return };
+        let to_nick = to.nick.clone();
+        let refused = match to.inventory.add(item) {
+            Ok(()) => {
+                refresh(to);
+                None
+            }
+            Err(item) => Some(item),
+        };
+        let Some(from) = self.players.get_mut(&id) else { return };
+        match refused {
+            None => {
+                refresh(from);
+                let line = format!("* item: {} gave {name} to {to_nick}", from.nick);
+                self.says.push(Say::addressed(id, format!("Proszę, {to_nick} — {}.", name.to_lowercase()), target));
+                self.log(line);
+            }
+            Some(item) => {
+                from.inventory.hands = Some(item); // give it back
+                self.says.push(Say::new(id, format!("{to_nick} nie ma już wolnych rąk ani kieszeni.")));
+            }
+        }
+    }
+
+    /// F: drink, eat, smoke or look at what you hold.
+    fn use_held(&mut self, id: u16) {
+        let tick = self.tick;
+        let Some(p) = self.players.get_mut(&id) else { return };
+        let Some(held) = &p.inventory.hands else { return };
+        let line = match held.kind {
+            item_kind::COFFEE => {
+                p.inventory.take_hands();
+                p.needs.drink_coffee();
+                refresh(p);
+                self.says.push(Say::new(id, coffee::lines::DRUNK));
+                self.give_new(id, item_kind::EMPTY_CUP);
+                return;
+            }
+            item_kind::EMPTY_CUP => "Pusty kubek. Można go umyć przy umywalce albo nalać kawy przy ekspresie.".into(),
+            item_kind::FRUIT if p.needs.is_full() => needs::lines::NOT_HUNGRY.into(),
+            item_kind::FRUIT => {
+                let what = held.label.to_lowercase();
+                let stale = held.stale;
+                p.inventory.take_hands();
+                let yuck = p.needs.eat_fruit();
+                refresh(p);
+                if stale {
+                    p.needs.upset_stomach();
+                    treats::lines::STALE_EATEN.to_string()
+                } else if yuck {
+                    format!("{} ({what})", needs::lines::YUCK)
+                } else {
+                    format!("Mniam, {what}.")
+                }
+            }
+            item_kind::EMPLOYEE_CARD => format!("Karta pracownika: {}.", held.label),
+            item_kind::GUEST_PASS => "Przepustka gościa — ważna do końca dnia.".into(),
+            _ if held.unpaid => shop::lines::PAY_FIRST.into(),
+            // Light up right here - wherever that is.
+            item_kind::CIGARETTES => {
+                inventory::take_piece(&mut p.inventory.hands);
+                refresh(p);
+                p.rest = Some((Rest::Smoking { until: tick + needs::SMOKE_TICKS }, p.body.floor, p.body.pos));
+                if self.smoke.is_open_air((p.body.floor, p.room)) { fire::lines::LIT } else { fire::lines::LIT_INSIDE }.into()
+            }
+            item_kind::LAPTOP => format!("{} — położę go na wolnym biurku w swoim dziale (E).", held.label),
+            k => {
+                let Some(prod) = shop::product(k) else { return };
+                p.inventory.take_hands();
+                p.needs.apply(prod.effect);
+                refresh(p);
+                prod.line.to_string()
+            }
+        };
+        self.says.push(Say::new(id, line));
+    }
+
+    /// Pick up the nearest item on the floor within reach, if any.
+    pub(super) fn try_pickup(&mut self, pid: u16, body: &Body) -> Option<String> {
+        let i = self
+            .dropped
+            .iter()
+            .enumerate()
+            .filter(|(_, d)| d.floor == body.floor && dist2(d.pos, body.pos) <= PICKUP_RADIUS * PICKUP_RADIUS)
+            .min_by_key(|(_, d)| dist2(d.pos, body.pos))
+            .map(|(i, _)| i)?;
+        let p = self.players.get_mut(&pid)?;
+        let d = self.dropped.remove(i);
+        let name = inventory::display_name(d.item.kind);
+        match p.inventory.add(d.item) {
+            Ok(()) => {
+                refresh(p);
+                Some(format!("Podniesione: {}.", name.to_lowercase()))
+            }
+            Err(item) => {
+                self.dropped.insert(i, Dropped { item, ..d });
+                Some(inventory::Refusal::HandsFull.line().to_string())
+            }
+        }
+    }
+}
+
+/// The hands and pockets as the owner sees them.
+pub(super) fn inventory_packet(inv: &Inventory) -> Packet {
+    let slot = |it: &Option<Item>| match it {
+        Some(i) => {
+            let mut label = i.label.clone();
+            if i.count > 1 {
+                let _ = write!(label, " ({} szt.)", i.count);
+            }
+            if i.unpaid {
+                let price = shop::product(i.kind).map_or(0, |p| p.price);
+                let _ = write!(label, " — niezapłacone, {}", shop::zl(price));
+            }
+            proto::SlotInfo { kind: i.kind, id: i.id, label }
+        }
+        None => proto::SlotInfo::default(),
+    };
+    let mut slots = Vec::with_capacity(1 + inv.pockets.len());
+    slots.push(slot(&inv.hands));
+    slots.extend(inv.pockets.iter().map(slot));
+    Packet::Inventory { slots }
+}

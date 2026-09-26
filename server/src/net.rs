@@ -2,7 +2,7 @@
 //! (one-way delay, jitter and packet loss applied in both directions).
 
 use std::cmp::Reverse;
-use std::collections::BinaryHeap;
+use std::collections::binary_heap::{BinaryHeap, PeekMut};
 use std::io;
 use std::net::{SocketAddr, UdpSocket};
 use std::time::{Duration, Instant};
@@ -49,6 +49,12 @@ pub fn canonical(addr: SocketAddr) -> SocketAddr {
 
 type Queued = Reverse<(Instant, u64, SocketAddr, Vec<u8>)>;
 
+/// Shortest socket wait (a zero timeout would mean "block forever").
+const MIN_WAIT: Duration = Duration::from_micros(100);
+
+/// Packets held back by the link simulator, per direction, at most.
+const MAX_QUEUED: usize = 1 << 16;
+
 pub struct Net {
     socket: UdpSocket,
     cond: LinkConditions,
@@ -57,6 +63,8 @@ pub struct Net {
     inbound: BinaryHeap<Queued>,
     outbound: BinaryHeap<Queued>,
     buf: Vec<u8>,
+    /// Read timeout currently set on the socket (a syscall to change).
+    read_timeout: Option<Duration>,
     pub bytes_out: u64,
     pub packets_out: u64,
     pub bytes_in: u64,
@@ -75,12 +83,22 @@ impl Net {
             inbound: BinaryHeap::new(),
             outbound: BinaryHeap::new(),
             buf: vec![0; 2048],
+            read_timeout: None,
             bytes_out: 0,
             packets_out: 0,
             bytes_in: 0,
             packets_in: 0,
             dropped: 0,
         })
+    }
+
+    /// Zero the traffic counters (after a stats report).
+    pub fn reset_counters(&mut self) {
+        self.bytes_out = 0;
+        self.packets_out = 0;
+        self.bytes_in = 0;
+        self.packets_in = 0;
+        self.dropped = 0;
     }
 
     pub fn local_addr(&self) -> io::Result<SocketAddr> {
@@ -105,6 +123,10 @@ impl Net {
             return;
         }
         if let Some(d) = self.delay() {
+            if self.outbound.len() >= MAX_QUEUED {
+                self.dropped += 1; // simulated link flooded
+                return;
+            }
             self.seq += 1;
             self.outbound.push(Reverse((Instant::now() + d, self.seq, addr, data)));
         }
@@ -112,11 +134,12 @@ impl Net {
 
     /// Send outbound packets whose simulated delay has elapsed.
     pub fn flush(&mut self, now: Instant) {
-        while let Some(Reverse((t, ..))) = self.outbound.peek() {
-            if *t > now {
+        while let Some(top) = self.outbound.peek_mut() {
+            if top.0 .0 > now {
                 break;
             }
-            let Reverse((_, _, addr, data)) = self.outbound.pop().unwrap();
+            let Reverse((_, _, addr, data)) = PeekMut::pop(top);
+            // Best effort, like UDP itself (e.g. ICMP unreachable on some OSes).
             let _ = self.socket.send_to(&data, addr);
         }
     }
@@ -133,33 +156,38 @@ impl Net {
 
     /// Wait up to `timeout` for one datagram and queue it (with simulated delay).
     pub fn recv(&mut self, timeout: Duration) {
-        let timeout = timeout.max(Duration::from_micros(100));
-        if self.socket.set_read_timeout(Some(timeout)).is_err() {
-            return;
-        }
-        match self.socket.recv_from(&mut self.buf) {
-            Ok((n, addr)) => {
-                self.bytes_in += n as u64;
-                self.packets_in += 1;
-                let data = self.buf[..n].to_vec();
-                let d = if self.cond.is_ideal() { Some(Duration::ZERO) } else { self.delay() };
-                if let Some(d) = d {
-                    self.seq += 1;
-                    self.inbound.push(Reverse((Instant::now() + d, self.seq, addr, data)));
-                }
+        // Whole milliseconds, rounded down (waking a little early is fine,
+        // late is not), so bursts of packets reuse the same setting instead
+        // of a setsockopt per datagram.
+        let timeout = match timeout.as_millis() {
+            0 => MIN_WAIT,
+            ms => Duration::from_millis(u64::try_from(ms).unwrap_or(u64::MAX)),
+        };
+        if self.read_timeout != Some(timeout) {
+            if self.socket.set_read_timeout(Some(timeout)).is_err() {
+                return;
             }
-            Err(_) => {} // timeout, or ICMP port-unreachable reported as error on some OSes
+            self.read_timeout = Some(timeout);
+        }
+        // Err: timeout, or ICMP port-unreachable reported as error on some OSes.
+        let Ok((n, addr)) = self.socket.recv_from(&mut self.buf) else { return };
+        self.bytes_in += n as u64;
+        self.packets_in += 1;
+        let d = if self.cond.is_ideal() { Some(Duration::ZERO) } else { self.delay() };
+        if let Some(d) = d {
+            if self.inbound.len() >= MAX_QUEUED {
+                self.dropped += 1; // simulated link flooded
+                return;
+            }
+            self.seq += 1;
+            self.inbound.push(Reverse((Instant::now() + d, self.seq, addr, self.buf[..n].to_vec())));
         }
     }
 
     /// Pop the next inbound packet whose simulated delay has elapsed.
     pub fn pop_inbound(&mut self, now: Instant) -> Option<(SocketAddr, Vec<u8>)> {
-        match self.inbound.peek() {
-            Some(Reverse((t, ..))) if *t <= now => {
-                let Reverse((_, _, addr, data)) = self.inbound.pop().unwrap();
-                Some((addr, data))
-            }
-            _ => None,
-        }
+        let top = self.inbound.peek_mut().filter(|top| top.0 .0 <= now)?;
+        let Reverse((_, _, addr, data)) = PeekMut::pop(top);
+        Some((addr, data))
     }
 }

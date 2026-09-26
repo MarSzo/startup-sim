@@ -1,7 +1,7 @@
 # Protokół sieciowy (wersja 22)
 
 Własny binarny protokół na UDP. Implementacje:
-- serwer: `server/src/protocol.rs` (źródło prawdy),
+- serwer: `server/src/protocol/` (źródło prawdy),
 - klient: `client/net/protocol.gd`.
 
 Parytet sprawdzają pliki golden w `server/tests/golden/packets.json`, generowane

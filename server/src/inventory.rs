@@ -67,8 +67,7 @@ pub fn display_name(k: u8) -> &'static str {
         kind::COFFEE => "Kawa",
         kind::EMPTY_CUP => "Pusty kubek",
         kind::FRUIT => "Owoc",
-        k if crate::shop::product(k).is_some() => crate::shop::product(k).unwrap().name,
-        _ => "?",
+        k => crate::shop::product(k).map_or("?", |p| p.name),
     }
 }
 
@@ -89,6 +88,16 @@ pub struct Item {
     pub unpaid: bool,
     /// Food past its best (fruit): upsets the stomach.
     pub stale: bool,
+}
+
+/// Use up one piece of a pack in `slot` (a cigarette); the empty pack goes.
+pub fn take_piece(slot: &mut Option<Item>) {
+    if let Some(item) = slot {
+        item.count = item.count.saturating_sub(1);
+        if item.count == 0 {
+            *slot = None;
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -142,6 +151,11 @@ impl Inventory {
 
     pub fn hands_free(&self) -> bool {
         self.hands.is_none()
+    }
+
+    /// Room for one more item: free hands or an empty pocket.
+    pub fn has_room(&self) -> bool {
+        self.hands_free() || self.pockets.iter().any(Option::is_none)
     }
 
     /// Store a received item: small ones in a pocket first, then hands.
@@ -214,17 +228,16 @@ impl Inventory {
         }
     }
 
-    /// Remove everything belonging to player `owner`.
-    pub fn remove_owned_by(&mut self, owner: u16) {
-        let mine = |s: &Option<Item>| s.as_ref().is_some_and(|i| i.owner == owner);
-        if mine(&self.hands) {
-            self.hands = None;
-        }
-        for s in self.pockets.iter_mut() {
-            if mine(s) {
+    /// Remove everything belonging to player `owner`; `true` if anything went.
+    pub fn remove_owned_by(&mut self, owner: u16) -> bool {
+        let mut removed = false;
+        for s in std::iter::once(&mut self.hands).chain(self.pockets.iter_mut()) {
+            if s.as_ref().is_some_and(|i| i.owner == owner) {
                 *s = None;
+                removed = true;
             }
         }
+        removed
     }
 
     /// Drop expired items (cold coffee); returns what was removed.
