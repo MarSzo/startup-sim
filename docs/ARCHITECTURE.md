@@ -22,9 +22,10 @@ z własnym binarnym protokołem (`docs/PROTOCOL.md`).
 ```
 server/                 crate Rusta (lib `game` + binarki)
   src/lib.rs            moduły współdzielone przez serwer i boty
-  src/building.rs       budynek: lista pięter, CRC, winda, BFS między piętrami
+  src/building.rs       budynek: lista pięter (+ mapa klatki schodowej), CRC, BFS między piętrami
   src/map.rs            jedno piętro: kafle, kolizje, pokoje, linki (schody/winda)
-  src/sim.rs            deterministyczny krok: ruch, kolizje, schody, winda
+  src/sim.rs            deterministyczny krok: ruch, kolizje, schody
+  src/elevator.rs       winda: przywołanie, jazda, drzwi (serwer, poza symulacją)
   src/nav.rs            podążanie ścieżką (boty, NPC)
   src/npc.rs            NPC po stronie serwera (portier, recepcja, HR)
   src/recruitment.rs    portal z ofertami i quiz rekrutacyjny
@@ -62,6 +63,7 @@ client/                 projekt Godota 4.7
   ui/inventory_hud.gd   pasek ekwipunku (ręce + 3 kieszenie)
   ui/computer_screen.gd ekran komputera: komunikator i ekran blokady
   ui/stats_hud.gd       paski potrzeb (prawy górny róg)
+  game/elevator_door_view.gd drzwi windy (rozsuwane) i wyświetlacz piętra
   game/stall_door_view.gd drzwi kabiny (zielone wolne / czerwone zajęte, otwarte, gdy ktoś w nich stoi)
   game/computer_view.gd laptop na biurku (ekran: niebieski / czat / zablokowany)
   game/remote_player.gd bufor snapshotów + interpolacja
@@ -228,21 +230,30 @@ kierunku” (`free_dir`: wyjście przez bramki i bramę garażową w dół jest 
 Bramki i brama garażowa wymagają przepustki lub karty, drzwi zaplecza —
 uprawnień obsługi. BFS (`Building::find_path`) stosuje te same reguły.
 
-**Przejścia między piętrami** (część kroku, więc przewidywane przez klienta):
-- **Schody**: wejście środkiem postaci na kafel schodów (`links` typu `stairs`)
-  przenosi na kafel przyjścia na drugim piętrze. Zaraz potem działa blokada:
-  schody nie zadziałają, dopóki nie zmienisz klawiszy ruchu *i* nie zejdziesz
-  z obszaru schodów — przytrzymanie „w górę” po przyjściu nie cofa na dół.
-- **Winda**: w kabinie (`links` typu `elevator`, ta sama pozycja na każdym
-  piętrze) wciśnięcie E (zbocze: nie wciśnięte w poprzednim kroku) przenosi
-  na następne aktywne piętro z kabiną o tym samym `id`. Zablokowane piętro 2
-  jest pomijane.
+**Przejścia między piętrami**:
+- **Schody** (część kroku, więc przewidywane przez klienta): wejście środkiem
+  postaci na kafel schodów (`links` typu `stairs`) przenosi na kafel przyjścia
+  na innej mapie. Między parterem a piętrem 1 jest osobna mapa **klatki
+  schodowej** (w `building.json` jako „piętro” 3 z `stairwell: true`): bieg w
+  górę, półpiętro, drugi bieg — widać tylko klatkę i osoby na niej. Zaraz po
+  przejściu działa blokada: schody nie zadziałają, dopóki nie zmienisz
+  klawiszy ruchu *i* nie zejdziesz z obszaru schodów.
+- **Winda** (`elevator.rs`, poza symulacją): E przy drzwiach przywołuje ją
+  (kolejka pięter), jazda trwa 3 s na piętro, drzwi są otwarte 4 s i nie
+  zamkną się na kimś w drzwiach; z więcej niż 6 osobami w kabinie (3×2 pola)
+  nie rusza; w czasie jazdy klient wygasza wszystko poza kabiną (`ride_mask.gd`,
+  między mapą a postaciami); E w kabinie wybiera następne aktywne piętro
+  (drzwi zamykają się po 1 s). Drzwi windy są w nakładce `closed` mapy (jak
+  kabiny toaletowe), więc zamknięte blokują ruch także w predykcji. Po
+  przyjeździe serwer przenosi wszystkich z kabiny piętra startowego na tę samą
+  pozycję docelowego piętra; klient dostaje to jak korektę (zmiana piętra =
+  przeskok).
 
 Ten sam algorytm jest w `sim.rs` i `movement.gd`; GDScript liczy na 64-bit
 int, więc wyniki są bit w bit równe. `tests/golden/movement_vectors.json`
-(10 losowych przejść × 400 kroków przy ścianach, meblach, drzwiach, bramkach,
-schodach i w windzie + scenariusz: spawn → schody → Chill room → winda w dół
-i w górę) jest generowany przez Rust i odtwarzany w Godocie.
+(losowe przejścia × 400 kroków przy ścianach, meblach, drzwiach, bramkach,
+schodach, też z wolnym chodem + scenariusz: spawn → schody przez klatkę →
+Chill room → z powrotem do holu) jest generowany przez Rust i odtwarzany w Godocie.
 
 ## Klient
 
@@ -310,7 +321,8 @@ nieobecny w snapshotach przez 5 ticków znika.
 wygładzania, z limitami mapy. Etykiety mają skalę `1/zoom` i rozmiar czcionki
 ekranowej, więc są ostre mimo zoomu.
 
-**Podpowiedzi** na dole ekranu: „[E] Winda: jedź na …” w kabinie windy,
+**Podpowiedzi** na dole ekranu: „[E] Wezwij windę” / „Winda jedzie…” przy
+drzwiach windy, „[E] Jedź na: …” w kabinie,
 „[E] Porozmawiaj: Portier” przy NPC, informacja o wymaganej przepustce przed
 bramką. **NPC** rysowane są w mundurze z czapką; wypowiedzi (`Say`) pokazują się
 w dymku nad postacią (także gdy mówiący dopiero wejdzie w pole widzenia) i w

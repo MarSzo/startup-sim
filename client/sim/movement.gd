@@ -62,7 +62,7 @@ static func tile_of_pos(p: Vector2i) -> Vector2i:
 
 ## One input step (1/60 s) in the building: movement, then floor links.
 ## Stairs move you when you step onto them (unless locked right after
-## arriving); the elevator needs an interact press inside the cabin.
+## arriving). The elevator is moved by the server, not simulated here.
 static func step(building, b: Dictionary, input: int) -> Dictionary:
 	var map = building.get_floor(b.floor)
 	if map == null:
@@ -81,12 +81,6 @@ static func step(building, b: Dictionary, input: int) -> Dictionary:
 				n.floor = link.to_floor
 				n.pos = tile_center(link.to.x, link.to.y)
 				n.lock = LOCK_HELD
-		elif link.kind == "elevator":
-			if (input & IN_INTERACT) != 0 and (b.prev & IN_INTERACT) == 0:
-				var f: int = building.next_elevator_floor(n.floor, link.id)
-				if f >= 0:
-					n.floor = f
-					n.lock = LOCK_HELD
 	n.prev = input
 	return n
 

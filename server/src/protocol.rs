@@ -5,7 +5,7 @@
 //! `tests/golden/packets.json`.
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 11;
+pub const VERSION: u8 = 14;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
 pub const MAX_PACKET: usize = 1200;
@@ -173,10 +173,19 @@ pub mod activity {
     pub const SOFA: u8 = 3;
     pub const TOILET: u8 = 4;
     pub const SMOKING: u8 = 5;
+    /// Washing hands at a sink.
+    pub const WASHING: u8 = 6;
 }
+
+/// `Doors::lift_target` when the elevator isn't heading anywhere.
+pub const NO_FLOOR: u8 = 255;
 
 /// `EntityState::flags` bit: walks slowly (exhausted / needs the toilet).
 pub const FLAG_SLOW: u8 = 0x40;
+/// `EntityState::flags` bit: low hygiene (a smell cloud others can see).
+pub const FLAG_SMELLY: u8 = 0x80;
+/// `Stats::flags` bit: dirty hands (after the toilet, until washed).
+pub const STATS_DIRTY_HANDS: u8 = 1;
 
 /// Entity kinds. Only players exist now; NPCs will use the same snapshot slot.
 pub mod kind {
@@ -213,7 +222,7 @@ pub struct EntityState {
     pub x: i32,
     pub y: i32,
     /// Bit 0-1: facing (0 down, 1 up, 2 left, 3 right); bit 2: moving;
-    /// bits 3-5 look; bit 6 slow (`FLAG_SLOW`); bit 7 reserved.
+    /// bits 3-5 look; bit 6 slow (`FLAG_SLOW`); bit 7 smelly (`FLAG_SMELLY`).
     pub flags: u8,
     /// Item kind in hands (`inventory::kind`), or the item itself for `kind::ITEM`.
     pub held: u8,
@@ -311,10 +320,12 @@ pub enum Packet {
     /// Messages of a conversation (sync reply or live push).
     Chat { conv: u16, messages: Vec<ChatEntry> },
     /// Character needs, 0..=100 each (sent to the owner twice a second).
-    Stats { hunger: u8, energy: u8, stress: u8, bladder: u8 },
-    /// Locked doors (toilet stalls) on the receiver's floor: solid for the
-    /// simulation. Sent on change and every 0.5 s.
-    Doors { floor: u8, tiles: Vec<(u8, u8)> },
+    Stats { hunger: u8, energy: u8, stress: u8, bladder: u8, hygiene: u8, flags: u8 },
+    /// Closed doors (locked toilet stalls, elevator doors) on the receiver's
+    /// floor: solid for the simulation. Plus the elevator: the floor it is at
+    /// and where it is heading (`NO_FLOOR` = standing). Sent on change and
+    /// every 0.5 s.
+    Doors { floor: u8, tiles: Vec<(u8, u8)>, lift_floor: u8, lift_target: u8, lift_moving: bool },
     /// Lock / unlock the stall the sender is in.
     DoorAction { token: u32 },
 }
@@ -641,20 +652,25 @@ impl Packet {
                 w.u32(*arg);
                 w.str16(text, MAX_CHAT_BYTES);
             }
-            Packet::Doors { floor, tiles } => {
+            Packet::Doors { floor, tiles, lift_floor, lift_target, lift_moving } => {
                 w.u8(*floor);
                 w.u8(tiles.len().min(255) as u8);
                 for (x, y) in tiles.iter().take(255) {
                     w.u8(*x);
                     w.u8(*y);
                 }
+                w.u8(*lift_floor);
+                w.u8(*lift_target);
+                w.u8(*lift_moving as u8);
             }
             Packet::DoorAction { token } => w.u32(*token),
-            Packet::Stats { hunger, energy, stress, bladder } => {
+            Packet::Stats { hunger, energy, stress, bladder, hygiene, flags } => {
                 w.u8(*hunger);
                 w.u8(*energy);
                 w.u8(*stress);
                 w.u8(*bladder);
+                w.u8(*hygiene);
+                w.u8(*flags);
             }
             Packet::Chat { conv, messages } => {
                 w.u16(*conv);
@@ -860,10 +876,17 @@ impl Packet {
                 for _ in 0..n {
                     tiles.push((r.u8()?, r.u8()?));
                 }
-                Packet::Doors { floor, tiles }
+                Packet::Doors { floor, tiles, lift_floor: r.u8()?, lift_target: r.u8()?, lift_moving: r.u8()? != 0 }
             }
             ty::DOOR_ACTION => Packet::DoorAction { token: r.u32()? },
-            ty::STATS => Packet::Stats { hunger: r.u8()?, energy: r.u8()?, stress: r.u8()?, bladder: r.u8()? },
+            ty::STATS => Packet::Stats {
+                hunger: r.u8()?,
+                energy: r.u8()?,
+                stress: r.u8()?,
+                bladder: r.u8()?,
+                hygiene: r.u8()?,
+                flags: r.u8()?,
+            },
             ty::CHAT => {
                 let conv = r.u16()?;
                 let n = r.u8()? as usize;
@@ -1074,8 +1097,8 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
             "computer_action",
             Packet::ComputerAction { token: 0x01020304, action: computer_action::SEND, conv: 17, arg: 42, text: "Kto zjadł mój jogurt?".into() },
         ),
-        ("stats", Packet::Stats { hunger: 35, energy: 80, stress: 12, bladder: 64 }),
-        ("doors", Packet::Doors { floor: 1, tiles: vec![(46, 27), (54, 31)] }),
+        ("stats", Packet::Stats { hunger: 35, energy: 80, stress: 12, bladder: 64, hygiene: 22, flags: STATS_DIRTY_HANDS }),
+        ("doors", Packet::Doors { floor: 1, tiles: vec![(46, 27), (54, 31)], lift_floor: 0, lift_target: 1, lift_moving: true }),
         ("door_action", Packet::DoorAction { token: 0x01020304 }),
         (
             "chat",

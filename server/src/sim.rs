@@ -178,8 +178,8 @@ impl Body {
 ///   other floor, unless locked. The lock is set on arrival and released once
 ///   the movement keys change *and* you are off any link area - so holding
 ///   "up" after arriving doesn't take you straight back down.
-/// - Elevator: pressing interact (edge: not pressed on the previous step)
-///   inside the cabin moves you to the next active floor, same position.
+/// - The elevator is not part of the simulation: the server moves the
+///   people in the cabin when it arrives (see `elevator.rs`).
 pub fn step(b: &Building, body: Body, input: u8) -> Body {
     let Some(map) = b.floor(body.floor) else { return body };
     let mut n = body;
@@ -197,12 +197,6 @@ pub fn step(b: &Building, body: Body, input: u8) -> Body {
             n.floor = *to_floor;
             n.pos = Pos::tile_center(to.x, to.y);
             n.lock = LOCK_HELD;
-        }
-        Some(LinkKind::Elevator { id }) if input & IN_INTERACT != 0 && body.prev_input & IN_INTERACT == 0 => {
-            if let Some(f) = b.next_elevator_floor(n.floor, id) {
-                n.floor = f;
-                n.lock = LOCK_HELD;
-            }
         }
         _ => {}
     }
@@ -325,46 +319,46 @@ mod tests {
         assert_eq!(p.y, 14 * TILE_UNITS + HALF_H);
     }
 
+    /// Stairwell map (between floors 0 and 1).
+    const MID: u8 = 3;
+
     #[test]
-    fn stairs_take_you_up_without_bouncing_back() {
+    fn stairs_go_through_the_stairwell_and_landing() {
         let b = building();
         // Hall below the stairwell door (x 34..35, row 13); hold UP.
         let body = until_floor_change(&b, Body::at(0, Pos::tile_center(34, 16)), IN_UP, 200);
-        assert_eq!(body.floor, 1, "took the stairs up");
-        assert_eq!(body.pos, Pos::tile_center(34, 10), "arrival tile");
+        assert_eq!(body.floor, MID, "into the stairwell");
+        assert_eq!(body.pos, Pos::tile_center(32, 13), "bottom of the first flight");
         assert_eq!(body.lock, LOCK_HELD);
-        // Keep holding UP: walks onto floor 1's flight but stays upstairs.
-        let body = walk(&b, body, IN_UP, 120);
-        assert_eq!(body.floor, 1);
-        assert_eq!(b.floor(1).unwrap().tile_char(body.pos.tile().0, body.pos.tile().1), Some('S'));
-        // Letting go while standing on the flight doesn't trigger either.
-        let body = walk(&b, body, 0, 10);
-        assert_eq!((body.floor, body.lock), (1, LOCK_RELEASED));
-        // Step off, then walk back onto the flight: down to the ground floor.
-        let body = walk(&b, body, IN_DOWN, 30);
-        assert_eq!(body.lock, LOCK_NONE);
-        let body = until_floor_change(&b, body, IN_UP, 200);
-        assert_eq!(body.floor, 0, "stairs back down");
+        // Keep holding UP: up the flight onto the landing, stays in the stairwell.
+        let body = walk(&b, body, IN_UP, 200);
+        assert_eq!(body.floor, MID);
+        let m = b.floor(MID).unwrap();
+        assert_eq!(m.room_name(m.room_at(body.pos.x, body.pos.y)), "Półpiętro");
+        assert!(body.pos.tile().1 <= 6, "on the landing: {:?}", body.pos.tile());
+        // Across the landing and down the second flight: floor 1.
+        let body = walk(&b, body, IN_RIGHT, 60);
+        let body = until_floor_change(&b, body, IN_DOWN, 300);
+        assert_eq!(body.floor, 1, "the second flight leads to floor 1");
         assert_eq!(body.pos, Pos::tile_center(34, 10));
+        // Keep holding DOWN: out of the stairwell, no bouncing back.
+        let body = walk(&b, body, IN_DOWN, 60);
+        assert_eq!(body.floor, 1);
+        // And back: floor 1's flight -> stairwell (second flight) -> ground floor.
+        let body = until_floor_change(&b, body, IN_UP, 300);
+        assert_eq!((body.floor, body.pos), (MID, Pos::tile_center(36, 13)));
+        let body = walk(&b, body, IN_UP, 200);
+        let body = walk(&b, body, IN_LEFT, 60);
+        let body = until_floor_change(&b, body, IN_DOWN, 300);
+        assert_eq!((body.floor, body.pos), (0, Pos::tile_center(34, 10)), "down to the ground floor");
     }
 
     #[test]
-    fn elevator_needs_an_interact_press() {
+    fn interact_in_the_elevator_cabin_changes_nothing_in_the_simulation() {
         let b = building();
-        let body = walk(&b, Body::at(0, Pos::tile_center(26, 16)), IN_UP, 60); // into the cabin
-        assert_eq!(b.floor(0).unwrap().room_name(b.floor(0).unwrap().room_at(body.pos.x, body.pos.y)), "Winda");
-        let pos = body.pos;
-        let body = step(&b, body, IN_INTERACT);
-        assert_eq!((body.floor, body.pos), (1, pos), "same spot, next floor");
-        let body = walk(&b, body, IN_INTERACT, 30);
-        assert_eq!(body.floor, 1, "holding E doesn't ride again");
-        let body = step(&b, step(&b, body, 0), IN_INTERACT);
-        assert_eq!(body.floor, 0, "second press rides back (floor 2 is locked)");
-        let body = walk(&b, body, IN_DOWN | IN_INTERACT, 60);
-        let m = b.floor(0).unwrap();
-        assert_eq!(m.room_name(m.room_at(body.pos.x, body.pos.y)), "Hol");
-        let body = step(&b, step(&b, body, 0), IN_INTERACT);
-        assert_eq!(body.floor, 0, "interact outside the cabin does nothing");
+        let body = walk(&b, Body::at(0, Pos::tile_center(26, 16)), IN_UP, 60); // towards the cabin
+        let after = step(&b, step(&b, body, 0), IN_INTERACT);
+        assert_eq!(after.floor, 0, "the server moves the cabin, not the simulation");
     }
 
     #[test]

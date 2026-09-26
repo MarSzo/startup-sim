@@ -73,9 +73,11 @@ func test_protocol(path: String) -> void:
 		expect(e0.id == 3 and e0.kind == 0 and e0.x == 4096 and e0.y == 8192 and e0.flags == 5 and e0.held == 3 and e0.activity == Protocol.ACT_COMPUTER, "entity 0 %s" % e0)
 		expect(e1.id == 65535 and e1.kind == 1 and e1.x == -1 and e1.y == 2000000 and e1.flags == Protocol.FLAG_SLOW, "entity 1 %s" % e1)
 	var dr := Protocol.decode(golden["doors"].hex_decode())
-	expect(dr.get("type") == Protocol.T_DOORS and dr.floor == 1 and dr.tiles == [Vector2i(46, 27), Vector2i(54, 31)], "decode doors %s" % dr)
+	expect(dr.get("type") == Protocol.T_DOORS and dr.floor == 1 and dr.tiles == [Vector2i(46, 27), Vector2i(54, 31)]
+		and dr.lift_floor == 0 and dr.lift_target == 1 and dr.lift_moving, "decode doors %s" % dr)
 	var st := Protocol.decode(golden["stats"].hex_decode())
-	expect(st.get("type") == Protocol.T_STATS and st.hunger == 35 and st.energy == 80 and st.stress == 12 and st.bladder == 64, "decode stats %s" % st)
+	expect(st.get("type") == Protocol.T_STATS and st.hunger == 35 and st.energy == 80 and st.stress == 12 and st.bladder == 64
+		and st.hygiene == 22 and st.stats_flags == Protocol.STATS_DIRTY_HANDS, "decode stats %s" % st)
 	var pi := Protocol.decode(golden["player_info"].hex_decode())
 	expect(pi.get("players", []).size() == 2 and pi.players[0].nick == "Ala" and pi.players[0].department == 1
 		and pi.players[0].gender == 0 and pi.players[0].appearance.hair_style == 1 and pi.players[0].appearance.hair_color == 3

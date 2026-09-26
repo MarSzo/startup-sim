@@ -8,6 +8,7 @@ use std::time::{Duration, Instant};
 use crate::building::Building;
 use crate::coffee::{self, Cup, Machine};
 use crate::computer::{self, Account, Computer, Messenger, Workstation};
+use crate::elevator::{self, Elevator};
 use crate::inventory::{self, kind as item_kind, Inventory, Item};
 use crate::net::{canonical, LinkConditions, Net};
 use crate::needs::{self, Needs, Rest, Spot, SpotKind};
@@ -184,6 +185,9 @@ pub struct Server {
     spots: Vec<Spot>,
     /// Toilet stalls and who locked them.
     stalls: Vec<Stall>,
+    elevators: Vec<Elevator>,
+    /// Some elevator was moving last tick (resend `Doors` when it starts/stops).
+    lift_was_moving: bool,
     /// A stall door changed: send `Doors` to everyone this tick.
     doors_dirty: bool,
     /// Desks where a laptop can stand, and the laptops standing on them.
@@ -213,13 +217,15 @@ pub struct Server {
 impl Server {
     pub fn new(building: Building, cfg: Config) -> std::io::Result<Server> {
         let net = Net::bind(cfg.bind, cfg.link)?;
-        Ok(Server {
+        let mut server = Server {
             npcs: Npc::spawn_all(&building),
             machines: coffee::find_machines(&building),
             dropped: Vec::new(),
             workstations: computer::find_workstations(&building),
             spots: needs::find_spots(&building),
             stalls: stalls::find_stalls(&building),
+            elevators: elevator::find_elevators(&building),
+            lift_was_moving: false,
             doors_dirty: false,
             computers: Vec::new(),
             messenger: Messenger::default(),
@@ -238,7 +244,80 @@ impl Server {
             rng: fastrand::Rng::new(),
             stats: Stats::default(),
             started: Instant::now(),
-        })
+        };
+        server.sync_elevator_doors(); // doors start closed
+        Ok(server)
+    }
+
+    /// Elevator doors: closed (solid) unless the car stands there open.
+    fn sync_elevator_doors(&mut self) {
+        let tick = self.tick;
+        let mut set = Vec::new();
+        for e in &self.elevators {
+            for (f, t) in &e.doors {
+                set.push((*f, *t, !e.is_open_at(*f, tick)));
+            }
+        }
+        for (f, t, closed) in set {
+            if let Some(m) = self.building.floor_mut(f) {
+                m.set_closed(t.x, t.y, closed);
+            }
+        }
+    }
+
+    /// E at the elevator: the button in the cabin, or the call button at
+    /// the doors. `None` = no elevator here.
+    fn use_elevator(&mut self, body: &Body) -> Option<String> {
+        let tick = self.tick;
+        for i in 0..self.elevators.len() {
+            let e = &self.elevators[i];
+            if e.in_cabin(body.floor, body.pos) {
+                let e = &mut self.elevators[i];
+                self.doors_dirty = true;
+                return Some(match e.press_inside(&self.building, body.floor, tick) {
+                    Some(t) => format!("Jedziemy na: {}.", self.building.floor_name(t)),
+                    None => elevator::lines::RIDING.to_string(),
+                });
+            }
+            if e.door_in_reach(body) {
+                self.doors_dirty = true; // show where the car is heading at once
+                return Some(self.elevators[i].call(body.floor, tick).to_string());
+            }
+        }
+        None
+    }
+
+    /// Move the elevators; carry the people in a cabin that arrived.
+    fn tick_elevators(&mut self) {
+        let people: Vec<(u8, Pos)> = self.players.values().map(|p| (p.body.floor, p.body.pos)).collect();
+        let tick = self.tick;
+        let mut changed = false;
+        for i in 0..self.elevators.len() {
+            let up = self.elevators[i].tick(tick, &people);
+            changed |= up.doors_changed;
+            if let Some(floor) = up.overloaded {
+                // Somebody in the cabin says it (everyone inside hears it).
+                let e = &self.elevators[i];
+                let speaker = self.players.values().find(|p| p.body.floor == floor && e.in_cabin(floor, p.body.pos)).map(|p| p.id);
+                if let Some(s) = speaker {
+                    self.pending_says.push((s, elevator::lines::OVERLOAD.to_string(), None));
+                }
+            }
+            if let Some((from, to)) = up.arrived {
+                let e = &self.elevators[i];
+                for p in self.players.values_mut() {
+                    if matches!(p.stage, Stage::Working) && e.in_cabin(from, p.body.pos) && p.body.floor == from {
+                        p.body.floor = to;
+                        p.room = self.building.floor(to).map_or(0, |m| m.room_at(p.body.pos.x, p.body.pos.y));
+                    }
+                }
+            }
+        }
+        if changed || self.elevators.iter().any(|e| e.moving.is_some()) != self.lift_was_moving {
+            self.lift_was_moving = self.elevators.iter().any(|e| e.moving.is_some());
+            self.sync_elevator_doors();
+            self.doors_dirty = true;
+        }
     }
 
     pub fn local_addr(&self) -> SocketAddr {
@@ -836,9 +915,13 @@ impl Server {
                     item_kind::FRUIT => {
                         let what = held.label.to_lowercase();
                         p.inventory.take_hands();
-                        p.needs.eat_fruit();
+                        let yuck = p.needs.eat_fruit();
                         refresh(p);
-                        format!("Mniam, {what}.")
+                        if yuck {
+                            format!("{} ({what})", needs::lines::YUCK)
+                        } else {
+                            format!("Mniam, {what}.")
+                        }
                     }
                     item_kind::EMPLOYEE_CARD => format!("Karta pracownika: {}.", held.label),
                     item_kind::GUEST_PASS => "Przepustka gościa — ważna do końca dnia.".into(),
@@ -939,12 +1022,14 @@ impl Server {
 
     fn doors_packet(&self, floor: u8) -> Packet {
         let tiles = self
-            .stalls
-            .iter()
-            .filter(|s| s.floor == floor && s.locked_by.is_some())
-            .map(|s| (s.door.x as u8, s.door.y as u8))
-            .collect();
-        Packet::Doors { floor, tiles }
+            .building
+            .floor(floor)
+            .map_or_else(Vec::new, |m| m.closed_tiles().into_iter().map(|(x, y)| (x as u8, y as u8)).collect());
+        let (lift_floor, lift_target, lift_moving) = self
+            .elevators
+            .first()
+            .map_or((proto::NO_FLOOR, proto::NO_FLOOR, false), |e| (e.floor, e.heading().unwrap_or(proto::NO_FLOOR), e.moving.is_some()));
+        Packet::Doors { floor, tiles, lift_floor, lift_target, lift_moving }
     }
 
     // --------------------------------------------------------- computers
@@ -1002,8 +1087,17 @@ impl Server {
                 p.rest = Some((Rest::Smoking { until: self.tick + needs::SMOKE_TICKS }, floor, pos));
                 needs::lines::SMOKE.into()
             }
+            SpotKind::Sink => {
+                p.rest = Some((Rest::Washing { until: self.tick + needs::WASH_TICKS }, floor, pos));
+                needs::lines::WASHING.into()
+            }
+            SpotKind::Sanitizer => {
+                p.needs.sanitize();
+                needs::lines::SANITIZED.into()
+            }
             SpotKind::Toilet => {
                 p.rest = Some((Rest::Toilet, floor, pos));
+                p.needs.use_toilet();
                 let mine = match p.profile.gender {
                     proto::gender::FEMALE => Some("female"),
                     proto::gender::MALE => Some("male"),
@@ -1271,6 +1365,8 @@ impl Server {
         let mut coffee_says: Vec<(u16, String, Option<u16>)> = std::mem::take(&mut self.pending_says);
         let mut coffee_ready = Vec::new();
         let mut portal_resend = Vec::new();
+        // Left a bathroom with dirty hands: (player, floor, bathroom room).
+        let mut unwashed_exits: Vec<(u16, u8, u16)> = Vec::new();
         for p in self.players.values_mut() {
             if !matches!(p.stage, Stage::Working) {
                 p.inputs.clear(); // not in the world yet
@@ -1296,7 +1392,16 @@ impl Server {
             if moved {
                 p.flags |= 0b100;
             }
+            let old_room = p.room;
             p.room = self.building.floor(p.body.floor).map_or(0, |m| m.room_at(p.body.pos.x, p.body.pos.y));
+            if p.needs.dirty_hands && p.room != old_room {
+                let kind = |r: u16| {
+                    self.building.floor(p.body.floor).and_then(|m| m.rooms.iter().find(|d| d.id == r)).map_or("", |d| d.kind.as_str())
+                };
+                if kind(old_room) == "bathroom" && !matches!(kind(p.room), "bathroom" | "stall") {
+                    unwashed_exits.push((p.id, p.body.floor, old_room));
+                }
+            }
             if coffee::tick_cup(&mut p.cup, self.tick) {
                 coffee_ready.push(p.id);
             }
@@ -1326,7 +1431,26 @@ impl Server {
                 coffee_says.push((p.id, line.to_string(), None));
             }
             p.body.slow = p.needs.slow();
-            p.flags = (p.flags & 0x3f) | if p.body.slow { proto::FLAG_SLOW } else { 0 };
+            p.flags = (p.flags & 0x3f)
+                | if p.body.slow { proto::FLAG_SLOW } else { 0 }
+                | if p.needs.smelly() { proto::FLAG_SMELLY } else { 0 };
+        }
+        // Somebody in the bathroom saw it.
+        for (pid, floor, bath) in unwashed_exits {
+            let m = self.building.floor(floor);
+            let witness = self.players.values().find(|o| {
+                o.id != pid
+                    && matches!(o.stage, Stage::Working)
+                    && o.body.floor == floor
+                    && (o.room == bath || m.is_some_and(|m| m.visible_from(o.room).contains(&bath)))
+            });
+            if let Some(w) = witness.map(|w| w.id) {
+                let nick = self.players[&pid].nick.clone();
+                coffee_says.push((w, format!("Ej, {nick}, a ręce?!"), Some(pid)));
+                if let Some(p) = self.players.get_mut(&pid) {
+                    p.needs.add_stress(3);
+                }
+            }
         }
         for pid in coffee_ready {
             let free = self.players[&pid].inventory.hands_free();
@@ -1368,12 +1492,15 @@ impl Server {
                 coffee_says.extend(said.map(|line| (pid, line, None)));
             } else if let Some(said) = self.use_spot(pid, &body) {
                 coffee_says.extend(said.map(|line| (pid, line, None)));
+            } else if let Some(line) = self.use_elevator(&body) {
+                coffee_says.push((pid, line, None));
             } else if let Some(line) = self.try_pickup(pid, &body) {
                 coffee_says.push((pid, line, None));
             }
         }
         self.check_computer_sessions();
         self.check_stalls();
+        self.tick_elevators();
 
         let bodies: HashMap<u16, Body> =
             self.players.values().filter(|p| matches!(p.stage, Stage::Working)).map(|p| (p.id, p.body)).collect();
@@ -1503,8 +1630,9 @@ impl Server {
                 outgoing.push((p.addr, id, self.doors_packet(p.body.floor)));
             }
             if tick % STATS_EVERY_TICKS == 0 {
-                let [hunger, energy, stress, bladder] = p.needs.points();
-                outgoing.push((p.addr, id, Packet::Stats { hunger, energy, stress, bladder }));
+                let [hunger, energy, stress, bladder, hygiene] = p.needs.points();
+                let flags = if p.needs.dirty_hands { proto::STATS_DIRTY_HANDS } else { 0 };
+                outgoing.push((p.addr, id, Packet::Stats { hunger, energy, stress, bladder, hygiene, flags }));
             }
             if tick % COMPUTER_RESEND_TICKS == 0 {
                 if let Some(pk) = self.computer_packet(id) {
@@ -1609,6 +1737,7 @@ fn activity(p: &Player) -> u8 {
         (_, Some(Rest::Toilet)) => a::TOILET,
         (_, Some(Rest::Sofa)) => a::SOFA,
         (_, Some(Rest::Smoking { .. })) => a::SMOKING,
+        (_, Some(Rest::Washing { .. })) => a::WASHING,
         _ if p.cup.brewing() => a::BREWING,
         _ => a::NONE,
     }

@@ -143,8 +143,10 @@ func _ground(x: int, y: int) -> void:
 			_blit(_tile_img("~", func(im): im.fill(Color("#15171f"))), x, y)
 		"e":
 			_blit(_tile_img("e", func(im): _diamond_plate(im)), x, y)
-		"E":
-			_blit(_tile_img("E", func(im): _elevator_door(im)), x, y)
+		"E":  # threshold; the door panels are nodes (open / closed)
+			_blit(_tile_img("E", func(im): _elevator_threshold(im)), x, y)
+		"s":
+			_blit(_tile_img("s", func(im): _steps(im)), x, y)
 		"S":
 			_blit(_tile_img("S", func(im): _stairs(im)), x, y)
 		"D":
@@ -264,6 +266,27 @@ func _elevator_door(t: Image) -> void:
 	for yy in TP:
 		t.set_pixel(7, yy, Color("#6f7a83"))
 		t.set_pixel(8, yy, Color("#dfe5ea"))
+
+
+func _elevator_threshold(t: Image) -> void:
+	t.fill(Color("#3a3f47"))
+	for xx in TP:
+		t.set_pixel(xx, 0, Color("#8a939c"))
+		t.set_pixel(xx, TP - 1, Color("#8a939c"))
+		t.set_pixel(xx, 7, Color("#2a2e35"))
+
+
+## Stairwell flights: treads with a nosing, lighter towards the landing.
+func _steps(t: Image) -> void:
+	for yy in TP:
+		var band := yy % 5
+		var c := Color("#a88d6e")
+		if band == 0:
+			c = Color("#cdb697")
+		elif band == 4:
+			c = Color("#7d6649")
+		for xx in TP:
+			t.set_pixel(xx, yy, c)
 
 
 func _stairs(t: Image) -> void:
@@ -403,7 +426,7 @@ func _wall_shadows() -> void:
 
 # ------------------------------------------------------------------- props
 
-const PROPS := ["W", "K", "H", "Q", "T", "P", "R", "N", "A", "U", "V", "X", "C", "J", "O", "|"]
+const PROPS := ["W", "K", "H", "Q", "T", "P", "R", "N", "A", "U", "V", "X", "C", "J", "O", "|", "Y"]
 
 
 ## Connected components of the same furniture char -> one object each.
@@ -456,6 +479,7 @@ func _prop(c: String, tr: Rect2i, index: int) -> void:
 		"J": _kitchen_counter(r)
 		"O": _fruit_bowl(r)
 		"|": _partition(r)
+		"Y": _sanitizer(r)
 
 
 func _desks(tr: Rect2i, r: Rect2i, index: int) -> void:
@@ -676,6 +700,18 @@ func _kitchen_counter(r: Rect2i) -> void:
 	if r.size.x >= 32:
 		_rect(Rect2i(x + 20, y + 2, 6, 7), Color("#9aa4ab"))
 		_rect(Rect2i(x + 21, y + 2, 4, 1), Color("#c9d1d7"))
+
+
+## Hand sanitizer: a white wall dispenser with a blue label and a drip tray.
+func _sanitizer(r: Rect2i) -> void:
+	var x := r.position.x + 4
+	var y := r.position.y + 2
+	_tint(Rect2i(x + 1, y + 1, 8, 11), Color(0, 0, 0, 0.18))
+	_rect(Rect2i(x, y, 8, 10), Color("#f4f7fa"))
+	_rect(Rect2i(x, y, 8, 1), Color("#ffffff"))
+	_rect(Rect2i(x + 2, y + 3, 4, 3), Color("#3b8fd9"))
+	_rect(Rect2i(x + 3, y + 10, 2, 1), Color("#9aa4ab"))
+	_rect(Rect2i(x + 1, y + 12, 6, 1), Color("#c5ccd3"))
 
 
 ## Toilet stall partitions: light panels with a darker front face.

@@ -3,7 +3,7 @@
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 11
+const VERSION := 14
 const MAX_PACKET := 1200
 const MAX_NICK_BYTES := 16
 const MAX_SAY_BYTES := 240
@@ -77,8 +77,15 @@ const ACT_BREWING := 2
 const ACT_SOFA := 3
 const ACT_TOILET := 4
 const ACT_SMOKING := 5
+const ACT_WASHING := 6
 # Entity flags bit 6: walks slowly (exhausted / needs the toilet).
 const FLAG_SLOW := 0x40
+# Entity flags bit 7: low hygiene (smell cloud).
+const FLAG_SMELLY := 0x80
+# Stats.flags bit 0: dirty hands.
+const STATS_DIRTY_HANDS := 1
+# Doors.lift_target: the elevator isn't heading anywhere.
+const NO_FLOOR := 255
 
 const DISCONNECT_QUIT := 0
 const DISCONNECT_TIMEOUT := 1
@@ -380,11 +387,16 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			for i in n:
 				tiles.append(Vector2i(r.u8(), r.u8()))
 			p.tiles = tiles
+			p.lift_floor = r.u8()
+			p.lift_target = r.u8()
+			p.lift_moving = r.u8() != 0
 		T_STATS:
 			p.hunger = r.u8()
 			p.energy = r.u8()
 			p.stress = r.u8()
 			p.bladder = r.u8()
+			p.hygiene = r.u8()
+			p.stats_flags = r.u8()
 		T_CHAT:
 			p.conv = r.u16()
 			var n := r.u8()

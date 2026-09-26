@@ -346,9 +346,10 @@ Ustalenia: sklep i portiernia są przed bramkami (dostępne bez karty); parking
 wewnętrzny duży, z bramą garażową na zewnątrz (też na kartę); wolne miejsce nad
 holem to zamknięte „Zaplecze techniczne”.
 
-**Poruszanie między piętrami:** schody — wejście na biegi schodów przenosi na
-drugie piętro (bez odbijania, gdy trzymasz klawisz); winda — w kabinie
-klawisz **E** jedzie na następne aktywne piętro (podpowiedź na ekranie).
+**Poruszanie między piętrami:** schody — wejście na biegi schodów przenosi do
+klatki schodowej (osobny widok: bieg, półpiętro, drugi bieg), a jej koniec
+na drugie piętro; winda — trzeba ją wezwać (E przy drzwiach), poczekać, wejść
+i wybrać piętro (E w kabinie) — szczegóły w 10.18.
 
 ### 10.7 Wdrożenie: portier, recepcja, HR (dzień próbny → karta)
 
@@ -525,6 +526,39 @@ Zastępuje prosty portal z 10.8. Po połączeniu gracz widzi pulpit komputera
   środku (i ona jego). Nie da się zamknąć drzwi, gdy ktoś w nich stoi.
 - Wyjście z kabiny albo z gry otwiera zamek automatycznie.
 
+### 10.17 Higiena
+
+- Piąty pasek **Higiena** (100 = czysto): spada powoli (100→0 w ~60 min).
+- **Toaleta brudzi ręce** (napis „Brudne ręce” pod paskami, higiena −5).
+- **Umywalka** (E, ~5 s mycia, ruch przerywa): czyste ręce, higiena +40.
+- **Płyn antybakteryjny** z dozownika (E, od razu): czyste ręce, higiena +10.
+  Dozowniki: w obu łazienkach i w chill roomie przy owocach.
+- Konsekwencje: higiena < 25 — zielona „chmurka” nad postacią (widzą ją
+  wszyscy) i rosnący stres; wyjście z łazienki z brudnymi rękami przy
+  świadku — komentarz „Ej, …, a ręce?!” (i trochę stresu); owoc jedzony
+  brudnymi rękami — „Fuj…” i stres +5.
+
+### 10.18 Winda
+
+- Drzwi są zamknięte, dopóki winda nie stoi na piętrze. **E przy drzwiach
+  wzywa windę**; nad drzwiami wyświetlacz: piętro (P, 1) i strzałka jazdy.
+- Jazda: ~3 s na piętro; po przyjeździe drzwi otwarte ~4 s (nie zamkną się na
+  kimś w drzwiach). **E w kabinie** wybiera piętro (przy dwóch aktywnych —
+  drugie); drzwi zamykają się po 1 s i jadą wszyscy w kabinie.
+- **Maksymalnie 6 osób**: z większą liczbą winda nie ruszy — drzwi zostają
+  otwarte, a ktoś w kabinie woła „Przeciążenie!”. Kabina jest mała (3×2
+  pola), więc 6 osób stoi ciasno.
+- W trakcie jazdy **widać tylko kabinę** (reszta ekranu jest wygaszona,
+  kabina lekko drga).
+
+### 10.19 Klatka schodowa i półpiętro
+
+- Schody między parterem a piętrem 1 prowadzą przez **osobny widok klatki
+  schodowej**: bieg w górę, **półpiętro** (podest), drugi bieg. Widać tylko
+  klatkę i osoby na niej; przejście trwa kilka sekund.
+- Przy wyjściach etykiety, dokąd prowadzą (Parter / Piętro 1 / Klatka
+  schodowa).
+
 ### 10.6 Stan implementacji
 
 *Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie,
@@ -561,6 +595,10 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Ekwipunek**: kieszenie i ręce, przedmioty (przepustka, karta, laptop,
   kawa), upuszczanie / podnoszenie / podawanie, dostęp z przedmiotów (10.13);
   protokół v8.
+- **Higiena, winda, klatka schodowa**: pasek higieny i brudne ręce, umywalki i
+  dozowniki (10.17); winda wzywana, jadąca, z drzwiami, limitem 6 osób i
+  widokiem samej kabiny w czasie jazdy (10.18); klatka schodowa z półpiętrem
+  (10.19); protokół v14.
 - **Kabiny toaletowe**: zamykane od środka, ukrywają osobę w środku, otwarte
   można podejrzeć (10.16); protokół v11.
 - **Statystyki postaci**: głód, energia, stres, toaleta; owoce, kawa, sofa,
@@ -577,12 +615,12 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Sieć mobilna**: serwer dual-stack IPv4/IPv6; gracz identyfikowany tokenem
   (zmiana adresu w trakcie gry przenosi sesję); klient przepina gniazdo po
   ciszy/powrocie z tła i sam łączy się ponownie po utracie sesji.
-- **Testy**: 68 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
+- **Testy**: 72 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
   zależna od uprawnień, bramki, ruch/kolizje, schody, winda, nawigacja,
-  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, kabiny, protokół), 2 golden, 14 e2e serwera
+  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, protokół), 2 golden, 16 e2e serwera
   (m.in. portal: odrzucenie → przyjęcie → spawn; całe wdrożenie aż do karty;
   niewidoczność między piętrami; zgodność stanu serwera z predykcją) —
-  łącznie 84 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb i kabin); 132 sprawdzenia w Godocie (parytet protokołu i ruchu, parsowanie
+  łącznie 90 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny i windy); 132 sprawdzenia w Godocie (parytet protokołu i ruchu, parsowanie
   adresów).
 
 #### Pomiary (MacBook, wszystko lokalnie)

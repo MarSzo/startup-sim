@@ -1,4 +1,6 @@
-//! Character needs (GDD 9a, step 5): hunger, energy, stress, bladder.
+//! Character needs (GDD 9a, step 5): hunger, energy, stress, bladder, and
+//! hygiene with "dirty hands" after the toilet (washed at a sink or with
+//! hand sanitizer).
 //!
 //! Values are fixed-point (`SCALE` units per point, 0..=100 points) so the
 //! per-tick drift stays an integer. Hunger, stress and bladder grow (100 =
@@ -23,6 +25,9 @@ const fn per_tick(minutes: i32) -> i32 {
 pub const HUNGER_UP: i32 = per_tick(25);
 pub const ENERGY_DOWN: i32 = per_tick(35);
 pub const BLADDER_UP: i32 = per_tick(20);
+pub const HYGIENE_DOWN: i32 = per_tick(60);
+/// Washing hands at a sink takes 5 s.
+pub const WASH_TICKS: u32 = 5 * 20;
 /// Extra stress per neglected need.
 pub const STRESS_NEGLECT: i32 = per_tick(15);
 /// Stress fades slowly while nothing is neglected.
@@ -45,6 +50,9 @@ const MUST_GO: i32 = 80;
 const STRESSED: i32 = 80;
 const SLOW_ENERGY: i32 = 10;
 const SLOW_BLADDER: i32 = 90;
+/// Below this you smell (visible to others) and it stresses you.
+pub const SMELLY: i32 = 25;
+const UNWASHED: i32 = 35;
 
 pub mod lines {
     pub const HUNGRY: &str = "Burczy mi w brzuchu… Może owoc z chill roomu?";
@@ -62,6 +70,11 @@ pub mod lines {
     pub const WRONG_BATHROOM: &str = "Ups… to chyba nie ta łazienka.";
     pub const HANDS_FULL: &str = "Najpierw muszę coś odłożyć.";
     pub const NOT_HUNGRY: &str = "Na razie wystarczy jedzenia.";
+    pub const WASHING: &str = "Mydło, woda, 30 sekund… no dobra, 5.";
+    pub const WASHED: &str = "Czyste ręce!";
+    pub const SANITIZED: &str = "Psik, psik — zdezynfekowane.";
+    pub const UNWASHED: &str = "Przydałoby się trochę higieny…";
+    pub const YUCK: &str = "Fuj… brudnymi rękami.";
 }
 
 /// Something to use with E (found on the map by tile type).
@@ -71,6 +84,8 @@ pub enum SpotKind {
     Toilet,
     Ashtray,
     FruitBowl,
+    Sink,
+    Sanitizer,
 }
 
 #[derive(Debug, Clone)]
@@ -92,6 +107,8 @@ pub fn find_spots(b: &Building) -> Vec<Spot> {
                     Some("toilet") => SpotKind::Toilet,
                     Some("ashtray") => SpotKind::Ashtray,
                     Some("fruit_bowl") => SpotKind::FruitBowl,
+                    Some("sink") => SpotKind::Sink,
+                    Some("sanitizer") => SpotKind::Sanitizer,
                     _ => continue,
                 };
                 // A toilet in the wall belongs to the room it faces: take the
@@ -130,6 +147,7 @@ pub enum Rest {
     Sofa,
     Toilet,
     Smoking { until: u32 },
+    Washing { until: u32 },
 }
 
 /// Things to tell the player (speech bubble "to self") or the room.
@@ -148,13 +166,25 @@ pub struct Needs {
     pub energy: i32,
     pub stress: i32,
     pub bladder: i32,
+    /// 100 = clean, 0 = smelly.
+    pub hygiene: i32,
+    /// After the toilet, until washed / sanitized.
+    pub dirty_hands: bool,
     /// Warnings already given (bit per threshold), re-armed on recovery.
     warned: u8,
 }
 
 impl Default for Needs {
     fn default() -> Self {
-        Needs { hunger: 20 * SCALE, energy: 90 * SCALE, stress: 10 * SCALE, bladder: 10 * SCALE, warned: 0 }
+        Needs {
+            hunger: 20 * SCALE,
+            energy: 90 * SCALE,
+            stress: 10 * SCALE,
+            bladder: 10 * SCALE,
+            hygiene: 90 * SCALE,
+            dirty_hands: false,
+            warned: 0,
+        }
     }
 }
 
@@ -163,6 +193,7 @@ const W_TIRED: u8 = 2;
 const W_MUST_GO: u8 = 4;
 const W_STRESSED: u8 = 8;
 const W_EXHAUSTED: u8 = 16;
+const W_UNWASHED: u8 = 32;
 
 fn pts(v: i32) -> i32 {
     v / SCALE
@@ -178,7 +209,13 @@ impl Needs {
         // Starving drains energy twice as fast.
         self.energy -= if pts(self.hunger) >= 100 { 2 * ENERGY_DOWN } else { ENERGY_DOWN };
         self.bladder += BLADDER_UP;
-        let neglected = [pts(self.hunger) >= HUNGRY, pts(self.energy) <= TIRED, pts(self.bladder) >= MUST_GO]
+        self.hygiene -= HYGIENE_DOWN;
+        let neglected = [
+            pts(self.hunger) >= HUNGRY,
+            pts(self.energy) <= TIRED,
+            pts(self.bladder) >= MUST_GO,
+            pts(self.hygiene) < SMELLY,
+        ]
             .iter()
             .filter(|&&b| b)
             .count() as i32;
@@ -202,6 +239,14 @@ impl Needs {
                     ev.push(Event::RestDone(lines::SMOKE_DONE));
                 }
             }
+            Some(Rest::Washing { until }) => {
+                if tick >= until {
+                    rest = None;
+                    self.dirty_hands = false;
+                    self.hygiene += 40 * SCALE;
+                    ev.push(Event::RestDone(lines::WASHED));
+                }
+            }
             None => {}
         }
         if self.bladder >= MAX && rest != Some(Rest::Toilet) {
@@ -221,6 +266,7 @@ impl Needs {
             (W_MUST_GO, pts(self.bladder) >= MUST_GO, pts(self.bladder) < MUST_GO - 10, lines::MUST_GO),
             (W_STRESSED, pts(self.stress) >= STRESSED, pts(self.stress) < STRESSED - 10, lines::STRESSED),
             (W_EXHAUSTED, pts(self.energy) <= SLOW_ENERGY, pts(self.energy) > SLOW_ENERGY + 5, lines::EXHAUSTED),
+            (W_UNWASHED, pts(self.hygiene) <= UNWASHED, pts(self.hygiene) > UNWASHED + 10, lines::UNWASHED),
         ];
         for (bit, bad, ok, line) in checks {
             if bad && self.warned & bit == 0 {
@@ -233,7 +279,7 @@ impl Needs {
     }
 
     fn clamp(&mut self) {
-        for v in [&mut self.hunger, &mut self.energy, &mut self.stress, &mut self.bladder] {
+        for v in [&mut self.hunger, &mut self.energy, &mut self.stress, &mut self.bladder, &mut self.hygiene] {
             *v = (*v).clamp(0, MAX);
         }
     }
@@ -250,10 +296,34 @@ impl Needs {
         self.clamp();
     }
 
-    pub fn eat_fruit(&mut self) {
+    /// Returns true if eaten with dirty hands (yuck: stress).
+    pub fn eat_fruit(&mut self) -> bool {
         self.hunger -= 20 * SCALE;
         self.energy += 3 * SCALE;
+        let yuck = self.dirty_hands;
+        if yuck {
+            self.stress += 5 * SCALE;
+        }
         self.clamp();
+        yuck
+    }
+
+    /// Sitting down on the toilet.
+    pub fn use_toilet(&mut self) {
+        self.dirty_hands = true;
+        self.hygiene -= 5 * SCALE;
+        self.clamp();
+    }
+
+    /// Hand sanitizer: clean hands at once, a little hygiene.
+    pub fn sanitize(&mut self) {
+        self.dirty_hands = false;
+        self.hygiene += 10 * SCALE;
+        self.clamp();
+    }
+
+    pub fn smelly(&self) -> bool {
+        pts(self.hygiene) < SMELLY
     }
 
     /// Embarrassment (e.g. the other bathroom).
@@ -266,10 +336,10 @@ impl Needs {
         pts(self.hunger) < 5
     }
 
-    /// Rounded points for the HUD: hunger, energy, stress, bladder.
-    pub fn points(&self) -> [u8; 4] {
+    /// Rounded points for the HUD: hunger, energy, stress, bladder, hygiene.
+    pub fn points(&self) -> [u8; 5] {
         let r = |v: i32| ((v + SCALE / 2) / SCALE).clamp(0, 100) as u8;
-        [r(self.hunger), r(self.energy), r(self.stress), r(self.bladder)]
+        [r(self.hunger), r(self.energy), r(self.stress), r(self.bladder), r(self.hygiene)]
     }
 }
 
@@ -293,7 +363,8 @@ mod tests {
     fn needs_drift_at_the_agreed_pace() {
         let mut n = Needs::default();
         run(&mut n, None, 5 * 60 * 20); // 5 minutes
-        let [h, e, _, b] = n.points();
+        let [h, e, _, b, hy] = n.points();
+        assert_eq!(hy, 82, "hygiene -8 in 5 min (100..0 in 60)");
         assert_eq!(h, 40, "hunger +20 in 5 min (0..100 in 25)");
         assert!((75..=76).contains(&e), "energy -14 in 5 min: {e}");
         assert_eq!(b, 35, "bladder +25 in 5 min");
@@ -332,9 +403,25 @@ mod tests {
     #[test]
     fn coffee_and_fruit() {
         let mut n = Needs { hunger: 80 * SCALE, energy: 20 * SCALE, ..Needs::default() };
-        n.eat_fruit();
+        assert!(!n.eat_fruit());
         n.drink_coffee();
-        assert_eq!(n.points(), [60, 48, 7, 18]);
+        assert_eq!(n.points()[..4], [60, 48, 7, 18]);
+    }
+
+    #[test]
+    fn toilet_dirties_hands_washing_and_sanitizer_clean_them() {
+        let mut n = Needs::default();
+        n.use_toilet();
+        assert!(n.dirty_hands);
+        assert!(n.eat_fruit(), "yuck");
+        let (rest, ev) = run(&mut n, Some(Rest::Washing { until: WASH_TICKS }), WASH_TICKS + 1);
+        assert_eq!(rest, None);
+        assert!(ev.contains(&Event::RestDone(lines::WASHED)) && !n.dirty_hands);
+        assert_eq!(n.points()[4], 100, "washing: +40 hygiene (capped)");
+        let mut n = Needs { hygiene: 20 * SCALE, dirty_hands: true, ..Needs::default() };
+        assert!(n.smelly());
+        n.sanitize();
+        assert!(!n.dirty_hands && !n.smelly() && n.points()[4] == 30, "sanitizer: clean hands, +10 only");
     }
 
     #[test]
@@ -343,6 +430,7 @@ mod tests {
         let spots = find_spots(&b);
         let count = |k| spots.iter().filter(|s| s.kind == k).count();
         assert!(count(SpotKind::Sofa) >= 1 && count(SpotKind::Ashtray) >= 1 && count(SpotKind::FruitBowl) == 1);
+        assert!(count(SpotKind::Sink) >= 4 && count(SpotKind::Sanitizer) == 3);
         let toilets: Vec<_> = spots.iter().filter(|s| s.kind == SpotKind::Toilet).collect();
         assert!(toilets.iter().any(|t| t.gender.as_deref() == Some("female")));
         assert!(toilets.iter().any(|t| t.gender.as_deref() == Some("male")));

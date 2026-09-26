@@ -34,8 +34,10 @@ const ACT_BREWING := 2
 const ACT_SOFA := 3
 const ACT_TOILET := 4
 const ACT_SMOKING := 5
+const ACT_WASHING := 6
 
 var slow := false
+var smelly := false
 var status := 0
 ## Item in hands (ItemArt kinds), visible to everyone.
 var held := 0
@@ -155,6 +157,13 @@ func set_held(k: int) -> void:
 		queue_redraw()
 
 
+## Low hygiene: a green smell cloud (everyone sees it).
+func set_smelly(on: bool) -> void:
+	if on != smelly:
+		smelly = on
+		queue_redraw()
+
+
 ## Activity (Protocol.ACT_*) and the slow walk (tired / needs the toilet).
 func set_status(s: int, p_slow := false) -> void:
 	if s != status or p_slow != slow:
@@ -176,7 +185,7 @@ func _process(delta: float) -> void:
 			bubble.visible = false
 		else:
 			_place_bubble()
-	if status in [ACT_BREWING, ACT_SOFA, ACT_SMOKING, ACT_COMPUTER] or slow:
+	if status in [ACT_BREWING, ACT_SOFA, ACT_SMOKING, ACT_COMPUTER, ACT_WASHING] or slow or smelly:
 		queue_redraw()  # animated dots / zzz / smoke / sweat
 	# Walk cycle from the distance travelled since the last frame.
 	if _last_pos != Vector2.INF:
@@ -335,6 +344,17 @@ func _draw_status(top: float, ty: float, side: bool, dir: int) -> void:
 			var k := float(ms % 1200) / 1200.0
 			_r(cx + 1 + k * 2, top + 3 - k * 6, 2, 2, Color(0.8, 0.8, 0.8, 0.7 * (1.0 - k)))
 			_r(cx + 2 - k, top - 1 - k * 5, 2, 2, Color(0.8, 0.8, 0.8, 0.5 * (1.0 - k)))
+	if status == ACT_WASHING:
+		# Water and soap bubbles at the hands.
+		for i in 3:
+			var k := float((ms + i * 250) % 750) / 750.0
+			_r(-4 + i * 3, ty + 7 - k * 4, 2, 2, Color(0.75, 0.9, 1.0, 0.9 * (1.0 - k)))
+	if smelly:
+		# Wavy green fumes rising around the head.
+		for i in 3:
+			var k := float((ms + i * 400) % 1200) / 1200.0
+			var sx := -6.0 + i * 5.0 + sin(k * TAU + i) * 1.5
+			_r(sx, top + 2 - k * 10, 2, 2, Color(0.45, 0.75, 0.2, 0.75 * (1.0 - k)))
 	if slow:
 		# A drop of sweat.
 		if (ms / 500) % 2 == 0:

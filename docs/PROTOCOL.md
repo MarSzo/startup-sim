@@ -1,4 +1,4 @@
-# Protokół sieciowy (wersja 11)
+# Protokół sieciowy (wersja 14)
 
 Własny binarny protokół na UDP. Implementacje:
 - serwer: `server/src/protocol.rs` (źródło prawdy),
@@ -23,7 +23,7 @@ przez `cargo test` i czytane przez `client/tests/run_tests.gd`.
 | pole    | typ | wartość |
 |---------|-----|---------|
 | magic   | u16 | `0x5354` (bajty `54 53`, „TS”) |
-| version | u8  | `11` |
+| version | u8  | `14` |
 | type    | u8  | typ pakietu (niżej) |
 
 ## Jednostki
@@ -114,11 +114,11 @@ Encja (14 B): `id u16 | kind u8 | x i32 | y i32 | flags u8 | held u8 | activity 
 - `held`: przedmiot w rękach (0 brak, 1 przepustka gościa, 2 karta
   pracownika, 3 laptop, 4 kawa, 5 owoc); dla `kind` 2 i 3 — sam przedmiot.
 - `activity`: 0 nic, 1 przy komputerze, 2 parzy kawę, 3 odpoczywa na sofie,
-  4 w toalecie, 5 pali (strefa palenia).
+  4 w toalecie, 5 pali (strefa palenia), 6 myje ręce.
 - `flags`: bity 0–1 kierunek (0 dół, 1 góra, 2 lewo, 3 prawo), bit 2 „w ruchu”,
   bity 3–5 wygląd (0 gracz, 1 portier — mundur z czapką, 2 pracownik biurowy —
   koszula z krawatem), bit 6 wolny chód (zmęczenie / pilna toaleta), bit 7
-  zarezerwowany.
+  niska higiena (chmurka).
   Dla laptopa (`kind` 3): bit 0 zablokowany, bit 1 ktoś przy nim siedzi.
 
 **Interest management**: lista zawiera tylko encje z tym samym `(floor, room)` co
@@ -126,7 +126,8 @@ odbiorca (bez niego samego). Snapshot jest pełny (nie delta) — zgubienie
 któregokolwiek nie wymaga retransmisji.
 
 `self_*` + `floor` to **pełny stan symulacji** odbiorcy, więc klient odtwarza
-niepotwierdzone inputy dokładnie od tego stanu, także przez schody i windę.
+niepotwierdzone inputy dokładnie od tego stanu, także przez schody. Windą
+przenosi serwer (zmiana `floor` w snapshocie = przeskok, jak korekta).
 
 Uprawnienia zmienia tylko serwer (np. portier daje przepustkę); klient poznaje
 je ze snapshotu i od razu uwzględnia w predykcji kolizji z bramkami.
@@ -257,7 +258,13 @@ Kabiny toaletowe: drzwi (typ kafla `stall_door`) zamknięte od środka są
 **nieprzechodnie dla wszystkich** — to część symulacji ruchu, więc klient musi
 je znać do predykcji. `Doors`: floor u8, n u8, n × {`x u8`, `y u8`} — lista
 zamkniętych drzwi na piętrze odbiorcy; wysyłana po każdej zmianie i co 0,5 s
-(zastępuje poprzednią listę dla tego piętra). `DoorAction`: token u32 —
+(zastępuje poprzednią listę dla tego piętra). Lista obejmuje też **drzwi
+windy** — zamknięte, dopóki winda nie stoi na danym piętrze z otwartymi
+drzwiami. Na końcu pakietu: `lift_floor u8` (gdzie jest winda) i
+`lift_target u8` (dokąd jedzie / najbliższe wezwanie; 255 = stoi) i
+`lift_moving u8` (1 = w ruchu) — do wyświetlacza przy drzwiach, podpowiedzi i
+widoku samej kabiny w czasie jazdy. Winda nie rusza z więcej niż 6 osobami w
+kabinie (drzwi zostają otwarte, `Say` „Przeciążenie!” od kogoś w kabinie). `DoorAction`: token u32 —
 zamknij / otwórz kabinę, w której stoi nadawca (odmowy jako `Say`: nie w
 kabinie, ktoś stoi w drzwiach, sam stoi w drzwiach). Serwer otwiera kabinę
 sam, gdy zamykający z niej wyjdzie albo wyjdzie z gry.
@@ -270,8 +277,9 @@ widzą pokój mówiącego.
 ### 24 `Stats` (S→C)
 
 Potrzeby postaci odbiorcy, co 0,5 s (tylko w budynku): `hunger u8`, `energy
-u8`, `stress u8`, `bladder u8`, każda 0..100. Głód, stres i toaleta: 100 =
-źle; energia: 0 = źle. Liczy je tylko serwer.
+u8`, `stress u8`, `bladder u8`, `hygiene u8` (każda 0..100), `flags u8` (bit 0
+brudne ręce). Głód, stres i toaleta: 100 = źle; energia i higiena: 0 = źle.
+Liczy je tylko serwer.
 
 ## Połączenie i timeouty
 
@@ -331,6 +339,9 @@ szyfrowaniem.
 
 ## Historia wersji
 
+- **14** — `Doors` + `lift_moving`; limit 6 osób w windzie; mniejsza kabina (3×2).
+- **13** — higiena: `Stats` + `hygiene`, `flags` (brudne ręce), flaga encji 7 = niska higiena, czynność 6 = mycie rąk.
+- **12** — winda poza symulacją (wzywanie, jazda, drzwi w `Doors`), `Doors` + `lift_floor`, `lift_target`; mapa klatki schodowej (piętro 3).
 - **11** — kabiny toaletowe: `Doors`, `DoorAction`; zamknięte drzwi blokują ruch (także w predykcji klienta).
 - **10** — potrzeby: `activity` w encji (14 B) i `self_activity` w miejsce bitów `self_status`, `self_slow` (wolny chód w symulacji — też w wektorach golden ruchu), flaga 6 = wolny chód, pakiet `Stats`, przedmiot 5 = owoc.
 - **9** — komputer i komunikator: encja laptopa (`kind` 3), bit „przy komputerze” (`self_status` 0 / flaga 6, w miejsce „trzyma kawę”), `Computer`, `ComputerAction`, `Chat`.

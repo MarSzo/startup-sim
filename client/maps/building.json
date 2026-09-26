@@ -16,6 +16,12 @@
    "file": null,
    "name": "Piętro 2",
    "locked": true
+  },
+  {
+   "floor": 3,
+   "file": "floor3.json",
+   "name": "Klatka schodowa (półpiętro)",
+   "stairwell": true
   }
  ]
 }

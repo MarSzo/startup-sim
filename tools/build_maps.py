@@ -32,6 +32,7 @@ LEGEND = {
     "E": {"type": "elevator_door", "solid": False, "color": "#b8c4cc"},
     "e": {"type": "elevator", "solid": False, "color": "#9aa8b0"},
     "S": {"type": "stairs", "solid": False, "color": "#b09070"},
+    "s": {"type": "steps", "solid": False, "color": "#a58a6c"},
     # Furniture: all solid, the type only decides how the client draws it.
     "T": {"type": "table", "solid": True, "color": "#8b6b4a"},
     "W": {"type": "desk", "solid": True, "color": "#9a7650"},
@@ -51,6 +52,7 @@ LEGEND = {
     # Toilet stalls: thin partitions and a door that can be locked from inside
     # (locked = solid for everyone; the server tells clients which ones).
     "|": {"type": "partition", "solid": True, "color": "#c3c9d1"},
+    "Y": {"type": "sanitizer", "solid": True, "color": "#e8f1f8"},
     "k": {"type": "stall_door", "solid": False, "color": "#9fb3c8"},
     "v": {"type": "grass", "solid": False, "color": "#5e8c4a"},
     "p": {"type": "sidewalk", "solid": False, "color": "#a8a8a0"},
@@ -100,12 +102,24 @@ class Floor:
 
 
 # Shared building geometry (must line up between floors).
-ELEV = (24, 8, 28, 12)       # elevator cabin interior
+ELEV = (25, 11, 27, 12)      # elevator cabin interior: 3 x 2, a tight fit for 6
+ELEV_SHAFT = (23, 7, 29, 13) # walls around it (the rest is the shaft)
 ELEV_DOOR = (25, 13, 27, 13)
 STAIRS = (31, 6, 38, 12)     # stairwell interior
 STAIRS_FLIGHT = (32, 6, 37, 7)
 STAIRS_DOOR = (34, 13, 35, 13)
 STAIRS_ARRIVAL = (34, 10)    # tile where you appear after taking the stairs
+
+# The stairwell between floors 0 and 1 is its own map ("floor" 3 in the
+# building list, not a real storey): a U-shaped staircase - flight up from
+# the ground floor on the left, the landing (półpiętro) at the top, flight on
+# the right leading to floor 1. Walking it takes a few seconds and you only
+# see the stairwell.
+STAIRWELL_FLOOR = 3
+MID_FLIGHT_A = (31, 7, 33, 14)   # from / to the ground floor
+MID_FLIGHT_B = (35, 7, 37, 14)   # from / to floor 1
+MID_ARRIVAL_A = (32, 13)
+MID_ARRIVAL_B = (36, 13)
 
 
 def building_shell(f, inside_fill):
@@ -115,6 +129,7 @@ def building_shell(f, inside_fill):
 
 
 def elevator_and_stairs(f, hall_room):
+    f.area(*ELEV_SHAFT, "#", "-")
     f.box(*ELEV, "e", "L")
     f.room("L", 20, "Winda", "elevator")
     f.area(*ELEV_DOOR, "E", hall_room)
@@ -243,6 +258,7 @@ def floor1():
     f.put(36, 26, 36, 26, "C")                           # coffee machine
     f.put(37, 26, 38, 26, "J")                           # kitchenette counter
     f.put(39, 26, 39, 26, "O")                           # fruit bowl (free fruit)
+    f.put(41, 26, 41, 26, "Y")                           # hand sanitizer by the food
     f.area(32, 25, 34, 25, "D", "K")
 
     f.box(44, 26, 49, 32, ":", "W")
@@ -268,8 +284,23 @@ def floor1():
             f.area(door_x, y, door_x, y, "k", key)
     f.put(49, 27, 49, 28, "V")                           # sinks
     f.put(51, 27, 51, 28, "V")
+    f.put(49, 30, 49, 30, "Y")                           # hand sanitizer
+    f.put(51, 30, 51, 30, "Y")
     for x, y in [(20, 14), (44, 20), (40, 26), (24, 26), (3, 26), (22, 32), (3, 22), (56, 22), (18, 3), (3, 3)]:
         f.put(x, y, x, y, "P")                           # potted plants
+    return f
+
+
+def stairwell():
+    f = Floor(STAIRWELL_FLOOR, "~")
+    f.box(31, 4, 37, 15, ".", "P")
+    f.room("P", 1, "Półpiętro", "stairs")
+    f.area(*MID_FLIGHT_A, "s")
+    f.area(*MID_FLIGHT_B, "s")
+    f.area(34, 7, 34, 15, "#", "-")          # wall between the flights
+    f.area(31, 15, 33, 15, "S")              # down to the ground floor
+    f.area(35, 15, 37, 15, "S")              # on to floor 1
+    f.put(31, 4, 31, 4, "P")                 # a plant on the landing
     return f
 
 
@@ -277,9 +308,14 @@ def links():
     ex0, ey0, ex1, ey1 = ELEV
     sx0, sy0, sx1, sy1 = STAIRS_FLIGHT
     elevator = {"kind": "elevator", "id": "main", "area": [ex0, ey0, ex1 - ex0 + 1, ey1 - ey0 + 1]}
+    flight = [sx0, sy0, sx1 - sx0 + 1, sy1 - sy0 + 1]
     return {
-        0: [elevator, {"kind": "stairs", "area": [sx0, sy0, sx1 - sx0 + 1, sy1 - sy0 + 1], "to_floor": 1, "to": list(STAIRS_ARRIVAL)}],
-        1: [elevator, {"kind": "stairs", "area": [sx0, sy0, sx1 - sx0 + 1, sy1 - sy0 + 1], "to_floor": 0, "to": list(STAIRS_ARRIVAL)}],
+        0: [elevator, {"kind": "stairs", "area": flight, "to_floor": STAIRWELL_FLOOR, "to": list(MID_ARRIVAL_A)}],
+        1: [elevator, {"kind": "stairs", "area": flight, "to_floor": STAIRWELL_FLOOR, "to": list(MID_ARRIVAL_B)}],
+        STAIRWELL_FLOOR: [
+            {"kind": "stairs", "area": [31, 15, 3, 1], "to_floor": 0, "to": list(STAIRS_ARRIVAL)},
+            {"kind": "stairs", "area": [35, 15, 3, 1], "to_floor": 1, "to": list(STAIRS_ARRIVAL)},
+        ],
     }
 
 
@@ -314,7 +350,7 @@ def check(f):
 
 
 def main():
-    floors = [floor0(), floor1()]
+    floors = [floor0(), floor1(), stairwell()]
     for f in floors:
         check(f)
     lk = links()
@@ -335,6 +371,7 @@ def main():
             {"floor": 0, "file": "floor0.json", "name": "Parter"},
             {"floor": 1, "file": "floor1.json", "name": "Piętro 1"},
             {"floor": 2, "file": None, "name": "Piętro 2", "locked": True},
+            {"floor": 3, "file": "floor3.json", "name": "Klatka schodowa (półpiętro)", "stairwell": True},
         ],
     }
     with open(os.path.join(OUT, "building.json"), "w", encoding="utf-8") as fh:

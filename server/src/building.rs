@@ -198,10 +198,11 @@ mod tests {
     #[test]
     fn loads_two_active_floors_and_locked_third() {
         let b = b();
-        assert_eq!(b.floors.len(), 3);
+        assert_eq!(b.floors.len(), 4);
         assert!(b.floor(0).is_some() && b.floor(1).is_some());
         assert!(b.floor(2).is_none() && b.floors[2].locked);
         assert_eq!(b.floor_name(1), "Piętro 1");
+        assert!(b.floor(3).is_some(), "the stairwell between 0 and 1 is a map of its own");
     }
 
     #[test]
@@ -222,9 +223,16 @@ mod tests {
         assert!(b.find_path(spawn, (f, goal), 0).is_none(), "gates stop visitors without a pass");
         assert_eq!(path.first(), Some(&spawn));
         assert_eq!(path.last(), Some(&(1, goal)));
+        // Ground floor -> stairwell (landing) -> floor 1.
+        let floors: Vec<u8> = path.iter().map(|p| p.0).fold(Vec::new(), |mut v, f| {
+            if v.last() != Some(&f) {
+                v.push(f);
+            }
+            v
+        });
+        assert_eq!(floors, [0, 3, 1]);
         let i = path.iter().position(|p| p.0 == 1).unwrap();
-        let stairs = path[i - 1];
-        assert_eq!(b.floor(0).unwrap().tile_char(stairs.1.x, stairs.1.y), Some('S'));
+        assert_eq!(b.floor(3).unwrap().tile_char(path[i - 1].1.x, path[i - 1].1.y), Some('S'));
         assert_eq!(path[i].1, Tile { x: 34, y: 10 }, "arrival tile");
         for w in path.windows(2) {
             if w[0].0 == w[1].0 {

@@ -2,132 +2,132 @@
   "packets": [
     {
       "debug": "Connect { nonce: 3735928559, nick: \"Zażółć\", profile: Profile { gender: 0, age: 27, city: \"Łódź\", email: \"ola@poczta.pl\", appearance: Appearance { skin: 1, hair_style: 4, hair_color: 2, shirt: 9, pants: 3 } } }",
-      "hex": "54530b01efbeadde0a5a61c5bcc3b3c582c487001b01040209030700c581c3b364c5ba0d006f6c6140706f637a74612e706c",
+      "hex": "54530e01efbeadde0a5a61c5bcc3b3c582c487001b01040209030700c581c3b364c5ba0d006f6c6140706f637a74612e706c",
       "name": "connect"
     },
     {
       "debug": "Welcome { nonce: 3735928559, player_id: 7, token: 16909060, tick_hz: 20, input_hz: 60, map_crc: 3405691582, server_tick: 1234 }",
-      "hex": "54530b02efbeadde070004030201143cbebafecad2040000",
+      "hex": "54530e02efbeadde070004030201143cbebafecad2040000",
       "name": "welcome"
     },
     {
       "debug": "Reject { reason: 1 }",
-      "hex": "54530b0301",
+      "hex": "54530e0301",
       "name": "reject"
     },
     {
       "debug": "Input { token: 16909060, ack_tick: 1200, last_seq: 99, inputs: [0, 1, 9, 6] }",
-      "hex": "54530b0404030201b0040000630000000400010906",
+      "hex": "54530e0404030201b0040000630000000400010906",
       "name": "input"
     },
     {
       "debug": "Snapshot { tick: 1234, last_input_seq: 99, frag_idx: 0, frag_cnt: 1, self_x: 10000, self_y: -5, floor: 1, room: 6, self_lock: 2, self_prev_input: 17, self_access: 5, self_slow: 1, self_activity: 3, entities: [EntityState { id: 3, kind: 0, x: 4096, y: 8192, flags: 5, held: 3, activity: 1 }, EntityState { id: 65535, kind: 1, x: -1, y: 2000000, flags: 64, held: 0, activity: 0 }] }",
-      "hex": "54530b05d204000063000000000110270000fbffffff0106000211050103020300000010000000200000050301ffff01ffffffff80841e00400000",
+      "hex": "54530e05d204000063000000000110270000fbffffff0106000211050103020300000010000000200000050301ffff01ffffffff80841e00400000",
       "name": "snapshot"
     },
     {
       "debug": "PlayerInfo { players: [PlayerInfoEntry { id: 3, nick: \"Ala\", department: 1, gender: 0, appearance: Appearance { skin: 2, hair_style: 1, hair_color: 3, shirt: 4, pants: 0 } }, PlayerInfoEntry { id: 4, nick: \"bot_07\", department: 0, gender: 1, appearance: Appearance { skin: 0, hair_style: 0, hair_color: 0, shirt: 0, pants: 0 } }] }",
-      "hex": "54530b0602030003416c6101000201030400040006626f745f303700010000000000",
+      "hex": "54530e0602030003416c6101000201030400040006626f745f303700010000000000",
       "name": "player_info"
     },
     {
       "debug": "InfoRequest { token: 16909060, ids: [3, 4, 500] }",
-      "hex": "54530b07040302010303000400f401",
+      "hex": "54530e07040302010303000400f401",
       "name": "info_request"
     },
     {
       "debug": "Ping { token: 16909060, client_time: 777000 }",
-      "hex": "54530b080403020128db0b00",
+      "hex": "54530e080403020128db0b00",
       "name": "ping"
     },
     {
       "debug": "Pong { client_time: 777000, server_tick: 1234 }",
-      "hex": "54530b0928db0b00d2040000",
+      "hex": "54530e0928db0b00d2040000",
       "name": "pong"
     },
     {
       "debug": "Disconnect { token: 16909060, reason: 1 }",
-      "hex": "54530b0a0403020101",
+      "hex": "54530e0a0403020101",
       "name": "disconnect"
     },
     {
       "debug": "Say { id: 61440, text: \"Dzień dobry! Proszę za mną.\" }",
-      "hex": "54530b0b00f01e00447a6965c58420646f627279212050726f737ac499207a61206d6ec4852e",
+      "hex": "54530e0b00f01e00447a6965c58420646f627279212050726f737ac499207a61206d6ec4852e",
       "name": "say"
     },
     {
       "debug": "JobOffers { offers: [OfferInfo { id: 1, department: 1, applied: true, company: \"Startup Sim sp. z o.o.\", title: \"Programista/ka\", description: \"Owocowe czwartki.\" }, OfferInfo { id: 12, department: 0, applied: false, company: \"Pizzeria u Stefana\", title: \"Dostawca/Dostawczyni\", description: \"Własny rower.\" }] }",
-      "hex": "54530b0c020101011600537461727475702053696d2073702e207a206f2e6f2e0e0050726f6772616d697374612f6b6111004f776f636f776520637a776172746b692e0c0000120050697a7a6572696120752053746566616e611400446f7374617763612f446f73746177637a796e690e0057c58261736e7920726f7765722e",
+      "hex": "54530e0c020101011600537461727475702053696d2073702e207a206f2e6f2e0e0050726f6772616d697374612f6b6111004f776f636f776520637a776172746b692e0c0000120050697a7a6572696120752053746566616e611400446f7374617763612f446f73746177637a796e690e0057c58261736e7920726f7765722e",
       "name": "job_offers"
     },
     {
       "debug": "Apply { token: 16909060, offer: 2, motivation: \"Lubię kawę i wyzwania.\" }",
-      "hex": "54530b0d040302010218004c756269c499206b6177c49920692077797a77616e69612e",
+      "hex": "54530e0d040302010218004c756269c499206b6177c49920692077797a77616e69612e",
       "name": "apply"
     },
     {
       "debug": "Question { attempt: 3, index: 1, total: 3, text: \"Co oznacza kod HTTP 404?\", options: [\"Nie znaleziono zasobu\", \"Skończyła się kawa\", \"Wszystko w porządku\"] }",
-      "hex": "54530b0e0301031800436f206f7a6e61637a61206b6f642048545450203430343f0315004e6965207a6e616c657a696f6e6f207a61736f62751500536b6fc584637a79c58261207369c499206b617761140057737a7973746b6f207720706f727ac485646b75",
+      "hex": "54530e0e0301031800436f206f7a6e61637a61206b6f642048545450203430343f0315004e6965207a6e616c657a696f6e6f207a61736f62751500536b6fc584637a79c58261207369c499206b617761140057737a7973746b6f207720706f727ac485646b75",
       "name": "question"
     },
     {
       "debug": "Answer { token: 16909060, attempt: 3, index: 1, choice: 2 }",
-      "hex": "54530b0f04030201030102",
+      "hex": "54530e0f04030201030102",
       "name": "answer"
     },
     {
       "debug": "RecruitResult { attempt: 3, passed: true, score: 2, total: 3, department: 1 }",
-      "hex": "54530b100301020301",
+      "hex": "54530e100301020301",
       "name": "recruit_result"
     },
     {
       "debug": "Mail { id: 2, from: \"Startup Sim — Rekrutacja\", subject: \"Zaproszenie na rozmowę\", body: \"Cześć Ola! Zapraszamy na rozmowę online.\", action: 1, arg: 1 }",
-      "hex": "54530b11021a00537461727475702053696d20e280942052656b72757461636a6117005a6170726f737a656e6965206e6120726f7a6d6f77c4992b00437a65c59bc487204f6c6121205a61707261737a616d79206e6120726f7a6d6f77c499206f6e6c696e652e0101",
+      "hex": "54530e11021a00537461727475702053696d20e280942052656b72757461636a6117005a6170726f737a656e6965206e6120726f7a6d6f77c4992b00437a65c59bc487204f6c6121205a61707261737a616d79206e6120726f7a6d6f77c499206f6e6c696e652e0101",
       "name": "mail"
     },
     {
       "debug": "PortalAction { token: 16909060, action: 2, arg: 0 }",
-      "hex": "54530b12040302010200",
+      "hex": "54530e12040302010200",
       "name": "portal_action"
     },
     {
       "debug": "Inventory { slots: [SlotInfo { kind: 3, id: 77, label: \"Laptop: Ola\" }, SlotInfo { kind: 2, id: 76, label: \"Ola · IT / Produkt\" }, SlotInfo { kind: 0, id: 0, label: \"\" }, SlotInfo { kind: 0, id: 0, label: \"\" }] }",
-      "hex": "54530b1304034d0000000b004c6170746f703a204f6c61024c00000013004f6c6120c2b7204954202f2050726f64756b740000000000000000000000000000",
+      "hex": "54530e1304034d0000000b004c6170746f703a204f6c61024c00000013004f6c6120c2b7204954202f2050726f64756b740000000000000000000000000000",
       "name": "inventory"
     },
     {
       "debug": "ItemAction { token: 16909060, action: 1, slot: 2 }",
-      "hex": "54530b14040302010102",
+      "hex": "54530e14040302010102",
       "name": "item_action"
     },
     {
       "debug": "Computer { handle: 57345, owner: 3, locked: false, convs: [ConvEntry { conv: 1, unread: 0, title: \"#ogólny\" }, ConvEntry { conv: 17, unread: 2, title: \"#it-produkt\" }, ConvEntry { conv: 32772, unread: 1, title: \"Kuba\" }] }",
-      "hex": "54530b1501e0030000030100000800236f67c3b36c6e791100020b002369742d70726f64756b7404800104004b756261",
+      "hex": "54530e1501e0030000030100000800236f67c3b36c6e791100020b002369742d70726f64756b7404800104004b756261",
       "name": "computer"
     },
     {
       "debug": "ComputerAction { token: 16909060, action: 6, conv: 17, arg: 42, text: \"Kto zjadł mój jogurt?\" }",
-      "hex": "54530b16040302010611002a00000017004b746f207a6a6164c582206dc3b36a206a6f677572743f",
+      "hex": "54530e16040302010611002a00000017004b746f207a6a6164c582206dc3b36a206a6f677572743f",
       "name": "computer_action"
     },
     {
-      "debug": "Stats { hunger: 35, energy: 80, stress: 12, bladder: 64 }",
-      "hex": "54530b1823500c40",
+      "debug": "Stats { hunger: 35, energy: 80, stress: 12, bladder: 64, hygiene: 22, flags: 1 }",
+      "hex": "54530e1823500c401601",
       "name": "stats"
     },
     {
-      "debug": "Doors { floor: 1, tiles: [(46, 27), (54, 31)] }",
-      "hex": "54530b1901022e1b361f",
+      "debug": "Doors { floor: 1, tiles: [(46, 27), (54, 31)], lift_floor: 0, lift_target: 1, lift_moving: true }",
+      "hex": "54530e1901022e1b361f000101",
       "name": "doors"
     },
     {
       "debug": "DoorAction { token: 16909060 }",
-      "hex": "54530b1a04030201",
+      "hex": "54530e1a04030201",
       "name": "door_action"
     },
     {
       "debug": "Chat { conv: 17, messages: [ChatEntry { id: 5, from: 3, nick: \"Ola\", text: \"Deploy w piątek?\" }, ChatEntry { id: 6, from: 4, nick: \"Kuba\", text: \"Nigdy w życiu.\" }] }",
-      "hex": "54530b1711000205000000030003004f6c6111004465706c6f792077207069c48574656b3f06000000040004004b7562610f004e69676479207720c5bc796369752e",
+      "hex": "54530e1711000205000000030003004f6c6111004465706c6f792077207069c48574656b3f06000000040004004b7562610f004e69676479207720c5bc796369752e",
       "name": "chat"
     }
   ]

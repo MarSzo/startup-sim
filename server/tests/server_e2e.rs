@@ -900,7 +900,7 @@ fn toilet_stall_hides_who_is_inside_and_locks() {
     while ola.recv().is_some() {}
     door_action(&ola);
     assert!(wait_for(&ola, &[&kuba], wait, said(sl::LOCKED)).is_some());
-    assert_eq!(locked_doors(&kuba, &ola), Some(vec![(46, 27)]));
+    assert!(locked_doors(&kuba, &ola).is_some_and(|t| t.contains(&(46, 27))));
     kuba.send_inputs(sim::IN_LEFT, 6);
     std::thread::sleep(Duration::from_millis(60));
     kuba.send_inputs(sim::IN_LEFT, 6);
@@ -913,8 +913,91 @@ fn toilet_stall_hides_who_is_inside_and_locks() {
     // Ola leaves the game while locked in: the stall opens by itself.
     ola.sock.send(&Packet::Disconnect { token: ola.token, reason: proto::disconnect::CLIENT_QUIT }.encode()).unwrap();
     let opened = wait_for(&kuba, &[], wait, |p| match p {
-        Packet::Doors { tiles, .. } if tiles.is_empty() => Some(()),
+        Packet::Doors { tiles, .. } if !tiles.contains(&(46, 27)) => Some(()),
         _ => None,
     });
     assert!(opened.is_some(), "unlocked when the person inside left");
+}
+
+#[test]
+fn elevator_is_called_waited_for_and_ridden() {
+    use game::elevator::lines as el;
+    let (addr, _) = start_server_cfg(0, true, true);
+    let b = building();
+    let (mut ola, _) = Client::connect(addr, "Ola"); // IT, floor 1
+    let wait = Duration::from_millis(800);
+    let said = |pred: fn(&str) -> bool| move |p: &Packet| matches!(p, Packet::Say { text, .. } if pred(text)).then_some(());
+    let ws = game::computer::find_workstations(&b);
+    let w = ws.iter().find(|w| w.room_name == "IT / Produkt").unwrap();
+    let start = Body { access: access::CARD, ..Body::at(w.floor, Pos::tile_center(w.tile.x, w.tile.y + 1)) };
+
+    // In front of the elevator on floor 1: the car is downstairs, doors shut.
+    let body = ola.walk_to(&b, start, (1, Tile { x: 26, y: 14 }), &[]);
+    let doors = |c: &Client| wait_for(c, &[], wait, |p| if let Packet::Doors { tiles, lift_floor, lift_target, .. } = p { Some((tiles.clone(), *lift_floor, *lift_target)) } else { None });
+    let (tiles, lift, _) = doors(&ola).unwrap();
+    assert!(tiles.contains(&(26, 13)) && lift == 0);
+    let body = ola.press_e(&b, body);
+    assert!(wait_for(&ola, &[], wait, said(|t| t == el::CALLED)).is_some());
+    // Walking into the closed doors doesn't work.
+    while ola.recv().is_some() {}
+    ola.send_inputs(sim::IN_UP, 6);
+    let (_, _, (_, y), _, _) = ola.latest_snapshot(Duration::from_millis(200)).unwrap();
+    assert!(y >= 14 * sim::TILE_UNITS, "doors closed while the car is away");
+    // ~3 s later it arrives and opens.
+    let opened = wait_for(&ola, &[], Duration::from_millis(4000), |p| match p {
+        Packet::Doors { tiles, lift_floor: 1, .. } if !tiles.contains(&(26, 13)) => Some(()),
+        _ => None,
+    });
+    assert!(opened.is_some(), "the car came up and opened");
+    // Step in, choose the floor (the other one: ground floor), ride.
+    let body = Body { pos: Pos { x: body.pos.x, y: 14 * sim::TILE_UNITS + sim::HALF_H }, ..body };
+    let body = ola.walk_to(&b, body, (1, Tile { x: 26, y: 12 }), &[]);
+    ola.press_e(&b, body);
+    assert!(wait_for(&ola, &[], wait, said(|t| t.starts_with("Jedziemy na: Parter"))).is_some());
+    let arrived = wait_for(&ola, &[], Duration::from_millis(5000), |p| match p {
+        Packet::Snapshot { floor: 0, self_x, self_y, .. } => Some((*self_x, *self_y)),
+        _ => None,
+    });
+    let (x, y) = arrived.expect("arrived at the ground floor");
+    assert_eq!(Pos { x, y }.tile(), (26, 12), "same spot in the cabin, other floor");
+}
+
+#[test]
+fn toilet_dirty_hands_witness_and_washing() {
+    use game::needs::lines as nl;
+    let (addr, _) = start_server_cfg(0, true, true);
+    let b = building();
+    let (mut ola, _) = Client::connect(addr, "Ola"); // IT
+    let (mut kuba, _) = Client::connect(addr, "Kuba"); // Biznes
+    let wait = Duration::from_millis(800);
+    let seat = |dept: &str| {
+        let ws = game::computer::find_workstations(&b);
+        let w = ws.iter().find(|w| w.room_name == dept).unwrap();
+        Body { access: access::CARD, ..Body::at(w.floor, Pos::tile_center(w.tile.x, w.tile.y + 1)) }
+    };
+    let said = |line: String| move |p: &Packet| matches!(p, Packet::Say { text, .. } if *text == line).then_some(());
+    let dirty = |c: &Client, keep: &Client, want: bool| {
+        wait_for(c, &[keep], Duration::from_millis(1500), |p| match p {
+            Packet::Stats { flags, .. } if (flags & proto::STATS_DIRTY_HANDS != 0) == want => Some(()),
+            _ => None,
+        })
+        .is_some()
+    };
+
+    // Kuba waits in the women's bathroom by the stalls; Ola uses a toilet.
+    let k = kuba.walk_to(&b, seat("Biznes"), (1, Tile { x: 47, y: 29 }), &[&ola]);
+    let o = ola.walk_to(&b, seat("IT / Produkt"), (1, Tile { x: 45, y: 27 }), &[&kuba]);
+    let o = ola.press_e(&b, o);
+    assert!(dirty(&ola, &kuba, true), "toilet -> dirty hands");
+    // Out of the bathroom without washing: Kuba notices.
+    while ola.recv().is_some() {}
+    let o = ola.walk_to(&b, o, (1, Tile { x: 46, y: 23 }), &[&kuba]);
+    assert!(wait_for(&ola, &[&kuba], wait, said("Ej, Ola, a ręce?!".into())).is_some());
+    // Back to the sink: 5 s of washing, clean hands.
+    let o = ola.walk_to(&b, o, (1, Tile { x: 48, y: 27 }), &[&kuba]);
+    ola.press_e(&b, o);
+    assert!(wait_for(&ola, &[&kuba], wait, said(nl::WASHING.into())).is_some());
+    assert!(wait_for(&ola, &[&kuba], Duration::from_millis(6000), said(nl::WASHED.into())).is_some());
+    assert!(dirty(&ola, &kuba, false), "washed");
+    let _ = k;
 }

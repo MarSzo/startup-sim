@@ -4,10 +4,12 @@
 extends Control
 
 ## [label, true if high = bad]
-const ROWS := [["Głód", true], ["Energia", false], ["Stres", true], ["Toaleta", true]]
+const ROWS := [["Głód", true], ["Energia", false], ["Stres", true], ["Toaleta", true], ["Higiena", false]]
 const CRITICAL := 80
 
-var values := [0, 100, 0, 0]
+var values := [0, 100, 0, 0, 100]
+var dirty_hands := false
+var _dirty := Label.new()
 var have := false
 var _panel := PanelContainer.new()
 var _bars: Array[Control] = []
@@ -48,6 +50,16 @@ func _ready() -> void:
 		n.add_theme_color_override("font_color", Color(1, 1, 1, 0.7))
 		grid.add_child(n)
 		_nums.append(n)
+	_dirty.text = "Brudne ręce — umyj je (umywalka / płyn)"
+	_dirty.add_theme_font_size_override("font_size", 12)
+	_dirty.add_theme_color_override("font_color", Color("#ffb347"))
+	_dirty.visible = false
+	grid.get_parent().remove_child(grid)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 6)
+	_panel.add_child(col)
+	col.add_child(grid)
+	col.add_child(_dirty)
 	visible = false
 	_panel.resized.connect(_place)
 	get_viewport().size_changed.connect(_place)
@@ -62,7 +74,11 @@ func _place() -> void:
 
 
 func update_stats(p: Dictionary) -> void:
-	values = [p.hunger, p.energy, p.stress, p.bladder]
+	values = [p.hunger, p.energy, p.stress, p.bladder, p.hygiene]
+	dirty_hands = (p.stats_flags & 1) != 0
+	if _dirty.visible != dirty_hands:
+		_dirty.visible = dirty_hands
+		_panel.reset_size()  # shrink back when the line hides
 	have = true
 	visible = true
 	for i in values.size():

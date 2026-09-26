@@ -19,6 +19,8 @@ const ComputerView = preload("res://game/computer_view.gd")
 const ComputerScreen = preload("res://ui/computer_screen.gd")
 const StatsHud = preload("res://ui/stats_hud.gd")
 const StallDoorView = preload("res://game/stall_door_view.gd")
+const ElevatorDoorView = preload("res://game/elevator_door_view.gd")
+const RideMask = preload("res://game/ride_mask.gd")
 
 const ZOOM := 3.0
 ## Remote players are rendered this far in the past (2 snapshots at 20 Hz).
@@ -60,6 +62,11 @@ var screen := ComputerScreen.new()
 var screen_layer := CanvasLayer.new()
 var stats_hud := StatsHud.new()
 var stall_doors := {}    # floor -> Array of StallDoorView
+var elevator_doors := {} # floor -> Array of ElevatorDoorView
+var lift_floor := 0      # elevator: where the car is (from Doors)
+var lift_target := 255   # ...and where it is heading (Protocol.NO_FLOOR = standing)
+var lift_moving := false
+var ride_mask := RideMask.new()
 var depts := {}          # id -> department (after the contract)
 var appearances := {}    # id -> appearance dict (from PlayerInfo)
 var own_appearance := {}
@@ -120,18 +127,33 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 		if m == null:
 			continue
 		var view := MapView.new()
-		view.build(m, ZOOM)
+		var names := {}
+		for g in building.floors.size():
+			names[g] = building.floor_name(g)
+		view.build(m, ZOOM, names)
 		view.visible = false
 		add_child(view)
 		views[f] = view
 	world.y_sort_enabled = true
+	add_child(ride_mask)  # between the map and the people
 	add_child(world)
 	for f in views:
 		var m = building.get_floor(f)
 		stall_doors[f] = []
+		elevator_doors[f] = []
 		for y in m.height:
 			for x in m.width:
-				if m.legend.get(m.tile_chars[y * m.width + x], {}).get("type") == "stall_door":
+				var ttype = m.legend.get(m.tile_chars[y * m.width + x], {}).get("type")
+				if ttype == "elevator_door":
+					var ev := ElevatorDoorView.new()
+					ev.tile = Vector2i(x, y)
+					ev.position = Movement.to_px(Movement.tile_center(x, y))
+					var is_door := func(dx: int) -> bool: return m.legend.get(m.tile_chars[y * m.width + x + dx], {}).get("type") == "elevator_door"
+					ev.display = is_door.call(-1) and is_door.call(1)  # the middle one
+					ev.visible = false
+					world.add_child(ev)
+					elevator_doors[f].append(ev)
+				if ttype == "stall_door":
 					var dv := StallDoorView.new()
 					dv.tile = Vector2i(x, y)
 					dv.position = Movement.to_px(Movement.tile_center(x, y))
@@ -202,6 +224,9 @@ func _show_floor(f: int) -> void:
 	for k in stall_doors:
 		for dv in stall_doors[k]:
 			dv.visible = (k == f)
+	for k in elevator_doors:
+		for ev in elevator_doors[k]:
+			ev.visible = (k == f)
 
 
 ## Session lost; the net client is getting a new one. Freeze local simulation.
@@ -360,7 +385,8 @@ func _plan_path(leg: String) -> Array[Vector2i]:
 	for y in map.height:
 		for x in map.width:
 			# Tiles we can't enter (walls, gates without a pass) are solid.
-			if map.is_blocked(x, y) or map.blocks(x, y, pred.access, MapData.DIR_UP):
+			# Closed doors (elevator, stall) count as passable: walk up and wait.
+			if map.is_blocked(x, y) or (map.blocks(x, y, pred.access, MapData.DIR_UP) and not map.is_closed(x, y)):
 				astar.set_point_solid(Vector2i(x, y))
 			elif goal.x < 0 and map.room_name(map.room_at_tile(x, y)) == leg:
 				goal = Vector2i(x + 2, y + 2)  # a bit inside the room
@@ -414,6 +440,7 @@ func _process(delta: float) -> void:
 			floor_items.erase(id)
 	if have_state:
 		_update_stall_doors()
+		_update_ride()
 	for id in computers.keys():
 		if latest_tick - computers[id].last_seen_tick > REMOTE_TIMEOUT_TICKS:
 			computers[id].queue_free()
@@ -448,8 +475,12 @@ func _on_packet(p: Dictionary) -> void:
 			var dm = building.get_floor(p.floor)
 			if dm:
 				dm.set_closed_tiles(p.tiles)
+			lift_floor = p.lift_floor
+			lift_target = p.lift_target
+			lift_moving = p.lift_moving
 		Protocol.T_STATS:
 			stats_hud.update_stats(p)
+			me.set_smelly(p.hygiene < 25)
 		Protocol.T_COMPUTER:
 			screen.on_computer(p)
 		Protocol.T_CHAT:
@@ -559,6 +590,7 @@ func _on_snapshot(p: Dictionary) -> void:
 				_pending_say.erase(e.id)
 		r.push_sample(tick, Vector2(e.x, e.y) / float(Movement.SUBPIXELS), e.flags)
 		r.set_status(e.activity, (e.flags & Protocol.FLAG_SLOW) != 0)
+		r.set_smelly((e.flags & Protocol.FLAG_SMELLY) != 0)
 		r.set_held(e.held)
 		kinds[e.id] = e.kind
 		if not nicks.has(e.id) and now - info_requested.get(e.id, -100000) > 500:
@@ -649,9 +681,15 @@ func _update_hint() -> void:
 	var t := Movement.tile_of_pos(pred.pos)
 	var link: Dictionary = map.link_at(t.x, t.y) if map else {}
 	if not link.is_empty() and link.kind == "elevator":
+		# In the cabin: the car stands here -> choose the floor; else riding.
+		var standing: bool = not lift_moving and lift_floor == pred.floor
 		var target: int = building.next_elevator_floor(pred.floor, link.id)
-		if target >= 0:
-			text = "[E] Winda: jedź na %s" % building.floor_name(target)
+		if standing and target >= 0:
+			text = "[E] Jedź na: %s" % building.floor_name(target)
+		else:
+			text = "Jedziemy…"
+	elif map:
+		text = _elevator_call_hint(map)
 	if text == "":
 		# Same choice as the server: NPCs standing at their post first, then nearest.
 		var me_px := Movement.to_px(pred.pos)
@@ -712,6 +750,30 @@ func _update_hint() -> void:
 	hint_label.visible = text != ""
 
 
+## Riding the elevator: only the cabin is visible, and it shakes a little.
+func _update_ride() -> void:
+	var m = building.get_floor(pred.floor)
+	var t := Movement.tile_of_pos(pred.pos)
+	var link: Dictionary = m.link_at(t.x, t.y) if m else {}
+	var riding: bool = lift_moving and not link.is_empty() and link.kind == "elevator"
+	if riding:
+		var r: Rect2i = link.rect
+		ride_mask.show_cabin(Rect2(Vector2(r.position) * m.tile_px, Vector2(r.size) * m.tile_px).grow(2))
+		camera.offset = Vector2(randf_range(-0.35, 0.35), randf_range(-0.35, 0.35))
+		_set_door_views_visible(false)  # nothing of the floor outside the car
+	elif ride_mask.visible:
+		ride_mask.visible = false
+		camera.offset = Vector2.ZERO
+		_set_door_views_visible(true)
+
+
+func _set_door_views_visible(on: bool) -> void:
+	for dv in stall_doors.get(pred.floor, []):
+		dv.visible = on
+	for ev in elevator_doors.get(pred.floor, []):
+		ev.visible = on
+
+
 ## Doors open while somebody stands in them (and aren't locked).
 func _update_stall_doors() -> void:
 	var m = building.get_floor(pred.floor)
@@ -725,6 +787,8 @@ func _update_stall_doors() -> void:
 				busy = true
 				break
 		dv.set_state(m.is_closed(dv.tile.x, dv.tile.y), busy)
+	for ev in elevator_doors.get(pred.floor, []):
+		ev.set_state(m.is_closed(ev.tile.x, ev.tile.y), lift_floor, lift_target)
 
 
 ## In a stall: lock / unlock (L). Outside next to a locked stall: "Zajęte".
@@ -744,12 +808,25 @@ func _stall_hint(map, t: Vector2i, text: String) -> String:
 	return text
 
 
-const SPOT_HINTS := {"sofa": "[E] Usiądź na sofie", "toilet": "[E] Skorzystaj z toalety", "ashtray": "[E] Zapal", "fruit_bowl": "[E] Weź owoc"}
+const SPOT_HINTS := {"sofa": "[E] Usiądź na sofie", "toilet": "[E] Skorzystaj z toalety", "ashtray": "[E] Zapal", "fruit_bowl": "[E] Weź owoc", "sink": "[E] Umyj ręce", "sanitizer": "[E] Zdezynfekuj ręce"}
+
+
+## Next to the elevator doors (outside the cabin): call it / wait / step in.
+func _elevator_call_hint(map) -> String:
+	var me_px := Movement.to_px(pred.pos)
+	for ev in elevator_doors.get(pred.floor, []):
+		if ev.position.distance_to(me_px) <= 24.0:
+			if not map.is_closed(ev.tile.x, ev.tile.y):
+				return "Winda otwarta — wejdź"
+			if lift_target == pred.floor:
+				return "Winda jedzie… (%s)" % ElevatorDoorView.floor_label(lift_floor)
+			return "[E] Wezwij windę"
+	return ""
 
 
 ## Sofa / toilet / ashtray / fruit bowl within reach (1.5 tiles, as the server).
 func _spot_hint(map) -> String:
-	if me.status in [Protocol.ACT_SOFA, Protocol.ACT_TOILET, Protocol.ACT_SMOKING]:
+	if me.status in [Protocol.ACT_SOFA, Protocol.ACT_TOILET, Protocol.ACT_SMOKING, Protocol.ACT_WASHING]:
 		return "[E] Wstań" if me.status != Protocol.ACT_SMOKING else "[E] Zgaś papierosa"
 	var me_px := Movement.to_px(pred.pos)
 	var t := Movement.tile_of_pos(pred.pos)

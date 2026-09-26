@@ -339,6 +339,11 @@ impl Map {
         }
     }
 
+    /// All closed doors (x, y).
+    pub fn closed_tiles(&self) -> Vec<(i32, i32)> {
+        self.closed.iter().enumerate().filter(|(_, c)| **c).map(|(i, _)| (i as i32 % self.width, i as i32 / self.width)).collect()
+    }
+
     pub fn is_closed(&self, tx: i32, ty: i32) -> bool {
         self.idx(tx, ty).is_some_and(|i| self.closed[i])
     }

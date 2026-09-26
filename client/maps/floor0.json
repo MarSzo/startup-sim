@@ -141,11 +141,11 @@
   "Fv#==XXX======XXX==#####################::::::::#vvvvvvvvvvF",
   "Fv#==XXX======XXX==############.SSSSSS.#::::::::#vvvvvvvvvvF",
   "Fv#================############.SSSSSS.#::::::::#vvvvvvvvvvF",
-  "Fv#================#####eeeee##........#:RR:::::#vvvvvvvvvvF",
-  "Fv#================#####eeeee##........#:RR:::::#vvvvvvvvvvF",
-  "Fv#================#####eeeee##........#:RR:::::#vvvvvvvvvvF",
-  "Fv#==XXX======XXX==#####eeeee##........#:RR:::::#vvvvvvvvvvF",
-  "Fv#==XXX======XXX==#####eeeee##........#::::::::#vvvvvvvvvvF",
+  "Fv#================############........#:RR:::::#vvvvvvvvvvF",
+  "Fv#================############........#:RR:::::#vvvvvvvvvvF",
+  "Fv#================############........#:RR:::::#vvvvvvvvvvF",
+  "Fv#==XXX======XXX==######eee###........#:RR:::::#vvvvvvvvvvF",
+  "Fv#==XXX======XXX==######eee###........#::::::::#vvvvvvvvvvF",
   "Fv#================######EEE######DD#######LL#############vF",
   "Fv#================#P...................................P#vF",
   "Fv#================#.....................................#vF",
@@ -191,11 +191,11 @@
   "-O-KKKKKKKKKKKKKKKK---------------------YYYYYYYY-OOOOOOOOOO-",
   "-O-KKKKKKKKKKKKKKKK------------QQQQQQQQ-YYYYYYYY-OOOOOOOOOO-",
   "-O-KKKKKKKKKKKKKKKK------------QQQQQQQQ-YYYYYYYY-OOOOOOOOOO-",
-  "-O-KKKKKKKKKKKKKKKK-----LLLLL--QQQQQQQQ-YYYYYYYY-OOOOOOOOOO-",
-  "-O-KKKKKKKKKKKKKKKK-----LLLLL--QQQQQQQQ-YYYYYYYY-OOOOOOOOOO-",
-  "-O-KKKKKKKKKKKKKKKK-----LLLLL--QQQQQQQQ-YYYYYYYY-OOOOOOOOOO-",
-  "-O-KKKKKKKKKKKKKKKK-----LLLLL--QQQQQQQQ-YYYYYYYY-OOOOOOOOOO-",
-  "-O-KKKKKKKKKKKKKKKK-----LLLLL--QQQQQQQQ-YYYYYYYY-OOOOOOOOOO-",
+  "-O-KKKKKKKKKKKKKKKK------------QQQQQQQQ-YYYYYYYY-OOOOOOOOOO-",
+  "-O-KKKKKKKKKKKKKKKK------------QQQQQQQQ-YYYYYYYY-OOOOOOOOOO-",
+  "-O-KKKKKKKKKKKKKKKK------------QQQQQQQQ-YYYYYYYY-OOOOOOOOOO-",
+  "-O-KKKKKKKKKKKKKKKK------LLL---QQQQQQQQ-YYYYYYYY-OOOOOOOOOO-",
+  "-O-KKKKKKKKKKKKKKKK------LLL---QQQQQQQQ-YYYYYYYY-OOOOOOOOOO-",
   "-O-KKKKKKKKKKKKKKKK------HHH------HH-------HH-------------O-",
   "-O-KKKKKKKKKKKKKKKK-HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH-O-",
   "-O-KKKKKKKKKKKKKKKK-HHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHHH-O-",
@@ -300,10 +300,10 @@
    "kind": "elevator",
    "id": "main",
    "area": [
-    24,
-    8,
-    5,
-    5
+    25,
+    11,
+    3,
+    2
    ]
   },
   {
@@ -314,10 +314,10 @@
     6,
     2
    ],
-   "to_floor": 1,
+   "to_floor": 3,
    "to": [
-    34,
-    10
+    32,
+    13
    ]
   }
  ],

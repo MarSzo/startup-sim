@@ -75,7 +75,7 @@ fn movement_vectors() {
         cases.push(json!({ "start": body_json(&start), "inputs": inputs, "states": states }));
     }
 
-    // Scripted (with a guest pass): spawn -> gates -> stairs up -> chill room -> elevator.
+    // Scripted (with a guest pass): spawn -> gates -> stairs up -> chill room -> back down.
     let mut body = guest(Body::at(0, Pos::tile_center(33, 35)));
     let start = body;
     let (mut inputs, mut states) = (Vec::new(), Vec::new());
@@ -91,15 +91,15 @@ fn movement_vectors() {
         let i = w.next_input(&body);
         record(&mut body, i);
     }
-    let mut w = Walker::to(&b, &body, (1, Tile { x: 26, y: 10 })).unwrap();
+    // Back down the stairs (through the stairwell) to the lobby.
+    let lobby = b.find_room("Hol").unwrap().1.id;
+    let goal = b.floor(0).unwrap().room_tiles(lobby)[10];
+    let mut w = Walker::to(&b, &body, (0, goal)).unwrap();
     while !w.done() {
         let i = w.next_input(&body);
         record(&mut body, i);
     }
-    for input in [0, sim::IN_INTERACT, sim::IN_INTERACT, 0, sim::IN_INTERACT, 0] {
-        record(&mut body, input);
-    }
-    assert_eq!(body.floor, 1, "rode down and back up");
+    assert_eq!(body.floor, 0, "down through the stairwell");
     cases.push(json!({ "start": body_json(&start), "inputs": inputs, "states": states }));
 
     check("movement_vectors.json", json!({ "building_crc": b.crc, "cases": cases }), false);
