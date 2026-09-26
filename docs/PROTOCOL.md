@@ -1,4 +1,4 @@
-# Protokół sieciowy (wersja 14)
+# Protokół sieciowy (wersja 15)
 
 Własny binarny protokół na UDP. Implementacje:
 - serwer: `server/src/protocol.rs` (źródło prawdy),
@@ -23,7 +23,7 @@ przez `cargo test` i czytane przez `client/tests/run_tests.gd`.
 | pole    | typ | wartość |
 |---------|-----|---------|
 | magic   | u16 | `0x5354` (bajty `54 53`, „TS”) |
-| version | u8  | `14` |
+| version | u8  | `15` |
 | type    | u8  | typ pakietu (niżej) |
 
 ## Jednostki
@@ -278,8 +278,21 @@ widzą pokój mówiącego.
 
 Potrzeby postaci odbiorcy, co 0,5 s (tylko w budynku): `hunger u8`, `energy
 u8`, `stress u8`, `bladder u8`, `hygiene u8` (każda 0..100), `flags u8` (bit 0
-brudne ręce). Głód, stres i toaleta: 100 = źle; energia i higiena: 0 = źle.
-Liczy je tylko serwer.
+brudne ręce), `money u32` (portfel w groszach). Głód, stres i toaleta: 100 =
+źle; energia i higiena: 0 = źle. Liczy je tylko serwer.
+
+### 27 `Shelf` (S→C), 28 `ShopTake` (C→S)
+
+`Shelf` — odpowiedź na E przy półce sklepowej: shelf u8, title str16, n u8 (≤ 16),
+n × {`kind u8`, `price u32` (grosze), `name` str16}. `ShopTake`: token u32,
+shelf u8, kind u8 — weź jedną sztukę (serwer sprawdza zasięg półki); towar
+trafia do ekwipunku jako niezapłacony (etykieta w `Inventory` z dopiskiem i
+ceną). Płacenie: E przy NPC „Kasa” (odpowiedź jako `Say`). Wyjście ze sklepu
+z niezapłaconym towarem: `Say` z alarmem od kasy, towar znika.
+
+Rodzaje przedmiotów sklepowych (`held`, `Inventory.kind`): 10 kanapka z serem,
+11 z szynką, 12 wrap wege, 13 hamburger, 14 frytki, 15 drożdżówka, 16 batonik,
+17 chipsy, 18 woda, 19 energetyk, 20 sok, 21 piwo, 22 wino, 23 papierosy.
 
 ## Połączenie i timeouty
 
@@ -339,6 +352,7 @@ szyfrowaniem.
 
 ## Historia wersji
 
+- **15** — sklep: `Stats` + `money`, `Shelf`, `ShopTake`, przedmioty 10–23.
 - **14** — `Doors` + `lift_moving`; limit 6 osób w windzie; mniejsza kabina (3×2).
 - **13** — higiena: `Stats` + `hygiene`, `flags` (brudne ręce), flaga encji 7 = niska higiena, czynność 6 = mycie rąk.
 - **12** — winda poza symulacją (wzywanie, jazda, drzwi w `Doors`), `Doors` + `lift_floor`, `lift_target`; mapa klatki schodowej (piętro 3).

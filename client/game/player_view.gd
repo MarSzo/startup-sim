@@ -317,6 +317,9 @@ func _draw_status(top: float, ty: float, side: bool, dir: int) -> void:
 			ItemArt.FRUIT:
 				_r(mx, ty + 4, 3, 3, Color("#e74c3c"))
 				_r(mx + 1, ty + 3, 1, 1, Color("#27ae60"))
+			_:
+				# Shop goods: the item's icon, small, in the hand.
+				ItemArt.draw(self, held, Vector2(mx - 1, ty + 2), 0.3)
 	var ms := Time.get_ticks_msec()
 	match status:
 		ACT_BREWING, ACT_COMPUTER:

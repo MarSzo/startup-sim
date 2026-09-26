@@ -9,7 +9,9 @@ const CRITICAL := 80
 
 var values := [0, 100, 0, 0, 100]
 var dirty_hands := false
+var money := 0
 var _dirty := Label.new()
+var _money := Label.new()
 var have := false
 var _panel := PanelContainer.new()
 var _bars: Array[Control] = []
@@ -58,6 +60,9 @@ func _ready() -> void:
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 6)
 	_panel.add_child(col)
+	_money.add_theme_font_size_override("font_size", 14)
+	_money.add_theme_color_override("font_color", Color("#f7d774"))
+	col.add_child(_money)
 	col.add_child(grid)
 	col.add_child(_dirty)
 	visible = false
@@ -75,6 +80,8 @@ func _place() -> void:
 
 func update_stats(p: Dictionary) -> void:
 	values = [p.hunger, p.energy, p.stress, p.bladder, p.hygiene]
+	money = p.money
+	_money.text = "Portfel: %d,%02d zł" % [money / 100, money % 100]
 	dirty_hands = (p.stats_flags & 1) != 0
 	if _dirty.visible != dirty_hands:
 		_dirty.visible = dirty_hands

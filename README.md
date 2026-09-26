@@ -15,7 +15,7 @@ cd server && cargo run --release -- --start-with-card   # wariant dla botów: ws
 cd server && cargo run --release --bin bots -- --count 50 --room "Chill room" --all-in-room
 ```
 
-Sterowanie: WASD / strzałki, **E** — rozmowa z NPC / winda (przy drzwiach — wezwij, w kabinie — wybierz piętro) / umywalka / płyn antybakteryjny / ekspres do kawy / podniesienie przedmiotu / biurko (połóż laptop, usiądź do komputera; Esc — wstań) / misa z owocami / sofa / toaleta / popielniczka (E ponownie — wstań), **1–3** — wyjmij / schowaj przedmiot z kieszeni, **Q** — upuść, **G** — podaj osobie obok, **F** — użyj (wypij kawę, zjedz owoc, pokaż kartę), **L** — zamknij / otwórz kabinę toaletową (od środka), **F3** — overlay debug.
+Sterowanie: WASD / strzałki, **E** — rozmowa z NPC / winda (przy drzwiach — wezwij, w kabinie — wybierz piętro) / umywalka / płyn antybakteryjny / ekspres do kawy / podniesienie przedmiotu / biurko (połóż laptop, usiądź do komputera; Esc — wstań) / misa z owocami / sofa / toaleta / popielniczka (E ponownie — wstań), **1–3** — wyjmij / schowaj przedmiot z kieszeni, **Q** — upuść, **G** — podaj osobie obok, **F** — użyj (wypij kawę, zjedz / wypij coś ze sklepu, pokaż kartę); w sklepie na parterze **E** przy półce — lista towarów (1–9 weź), **E** przy kasie — zapłać, **L** — zamknij / otwórz kabinę toaletową (od środka), **F3** — overlay debug.
 Na starcie tworzysz postać (imię, płeć, wiek, miejscowość, e-mail postaci,
 wygląd z podglądem; zapamiętywana lokalnie). Po połączeniu siedzisz w domu przy komputerze: w **przeglądarce** jest portal z
 ogłoszeniami (kilka firm; zatrudnia tylko nasz startup), wypełniasz formularz,

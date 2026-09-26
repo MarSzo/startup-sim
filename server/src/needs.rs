@@ -326,6 +326,15 @@ impl Needs {
         pts(self.hygiene) < SMELLY
     }
 
+    /// Eating / drinking shop goods.
+    pub fn apply(&mut self, e: crate::shop::Effect) {
+        self.hunger += e.hunger * SCALE;
+        self.energy += e.energy * SCALE;
+        self.stress += e.stress * SCALE;
+        self.bladder += e.bladder * SCALE;
+        self.clamp();
+    }
+
     /// Embarrassment (e.g. the other bathroom).
     pub fn add_stress(&mut self, points: i32) {
         self.stress += points * SCALE;

@@ -1001,3 +1001,58 @@ fn toilet_dirty_hands_witness_and_washing() {
     assert!(dirty(&ola, &kuba, false), "washed");
     let _ = k;
 }
+
+#[test]
+fn shop_take_from_shelf_alarm_and_pay() {
+    use game::inventory::kind as item_kind;
+    use game::shop::lines as sl;
+    let (addr, _) = start_server_cfg(0, true, true); // hired: 200 zł advance
+    let b = building();
+    let (mut ola, _) = Client::connect(addr, "Ola");
+    let wait = Duration::from_millis(800);
+    let said = |pred: fn(&str) -> bool| move |p: &Packet| matches!(p, Packet::Say { text, .. } if pred(text)).then_some(());
+    let money = |c: &Client| wait_for(c, &[], Duration::from_millis(1200), |p| if let Packet::Stats { money, .. } = p { Some(*money) } else { None });
+    // (Resent every 2 s, so a missed one comes again.)
+    let inventory = |c: &Client| wait_for(c, &[], Duration::from_millis(2500), |p| if let Packet::Inventory { slots } = p { Some(slots.clone()) } else { None });
+    let take = |c: &Client, shelf: u8, kind: u8| c.sock.send(&Packet::ShopTake { token: c.token, shelf, kind }.encode()).unwrap();
+    let ws = game::computer::find_workstations(&b);
+    let w = ws.iter().find(|w| w.room_name == "IT / Produkt").unwrap();
+    let body = Body { access: access::CARD, ..Body::at(w.floor, Pos::tile_center(w.tile.x, w.tile.y + 1)) };
+    assert_eq!(money(&ola), Some(200_00));
+
+    // Downstairs to the sandwich shelf: E shows what's on it.
+    let body = ola.walk_to(&b, body, (0, Tile { x: 47, y: 25 }), &[]);
+    while ola.recv().is_some() {}
+    let body = ola.press_e(&b, body);
+    let goods = wait_for(&ola, &[], wait, |p| match p {
+        Packet::Shelf { shelf: 1, goods, .. } => Some(goods.iter().map(|g| g.kind).collect::<Vec<_>>()),
+        _ => None,
+    });
+    assert_eq!(goods, Some(vec![item_kind::SANDWICH_CHEESE, item_kind::SANDWICH_HAM, item_kind::WRAP]));
+    take(&ola, 1, item_kind::SANDWICH_HAM);
+    let slots = wait_for(&ola, &[], wait, |p| match p {
+        Packet::Inventory { slots } if slots.iter().any(|s| s.kind == item_kind::SANDWICH_HAM) => Some(slots.clone()),
+        _ => None,
+    })
+    .expect("sandwich in a pocket");
+    assert!(slots.iter().any(|s| s.label.contains("niezapłacone")));
+
+    // Walking out without paying: beep, the sandwich stays.
+    let out = ola.walk_to(&b, body, (0, Tile { x: 39, y: 29 }), &[]);
+    assert!(wait_for(&ola, &[], wait, said(|t| t == sl::ALARM)).is_some());
+    assert!(inventory(&ola).is_some_and(|s| s.iter().all(|s| s.kind != item_kind::SANDWICH_HAM)));
+
+    // Back in, take it again, pay at the till, eat it.
+    let body = ola.walk_to(&b, out, (0, Tile { x: 47, y: 25 }), &[]);
+    take(&ola, 1, item_kind::SANDWICH_HAM);
+    std::thread::sleep(Duration::from_millis(150));
+    let body = ola.walk_to(&b, body, (0, Tile { x: 53, y: 30 }), &[]);
+    while ola.recv().is_some() {}
+    let body = ola.press_e(&b, body);
+    assert!(wait_for(&ola, &[], wait, said(|t| t.starts_with("Razem 14,00 zł. Dziękuję!"))).is_some());
+    assert_eq!(money(&ola), Some(186_00));
+    let slots = inventory(&ola).unwrap();
+    let pocket = slots[1..].iter().position(|s| s.kind == item_kind::SANDWICH_HAM).expect("paid sandwich");
+    assert!(!slots[pocket + 1].label.contains("niezapłacone"));
+    let _ = body;
+}

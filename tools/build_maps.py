@@ -185,6 +185,7 @@ def floor0():
     for y in (24, 27):
         f.put(45, y, 54, y, "H")                         # shelves
     f.put(51, 31, 55, 31, "K")                           # checkout counter
+    f.put(56, 23, 56, 27, "H")                           # alcohol & cigarettes
     for x, y in [(27, 22), (40, 22), (27, 32), (40, 32), (20, 14), (56, 14), (42, 22)]:
         f.put(x, y, x, y, "P")                           # potted plants
 
@@ -203,7 +204,11 @@ def floor0():
 
     f.spawns = [[x, y] for y in (35, 36) for x in range(28, 39)]
     # Porter: sits in the lodge; escorts newcomers to the 1st floor reception.
-    f.npcs = [{"kind": "porter", "name": "Portier", "home": [24, 29], "escort_to": [1, 32, 18]}]
+    f.npcs = [
+        {"kind": "porter", "name": "Portier", "home": [24, 29], "escort_to": [1, 32, 18]},
+        # Behind the till; customers pay from the other side of the counter.
+        {"kind": "cashier", "name": "Kasa", "home": [53, 32]},
+    ]
     return f
 
 

@@ -50,6 +50,7 @@ func test_protocol(path: String) -> void:
 		"portal_action": Protocol.encode_portal_action(0x01020304, Protocol.PORTAL_GO_TO_OFFICE, 0),
 		"item_action": Protocol.encode_item_action(0x01020304, Protocol.ITEM_TAKE_OUT, 2),
 		"door_action": Protocol.encode_door_action(0x01020304),
+		"shop_take": Protocol.encode_shop_take(0x01020304, 1, 11),
 		"computer_action": Protocol.encode_computer_action(0x01020304, Protocol.PC_SEND, 17, 42, "Kto zjadł mój jogurt?"),
 		"answer": Protocol.encode_answer(0x01020304, 3, 1, 2),
 	}
@@ -77,7 +78,10 @@ func test_protocol(path: String) -> void:
 		and dr.lift_floor == 0 and dr.lift_target == 1 and dr.lift_moving, "decode doors %s" % dr)
 	var st := Protocol.decode(golden["stats"].hex_decode())
 	expect(st.get("type") == Protocol.T_STATS and st.hunger == 35 and st.energy == 80 and st.stress == 12 and st.bladder == 64
-		and st.hygiene == 22 and st.stats_flags == Protocol.STATS_DIRTY_HANDS, "decode stats %s" % st)
+		and st.hygiene == 22 and st.stats_flags == Protocol.STATS_DIRTY_HANDS and st.money == 18750, "decode stats %s" % st)
+	var sh := Protocol.decode(golden["shelf"].hex_decode())
+	expect(sh.get("type") == Protocol.T_SHELF and sh.shelf == 1 and sh.title == "Kanapki" and sh.goods.size() == 2
+		and sh.goods[1].name == "Kanapka z szynką" and sh.goods[1].price == 1400 and sh.goods[0].kind == 10, "decode shelf %s" % sh)
 	var pi := Protocol.decode(golden["player_info"].hex_decode())
 	expect(pi.get("players", []).size() == 2 and pi.players[0].nick == "Ala" and pi.players[0].department == 1
 		and pi.players[0].gender == 0 and pi.players[0].appearance.hair_style == 1 and pi.players[0].appearance.hair_color == 3

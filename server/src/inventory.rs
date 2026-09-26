@@ -15,12 +15,33 @@ pub mod kind {
     pub const LAPTOP: u8 = 3;
     pub const COFFEE: u8 = 4;
     pub const FRUIT: u8 = 5;
+    // Shop goods (see `shop::PRODUCTS`).
+    pub const SANDWICH_CHEESE: u8 = 10;
+    pub const SANDWICH_HAM: u8 = 11;
+    pub const WRAP: u8 = 12;
+    pub const BURGER: u8 = 13;
+    pub const FRIES: u8 = 14;
+    pub const BUN: u8 = 15;
+    pub const BAR: u8 = 16;
+    pub const CHIPS: u8 = 17;
+    pub const WATER: u8 = 18;
+    pub const ENERGY_DRINK: u8 = 19;
+    pub const JUICE: u8 = 20;
+    pub const BEER: u8 = 21;
+    pub const WINE: u8 = 22;
+    pub const CIGARETTES: u8 = 23;
 }
 
 pub const POCKETS: usize = 3;
 
 pub fn is_small(k: u8) -> bool {
-    matches!(k, kind::GUEST_PASS | kind::EMPLOYEE_CARD | kind::FRUIT)
+    match k {
+        kind::GUEST_PASS | kind::EMPLOYEE_CARD | kind::FRUIT => true,
+        // Shop goods fit in a pocket, except the bulky ones.
+        kind::BURGER | kind::FRIES | kind::WINE => false,
+        10..=23 => true,
+        _ => false,
+    }
 }
 
 pub fn display_name(k: u8) -> &'static str {
@@ -30,6 +51,7 @@ pub fn display_name(k: u8) -> &'static str {
         kind::LAPTOP => "Laptop",
         kind::COFFEE => "Kawa",
         kind::FRUIT => "Owoc",
+        k if crate::shop::product(k).is_some() => crate::shop::product(k).unwrap().name,
         _ => "?",
     }
 }
@@ -45,6 +67,10 @@ pub struct Item {
     pub expires: Option<u32>,
     /// Player it belongs to (laptop: whose account it logs into); 0 = nobody.
     pub owner: u16,
+    /// Pieces left (a pack of cigarettes); 1 for everything else.
+    pub count: u8,
+    /// Taken off a shop shelf, not paid for yet.
+    pub unpaid: bool,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -152,6 +178,24 @@ impl Inventory {
         self.pockets.iter_mut().find(|s| s.as_ref().is_some_and(|it| it.kind == k)).and_then(|s| s.take())
     }
 
+    /// Goods taken off a shop shelf and not paid for go back.
+    pub fn remove_unpaid(&mut self) {
+        if self.hands.as_ref().is_some_and(|i| i.unpaid) {
+            self.hands = None;
+        }
+        for s in self.pockets.iter_mut() {
+            if s.as_ref().is_some_and(|i| i.unpaid) {
+                *s = None;
+            }
+        }
+    }
+
+    pub fn mark_paid(&mut self) {
+        for it in self.hands.iter_mut().chain(self.pockets.iter_mut().flatten()) {
+            it.unpaid = false;
+        }
+    }
+
     /// Remove everything belonging to player `owner`.
     pub fn remove_owned_by(&mut self, owner: u16) {
         let mine = |s: &Option<Item>| s.as_ref().is_some_and(|i| i.owner == owner);
@@ -186,7 +230,7 @@ mod tests {
     use super::*;
 
     fn item(id: u32, k: u8) -> Item {
-        Item { id, kind: k, label: String::new(), expires: None, owner: 0 }
+        Item { id, kind: k, label: String::new(), expires: None, owner: 0, count: 1, unpaid: false }
     }
 
     #[test]
@@ -241,7 +285,7 @@ mod tests {
     #[test]
     fn coffee_goes_cold() {
         let mut inv = Inventory::default();
-        inv.add(Item { id: 1, kind: kind::COFFEE, label: String::new(), expires: Some(100), owner: 0 }).unwrap();
+        inv.add(Item { id: 1, kind: kind::COFFEE, label: String::new(), expires: Some(100), owner: 0, count: 1, unpaid: false }).unwrap();
         assert!(inv.expire(99).is_empty());
         assert_eq!(inv.expire(100).len(), 1);
         assert!(inv.hands_free());

@@ -171,6 +171,53 @@ Kolejność realizacji: (1) tworzenie postaci → (2) pulpit, portal, rozmowa �
 (3) ekwipunek i karta jako przedmiot → (4) komputer i komunikator →
 (5) statystyki.
 
+## 9b. Backlog (pomysły 2026-09-26, do realizacji po kolei)
+
+**Zrobione:** sklep na parterze (półki + kasa, złotówki), zaliczka 200 zł przy
+podpisaniu umowy, kanapki, przekąski, napoje, fast food, alkohol, papierosy
+(potrzebne do palenia) — zob. 10.20.
+
+**Czas i dni**
+- Zegar gry (aktualna godzina na ekranie), pory dnia (światło), **zmienna
+  pogoda** na zewnątrz.
+- Rozgrywka podzielona na **dni**: pierwszy dzień — pełnoekranowa plansza
+  „Dzień 1”, szukanie pracy (portal, aplikacja); po zatrudnieniu „Dzień 2” —
+  start w pracy rano o losowej godzinie między 7:00 a 10:00.
+- Pensja wypłacana za dzień pracy (zastąpi jednorazową zaliczkę).
+
+**Dojazd do pracy** — wybór: pieszo, rowerem, samochodem (parking), taksówką,
+tramwajem (bilet/taksówka kosztują).
+
+**Zarząd i kalendarz** — do pokoju zarządu nie można wejść bez spotkania;
+spotkanie umawia się w kalendarzu (aplikacja na komputerze).
+
+**Rekrutacja i rozwój firmy**
+- Na starcie **mało ogłoszeń** (to start firmy); przybywa ich z rozwojem.
+- Stanowisko obsadzone przez jednego gracza **znika** dla innych (nie można
+  aplikować na zajęte miejsce).
+
+**Chill room** — oprócz owoców i kawy **losowo pojawiające się ciastka /
+słodycze** w ograniczonej ilości (teraz decyduje NPC/serwer, w przyszłości
+gracze).
+
+**Obiady** — aplikacja na komputerze do **zamawiania obiadu** w trakcie pracy
+(dostawa do biura).
+
+**Model biznesowy (przyszłość)**
+- Gra **darmowa** dla graczy.
+- Każda firma = **osobny serwer / instancja gry**. Założenie firmy (własna
+  instancja) i wystawianie ogłoszeń o pracę jest **płatne**.
+- Założyciel wybiera nazwę firmy, jest w zarządzie, ma **panel ogłoszeń**
+  (wystawia oferty, przegląda aplikacje, zatrudnia).
+- Później **mikropłatności**: doładowanie portfela w grze (sklep, bilet,
+  taksówka). Wymaga osobnego projektu (płatności, konta, regulaminy) — nie
+  robimy tego w ramach prototypu.
+
+Proponowana kolejność: sklep i pieniądze → zegar, pory dnia, dni gry i
+pensja dzienna → dojazd do pracy → pogoda → kalendarz i zarząd → słodycze w
+chill roomie → zamawianie obiadów → mniej ogłoszeń na start i obsadzone
+stanowiska → panel założyciela firmy (i dalej: instancje / płatności).
+
 ---
 
 ## 10. Implementacja — ustalenia i stan
@@ -559,6 +606,29 @@ Zastępuje prosty portal z 10.8. Po połączeniu gracz widzi pulpit komputera
 - Przy wyjściach etykiety, dokąd prowadzą (Parter / Piętro 1 / Klatka
   schodowa).
 
+### 10.20 Sklep i pieniądze
+
+- **Portfel** w złotówkach (grosze na serwerze), widoczny nad paskami potrzeb.
+  Na razie jedyny przychód: **200 zł zaliczki** przy podpisaniu umowy w HR
+  (dzienna pensja razem z dniami gry — backlog 9b).
+- **Sklep na parterze** (przed bramkami, dostępny także dla gości):
+  - **E przy półce** pokazuje towary z cenami; „Weź” (albo 1–9) wkłada towar do
+    kieszeni / rąk jako **niezapłacony** (widać to w ekwipunku, z ceną);
+  - **kasa** (NPC „Kasa” za ladą): E = płacisz za wszystkie niezapłacone rzeczy;
+    za mało pieniędzy — trzeba coś odłożyć;
+  - **wyjście z niezapłaconym towarem**: bramka piszczy, towar zostaje w
+    sklepie, stres +10.
+- Półki: **Kanapki** (z serem 12 zł, z szynką 14 zł, wrap wege 13 zł),
+  **Fast food** (hamburger 18 zł, frytki 9 zł — tylko w rękach), **Przekąski**
+  (drożdżówka 6 zł, batonik 5 zł, chipsy 7 zł), **Napoje** (woda 4 zł,
+  energetyk 8 zł, sok 6 zł), **Alkohol i papierosy** (piwo 7 zł, wino 25 zł,
+  papierosy 18 zł / 20 szt.).
+- **F = zjedz / wypij** (niezapłaconego nie można): każdy towar zmienia potrzeby
+  (np. kanapka głód −35…−40, energetyk energia +30 ale stres +8 i toaleta +10,
+  piwo stres −15 i toaleta +20).
+- **Palenie wymaga papierosów** (jeden z paczki na przerwę).
+- Do przemyślenia: konsekwencje alkoholu w pracy, zwroty, promocje.
+
 ### 10.6 Stan implementacji
 
 *Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie,
@@ -595,6 +665,8 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Ekwipunek**: kieszenie i ręce, przedmioty (przepustka, karta, laptop,
   kawa), upuszczanie / podnoszenie / podawanie, dostęp z przedmiotów (10.13);
   protokół v8.
+- **Sklep i pieniądze**: portfel, zaliczka 200 zł, półki + kasa + bramka,
+  14 towarów, jedzenie z efektami, papierosy do palenia (10.20); protokół v15.
 - **Higiena, winda, klatka schodowa**: pasek higieny i brudne ręce, umywalki i
   dozowniki (10.17); winda wzywana, jadąca, z drzwiami, limitem 6 osób i
   widokiem samej kabiny w czasie jazdy (10.18); klatka schodowa z półpiętrem
@@ -615,12 +687,12 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Sieć mobilna**: serwer dual-stack IPv4/IPv6; gracz identyfikowany tokenem
   (zmiana adresu w trakcie gry przenosi sesję); klient przepina gniazdo po
   ciszy/powrocie z tła i sam łączy się ponownie po utracie sesji.
-- **Testy**: 72 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
+- **Testy**: 75 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
   zależna od uprawnień, bramki, ruch/kolizje, schody, winda, nawigacja,
-  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, protokół), 2 golden, 16 e2e serwera
+  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, protokół), 2 golden, 17 e2e serwera
   (m.in. portal: odrzucenie → przyjęcie → spawn; całe wdrożenie aż do karty;
   niewidoczność między piętrami; zgodność stanu serwera z predykcją) —
-  łącznie 90 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny i windy); 132 sprawdzenia w Godocie (parytet protokołu i ruchu, parsowanie
+  łącznie 94 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy i sklepu); 134 sprawdzenia w Godocie (parytet protokołu i ruchu, parsowanie
   adresów).
 
 #### Pomiary (MacBook, wszystko lokalnie)

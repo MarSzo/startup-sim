@@ -14,5 +14,6 @@ pub mod net;
 pub mod protocol;
 pub mod recruitment;
 pub mod server;
+pub mod shop;
 pub mod sim;
 pub mod stalls;

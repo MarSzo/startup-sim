@@ -527,7 +527,7 @@ mod tests {
     fn porter_is_placed_in_the_lodge() {
         let b = b();
         let m = b.floor(0).unwrap();
-        assert_eq!(m.npcs.len(), 1);
+        assert_eq!(m.npcs.len(), 2, "porter + shop cashier");
         let p = &m.npcs[0];
         assert_eq!((p.kind.as_str(), p.name.as_str()), ("porter", "Portier"));
         assert_eq!(m.room_name(m.room_at_tile(p.home.x, p.home.y)), "Portiernia");

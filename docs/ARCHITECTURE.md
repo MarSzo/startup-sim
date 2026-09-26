@@ -32,6 +32,7 @@ server/                 crate Rusta (lib `game` + binarki)
   src/coffee.rs         ekspresy do kawy (parzenie → kawa jako przedmiot)
   src/inventory.rs      przedmioty, kieszenie i ręce, uprawnienia z przedmiotów
   src/computer.rs       stanowiska (biurka działów), laptopy na biurkach, komunikator
+  src/shop.rs           sklep: towary i ceny, półki, kasa, złotówki
   src/stalls.rs         kabiny toaletowe: znajdowanie drzwi, zamykanie od środka
   src/needs.rs          potrzeby postaci (głód, energia, stres, toaleta), sofa / toaleta / papieros / owoce
   data/recruitment.json oferty i pule pytań (pierwsza odpowiedź = poprawna)
@@ -62,7 +63,8 @@ client/                 projekt Godota 4.7
   game/item_view.gd     przedmiot leżący na podłodze
   ui/inventory_hud.gd   pasek ekwipunku (ręce + 3 kieszenie)
   ui/computer_screen.gd ekran komputera: komunikator i ekran blokady
-  ui/stats_hud.gd       paski potrzeb (prawy górny róg)
+  ui/stats_hud.gd       portfel i paski potrzeb (prawy górny róg)
+  ui/shelf_window.gd    okno półki sklepowej (towary, ceny, „Weź”)
   game/elevator_door_view.gd drzwi windy (rozsuwane) i wyświetlacz piętra
   game/stall_door_view.gd drzwi kabiny (zielone wolne / czerwone zajęte, otwarte, gdy ktoś w nich stoi)
   game/computer_view.gd laptop na biurku (ekran: niebieski / czat / zablokowany)
@@ -149,6 +151,16 @@ sprawdza `Map::blocks`, czyli wspólna reguła kolizji; klient trzyma tę samą
 nakładkę w `MapData.closed` (pakiet `Doors`). Mapy są przez to zmienne po
 stronie serwera (`Building::floor_mut`). Zamek zwalnia się, gdy zamykający
 opuści pokój kabiny albo grę; nie można zamknąć, gdy ktoś stoi w drzwiach.
+
+**Sklep** (`shop.rs`): lista towarów (`PRODUCTS`: rodzaj przedmiotu, nazwa,
+cena w groszach, efekt na potrzeby, liczba sztuk) i półek (prostokąty kafli
+`shelf` na parterze + co na nich leży; `shop::check` pilnuje zgodności z mapą).
+E przy półce → pakiet `Shelf`; `ShopTake` dodaje `Item { unpaid: true }`.
+NPC `Cashier` zwraca `npc::Event::Checkout`, a serwer pobiera z `Player::money`
+sumę niezapłaconych rzeczy (`Inventory::mark_paid`). Zmiana pokoju ze sklepu z
+niezapłaconym towarem → `Inventory::remove_unpaid`, stres i alarm od kasy.
+Zaliczka `shop::ADVANCE` przy `npc::Event::Contract`. Paczka papierosów to
+przedmiot z `count` (20), zużywany przy popielniczce.
 
 **Potrzeby** (`needs.rs`): `Needs` w stałym przecinku (10 000 jednostek na
 punkt), zmiana co tick: głód 0→100 w 25 min, energia 100→0 w 35 min, toaleta

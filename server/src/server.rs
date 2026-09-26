@@ -16,6 +16,7 @@ use crate::npc::{self, Npc};
 use crate::protocol::{self as proto, EntityState, Packet, PlayerInfoEntry, Profile, SelfState};
 use crate::recruitment::{Attempt, Recruitment};
 use crate::sim::{self, Body, Pos};
+use crate::shop::{self, Shelf};
 use crate::stalls::{self, Stall};
 
 pub const TICK_HZ: u32 = 20;
@@ -144,6 +145,8 @@ struct Player {
     at_computer: Option<u16>,
     /// Hunger, energy, stress, bladder.
     needs: Needs,
+    /// Wallet, grosze.
+    money: i64,
     /// Sofa / toilet / smoke break, and where it started (moving ends it).
     rest: Option<(Rest, u8, Pos)>,
     /// Messenger spam guard / retry dedupe.
@@ -186,6 +189,11 @@ pub struct Server {
     /// Toilet stalls and who locked them.
     stalls: Vec<Stall>,
     elevators: Vec<Elevator>,
+    shelves: Vec<Shelf>,
+    /// Room id of the shop per floor (leaving it with unpaid goods beeps).
+    shop_rooms: Vec<(u8, u16)>,
+    /// The cashier NPC (says the alarm line).
+    cashier: Option<u16>,
     /// Some elevator was moving last tick (resend `Doors` when it starts/stops).
     lift_was_moving: bool,
     /// A stall door changed: send `Doors` to everyone this tick.
@@ -225,6 +233,12 @@ impl Server {
             spots: needs::find_spots(&building),
             stalls: stalls::find_stalls(&building),
             elevators: elevator::find_elevators(&building),
+            shelves: shop::shelves(),
+            shop_rooms: building
+                .active_floors()
+                .flat_map(|(f, m)| m.rooms.iter().filter(|r| r.kind == "shop").map(move |r| (f, r.id)))
+                .collect(),
+            cashier: None,
             lift_was_moving: false,
             doors_dirty: false,
             computers: Vec::new(),
@@ -246,6 +260,7 @@ impl Server {
             started: Instant::now(),
         };
         server.sync_elevator_doors(); // doors start closed
+        server.cashier = server.npcs.iter().find(|n| n.role == npc::Role::Cashier).map(|n| n.id);
         Ok(server)
     }
 
@@ -398,7 +413,8 @@ impl Server {
             | Packet::PortalAction { token, .. }
             | Packet::ItemAction { token, .. }
             | Packet::ComputerAction { token, .. }
-            | Packet::DoorAction { token } => *token,
+            | Packet::DoorAction { token }
+            | Packet::ShopTake { token, .. } => *token,
             _ => return,
         };
         let Some(&id) = self.by_token.get(&token) else {
@@ -457,6 +473,7 @@ impl Server {
             Packet::ItemAction { action, slot, .. } => self.handle_item_action(id, action, slot),
             Packet::ComputerAction { action, conv, arg, text, .. } => self.handle_computer_action(id, action, conv, arg, &text),
             Packet::DoorAction { .. } => self.handle_door_action(id),
+            Packet::ShopTake { shelf, kind, .. } => self.handle_shop_take(id, shelf, kind),
             Packet::Answer { attempt, index, choice, .. } => self.handle_answer(id, attempt, index, choice),
             _ => {}
         }
@@ -509,6 +526,7 @@ impl Server {
             inv_dirty: true,
             at_computer: None,
             needs: Needs::default(),
+            money: 0,
             rest: None,
             last_chat_tick: None,
             last_chat_nonce: 0,
@@ -811,7 +829,7 @@ impl Server {
         let label = self.label_for(pid, k);
         let expires = (k == item_kind::COFFEE).then_some(self.tick + coffee::DRINK_TICKS);
         let owner = if k == item_kind::COFFEE { 0 } else { pid };
-        let item = Item { id: self.next_item_id, kind: k, label, expires, owner };
+        let item = Item { id: self.next_item_id, kind: k, label, expires, owner, count: 1, unpaid: false };
         self.next_item_id += 1;
         self.give(pid, item);
     }
@@ -925,6 +943,15 @@ impl Server {
                     }
                     item_kind::EMPLOYEE_CARD => format!("Karta pracownika: {}.", held.label),
                     item_kind::GUEST_PASS => "Przepustka gościa — ważna do końca dnia.".into(),
+                    _ if held.unpaid => shop::lines::PAY_FIRST.into(),
+                    item_kind::CIGARETTES => format!("Zostało {} papierosów. Palić tylko w strefie palenia.", held.count),
+                    k if shop::product(k).is_some() => {
+                        let prod = shop::product(k).unwrap();
+                        p.inventory.take_hands();
+                        p.needs.apply(prod.effect);
+                        refresh(p);
+                        prod.line.to_string()
+                    }
                     item_kind::LAPTOP => format!("{} — położę go na wolnym biurku w swoim dziale (E).", held.label),
                     _ => return,
                 };
@@ -956,6 +983,52 @@ impl Server {
                 Some(inventory::Refusal::HandsFull.line().to_string())
             }
         }
+    }
+
+    // -------------------------------------------------------------- shop
+
+    /// Take a product off a shelf (unpaid).
+    fn handle_shop_take(&mut self, pid: u16, shelf: u8, kind: u8) {
+        let Some(p) = self.players.get(&pid) else { return };
+        let body = p.body;
+        let Some(s) = shop::shelf_in_reach(&self.shelves, &body).filter(|s| s.id == shelf) else { return };
+        if !s.goods.contains(&kind) {
+            return;
+        }
+        let Some(prod) = shop::product(kind) else { return };
+        let item = Item {
+            id: self.next_item_id,
+            kind,
+            label: prod.name.into(),
+            expires: None,
+            owner: 0,
+            count: prod.count,
+            unpaid: true,
+        };
+        self.next_item_id += 1;
+        let p = self.players.get_mut(&pid).unwrap();
+        match p.inventory.add(item) {
+            Ok(()) => refresh(p),
+            Err(_) => self.pending_says.push((pid, shop::lines::NO_ROOM.into(), None)),
+        }
+    }
+
+    /// Pay for everything unpaid; the cashier's answer.
+    fn checkout(&mut self, pid: u16) -> Option<String> {
+        let p = self.players.get_mut(&pid)?;
+        let total: i64 = p.inventory.items().filter(|i| i.unpaid).filter_map(|i| shop::product(i.kind)).map(|pr| pr.price).sum();
+        if total == 0 {
+            return Some(shop::lines::NOTHING_TO_PAY.into());
+        }
+        if p.money < total {
+            return Some(shop::lines::too_poor(total, p.money));
+        }
+        p.money -= total;
+        p.inventory.mark_paid();
+        refresh(p);
+        let (nick, left) = (p.nick.clone(), p.money);
+        self.log(format!("* shop: {nick} paid {}", shop::zl(total)));
+        Some(shop::lines::paid(total, left))
     }
 
     // ------------------------------------------------------------ stalls
@@ -1050,6 +1123,7 @@ impl Server {
         let Some(p) = self.players.get_mut(&id) else { return };
         p.department = dept;
         p.contract = true;
+        p.money += shop::ADVANCE;
         if let Some((floor, x, y)) = seat {
             p.body = Body::at(floor, Pos::tile_center(x, y));
             p.room = self.building.floor(floor).map_or(0, |m| m.room_at_tile(x, y));
@@ -1074,7 +1148,15 @@ impl Server {
                     return Some(Some(needs::lines::HANDS_FULL.into()));
                 }
                 let fruit = FRUITS[self.rng.usize(..FRUITS.len())];
-                let item = Item { id: self.next_item_id, kind: item_kind::FRUIT, label: fruit.into(), expires: None, owner: 0 };
+                let item = Item {
+                    id: self.next_item_id,
+                    kind: item_kind::FRUIT,
+                    label: fruit.into(),
+                    expires: None,
+                    owner: 0,
+                    count: 1,
+                    unpaid: false,
+                };
                 self.next_item_id += 1;
                 self.give(pid, item);
                 format!("{} {}", needs::lines::FRUIT, fruit)
@@ -1084,6 +1166,19 @@ impl Server {
                 needs::lines::SOFA.into()
             }
             SpotKind::Ashtray => {
+                // One cigarette from a paid pack.
+                let slot = std::iter::once(&mut p.inventory.hands)
+                    .chain(p.inventory.pockets.iter_mut())
+                    .find(|s| s.as_ref().is_some_and(|i| i.kind == item_kind::CIGARETTES && !i.unpaid && i.count > 0));
+                let Some(slot) = slot else {
+                    return Some(Some(shop::lines::NO_CIGARETTES.into()));
+                };
+                let pack = slot.as_mut().unwrap();
+                pack.count -= 1;
+                if pack.count == 0 {
+                    *slot = None;
+                }
+                refresh(p);
                 p.rest = Some((Rest::Smoking { until: self.tick + needs::SMOKE_TICKS }, floor, pos));
                 needs::lines::SMOKE.into()
             }
@@ -1367,6 +1462,8 @@ impl Server {
         let mut portal_resend = Vec::new();
         // Left a bathroom with dirty hands: (player, floor, bathroom room).
         let mut unwashed_exits: Vec<(u16, u8, u16)> = Vec::new();
+        // Walked out of the shop with unpaid goods.
+        let mut shoplifters: Vec<u16> = Vec::new();
         for p in self.players.values_mut() {
             if !matches!(p.stage, Stage::Working) {
                 p.inputs.clear(); // not in the world yet
@@ -1394,6 +1491,12 @@ impl Server {
             }
             let old_room = p.room;
             p.room = self.building.floor(p.body.floor).map_or(0, |m| m.room_at(p.body.pos.x, p.body.pos.y));
+            if p.room != old_room
+                && self.shop_rooms.contains(&(p.body.floor, old_room))
+                && p.inventory.items().any(|i| i.unpaid)
+            {
+                shoplifters.push(p.id);
+            }
             if p.needs.dirty_hands && p.room != old_room {
                 let kind = |r: u16| {
                     self.building.floor(p.body.floor).and_then(|m| m.rooms.iter().find(|d| d.id == r)).map_or("", |d| d.kind.as_str())
@@ -1434,6 +1537,16 @@ impl Server {
             p.flags = (p.flags & 0x3f)
                 | if p.body.slow { proto::FLAG_SLOW } else { 0 }
                 | if p.needs.smelly() { proto::FLAG_SMELLY } else { 0 };
+        }
+        // The security gate beeps; the goods stay in the shop.
+        for pid in shoplifters {
+            if let Some(p) = self.players.get_mut(&pid) {
+                p.inventory.remove_unpaid();
+                p.needs.add_stress(10);
+                refresh(p);
+            }
+            let speaker = self.cashier.unwrap_or(pid);
+            coffee_says.push((speaker, shop::lines::ALARM.to_string(), Some(pid)));
         }
         // Somebody in the bathroom saw it.
         for (pid, floor, bath) in unwashed_exits {
@@ -1494,6 +1607,16 @@ impl Server {
                 coffee_says.extend(said.map(|line| (pid, line, None)));
             } else if let Some(line) = self.use_elevator(&body) {
                 coffee_says.push((pid, line, None));
+            } else if let Some(s) = shop::shelf_in_reach(&self.shelves, &body) {
+                let goods = s
+                    .goods
+                    .iter()
+                    .filter_map(|&k| shop::product(k))
+                    .map(|p| proto::ShelfItem { kind: p.kind, price: p.price as u32, name: p.name.into() })
+                    .collect();
+                let packet = Packet::Shelf { shelf: s.id, title: s.title.into(), goods };
+                let addr = self.players[&pid].addr;
+                self.send(addr, &packet);
             } else if let Some(line) = self.try_pickup(pid, &body) {
                 coffee_says.push((pid, line, None));
             }
@@ -1519,9 +1642,15 @@ impl Server {
                     }
                 }
                 npc::Event::Say { npc, text, to } => says.push((npc, text, to)),
+                npc::Event::Checkout { npc, player } => {
+                    if let Some(line) = self.checkout(player) {
+                        says.push((npc, line, Some(player)));
+                    }
+                }
                 npc::Event::Contract { player } => {
                     if let Some(p) = self.players.get_mut(&player) {
                         p.contract = true;
+                        p.money += shop::ADVANCE;
                         let msg = format!(
                             "* player {player} '{}' signed a contract: {}",
                             p.nick,
@@ -1632,7 +1761,8 @@ impl Server {
             if tick % STATS_EVERY_TICKS == 0 {
                 let [hunger, energy, stress, bladder, hygiene] = p.needs.points();
                 let flags = if p.needs.dirty_hands { proto::STATS_DIRTY_HANDS } else { 0 };
-                outgoing.push((p.addr, id, Packet::Stats { hunger, energy, stress, bladder, hygiene, flags }));
+                let money = p.money.clamp(0, u32::MAX as i64) as u32;
+                outgoing.push((p.addr, id, Packet::Stats { hunger, energy, stress, bladder, hygiene, flags, money }));
             }
             if tick % COMPUTER_RESEND_TICKS == 0 {
                 if let Some(pk) = self.computer_packet(id) {
@@ -1756,7 +1886,17 @@ fn dist2(a: Pos, b: Pos) -> i32 {
 
 fn inventory_packet(inv: &Inventory) -> Packet {
     let slot = |it: &Option<Item>| match it {
-        Some(i) => proto::SlotInfo { kind: i.kind, id: i.id, label: i.label.clone() },
+        Some(i) => {
+            let mut label = i.label.clone();
+            if i.count > 1 {
+                label += &format!(" ({} szt.)", i.count);
+            }
+            if i.unpaid {
+                let price = shop::product(i.kind).map_or(0, |p| p.price);
+                label += &format!(" — niezapłacone, {}", shop::zl(price));
+            }
+            proto::SlotInfo { kind: i.kind, id: i.id, label }
+        }
         None => proto::SlotInfo::default(),
     };
     let mut slots = vec![slot(&inv.hands)];

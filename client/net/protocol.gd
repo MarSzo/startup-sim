@@ -3,7 +3,7 @@
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 14
+const VERSION := 15
 const MAX_PACKET := 1200
 const MAX_NICK_BYTES := 16
 const MAX_SAY_BYTES := 240
@@ -37,6 +37,8 @@ const T_CHAT := 23
 const T_STATS := 24
 const T_DOORS := 25
 const T_DOOR_ACTION := 26
+const T_SHELF := 27
+const T_SHOP_TAKE := 28
 
 const PC_CLOSE := 1
 const PC_LOCK := 2
@@ -214,6 +216,14 @@ static func encode_computer_action(token: int, action: int, conv: int, arg: int,
 	b.put_u16(conv)
 	b.put_u32(arg)
 	_put_str16(b, text, MAX_CHAT_BYTES)
+	return b.data_array
+
+
+static func encode_shop_take(token: int, shelf: int, kind: int) -> PackedByteArray:
+	var b := _writer(T_SHOP_TAKE)
+	b.put_u32(token)
+	b.put_u8(shelf)
+	b.put_u8(kind)
 	return b.data_array
 
 
@@ -397,6 +407,17 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			p.bladder = r.u8()
 			p.hygiene = r.u8()
 			p.stats_flags = r.u8()
+			p.money = r.u32()
+		T_SHELF:
+			p.shelf = r.u8()
+			p.title = r.str16(MAX_TEXT_BYTES)
+			var n := r.u8()
+			if n > 16:
+				return {}
+			var goods := []
+			for i in n:
+				goods.append({"kind": r.u8(), "price": r.u32(), "name": r.str16(MAX_TEXT_BYTES)})
+			p.goods = goods
 		T_CHAT:
 			p.conv = r.u16()
 			var n := r.u8()

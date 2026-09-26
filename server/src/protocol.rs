@@ -5,7 +5,7 @@
 //! `tests/golden/packets.json`.
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 14;
+pub const VERSION: u8 = 15;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
 pub const MAX_PACKET: usize = 1200;
@@ -57,6 +57,8 @@ pub mod ty {
     pub const STATS: u8 = 24;
     pub const DOORS: u8 = 25;
     pub const DOOR_ACTION: u8 = 26;
+    pub const SHELF: u8 = 27;
+    pub const SHOP_TAKE: u8 = 28;
 }
 
 /// `ItemAction::action`.
@@ -206,6 +208,15 @@ pub struct ConvEntry {
     pub title: String,
 }
 
+/// One product on a shop shelf.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ShelfItem {
+    pub kind: u8,
+    /// Grosze.
+    pub price: u32,
+    pub name: String,
+}
+
 /// One messenger message.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ChatEntry {
@@ -320,7 +331,12 @@ pub enum Packet {
     /// Messages of a conversation (sync reply or live push).
     Chat { conv: u16, messages: Vec<ChatEntry> },
     /// Character needs, 0..=100 each (sent to the owner twice a second).
-    Stats { hunger: u8, energy: u8, stress: u8, bladder: u8, hygiene: u8, flags: u8 },
+    /// ... and the wallet (`money`, grosze).
+    Stats { hunger: u8, energy: u8, stress: u8, bladder: u8, hygiene: u8, flags: u8, money: u32 },
+    /// A shop shelf the receiver pressed E at: what's on it.
+    Shelf { shelf: u8, title: String, goods: Vec<ShelfItem> },
+    /// Take one `kind` off shelf `shelf` (unpaid, into the inventory).
+    ShopTake { token: u32, shelf: u8, kind: u8 },
     /// Closed doors (locked toilet stalls, elevator doors) on the receiver's
     /// floor: solid for the simulation. Plus the elevator: the floor it is at
     /// and where it is heading (`NO_FLOOR` = standing). Sent on change and
@@ -455,6 +471,8 @@ impl Packet {
             Packet::ComputerAction { .. } => ty::COMPUTER_ACTION,
             Packet::Chat { .. } => ty::CHAT,
             Packet::Stats { .. } => ty::STATS,
+            Packet::Shelf { .. } => ty::SHELF,
+            Packet::ShopTake { .. } => ty::SHOP_TAKE,
             Packet::Doors { .. } => ty::DOORS,
             Packet::DoorAction { .. } => ty::DOOR_ACTION,
         }
@@ -664,13 +682,29 @@ impl Packet {
                 w.u8(*lift_moving as u8);
             }
             Packet::DoorAction { token } => w.u32(*token),
-            Packet::Stats { hunger, energy, stress, bladder, hygiene, flags } => {
+            Packet::Stats { hunger, energy, stress, bladder, hygiene, flags, money } => {
                 w.u8(*hunger);
                 w.u8(*energy);
                 w.u8(*stress);
                 w.u8(*bladder);
                 w.u8(*hygiene);
                 w.u8(*flags);
+                w.u32(*money);
+            }
+            Packet::Shelf { shelf, title, goods } => {
+                w.u8(*shelf);
+                w.str16(title, MAX_TEXT_BYTES);
+                w.u8(goods.len().min(16) as u8);
+                for g in goods.iter().take(16) {
+                    w.u8(g.kind);
+                    w.u32(g.price);
+                    w.str16(&g.name, MAX_TEXT_BYTES);
+                }
+            }
+            Packet::ShopTake { token, shelf, kind } => {
+                w.u32(*token);
+                w.u8(*shelf);
+                w.u8(*kind);
             }
             Packet::Chat { conv, messages } => {
                 w.u16(*conv);
@@ -886,7 +920,22 @@ impl Packet {
                 bladder: r.u8()?,
                 hygiene: r.u8()?,
                 flags: r.u8()?,
+                money: r.u32()?,
             },
+            ty::SHELF => {
+                let shelf = r.u8()?;
+                let title = r.str16(MAX_TEXT_BYTES)?;
+                let n = r.u8()? as usize;
+                if n > 16 {
+                    return Err(DecodeError::Invalid("too many goods"));
+                }
+                let mut goods = Vec::with_capacity(n);
+                for _ in 0..n {
+                    goods.push(ShelfItem { kind: r.u8()?, price: r.u32()?, name: r.str16(MAX_TEXT_BYTES)? });
+                }
+                Packet::Shelf { shelf, title, goods }
+            }
+            ty::SHOP_TAKE => Packet::ShopTake { token: r.u32()?, shelf: r.u8()?, kind: r.u8()? },
             ty::CHAT => {
                 let conv = r.u16()?;
                 let n = r.u8()? as usize;
@@ -1097,9 +1146,21 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
             "computer_action",
             Packet::ComputerAction { token: 0x01020304, action: computer_action::SEND, conv: 17, arg: 42, text: "Kto zjadł mój jogurt?".into() },
         ),
-        ("stats", Packet::Stats { hunger: 35, energy: 80, stress: 12, bladder: 64, hygiene: 22, flags: STATS_DIRTY_HANDS }),
+        ("stats", Packet::Stats { hunger: 35, energy: 80, stress: 12, bladder: 64, hygiene: 22, flags: STATS_DIRTY_HANDS, money: 187_50 }),
         ("doors", Packet::Doors { floor: 1, tiles: vec![(46, 27), (54, 31)], lift_floor: 0, lift_target: 1, lift_moving: true }),
         ("door_action", Packet::DoorAction { token: 0x01020304 }),
+        (
+            "shelf",
+            Packet::Shelf {
+                shelf: 1,
+                title: "Kanapki".into(),
+                goods: vec![
+                    ShelfItem { kind: 10, price: 12_00, name: "Kanapka z serem".into() },
+                    ShelfItem { kind: 11, price: 14_00, name: "Kanapka z szynką".into() },
+                ],
+            },
+        ),
+        ("shop_take", Packet::ShopTake { token: 0x01020304, shelf: 1, kind: 11 }),
         (
             "chat",
             Packet::Chat {
@@ -1167,7 +1228,7 @@ mod tests {
                 b[0] = 0x54;
                 b[1] = 0x53;
                 b[2] = VERSION;
-                b[3] = rng.u8(1..=26);
+                b[3] = rng.u8(1..=28);
             }
             let _ = Packet::decode(&b);
         }

@@ -56,9 +56,9 @@ pub mod lines {
     pub const RECEPTION_HAS_CARD: &str = "Dzień dobry! Miłego dnia w pracy.";
     pub const NO_PASS: &str = "Najpierw proszę zgłosić się na portierni.";
     // HR
-    pub const HR_SIGNED: &str = "Umowa podpisana — witamy w firmie! Oto karta pracownika i Twój laptop.";
+    pub const HR_SIGNED: &str = "Umowa podpisana — witamy w firmie! Oto karta pracownika, Twój laptop i 200 zł zaliczki na start.";
     pub fn hr_signed_in(department: &str) -> String {
-        format!("Umowa podpisana — witamy w dziale {department}! Oto karta pracownika i Twój laptop.")
+        format!("Umowa podpisana — witamy w dziale {department}! Oto karta pracownika, Twój laptop i 200 zł zaliczki na start.")
     }
     pub const HR_HAS_CARD: &str = "Umowa już podpisana, karta działa. Powodzenia!";
     pub const HR_HANDS_FULL: &str = "Proszę odłożyć to, co masz w rękach — zaraz dostaniesz laptopa.";
@@ -69,6 +69,8 @@ pub enum Role {
     Porter,
     Receptionist,
     Hr,
+    /// Shop till: E = pay for what you took off the shelves.
+    Cashier,
 }
 
 impl Role {
@@ -77,6 +79,7 @@ impl Role {
             "porter" => Some(Role::Porter),
             "receptionist" => Some(Role::Receptionist),
             "hr" => Some(Role::Hr),
+            "cashier" => Some(Role::Cashier),
             _ => None,
         }
     }
@@ -84,7 +87,7 @@ impl Role {
     fn look(self) -> u8 {
         match self {
             Role::Porter => look::PORTER,
-            Role::Receptionist | Role::Hr => look::OFFICE,
+            Role::Receptionist | Role::Hr | Role::Cashier => look::OFFICE,
         }
     }
 }
@@ -117,6 +120,8 @@ pub enum Event {
     Take { player: u16, item: u8 },
     /// Employment contract signed (HR): the department becomes official.
     Contract { player: u16 },
+    /// At the till: the server charges the unpaid goods and answers as `npc`.
+    Checkout { npc: u16, player: u16 },
 }
 
 enum State {
@@ -204,6 +209,9 @@ impl Npc {
         let say = |text: &str| Event::Say { npc: self.id, text: text.to_string(), to: Some(player) };
         let has_card = player_access & access::CARD != 0;
         let has_pass = player_access & access::GUEST != 0;
+        if self.role == Role::Cashier {
+            return vec![Event::Checkout { npc: self.id, player }];
+        }
         if self.role == Role::Hr {
             return if has_card {
                 vec![say(lines::HR_HAS_CARD)]
@@ -469,15 +477,20 @@ mod tests {
     }
 
     #[test]
-    fn spawns_three_staff_with_looks() {
+    fn spawns_the_staff_with_looks() {
         let (_, npcs) = everyone();
         let roles: Vec<(Role, &str, u8)> = npcs.iter().map(|n| (n.role, n.name.as_str(), n.flags >> 3)).collect();
         assert_eq!(
             roles,
-            vec![(Role::Porter, "Portier", look::PORTER), (Role::Receptionist, "Recepcja", look::OFFICE), (Role::Hr, "HR", look::OFFICE)]
+            vec![
+                (Role::Porter, "Portier", look::PORTER),
+                (Role::Cashier, "Kasa", look::OFFICE),
+                (Role::Receptionist, "Recepcja", look::OFFICE),
+                (Role::Hr, "HR", look::OFFICE)
+            ]
         );
         let ids: Vec<u16> = npcs.iter().map(|n| n.id).collect();
-        assert_eq!(ids, vec![NPC_ID_BASE, NPC_ID_BASE + 1, NPC_ID_BASE + 2]);
+        assert_eq!(ids, (0..4).map(|i| NPC_ID_BASE + i).collect::<Vec<_>>());
     }
 
     #[test]
@@ -526,7 +539,7 @@ mod tests {
         assert_eq!(says(&hr.interact(&b, 1, 0, None, true)), vec![lines::NO_PASS]);
         assert_eq!(says(&hr.interact(&b, 1, access::GUEST, None, false)), vec![lines::HR_HANDS_FULL], "laptop needs free hands");
         let ev = hr.interact(&b, 1, access::GUEST, Some("IT / Produkt"), true);
-        assert_eq!(says(&ev), vec!["Umowa podpisana — witamy w dziale IT / Produkt! Oto karta pracownika i Twój laptop."]);
+        assert_eq!(says(&ev), vec!["Umowa podpisana — witamy w dziale IT / Produkt! Oto karta pracownika, Twój laptop i 200 zł zaliczki na start."]);
         assert!(ev.contains(&Event::Contract { player: 1 }));
         assert!(ev.contains(&Event::Give { player: 1, item: item::EMPLOYEE_CARD }));
         assert!(ev.contains(&Event::Give { player: 1, item: item::LAPTOP }));

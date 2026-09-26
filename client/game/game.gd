@@ -21,6 +21,7 @@ const StatsHud = preload("res://ui/stats_hud.gd")
 const StallDoorView = preload("res://game/stall_door_view.gd")
 const ElevatorDoorView = preload("res://game/elevator_door_view.gd")
 const RideMask = preload("res://game/ride_mask.gd")
+const ShelfWindow = preload("res://ui/shelf_window.gd")
 
 const ZOOM := 3.0
 ## Remote players are rendered this far in the past (2 snapshots at 20 Hz).
@@ -67,6 +68,8 @@ var lift_floor := 0      # elevator: where the car is (from Doors)
 var lift_target := 255   # ...and where it is heading (Protocol.NO_FLOOR = standing)
 var lift_moving := false
 var ride_mask := RideMask.new()
+var shelf_window := ShelfWindow.new()
+var _shelf_at := Vector2.ZERO     # where the shelf window was opened (walk away = close)
 var depts := {}          # id -> department (after the contract)
 var appearances := {}    # id -> appearance dict (from PlayerInfo)
 var own_appearance := {}
@@ -108,6 +111,7 @@ var _autowalk_timer := 0.0
 var goto_legs: PackedStringArray = []
 var goto_delay := 3.0
 var _goto_path: Array[Vector2i] = []
+var _goto_floor := -1   # floor the current path was planned on
 
 
 func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Dictionary) -> void:
@@ -209,6 +213,8 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 	status_layer.add_child(hud)
 	hud.slot_clicked.connect(_pocket_key)
 	status_layer.add_child(stats_hud)
+	status_layer.add_child(shelf_window)
+	shelf_window.take.connect(func(shelf: int, kind: int): if net.is_playing(): net.send(Protocol.encode_shop_take(net.token, shelf, kind)))
 	screen_layer.layer = 12
 	add_child(screen_layer)
 	screen.my_id = net.player_id
@@ -340,6 +346,10 @@ func _goto_input(delta: float) -> int:
 		if leg.begins_with("wait:"):
 			goto_delay = float(leg.substr(5))
 			return 0
+		if leg.begins_with("shop:"):  # shop:<shelf>:<kind> takes one off a shelf
+			net.send(Protocol.encode_shop_take(net.token, int(leg.get_slice(":", 1)), int(leg.get_slice(":", 2))))
+			goto_delay = 0.4
+			return 0
 		if leg == "L":  # lock / unlock the stall
 			net.send(Protocol.encode_door_action(net.token))
 			goto_delay = 0.3
@@ -359,7 +369,11 @@ func _goto_input(delta: float) -> int:
 			goto_delay = 0.4
 			return 0
 		_goto_path = _plan_path(leg)
+		_goto_floor = pred.floor
 		goto_delay = 0.3
+	if not _goto_path.is_empty() and pred.floor != _goto_floor:
+		_goto_path.clear()  # the stairs / elevator took us elsewhere: leg done
+		return 0
 	while not _goto_path.is_empty():
 		var c := Movement.tile_center(_goto_path[0].x, _goto_path[0].y)
 		var p: Vector2i = pred.pos
@@ -438,6 +452,8 @@ func _process(delta: float) -> void:
 		if latest_tick - floor_items[id].last_seen_tick > REMOTE_TIMEOUT_TICKS:
 			floor_items[id].queue_free()
 			floor_items.erase(id)
+	if shelf_window.visible and have_state and Movement.to_px(pred.pos).distance_to(_shelf_at) > 20.0:
+		shelf_window.close()  # walked away from the shelf
 	if have_state:
 		_update_stall_doors()
 		_update_ride()
@@ -478,6 +494,9 @@ func _on_packet(p: Dictionary) -> void:
 			lift_floor = p.lift_floor
 			lift_target = p.lift_target
 			lift_moving = p.lift_moving
+		Protocol.T_SHELF:
+			shelf_window.show_shelf(p)
+			_shelf_at = Movement.to_px(pred.pos)
 		Protocol.T_STATS:
 			stats_hud.update_stats(p)
 			me.set_smelly(p.hygiene < 25)
@@ -704,7 +723,8 @@ func _update_hint() -> void:
 					best_key = key
 					best_id = id
 		if best_id >= 0:
-			text = "[E] Porozmawiaj: %s" % nicks.get(best_id, "?")
+			var who: String = nicks.get(best_id, "?")
+			text = "[E] Kasa — zapłać za zakupy" if who == "Kasa" else "[E] Porozmawiaj: %s" % who
 	if text == "" and map:
 		# Coffee machine within reach (same radius as the server: 1.5 tiles).
 		for dy in range(-2, 3):
@@ -808,7 +828,7 @@ func _stall_hint(map, t: Vector2i, text: String) -> String:
 	return text
 
 
-const SPOT_HINTS := {"sofa": "[E] Usiądź na sofie", "toilet": "[E] Skorzystaj z toalety", "ashtray": "[E] Zapal", "fruit_bowl": "[E] Weź owoc", "sink": "[E] Umyj ręce", "sanitizer": "[E] Zdezynfekuj ręce"}
+const SPOT_HINTS := {"shelf": "[E] Zobacz półkę", "sofa": "[E] Usiądź na sofie", "toilet": "[E] Skorzystaj z toalety", "ashtray": "[E] Zapal", "fruit_bowl": "[E] Weź owoc", "sink": "[E] Umyj ręce", "sanitizer": "[E] Zdezynfekuj ręce"}
 
 
 ## Next to the elevator doors (outside the cabin): call it / wait / step in.
@@ -837,6 +857,8 @@ func _spot_hint(map) -> String:
 			if tx < 0 or ty < 0 or tx >= map.width or ty >= map.height:
 				continue
 			var type: String = map.legend.get(map.tile_chars[ty * map.width + tx], {}).get("type", "")
+			if type == "shelf" and map.room_types.get(map.room_at_tile(tx, ty), "") != "shop":
+				continue  # only shop shelves have goods
 			if SPOT_HINTS.has(type) and Movement.to_px(Movement.tile_center(tx, ty)).distance_to(me_px) <= 24.0:
 				return SPOT_HINTS[type]
 	return ""
