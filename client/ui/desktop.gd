@@ -4,6 +4,8 @@
 ## re-sends our last action when the server's state shows it got lost.
 extends Control
 
+const PixelUI = preload("res://ui/pixel_ui.gd")
+
 const Protocol = preload("res://net/protocol.gd")
 const PlayerView = preload("res://game/player_view.gd")
 
@@ -119,11 +121,11 @@ func _build_desktop() -> void:
 	_root.add_child(icons)
 	icons.add_child(_icon("Przeglądarka", "browser", func(): _open_window("browser")))
 	var mail_icon := _icon("Poczta", "mail", func(): _open_window("mail"))
-	_mail_icon_badge.add_theme_font_size_override("font_size", 13)
-	_mail_icon_badge.add_theme_color_override("font_color", Color.WHITE)
+	PixelUI.style_label(_mail_icon_badge, 16, Color.WHITE)
 	var badge_bg := StyleBoxFlat.new()
-	badge_bg.bg_color = Color("#e74c3c")
-	badge_bg.set_corner_radius_all(9)
+	badge_bg.bg_color = PixelUI.RED
+	badge_bg.border_color = PixelUI.INK
+	badge_bg.set_border_width_all(PixelUI.PX)
 	badge_bg.content_margin_left = 6
 	badge_bg.content_margin_right = 6
 	_mail_icon_badge.add_theme_stylebox_override("normal", badge_bg)
@@ -135,15 +137,9 @@ func _build_desktop() -> void:
 
 	# Taskbar.
 	var bar := PanelContainer.new()
-	var bs := StyleBoxFlat.new()
-	bs.bg_color = Color(0.07, 0.08, 0.12, 0.92)
-	bs.content_margin_left = 10
-	bs.content_margin_right = 14
-	bs.content_margin_top = 6
-	bs.content_margin_bottom = 6
-	bar.add_theme_stylebox_override("panel", bs)
+	bar.add_theme_stylebox_override("panel", PixelUI.box("hud"))
 	bar.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
-	bar.offset_top = -44
+	bar.offset_top = -52
 	_root.add_child(bar)
 	var row := HBoxContainer.new()
 	bar.add_child(row)
@@ -160,31 +156,47 @@ func _build_desktop() -> void:
 	_toast.position = Vector2(-380, 16)
 	_toast.size = Vector2(360, 0)
 	_toast.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_toast.add_theme_font_size_override("font_size", 15)
-	_toast.add_theme_color_override("font_color", Color.WHITE)
-	var ts := StyleBoxFlat.new()
-	ts.bg_color = Color(0.1, 0.12, 0.18, 0.95)
-	ts.border_color = Color("#2e6bd9")
-	ts.border_width_left = 4
-	ts.set_corner_radius_all(6)
-	ts.set_content_margin_all(12)
-	_toast.add_theme_stylebox_override("normal", ts)
+	PixelUI.style_label(_toast, 16, PixelUI.TEXT)
+	_toast.add_theme_stylebox_override("normal", PixelUI.box("hud"))
 	_toast.visible = false
 	_root.add_child(_toast)
 
 
+## A pixel-art wallpaper: evening sky in bands, stars, a city skyline with
+## lit windows (drawn small, scaled up with nearest filtering).
 func _wallpaper() -> Texture2D:
-	var g := Gradient.new()
-	g.set_color(0, Color("#1b2a4a"))
-	g.set_color(1, Color("#4a2d5e"))
-	var gt := GradientTexture2D.new()
-	gt.gradient = g
-	gt.fill_from = Vector2(0, 0)
-	gt.fill_to = Vector2(1, 1)
-	gt.width = 256
-	gt.height = 256
-	return gt
-
+	var w := 160
+	var h := 90
+	var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
+	var bands := [Color("#1a1c3a"), Color("#232552"), Color("#2e2d66"), Color("#403579"), Color("#5a3f85"), Color("#7a4a86"), Color("#a15a7f")]
+	for y in h:
+		var t := float(y) / h
+		var i := mini(int(t * bands.size()), bands.size() - 1)
+		for x in w:
+			var c: Color = bands[i]
+			# Dither the band edges.
+			if i + 1 < bands.size() and fmod(t * bands.size(), 1.0) > 0.75 and (x + y) % 2 == 0:
+				c = bands[i + 1]
+			img.set_pixel(x, y, c)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	for k in 40:
+		img.set_pixel(rng.randi_range(0, w - 1), rng.randi_range(0, h / 2), Color(1, 1, 1, rng.randf_range(0.4, 0.9)))
+	var x := 0
+	while x < w:
+		var bw := rng.randi_range(8, 18)
+		var bh := rng.randi_range(14, 40)
+		var shade := Color("#12132a").lightened(rng.randf_range(0.0, 0.08))
+		for yy in range(h - bh, h):
+			for xx in range(x, mini(x + bw, w)):
+				img.set_pixel(xx, yy, shade)
+		for wy in range(h - bh + 3, h - 2, 4):
+			for wx in range(x + 2, mini(x + bw - 1, w), 3):
+				if rng.randf() < 0.35:
+					img.set_pixel(wx, wy, Color("#f7d774"))
+		x += bw + rng.randi_range(0, 3)
+	img.resize(w * 4, h * 4, Image.INTERPOLATE_NEAREST)
+	return ImageTexture.create_from_image(img)
 
 func _icon(caption: String, kind: String, on_open: Callable) -> Control:
 	var b := Button.new()
@@ -196,7 +208,7 @@ func _icon(caption: String, kind: String, on_open: Callable) -> Control:
 	pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	pic.draw.connect(func(): _draw_icon(pic, kind))
 	b.add_child(pic)
-	var l := _label(caption, 14, Color.WHITE, false)
+	var l := _label(caption, 16, Color.WHITE, false)
 	l.position = Vector2(0, 54)
 	l.size = Vector2(84, 22)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -207,24 +219,65 @@ func _icon(caption: String, kind: String, on_open: Callable) -> Control:
 	return b
 
 
-func _draw_icon(c: Control, kind: String) -> void:
-	var o := Vector2(26, 6)
-	match kind:
-		"browser":
-			c.draw_circle(o + Vector2(16, 20), 18, Color("#2e86de"))
-			c.draw_circle(o + Vector2(16, 20), 18, Color("#1b4f8a"), false, 2)
-			c.draw_line(o + Vector2(-2, 20), o + Vector2(34, 20), Color("#bfe0ff"), 2)
-			c.draw_arc(o + Vector2(16, 20), 9, -PI / 2, PI / 2, 12, Color("#bfe0ff"), 2)
-			c.draw_arc(o + Vector2(16, 20), 9, PI / 2, 3 * PI / 2, 12, Color("#bfe0ff"), 2)
-		"mail":
-			c.draw_rect(Rect2(o + Vector2(-2, 6), Vector2(36, 26)), Color("#f4f1ea"))
-			c.draw_polyline(PackedVector2Array([o + Vector2(-2, 6), o + Vector2(16, 22), o + Vector2(34, 6)]), Color("#c0392b"), 2)
-		"trash":
-			c.draw_rect(Rect2(o + Vector2(4, 8), Vector2(24, 28)), Color("#9aa4ab"))
-			c.draw_rect(Rect2(o + Vector2(0, 4), Vector2(32, 4)), Color("#7f8a93"))
-			for i in 3:
-				c.draw_line(o + Vector2(10 + i * 6, 12), o + Vector2(10 + i * 6, 32), Color("#6d7780"), 2)
+## Desktop icons: 12x12 pixel art, 3 screen pixels per art pixel.
+const ICONS := {
+	"browser": [
+		"....KKKK....",
+		"..KKbbbbKK..",
+		".KbbwbbbbbK.",
+		".KbwwbgggbK.",
+		"KbbbbgggggbK",
+		"KbbbggggbbbK",
+		"KbbbbgggbbbK",
+		"KbbbbbggbbbK",
+		".KbbbbgbbbK.",
+		".KbbbbbbbbK.",
+		"..KKbbbbKK..",
+		"....KKKK....",
+	],
+	"mail": [
+		"............",
+		"KKKKKKKKKKKK",
+		"KrwwwwwwwwrK",
+		"KwrwwwwwwrwK",
+		"KwwrwwwwrwwK",
+		"KwwwrwwrwwwK",
+		"KwwwwrrwwwwK",
+		"KwwwwwwwwwwK",
+		"KwwwwwwwwwwK",
+		"KwwwwwwwwwwK",
+		"KKKKKKKKKKKK",
+		"............",
+	],
+	"trash": [
+		"....KKKK....",
+		".KKKKKKKKKK.",
+		".KssssssssK.",
+		"..KKKKKKKK..",
+		"..KsgsgsgK..",
+		"..KsgsgsgK..",
+		"..KsgsgsgK..",
+		"..KsgsgsgK..",
+		"..KsgsgsgK..",
+		"..KsgsgsgK..",
+		"..KKKKKKKK..",
+		"............",
+	],
+}
+const ICON_COLORS := {"K": Color("#161826"), "b": Color("#3f8fe0"), "g": Color("#5bb04b"), "w": Color("#f3ead7"),
+	"r": Color("#d24b4b"), "s": Color("#aab2b8"), ".": Color(0, 0, 0, 0)}
 
+
+func _draw_icon(c: Control, kind: String) -> void:
+	var art: Array = ICONS.get(kind, [])
+	var px := 3.0
+	var o := Vector2((c.size.x - 12 * px) / 2, 6)
+	for y in art.size():
+		var row: String = art[y]
+		for x in row.length():
+			var col: Color = ICON_COLORS.get(row[x], Color(0, 0, 0, 0))
+			if col.a > 0:
+				c.draw_rect(Rect2(o + Vector2(x, y) * px, Vector2(px, px)), col)
 
 func _process(_d: float) -> void:
 	if not visible:
@@ -242,32 +295,18 @@ const TITLES := {"browser": "Przeglądarka — praca.example", "mail": "Poczta �
 
 func _open_window(name: String) -> void:
 	if not _windows.has(name):
-		var win := PanelContainer.new()
-		var ws := StyleBoxFlat.new()
-		ws.bg_color = Color("#eef1f6")
-		ws.set_corner_radius_all(8)
-		ws.shadow_color = Color(0, 0, 0, 0.45)
-		ws.shadow_size = 12
-		win.add_theme_stylebox_override("panel", ws)
+		var win := PixelUI.panel("paper")
 		var col := VBoxContainer.new()
 		col.add_theme_constant_override("separation", 0)
 		win.add_child(col)
 		var title_bar := PanelContainer.new()
-		var tb := StyleBoxFlat.new()
-		tb.bg_color = Color("#1f3a5f")
-		tb.corner_radius_top_left = 8
-		tb.corner_radius_top_right = 8
-		tb.set_content_margin_all(8)
-		title_bar.add_theme_stylebox_override("panel", tb)
+		title_bar.add_theme_stylebox_override("panel", PixelUI.box("title"))
 		var trow := HBoxContainer.new()
 		title_bar.add_child(trow)
-		var tl := _label(TITLES[name] % [profile.get("email", "")] if name == "mail" else TITLES[name], 15, Color.WHITE)
+		var tl := _label(TITLES[name] % [profile.get("email", "")] if name == "mail" else TITLES[name], 16, Color.WHITE)
 		tl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		trow.add_child(tl)
-		var close := Button.new()
-		close.text = " ✕ "
-		close.flat = true
-		close.add_theme_color_override("font_color", Color.WHITE)
+		var close := PixelUI.button("X", false, true)
 		close.pressed.connect(func(): _close_window(name))
 		trow.add_child(close)
 		title_bar.gui_input.connect(func(ev): _drag(win, ev))
@@ -293,17 +332,7 @@ func _open_window(name: String) -> void:
 		_root.add_child(win)
 		_windows[name] = win
 		_body[name] = body
-		var tbtn := Button.new()
-		tbtn.text = {"browser": "Przeglądarka", "mail": "Poczta", "interview": "Rozmowa"}[name]
-		var tbs := StyleBoxFlat.new()
-		tbs.bg_color = Color(1, 1, 1, 0.12)
-		tbs.set_corner_radius_all(4)
-		tbs.content_margin_left = 10
-		tbs.content_margin_right = 10
-		for st in ["normal", "hover", "pressed", "focus"]:
-			tbtn.add_theme_stylebox_override(st, tbs)
-		for fc in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
-			tbtn.add_theme_color_override(fc, Color.WHITE)
+		var tbtn := PixelUI.button({"browser": "Przeglądarka", "mail": "Poczta", "interview": "Rozmowa"}[name])
 		tbtn.pressed.connect(func(): _focus(name))
 		tbtn.name = "task_" + name
 		_taskbar.add_child(tbtn)
@@ -519,7 +548,8 @@ func _video_tile(parent: Container, who: String, look: int, appearance: Dictiona
 	var tile := PanelContainer.new()
 	var s := StyleBoxFlat.new()
 	s.bg_color = Color("#20242e")
-	s.set_corner_radius_all(8)
+	s.border_color = PixelUI.INK
+	s.set_border_width_all(PixelUI.PX)
 	tile.add_theme_stylebox_override("panel", s)
 	tile.custom_minimum_size = Vector2(230, 170)
 	var stage := Control.new()
@@ -535,10 +565,9 @@ func _video_tile(parent: Container, who: String, look: int, appearance: Dictiona
 	v.setup(seed_id, "", 9)
 	if not appearance.is_empty():
 		v.set_appearance(appearance)
-	var name_l := _label(who, 13, Color.WHITE, false)
+	var name_l := _label(who, 16, Color.WHITE, false)
 	var nb := StyleBoxFlat.new()
 	nb.bg_color = Color(0, 0, 0, 0.6)
-	nb.set_corner_radius_all(4)
 	nb.content_margin_left = 6
 	nb.content_margin_right = 6
 	name_l.add_theme_stylebox_override("normal", nb)
@@ -745,14 +774,8 @@ func _toast_msg(text: String) -> void:
 	get_tree().create_timer(4.0).timeout.connect(func(): if _toast.text == my: _toast.visible = false)
 
 
-func _label(text: String, size: int, color := Color("#1c2430"), wrap := true) -> Label:
-	var l := Label.new()
-	l.text = text
-	l.add_theme_font_size_override("font_size", size)
-	l.add_theme_color_override("font_color", color)
-	if wrap:
-		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	return l
+func _label(text: String, size: int, color := PixelUI.TEXT_INK, wrap := true) -> Label:
+	return PixelUI.label(text, size, color, wrap)
 
 
 func _card(parent: Container) -> VBoxContainer:
@@ -760,14 +783,7 @@ func _card(parent: Container) -> VBoxContainer:
 
 
 func _card_in(parent: Container) -> VBoxContainer:
-	var panel := PanelContainer.new()
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color.WHITE
-	sb.border_color = Color("#d5dbe5")
-	sb.set_border_width_all(1)
-	sb.set_corner_radius_all(10)
-	sb.set_content_margin_all(16)
-	panel.add_theme_stylebox_override("panel", sb)
+	var panel := PixelUI.panel("card")
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 8)
 	panel.add_child(box)
@@ -776,29 +792,6 @@ func _card_in(parent: Container) -> VBoxContainer:
 
 
 func _button(text: String, primary := true) -> Button:
-	var b := Button.new()
-	b.text = text
-	b.custom_minimum_size = Vector2(0, 40)
-	b.add_theme_font_size_override("font_size", 16)
-	var sb := StyleBoxFlat.new()
-	sb.set_corner_radius_all(8)
-	sb.content_margin_left = 14
-	sb.content_margin_right = 14
-	sb.content_margin_top = 8
-	sb.content_margin_bottom = 8
-	if primary:
-		sb.bg_color = Color("#2e6bd9")
-	else:
-		sb.bg_color = Color("#f7f9fc")
-		sb.border_color = Color("#c9d2df")
-		sb.set_border_width_all(1)
-	var hover := sb.duplicate()
-	hover.bg_color = Color("#3b7bef") if primary else Color("#e3edfc")
-	for st in ["normal", "focus"]:
-		b.add_theme_stylebox_override(st, sb)
-	b.add_theme_stylebox_override("hover", hover)
-	b.add_theme_stylebox_override("pressed", hover)
-	var fc := Color.WHITE if primary else Color("#1c2430")
-	for c in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
-		b.add_theme_color_override(c, fc)
+	var b := PixelUI.button(text, primary)
+	b.custom_minimum_size = Vector2(0, 36)
 	return b

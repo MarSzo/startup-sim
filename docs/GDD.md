@@ -214,7 +214,7 @@ gracze).
   części pomieszczeń czujka → alarm, straż pożarna, ewakuacja, kara —
   *zrobione (10.31)*.
 - Interfejs w pikselowym stylu gry: HUD (ekwipunek, statystyki), komputer,
-  portal z ofertami — pikselowa czcionka i ramki.
+  portal z ofertami — pikselowa czcionka i ramki — *zrobione (10.32)*.
 
 **Model biznesowy (przyszłość)**
 - Gra **darmowa** dla graczy.
@@ -857,6 +857,25 @@ Zastępuje prosty portal z 10.8. Po połączeniu gracz widzi pulpit komputera
   Administracja budynku pisze na #ogólny, gdzie i o której był alarm i kto
   palił. Gdy strażak wróci do wozu — koniec alarmu.
 
+### 10.32 Pikselowy interfejs
+
+- Cały interfejs w stylu pixel artu gry: czcionka **Pixelify Sans** (licencja
+  SIL OFL, `client/fonts/`), bez wygładzania, w kilku stałych rozmiarach
+  (16/20/24/32), z polskimi znakami.
+- Wspólny zestaw (`ui/pixel_ui.gd`): ramki 9-slice rysowane w kodzie (obrys,
+  jasna i ciemna krawędź, ścięte rogi; 1 piksel grafiki = 2 piksele ekranu),
+  przyciski z wciśnięciem, pola tekstowe „wgłębione”, paski przewijania,
+  segmentowe paski potrzeb, pikselowe koło (słońce, księżyc).
+- **HUD**: ciemne granatowe panele (zegar, portfel i potrzeby, ekwipunek ze
+  slotami i złotą ramką na rzeczy w rękach), dymki i nicki pikselową czcionką.
+- **Komputer w biurze**: pikselowy monitor — ciemna ramka, jasny ekran, niebieski
+  pasek tytułu, zakładki jako przyciski.
+- **Pulpit i portal**: pikselowa tapeta (wieczorne niebo w pasach, gwiazdy,
+  miasto z oknami), ikony 12×12 w pixel arcie, okna jak papier z niebieskim
+  paskiem, karty ofert, pasek zadań.
+- Okna rozmowy z NPC, półki sklepowej, plansze dnia i ekran tworzenia postaci w
+  tym samym stylu.
+
 ### 10.6 Stan implementacji
 
 *Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie,
@@ -893,6 +912,8 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Ekwipunek**: kieszenie i ręce, przedmioty (przepustka, karta, laptop,
   kawa), upuszczanie / podnoszenie / podawanie, dostęp z przedmiotów (10.13);
   protokół v8.
+- **Pikselowy interfejs**: czcionka Pixelify Sans, pikselowe ramki, przyciski,
+  paski i ikony w całym UI — HUD, komputer, pulpit z portalem, okna (10.32).
 - **Palenie, dym i straż**: papieros wszędzie, dym w pomieszczeniach
   przenikający przez drzwi, czujki, alarm z ewakuacją, strażak i kara (10.31);
   protokół v26.

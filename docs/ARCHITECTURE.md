@@ -192,6 +192,14 @@ dodaje `Vehicle::police` (parkuje przy wejściu) i `PoliceCall`; `tick_police`
 wypuszcza policjanta (`Npc::police`, id od `NPC_ID_BASE + 0xF00`), a gdy ten
 wróci do auta — usuwa NPC i odsyła radiowóz (`Vehicle::leave`).
 
+**Pikselowy interfejs** (klient, `ui/pixel_ui.gd`): czcionka (FontFile z
+`fonts/PixelifySans.ttf`, bez antyaliasingu i ligatur), `fs()` przyciąga
+rozmiary do 16/20/24/32, `box(kind)` buduje `StyleBoxTexture` z obrazka
+rysowanego w kodzie i powiększanego ×`PX` (najbliższy sąsiad), `button()`,
+`label()`, `draw_bar()`. `main.gd` ustawia czcionkę i motyw globalnie
+(`ThemeDB.fallback_font`, domyślny motyw + motyw okna), więc także
+`draw_string` i kontrolki bez własnego stylu są pikselowe.
+
 **Dym i straż** (`fire.rs`): `Smoke` trzyma ilość dymu na (piętro, pokój);
 stężenie = ilość / liczba kafli pokoju. `puff` (każdy tick palenia w środku),
 `tick` co `DRIFT_EVERY` przelewa przez każde przejście między pokojami

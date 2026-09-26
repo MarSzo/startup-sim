@@ -3,6 +3,8 @@
 ## worse and blink when it is critical.
 extends Control
 
+const PixelUI = preload("res://ui/pixel_ui.gd")
+
 ## [label, true if high = bad]
 const ROWS := [["Głód", true], ["Energia", false], ["Stres", true], ["Toaleta", true], ["Higiena", false]]
 const CRITICAL := 80
@@ -20,11 +22,7 @@ var _nums: Array[Label] = []
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(0.07, 0.08, 0.12, 0.82)
-	sb.set_corner_radius_all(8)
-	sb.set_content_margin_all(10)
-	_panel.add_theme_stylebox_override("panel", sb)
+	_panel.add_theme_stylebox_override("panel", PixelUI.box("hud"))
 	_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_panel)
 	var grid := GridContainer.new()
@@ -35,11 +33,10 @@ func _ready() -> void:
 	for i in ROWS.size():
 		var l := Label.new()
 		l.text = ROWS[i][0]
-		l.add_theme_font_size_override("font_size", 14)
-		l.add_theme_color_override("font_color", Color.WHITE)
+		PixelUI.style_label(l, 16, PixelUI.TEXT)
 		grid.add_child(l)
 		var bar := Control.new()
-		bar.custom_minimum_size = Vector2(120, 12)
+		bar.custom_minimum_size = Vector2(128, 14)
 		bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		var idx := i
 		bar.draw.connect(func(): _draw_bar(bar, idx))
@@ -48,20 +45,17 @@ func _ready() -> void:
 		var n := Label.new()
 		n.custom_minimum_size = Vector2(30, 0)
 		n.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		n.add_theme_font_size_override("font_size", 13)
-		n.add_theme_color_override("font_color", Color(1, 1, 1, 0.7))
+		PixelUI.style_label(n, 16, PixelUI.TEXT_DIM)
 		grid.add_child(n)
 		_nums.append(n)
 	_dirty.text = "Brudne ręce — umyj je (umywalka / płyn)"
-	_dirty.add_theme_font_size_override("font_size", 12)
-	_dirty.add_theme_color_override("font_color", Color("#ffb347"))
+	PixelUI.style_label(_dirty, 16, Color("#ffb347"))
 	_dirty.visible = false
 	grid.get_parent().remove_child(grid)
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 6)
 	_panel.add_child(col)
-	_money.add_theme_font_size_override("font_size", 14)
-	_money.add_theme_color_override("font_color", Color("#f7d774"))
+	PixelUI.style_label(_money, 16, PixelUI.GOLD)
 	col.add_child(_money)
 	col.add_child(grid)
 	col.add_child(_dirty)
@@ -116,12 +110,10 @@ func _process(_d: float) -> void:
 
 func _draw_bar(bar: Control, i: int) -> void:
 	var r := Rect2(Vector2.ZERO, bar.size)
-	bar.draw_rect(r, Color(1, 1, 1, 0.1))
 	var bad := badness(i)
 	var c := Color("#4caf50").lerp(Color("#f1c40f"), clampf(bad / 50.0, 0, 1))
 	if bad > 50:
 		c = Color("#f1c40f").lerp(Color("#e74c3c"), clampf((bad - 50) / 40.0, 0, 1))
 	if bad >= CRITICAL and (Time.get_ticks_msec() / 350) % 2 == 0:
 		c = c.lightened(0.35)
-	bar.draw_rect(Rect2(0, 0, bar.size.x * values[i] / 100.0, bar.size.y), c)
-	bar.draw_rect(r, Color(1, 1, 1, 0.25), false, 1.0)
+	PixelUI.draw_bar(bar, r, values[i] / 100.0, c)

@@ -4,6 +4,8 @@
 ## - a short "Dzień N" card whenever the personal day number goes up.
 extends Control
 
+const PixelUI = preload("res://ui/pixel_ui.gd")
+
 const Protocol = preload("res://net/protocol.gd")
 
 const CARD_SEC := 3.5
@@ -40,11 +42,13 @@ func _ready() -> void:
 	for l in [_title, _sub, _info]:
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		l.add_theme_color_override("font_color", Color.WHITE)
+		l.add_theme_constant_override("outline_size", 8)
+		l.add_theme_color_override("font_outline_color", PixelUI.INK)
 		col.add_child(l)
 	_title.add_theme_font_size_override("font_size", 64)
-	_sub.add_theme_font_size_override("font_size", 26)
-	_info.add_theme_font_size_override("font_size", 18)
-	_info.add_theme_color_override("font_color", Color(1, 1, 1, 0.75))
+	_sub.add_theme_font_size_override("font_size", 24)
+	_info.add_theme_font_size_override("font_size", 20)
+	_info.add_theme_color_override("font_color", Color(1, 1, 1, 0.8))
 	_modes.alignment = BoxContainer.ALIGNMENT_CENTER
 	_modes.add_theme_constant_override("separation", 10)
 	col.add_child(_modes)
@@ -52,7 +56,7 @@ func _ready() -> void:
 		var b := Button.new()
 		b.custom_minimum_size = Vector2(150, 84)
 		b.focus_mode = Control.FOCUS_NONE
-		b.add_theme_font_size_override("font_size", 15)
+		b.add_theme_font_size_override("font_size", 16)
 		var m: int = id
 		b.pressed.connect(func(): choose_commute.emit(m))
 		_modes.add_child(b)
@@ -106,13 +110,10 @@ func _render_modes() -> void:
 		var cost := "za darmo" if m[2] == 0 else "%d,%02d zł" % [m[2] / 100, m[2] % 100]
 		b.text = "%s\n%d min · %s\n%s" % [m[0], m[1], cost, MODE_NOTES[id]]
 		b.disabled = m[2] > clock.money
-		var sb := StyleBoxFlat.new()
-		sb.set_corner_radius_all(10)
-		sb.set_content_margin_all(8)
-		sb.bg_color = Color("#ffd166") if id == clock.mode else Color(1, 1, 1, 0.14)
+		var chosen: bool = id == clock.mode
 		for st in ["normal", "hover", "pressed", "disabled"]:
-			b.add_theme_stylebox_override(st, sb)
-		var fc := Color("#1c2430") if id == clock.mode else Color.WHITE
+			b.add_theme_stylebox_override(st, PixelUI.button_box(st, chosen) if chosen else PixelUI.box("hud"))
+		var fc := Color.WHITE
 		for k in ["font_color", "font_hover_color", "font_pressed_color"]:
 			b.add_theme_color_override(k, fc)
 		b.add_theme_color_override("font_disabled_color", Color(1, 1, 1, 0.35))
@@ -166,10 +167,10 @@ func _draw_sky() -> void:
 	var c := Vector2(size.x / 2, size.y * 0.22)
 	match clock.get("place", -1):
 		Protocol.PLACE_HOME:
-			_sky.draw_circle(c, 36, Color("#f4f1c9"))
-			_sky.draw_circle(c + Vector2(14, -8), 32, Color("#0d1330"))
+			PixelUI.draw_pixel_circle(_sky, c, 36, Color("#f4f1c9"))
+			PixelUI.draw_pixel_circle(_sky, c + Vector2(14, -8), 32, Color("#0d1330"))
 			for i in 24:
 				var sp := Vector2(fmod(i * 197.0, size.x), fmod(i * 83.0, size.y * 0.5))
 				_sky.draw_rect(Rect2(sp, Vector2(2, 2)), Color(1, 1, 1, 0.3 + 0.5 * fmod(i * 0.37, 1.0)))
 		Protocol.PLACE_COMMUTING:
-			_sky.draw_circle(c + Vector2(0, 30), 44, Color("#ffd166"))
+			PixelUI.draw_pixel_circle(_sky, c + Vector2(0, 30), 44, Color("#ffd166"))

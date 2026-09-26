@@ -5,6 +5,7 @@
 ## the movement for both the local player and interpolated remote ones.
 extends Node2D
 
+const PixelUI = preload("res://ui/pixel_ui.gd")
 const ItemArt = preload("res://game/item_art.gd")
 
 const FACING_DOWN := 0
@@ -70,12 +71,13 @@ func setup(seed_id: int, nick: String, zoom: float) -> void:
 	set_seed(seed_id)
 	nick_label.text = nick
 	var ls := LabelSettings.new()
+	ls.font = PixelUI.font()
 	ls.font_size = 16
 	ls.outline_size = 4
-	ls.outline_color = Color.BLACK
+	ls.outline_color = PixelUI.INK
 	nick_label.label_settings = ls
 	nick_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	nick_label.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	nick_label.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	# Render the label at screen resolution regardless of camera zoom.
 	nick_label.scale = Vector2.ONE / zoom
 	nick_label.size = Vector2(200, 24)
@@ -131,19 +133,12 @@ func set_seed(seed_id: int) -> void:
 
 
 func _build_bubble() -> void:
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color(1, 1, 1, 0.95)
-	sb.border_color = Color(0.1, 0.1, 0.1)
-	sb.set_border_width_all(2)
-	sb.set_corner_radius_all(8)
-	sb.set_content_margin_all(8)
-	bubble.add_theme_stylebox_override("panel", sb)
+	bubble.add_theme_stylebox_override("panel", PixelUI.box("bubble"))
 	bubble_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	bubble_label.custom_minimum_size = Vector2(BUBBLE_WIDTH, 0)
-	bubble_label.add_theme_color_override("font_color", Color(0.1, 0.1, 0.1))
-	bubble_label.add_theme_font_size_override("font_size", 15)
+	PixelUI.style_label(bubble_label, 16, PixelUI.TEXT_INK)
 	bubble.add_child(bubble_label)
-	bubble.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	bubble.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	bubble.scale = Vector2.ONE / _zoom
 	bubble.visible = false
 	bubble.z_index = 10

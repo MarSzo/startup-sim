@@ -57,6 +57,12 @@ godot --headless --path client -s tests/run_tests.gd
 Pliki golden (`server/tests/golden/`) pilnują, że protokół i ruch są identyczne
 w Rust i GDScript. Po celowej zmianie: `UPDATE_GOLDEN=1 cargo test --test golden`.
 
+## Czcionka
+
+Interfejs używa pikselowej czcionki **Pixelify Sans** (© The Pixelify Sans
+Project Authors), na licencji SIL Open Font License 1.1 — plik i licencja w
+`client/fonts/` (`PixelifySans.ttf`, `OFL.txt`).
+
 ## Mapy
 
 Budynek jest w `client/maps/` (`building.json` + `floorN.json`) — to jedno

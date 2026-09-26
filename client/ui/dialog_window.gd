@@ -2,6 +2,8 @@
 ## as buttons (or keys 1-3). The server drives it; id 0 closes it.
 extends Control
 
+const PixelUI = preload("res://ui/pixel_ui.gd")
+
 signal answer(id: int, choice: int)
 
 var dialog_id := 0
@@ -18,25 +20,15 @@ var _answered_at := 0
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	visible = false
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color("#f7f4ee")
-	sb.border_color = Color("#3d5a86")
-	sb.set_border_width_all(2)
-	sb.set_corner_radius_all(12)
-	sb.set_content_margin_all(16)
-	sb.shadow_color = Color(0, 0, 0, 0.4)
-	sb.shadow_size = 12
-	_panel.add_theme_stylebox_override("panel", sb)
+	_panel.add_theme_stylebox_override("panel", PixelUI.box("paper"))
 	_panel.custom_minimum_size = Vector2(560, 0)
 	add_child(_panel)
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 10)
 	_panel.add_child(col)
-	_who.add_theme_font_size_override("font_size", 14)
-	_who.add_theme_color_override("font_color", Color("#3d5a86"))
+	PixelUI.style_label(_who, 16, PixelUI.BLUE)
 	col.add_child(_who)
-	_text.add_theme_font_size_override("font_size", 19)
-	_text.add_theme_color_override("font_color", Color("#1c2430"))
+	PixelUI.style_label(_text, 20, PixelUI.TEXT_INK)
 	_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_text.custom_minimum_size = Vector2(528, 0)  # wrap width (else it measures as a tall column)
 	col.add_child(_text)
@@ -70,11 +62,9 @@ func on_dialog(p: Dictionary) -> void:
 	for c in _opts.get_children():
 		c.queue_free()
 	for i in p.options.size():
-		var b := Button.new()
-		b.text = "%d. %s" % [i + 1, p.options[i]]
+		var b := PixelUI.button("%d. %s" % [i + 1, p.options[i]])
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		b.focus_mode = Control.FOCUS_NONE
-		b.add_theme_font_size_override("font_size", 16)
 		var choice: int = i
 		b.pressed.connect(func(): _choose(choice))
 		_opts.add_child(b)

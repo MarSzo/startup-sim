@@ -11,6 +11,7 @@ const NetClient = preload("res://net/net_client.gd")
 const Building = preload("res://map/building.gd")
 const Game = preload("res://game/game.gd")
 const CharacterScreen = preload("res://ui/character_screen.gd")
+const PixelUI = preload("res://ui/pixel_ui.gd")
 const Desktop = preload("res://ui/desktop.gd")
 const Protocol = preload("res://net/protocol.gd")
 const DayScreen = preload("res://ui/day_screen.gd")
@@ -30,6 +31,11 @@ var day_screen := DayScreen.new()
 
 
 func _ready() -> void:
+	# Pixel font and frames everywhere (also text drawn with the fallback font).
+	ThemeDB.fallback_font = PixelUI.font()
+	ThemeDB.fallback_font_size = 16
+	ThemeDB.get_default_theme().merge_with(PixelUI.theme())
+	get_tree().root.theme = PixelUI.theme()
 	for a in OS.get_cmdline_user_args():
 		var kv: PackedStringArray = a.trim_prefix("--").split("=", true, 1)
 		args[kv[0]] = kv[1] if kv.size() > 1 else ""

@@ -27,6 +27,7 @@ const WeatherFx = preload("res://ui/weather_fx.gd")
 const DialogWindow = preload("res://ui/dialog_window.gd")
 const TrayView = preload("res://game/tray_view.gd")
 const SmokeView = preload("res://game/smoke_view.gd")
+const PixelUI = preload("res://ui/pixel_ui.gd")
 
 const ZOOM := 3.0
 ## Remote players are rendered this far in the past (2 snapshots at 20 Hz).
@@ -208,7 +209,7 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 	status_label.position = Vector2(-200, 24)
 	status_label.size = Vector2(400, 40)
 	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	status_label.add_theme_font_size_override("font_size", 22)
+	status_label.add_theme_font_size_override("font_size", 24)
 	status_label.add_theme_constant_override("outline_size", 6)
 	status_label.add_theme_color_override("font_outline_color", Color.BLACK)
 	status_label.visible = false
@@ -228,24 +229,16 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 	log_label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 	log_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	log_label.add_theme_font_size_override("font_size", 16)
+	log_label.add_theme_constant_override("line_spacing", 2)
 	log_label.add_theme_constant_override("outline_size", 5)
 	log_label.add_theme_color_override("font_outline_color", Color.BLACK)
 	status_layer.add_child(log_label)
 	status_layer.add_child(hud)
 	hud.slot_clicked.connect(_pocket_key)
 	status_layer.add_child(stats_hud)
-	var cp := PanelContainer.new()
-	var csb := StyleBoxFlat.new()
-	csb.bg_color = Color(0.07, 0.08, 0.12, 0.82)
-	csb.set_corner_radius_all(8)
-	csb.content_margin_left = 12
-	csb.content_margin_right = 12
-	csb.content_margin_top = 6
-	csb.content_margin_bottom = 6
-	cp.add_theme_stylebox_override("panel", csb)
+	var cp := PixelUI.panel("hud")
 	cp.position = Vector2(16, 16)
-	clock_label.add_theme_font_size_override("font_size", 18)
-	clock_label.add_theme_color_override("font_color", Color.WHITE)
+	PixelUI.style_label(clock_label, 20, PixelUI.TEXT)
 	cp.add_child(clock_label)
 	status_layer.add_child(cp)
 	add_child(daylight)
@@ -259,7 +252,7 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 	alarm_label.size = Vector2(660, 40)
 	alarm_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	alarm_label.text = "ALARM POŻAROWY — wyjdź z budynku!"
-	alarm_label.add_theme_font_size_override("font_size", 26)
+	alarm_label.add_theme_font_size_override("font_size", 32)
 	alarm_label.add_theme_color_override("font_color", Color("#ffdddd"))
 	alarm_label.add_theme_constant_override("outline_size", 8)
 	alarm_label.add_theme_color_override("font_outline_color", Color("#7a0000"))

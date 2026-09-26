@@ -2,6 +2,8 @@
 ## 1-9) takes one - unpaid until you pay at the till.
 extends Control
 
+const PixelUI = preload("res://ui/pixel_ui.gd")
+
 const ItemArt = preload("res://game/item_art.gd")
 
 signal take(shelf: int, kind: int)
@@ -16,28 +18,18 @@ var _list := VBoxContainer.new()
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	visible = false
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color("#f4f1ea")
-	sb.border_color = Color("#8f7a5a")
-	sb.set_border_width_all(2)
-	sb.set_corner_radius_all(10)
-	sb.set_content_margin_all(14)
-	sb.shadow_color = Color(0, 0, 0, 0.4)
-	sb.shadow_size = 10
-	_panel.add_theme_stylebox_override("panel", sb)
+	_panel.add_theme_stylebox_override("panel", PixelUI.box("paper"))
 	add_child(_panel)
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 8)
 	_panel.add_child(col)
-	_title.add_theme_font_size_override("font_size", 18)
-	_title.add_theme_color_override("font_color", Color("#1c2430"))
+	PixelUI.style_label(_title, 20, PixelUI.TEXT_INK)
 	col.add_child(_title)
 	_list.add_theme_constant_override("separation", 6)
 	col.add_child(_list)
 	var hint := Label.new()
 	hint.text = "1–9 weź · Esc zamknij · płaci się przy kasie"
-	hint.add_theme_font_size_override("font_size", 12)
-	hint.add_theme_color_override("font_color", Color("#6b6456"))
+	PixelUI.style_label(hint, 16, PixelUI.TEXT_MUTED)
 	col.add_child(hint)
 	_panel.resized.connect(_place)
 	get_viewport().size_changed.connect(_place)
@@ -72,20 +64,17 @@ func show_shelf(p: Dictionary) -> void:
 		var name := Label.new()
 		name.text = "%d. %s" % [i + 1, g.name]
 		name.custom_minimum_size = Vector2(200, 0)
-		name.add_theme_font_size_override("font_size", 16)
-		name.add_theme_color_override("font_color", Color("#1c2430"))
+		PixelUI.style_label(name, 16, PixelUI.TEXT_INK)
 		name.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(name)
 		var price := Label.new()
 		price.text = zl(g.price)
 		price.custom_minimum_size = Vector2(80, 0)
 		price.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		price.add_theme_font_size_override("font_size", 16)
-		price.add_theme_color_override("font_color", Color("#8f5a1a"))
+		PixelUI.style_label(price, 16, Color("#8f5a1a"))
 		price.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(price)
-		var b := Button.new()
-		b.text = "Weź"
+		var b := PixelUI.button("Weź", true)
 		b.focus_mode = Control.FOCUS_NONE
 		b.pressed.connect(func(): take.emit(shelf, kind))
 		row.add_child(b)

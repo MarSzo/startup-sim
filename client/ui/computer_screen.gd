@@ -6,6 +6,7 @@ extends Control
 
 const Protocol = preload("res://net/protocol.gd")
 const ItemArt = preload("res://game/item_art.gd")
+const PixelUI = preload("res://ui/pixel_ui.gd")
 
 ## ComputerAction to send: action, conversation, argument, text.
 signal action(action: int, conv: int, arg: int, text: String)
@@ -273,18 +274,12 @@ func _build() -> void:
 	_dim.color = Color(0.02, 0.03, 0.06, 0.6)
 	_dim.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(_dim)
-	var fsb := StyleBoxFlat.new()
-	fsb.bg_color = Color("#1c1f26")
-	fsb.set_corner_radius_all(16)
-	fsb.set_content_margin_all(14)
-	fsb.shadow_color = Color(0, 0, 0, 0.5)
-	fsb.shadow_size = 18
-	_frame.add_theme_stylebox_override("panel", fsb)
+	# A pixel monitor: dark bezel, light screen, blue title bar.
+	_frame.add_theme_stylebox_override("panel", PixelUI.box("screen"))
 	add_child(_frame)
 	var screen_bg := PanelContainer.new()
 	var ssb := StyleBoxFlat.new()
-	ssb.bg_color = Color("#eef1f6")
-	ssb.set_corner_radius_all(6)
+	ssb.bg_color = PixelUI.PAPER
 	screen_bg.add_theme_stylebox_override("panel", ssb)
 	_frame.add_child(screen_bg)
 	_screen.add_theme_constant_override("separation", 0)
@@ -292,13 +287,7 @@ func _build() -> void:
 
 	# Top bar: app name, whose account, lock / take / close.
 	var bar := PanelContainer.new()
-	var bsb := StyleBoxFlat.new()
-	bsb.bg_color = Color("#1f3a5f")
-	bsb.corner_radius_top_left = 6
-	bsb.corner_radius_top_right = 6
-	bsb.set_content_margin_all(8)
-	bsb.content_margin_left = 14
-	bar.add_theme_stylebox_override("panel", bsb)
+	bar.add_theme_stylebox_override("panel", PixelUI.box("title"))
 	_screen.add_child(bar)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
@@ -338,8 +327,7 @@ func _build() -> void:
 	_chat_view.add_child(_body)
 	var side := PanelContainer.new()
 	var sdb := StyleBoxFlat.new()
-	sdb.bg_color = Color("#2a3342")
-	sdb.corner_radius_bottom_left = 6
+	sdb.bg_color = PixelUI.NAVY
 	sdb.set_content_margin_all(10)
 	side.add_theme_stylebox_override("panel", sdb)
 	side.custom_minimum_size = Vector2(230, 0)
@@ -383,16 +371,8 @@ func _build() -> void:
 	_entry.custom_minimum_size = Vector2(0, 40)
 	_entry.max_length = 200
 	_entry.add_theme_font_size_override("font_size", 16)
-	var esb := StyleBoxFlat.new()
-	esb.bg_color = Color.WHITE
-	esb.border_color = Color("#c9d2df")
-	esb.set_border_width_all(1)
-	esb.set_corner_radius_all(6)
-	esb.content_margin_left = 10
-	var efocus := esb.duplicate()
-	efocus.border_color = Color("#2e6bd9")
-	_entry.add_theme_stylebox_override("normal", esb)
-	_entry.add_theme_stylebox_override("focus", efocus)
+	_entry.add_theme_stylebox_override("normal", PixelUI.box("input"))
+	_entry.add_theme_stylebox_override("focus", PixelUI.box("input_focus"))
 	_entry.add_theme_color_override("font_color", Color("#1c2430"))
 	_entry.add_theme_color_override("font_placeholder_color", Color("#8a93a3"))
 	_entry.add_theme_color_override("caret_color", Color("#1c2430"))
@@ -595,17 +575,8 @@ func _co_edit(key: String, value: String, max_len: int, width: int) -> LineEdit:
 	e.add_theme_font_size_override("font_size", 14)
 	e.add_theme_color_override("font_color", Color("#1c2430"))
 	e.add_theme_color_override("font_placeholder_color", Color("#8a93a3"))
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color.WHITE
-	sb.border_color = Color("#c5ccd8")
-	sb.set_border_width_all(1)
-	sb.set_corner_radius_all(5)
-	sb.content_margin_left = 8
-	sb.content_margin_right = 8
-	e.add_theme_stylebox_override("normal", sb)
-	var fsb := sb.duplicate()
-	fsb.border_color = Color("#2e6bd9")
-	e.add_theme_stylebox_override("focus", fsb)
+	e.add_theme_stylebox_override("normal", PixelUI.box("input"))
+	e.add_theme_stylebox_override("focus", PixelUI.box("input_focus"))
 	e.text_changed.connect(func(t: String): _co_drafts[key] = t)
 	return e
 
@@ -687,8 +658,7 @@ func _render_company() -> void:
 		var hire := _button("Zatrudnij", true)
 		hire.pressed.connect(func(): company_action.emit(Protocol.CO_HIRE, pid, 0, ""))
 		row.add_child(hire)
-		var rej := _button("Odrzuć", false)
-		rej.add_theme_color_override("font_color", Color("#c0392b"))
+		var rej := PixelUI.button("Odrzuć", false, true)
 		rej.pressed.connect(func(): company_action.emit(Protocol.CO_REJECT, pid, 0, ""))
 		row.add_child(rej)
 
@@ -705,8 +675,7 @@ func _render_company() -> void:
 		if pid == my_id:
 			row.add_child(_co_label("(Ty)", 14, Color("#8a93a3")))
 			continue
-		var fire := _button("Zwolnij", false)
-		fire.add_theme_color_override("font_color", Color("#c0392b"))
+		var fire := PixelUI.button("Zwolnij", false, true)
 		fire.pressed.connect(func(): company_action.emit(Protocol.CO_FIRE, pid, 0, ""))
 		row.add_child(fire)
 
@@ -861,7 +830,6 @@ func _render_sidebar() -> void:
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		b.add_theme_font_size_override("font_size", 15)
 		var sb := StyleBoxFlat.new()
-		sb.set_corner_radius_all(6)
 		sb.set_content_margin_all(6)
 		sb.content_margin_left = 10
 		sb.bg_color = Color("#3d5a86") if c.conv == current else Color(0, 0, 0, 0)
@@ -922,28 +890,8 @@ func _render_input() -> void:
 
 
 func _style_label(l: Label, size: int, color: Color) -> void:
-	l.add_theme_font_size_override("font_size", size)
-	l.add_theme_color_override("font_color", color)
+	PixelUI.style_label(l, size, color)
 
 
 func _button(text: String, primary: bool) -> Button:
-	var b := Button.new()
-	b.text = text
-	b.add_theme_font_size_override("font_size", 14)
-	var sb := StyleBoxFlat.new()
-	sb.set_corner_radius_all(6)
-	sb.content_margin_left = 12
-	sb.content_margin_right = 12
-	sb.content_margin_top = 6
-	sb.content_margin_bottom = 6
-	sb.bg_color = Color("#2e6bd9") if primary else Color(1, 1, 1, 0.14)
-	var hover := sb.duplicate()
-	hover.bg_color = Color("#3b7bef") if primary else Color(1, 1, 1, 0.24)
-	for st in ["normal", "focus", "disabled"]:
-		b.add_theme_stylebox_override(st, sb)
-	b.add_theme_stylebox_override("hover", hover)
-	b.add_theme_stylebox_override("pressed", hover)
-	for c in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
-		b.add_theme_color_override(c, Color.WHITE)
-	b.add_theme_color_override("font_disabled_color", Color(1, 1, 1, 0.6))
-	return b
+	return PixelUI.button(text, primary)

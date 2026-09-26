@@ -3,6 +3,8 @@
 ## (user://character.cfg) so it doesn't have to be typed in every time.
 extends Control
 
+const PixelUI = preload("res://ui/pixel_ui.gd")
+
 const PlayerView = preload("res://game/player_view.gd")
 
 ## Emitted with a validated character; `address` = server "host:port".
@@ -42,7 +44,9 @@ func _ready() -> void:
 	outer.add_theme_constant_override("separation", 14)
 	center.add_child(outer)
 
-	var title := _label("Startup Sim", 38, Color.WHITE)
+	var title := _label("Startup Sim", 64, Color.WHITE)
+	title.add_theme_constant_override("outline_size", 8)
+	title.add_theme_color_override("font_outline_color", PixelUI.BLUE_LO)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	outer.add_child(title)
 	var sub := _label("Stwórz swoją postać — za chwilę zaczniesz szukać pracy.", 16, Color(1, 1, 1, 0.6))
@@ -56,20 +60,12 @@ func _ready() -> void:
 	row.add_child(_panel(_build_looks()))
 
 	button.text = "Rozpocznij"
-	button.custom_minimum_size = Vector2(0, 46)
-	button.add_theme_font_size_override("font_size", 19)
-	var bs := StyleBoxFlat.new()
-	bs.bg_color = Color("#2e6bd9")
-	bs.set_corner_radius_all(8)
-	var bh := bs.duplicate()
-	bh.bg_color = Color("#3b7bef")
-	var bd := bs.duplicate()
-	bd.bg_color = Color("#3a4257")
-	button.add_theme_stylebox_override("normal", bs)
-	button.add_theme_stylebox_override("hover", bh)
-	button.add_theme_stylebox_override("pressed", bh)
-	button.add_theme_stylebox_override("disabled", bd)
-	button.add_theme_color_override("font_color", Color.WHITE)
+	button.custom_minimum_size = Vector2(0, 48)
+	button.add_theme_font_size_override("font_size", 24)
+	for st in ["normal", "hover", "pressed", "disabled", "focus"]:
+		button.add_theme_stylebox_override(st, PixelUI.button_box(st, true))
+	for k in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+		button.add_theme_color_override(k, Color.WHITE)
 	outer.add_child(button)
 	status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -95,18 +91,13 @@ func _fit() -> void:
 func _label(text: String, size: int, color := Color(1, 1, 1, 0.8)) -> Label:
 	var l := Label.new()
 	l.text = text
-	l.add_theme_font_size_override("font_size", size)
-	l.add_theme_color_override("font_color", color)
+	PixelUI.style_label(l, size, color)
 	return l
 
 
 func _panel(content: Control) -> PanelContainer:
 	var p := PanelContainer.new()
-	var sb := StyleBoxFlat.new()
-	sb.bg_color = Color("#2a3042")
-	sb.set_corner_radius_all(10)
-	sb.set_content_margin_all(18)
-	p.add_theme_stylebox_override("panel", sb)
+	p.add_theme_stylebox_override("panel", PixelUI.box("hud"))
 	p.add_child(content)
 	return p
 
@@ -219,10 +210,9 @@ func _refresh_looks() -> void:
 		for i in buttons.size():
 			var sb := StyleBoxFlat.new()
 			sb.bg_color = colors[i]
-			sb.set_corner_radius_all(4)
 			var selected: bool = appearance[key] == i
-			sb.set_border_width_all(3 if selected else 1)
-			sb.border_color = Color.WHITE if selected else Color(0, 0, 0, 0.5)
+			sb.set_border_width_all(PixelUI.PX * (2 if selected else 1))
+			sb.border_color = PixelUI.GOLD if selected else PixelUI.INK
 			for state in ["normal", "hover", "pressed", "focus"]:
 				buttons[i].add_theme_stylebox_override(state, sb)
 	_hair_label.text = PlayerView.HAIR_STYLE_NAMES[appearance.hair_style]
