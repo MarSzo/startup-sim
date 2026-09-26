@@ -2,6 +2,7 @@
 
 pub mod args;
 pub mod building;
+pub mod clock;
 pub mod coffee;
 pub mod elevator;
 pub mod computer;

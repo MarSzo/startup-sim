@@ -5,7 +5,7 @@
 //! `tests/golden/packets.json`.
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 15;
+pub const VERSION: u8 = 16;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
 pub const MAX_PACKET: usize = 1200;
@@ -59,6 +59,7 @@ pub mod ty {
     pub const DOOR_ACTION: u8 = 26;
     pub const SHELF: u8 = 27;
     pub const SHOP_TAKE: u8 = 28;
+    pub const CLOCK: u8 = 29;
 }
 
 /// `ItemAction::action`.
@@ -178,6 +179,21 @@ pub mod activity {
     /// Washing hands at a sink.
     pub const WASHING: u8 = 6;
 }
+
+/// `Clock::place`: where the receiver is.
+pub mod place {
+    /// In the building.
+    pub const BUILDING: u8 = 0;
+    /// At home for the night (after 22:00).
+    pub const HOME: u8 = 1;
+    /// On the way to work (morning, until `arrive`).
+    pub const COMMUTING: u8 = 2;
+    /// At home looking for a job (the portal).
+    pub const PORTAL: u8 = 3;
+}
+
+/// `Clock::arrive` when there is no arrival time.
+pub const NO_TIME: u16 = 0xFFFF;
 
 /// `Doors::lift_target` when the elevator isn't heading anywhere.
 pub const NO_FLOOR: u8 = 255;
@@ -337,6 +353,11 @@ pub enum Packet {
     Shelf { shelf: u8, title: String, goods: Vec<ShelfItem> },
     /// Take one `kind` off shelf `shelf` (unpaid, into the inventory).
     ShopTake { token: u32, shelf: u8, kind: u8 },
+    /// Game time (shared) + the receiver's day: personal day number, minute
+    /// of the day (0..1439), night (office closed), where they are
+    /// (`place`), arrival time (minute of the day or `NO_TIME`), last payday
+    /// (grosze, game minutes worked) and minutes worked today.
+    Clock { day: u16, minute: u16, night: bool, place: u8, arrive: u16, pay: u32, pay_minutes: u16, today_minutes: u16 },
     /// Closed doors (locked toilet stalls, elevator doors) on the receiver's
     /// floor: solid for the simulation. Plus the elevator: the floor it is at
     /// and where it is heading (`NO_FLOOR` = standing). Sent on change and
@@ -473,6 +494,7 @@ impl Packet {
             Packet::Stats { .. } => ty::STATS,
             Packet::Shelf { .. } => ty::SHELF,
             Packet::ShopTake { .. } => ty::SHOP_TAKE,
+            Packet::Clock { .. } => ty::CLOCK,
             Packet::Doors { .. } => ty::DOORS,
             Packet::DoorAction { .. } => ty::DOOR_ACTION,
         }
@@ -706,6 +728,16 @@ impl Packet {
                 w.u8(*shelf);
                 w.u8(*kind);
             }
+            Packet::Clock { day, minute, night, place, arrive, pay, pay_minutes, today_minutes } => {
+                w.u16(*day);
+                w.u16(*minute);
+                w.u8(*night as u8);
+                w.u8(*place);
+                w.u16(*arrive);
+                w.u32(*pay);
+                w.u16(*pay_minutes);
+                w.u16(*today_minutes);
+            }
             Packet::Chat { conv, messages } => {
                 w.u16(*conv);
                 w.u8(messages.len().min(255) as u8);
@@ -936,6 +968,16 @@ impl Packet {
                 Packet::Shelf { shelf, title, goods }
             }
             ty::SHOP_TAKE => Packet::ShopTake { token: r.u32()?, shelf: r.u8()?, kind: r.u8()? },
+            ty::CLOCK => Packet::Clock {
+                day: r.u16()?,
+                minute: r.u16()?,
+                night: r.u8()? != 0,
+                place: r.u8()?,
+                arrive: r.u16()?,
+                pay: r.u32()?,
+                pay_minutes: r.u16()?,
+                today_minutes: r.u16()?,
+            },
             ty::CHAT => {
                 let conv = r.u16()?;
                 let n = r.u8()? as usize;
@@ -1162,6 +1204,19 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
         ),
         ("shop_take", Packet::ShopTake { token: 0x01020304, shelf: 1, kind: 11 }),
         (
+            "clock",
+            Packet::Clock {
+                day: 2,
+                minute: 8 * 60 + 12,
+                night: false,
+                place: place::COMMUTING,
+                arrive: 9 * 60 + 5,
+                pay: 230_00,
+                pay_minutes: 460,
+                today_minutes: 0,
+            },
+        ),
+        (
             "chat",
             Packet::Chat {
                 conv: 17,
@@ -1228,7 +1283,7 @@ mod tests {
                 b[0] = 0x54;
                 b[1] = 0x53;
                 b[2] = VERSION;
-                b[3] = rng.u8(1..=28);
+                b[3] = rng.u8(1..=29);
             }
             let _ = Packet::decode(&b);
         }

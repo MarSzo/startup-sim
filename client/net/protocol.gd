@@ -3,7 +3,7 @@
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 15
+const VERSION := 16
 const MAX_PACKET := 1200
 const MAX_NICK_BYTES := 16
 const MAX_SAY_BYTES := 240
@@ -39,6 +39,13 @@ const T_DOORS := 25
 const T_DOOR_ACTION := 26
 const T_SHELF := 27
 const T_SHOP_TAKE := 28
+const T_CLOCK := 29
+# Clock.place
+const PLACE_BUILDING := 0
+const PLACE_HOME := 1
+const PLACE_COMMUTING := 2
+const PLACE_PORTAL := 3
+const NO_TIME := 0xFFFF
 
 const PC_CLOSE := 1
 const PC_LOCK := 2
@@ -408,6 +415,15 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			p.hygiene = r.u8()
 			p.stats_flags = r.u8()
 			p.money = r.u32()
+		T_CLOCK:
+			p.day = r.u16()
+			p.minute = r.u16()
+			p.night = r.u8() != 0
+			p.place = r.u8()
+			p.arrive = r.u16()
+			p.pay = r.u32()
+			p.pay_minutes = r.u16()
+			p.today_minutes = r.u16()
 		T_SHELF:
 			p.shelf = r.u8()
 			p.title = r.str16(MAX_TEXT_BYTES)

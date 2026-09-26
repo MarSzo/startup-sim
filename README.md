@@ -30,7 +30,8 @@ do HR, a HR (E) podpisze umowę i wyda kartę pracownika.
 `--bind`, `--map`, `--max-players`, `--stats-secs`, `--start-with-card` (każdy gracz z kartą — do testów z botami),
 `--skip-recruitment` (bez portalu, od razu do świata), `--start-employed` (od razu zatrudniony:
 umowa, karta i laptop, start przy biurku działu — nieparzyste id IT, parzyste Biznes),
-`--needs-speed <n>` (głód, energia itd. zmieniają się n razy szybciej), `--recruitment <plik>` (oferty i pytania,
+`--needs-speed <n>` (głód, energia itd. zmieniają się n razy szybciej),
+`--start-time <hh:mm>` (godzina gry na starcie, domyślnie 8:00), `--time-scale <n>` (dzień w grze płynie n razy szybciej), `--recruitment <plik>` (oferty i pytania,
 domyślnie `server/data/recruitment.json`), oraz symulacja sieci:
 `--lag-ms <ms>` (opóźnienie w jedną stronę, RTT rośnie 2×), `--jitter-ms <ms>`, `--loss <0..1>`.
 Np. RTT ~100 ms i 2% strat: `cargo run --release -- --lag-ms 50 --jitter-ms 10 --loss 0.02`.

@@ -25,9 +25,23 @@ OPTIONS:
   --skip-recruitment    spawn straight into the building, no job portal (dev)
   --start-employed      like --skip-recruitment, but already hired: contract, card and
                         laptop, spawned at a desk (departments alternate by player id)
+  --start-time <hh:mm>  game time when the server starts (day 1)  [default: 8:00]
+  --time-scale <n>      daytime passes n times faster (dev)       [default: 1 = 1 h / 5 min]
   --needs-speed <n>     needs (hunger, energy...) change n times faster (dev)
   --recruitment <path>  recruitment JSON  [default: data/recruitment.json]
 ";
+
+/// "8:30" -> minutes since midnight.
+fn parse_time(s: &str) -> u32 {
+    let (h, m) = s.split_once(':').unwrap_or((s, "0"));
+    match (h.trim().parse::<u32>(), m.trim().parse::<u32>()) {
+        (Ok(h), Ok(m)) if h < 24 && m < 60 => h * 60 + m,
+        _ => {
+            eprintln!("invalid --start-time {s} (expected hh:mm)");
+            std::process::exit(2);
+        }
+    }
+}
 
 fn main() {
     let args = Args::from_env();
@@ -61,6 +75,8 @@ fn main() {
         skip_recruitment: args.flag("skip-recruitment") || args.flag("start-employed"),
         start_employed: args.flag("start-employed"),
         needs_speed: args.get("needs-speed", 1),
+        start_minute: parse_time(args.str("start-time").unwrap_or("8:00")),
+        time_scale: args.get("time-scale", 1),
     };
     let mut cfg = cfg;
     if args.str("bind").is_none() && game::net::bind_udp(cfg.bind).is_err() {

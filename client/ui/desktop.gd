@@ -32,6 +32,8 @@ var _windows := {}        # name -> window PanelContainer
 var _body := {}           # name -> VBoxContainer (window content)
 var _taskbar := HBoxContainer.new()
 var _clock := Label.new()
+var game_day := 0          # from the server's Clock (0 = not known yet)
+var game_minute := 0
 var _toast := Label.new()
 var _mail_icon_badge := Label.new()
 var _browser_view := "list"   # list / form
@@ -216,8 +218,10 @@ func _draw_icon(c: Control, kind: String) -> void:
 func _process(_d: float) -> void:
 	if not visible:
 		return
-	var t := Time.get_time_dict_from_system()
-	_clock.text = "%s   %02d:%02d" % [nick, t.hour, t.minute]
+	if game_day > 0:
+		_clock.text = "%s   Dzień %d · %02d:%02d" % [nick, game_day, game_minute / 60, game_minute % 60]
+	else:
+		_clock.text = nick
 
 
 # ----------------------------------------------------------------- windows

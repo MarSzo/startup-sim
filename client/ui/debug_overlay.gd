@@ -13,7 +13,7 @@ func _ready() -> void:
 	sb.bg_color = Color(0, 0, 0, 0.6)
 	sb.set_content_margin_all(8)
 	panel.add_theme_stylebox_override("panel", sb)
-	panel.position = Vector2(8, 8)
+	panel.position = Vector2(8, 56)  # below the game clock
 	add_child(panel)
 	label.add_theme_font_size_override("font_size", 14)
 	panel.add_child(label)

@@ -6,6 +6,7 @@ use std::net::SocketAddr;
 use std::time::{Duration, Instant};
 
 use crate::building::Building;
+use crate::clock::{self, Clock, Transition};
 use crate::coffee::{self, Cup, Machine};
 use crate::computer::{self, Account, Computer, Messenger, Workstation};
 use crate::elevator::{self, Elevator};
@@ -48,6 +49,10 @@ pub struct Config {
     pub start_employed: bool,
     /// Needs change this many times faster (dev / testing; 1 = normal).
     pub needs_speed: u32,
+    /// Game time when the server starts (minute of day 1).
+    pub start_minute: u32,
+    /// Daytime clock speed multiplier (dev / testing; 1 = 1 game hour per 5 min).
+    pub time_scale: u32,
 }
 
 /// Where a connected player is in the game.
@@ -57,6 +62,9 @@ enum Stage {
     Portal(Box<Desk>),
     /// Hired and in the building.
     Working,
+    /// Hired, out of the building: at home for the night (`None`) or on the
+    /// way to work, arriving at game minute `Some(t)` (`Clock::total_minutes`).
+    Home { arrive_at: Option<u32> },
 }
 
 /// Desktop state of a candidate (GDD 9a, step 2).
@@ -113,6 +121,9 @@ const GIVE_RADIUS: i32 = sim::TILE_UNITS * 2;
 /// Resend the inventory this often (ticks).
 const INVENTORY_RESEND_TICKS: u32 = 40;
 
+/// Resend the game time this often (ticks).
+const CLOCK_RESEND_TICKS: u32 = 20;
+
 /// Send the character's needs this often (ticks).
 const STATS_EVERY_TICKS: u32 = 10;
 /// Fruit in the bowl (label of the item).
@@ -147,6 +158,12 @@ struct Player {
     needs: Needs,
     /// Wallet, grosze.
     money: i64,
+    /// Personal day number (1 = looking for a job).
+    day: u32,
+    /// Game deciseconds worked today (salary at 22:00).
+    worked_ds: u64,
+    /// Last payday: amount (grosze) and game minutes worked.
+    last_pay: (i64, u32),
     /// Sofa / toilet / smoke break, and where it started (moving ends it).
     rest: Option<(Rest, u8, Pos)>,
     /// Messenger spam guard / retry dedupe.
@@ -196,6 +213,9 @@ pub struct Server {
     cashier: Option<u16>,
     /// Some elevator was moving last tick (resend `Doors` when it starts/stops).
     lift_was_moving: bool,
+    clock: Clock,
+    /// Send `Clock` to everyone this tick (a day started / ended, someone arrived).
+    clock_dirty: bool,
     /// A stall door changed: send `Doors` to everyone this tick.
     doors_dirty: bool,
     /// Desks where a laptop can stand, and the laptops standing on them.
@@ -240,6 +260,8 @@ impl Server {
                 .collect(),
             cashier: None,
             lift_was_moving: false,
+            clock: Clock::new(cfg.start_minute, cfg.time_scale),
+            clock_dirty: true,
             doors_dirty: false,
             computers: Vec::new(),
             messenger: Messenger::default(),
@@ -527,6 +549,9 @@ impl Server {
             at_computer: None,
             needs: Needs::default(),
             money: 0,
+            day: 1,
+            worked_ds: 0,
+            last_pay: (0, 0),
             rest: None,
             last_chat_tick: None,
             last_chat_nonce: 0,
@@ -549,6 +574,12 @@ impl Server {
         self.by_addr.insert(addr, id);
         if self.cfg.start_employed {
             self.employ(id);
+            if let Some(p) = self.players.get_mut(&id) {
+                p.day = 2;
+                if self.clock.is_night() {
+                    p.stage = Stage::Home { arrive_at: None };
+                }
+            }
         } else if skip && self.cfg.start_access & crate::map::access::CARD != 0 {
             self.give_new(id, item_kind::EMPLOYEE_CARD); // load tests: straight in with a card
         }
@@ -605,7 +636,7 @@ impl Server {
     fn desk(&mut self, id: u16) -> Option<&mut Desk> {
         match &mut self.players.get_mut(&id)?.stage {
             Stage::Portal(d) => Some(d),
-            Stage::Working => None,
+            Stage::Working | Stage::Home { .. } => None,
         }
     }
 
@@ -672,8 +703,12 @@ impl Server {
                 let p = self.players.get_mut(&id).unwrap();
                 let Stage::Portal(desk) = &p.stage else { return };
                 let Some(dept) = desk.hired else { return };
-                p.stage = Stage::Working;
+                // Hired: a new day - the first one at work. At night you come
+                // in the morning (random arrival, like everybody).
+                p.day += 1;
+                p.stage = if self.clock.is_night() { Stage::Home { arrive_at: None } } else { Stage::Working };
                 p.department = dept;
+                self.clock_dirty = true;
                 let msg = format!(
                     "* player {id} '{}' goes to the office: {}",
                     p.nick,
@@ -982,6 +1017,102 @@ impl Server {
                 self.dropped.insert(i, Dropped { item, ..d });
                 Some(inventory::Refusal::HandsFull.line().to_string())
             }
+        }
+    }
+
+    // ------------------------------------------------------------- clock
+
+    /// Game time: salary accrues, 22:00 sends everybody home (payday), 6:00
+    /// starts a new day with random arrivals, arrivals come in.
+    fn tick_clock(&mut self) {
+        let rate = self.clock.rate() as u64;
+        let transition = self.clock.tick();
+        if !self.clock.is_night() {
+            for p in self.players.values_mut() {
+                if p.contract && matches!(p.stage, Stage::Working) {
+                    p.worked_ds += rate;
+                }
+            }
+        }
+        match transition {
+            Some(Transition::Evening) => {
+                let ids: Vec<u16> = self.players.values().filter(|p| matches!(p.stage, Stage::Working)).map(|p| p.id).collect();
+                for pid in ids {
+                    self.go_home(pid);
+                }
+                self.log(format!("* day {} ends: office closed", self.clock.day));
+                self.clock_dirty = true;
+            }
+            Some(Transition::Morning) => {
+                let now = self.clock.total_minutes();
+                for p in self.players.values_mut() {
+                    p.day += 1;
+                    if let Stage::Home { arrive_at } = &mut p.stage {
+                        *arrive_at = Some(now + self.rng.u32(clock::ARRIVAL_FROM..=clock::ARRIVAL_TO));
+                    }
+                }
+                self.log(format!("* day {} starts", self.clock.day));
+                self.clock_dirty = true;
+            }
+            None => {}
+        }
+        let now = self.clock.total_minutes();
+        let arriving: Vec<u16> = self
+            .players
+            .values()
+            .filter(|p| matches!(p.stage, Stage::Home { arrive_at: Some(t) } if now >= t))
+            .map(|p| p.id)
+            .collect();
+        for pid in arriving {
+            self.arrive(pid);
+        }
+    }
+
+    /// 22:00: out of the building; salary for the hours worked today.
+    fn go_home(&mut self, pid: u16) {
+        self.end_session(pid);
+        let Some(p) = self.players.get_mut(&pid) else { return };
+        p.rest = None;
+        let minutes = (p.worked_ds / clock::DS_PER_MIN as u64) as u32;
+        let pay = minutes as i64 * clock::PAY_PER_MIN;
+        p.money += pay;
+        p.last_pay = (pay, minutes);
+        p.worked_ds = 0;
+        p.stage = Stage::Home { arrive_at: None };
+        let msg = format!("* {} goes home: worked {} min, paid {}", p.nick, minutes, shop::zl(pay));
+        self.log(msg);
+    }
+
+    /// Morning arrival: in front of the building.
+    fn arrive(&mut self, pid: u16) {
+        let spawns = self.building.spawns();
+        let (floor, t) = spawns[self.next_spawn % spawns.len()];
+        self.next_spawn += 1;
+        let room = self.room_of(floor, Pos::tile_center(t.x, t.y));
+        let Some(p) = self.players.get_mut(&pid) else { return };
+        p.body = Body::at(floor, Pos::tile_center(t.x, t.y));
+        p.room = room;
+        p.stage = Stage::Working;
+        refresh(p);
+        self.clock_dirty = true;
+    }
+
+    fn clock_packet(&self, p: &Player) -> Packet {
+        let (place, arrive) = match p.stage {
+            Stage::Portal(_) => (proto::place::PORTAL, proto::NO_TIME),
+            Stage::Working => (proto::place::BUILDING, proto::NO_TIME),
+            Stage::Home { arrive_at: None } => (proto::place::HOME, proto::NO_TIME),
+            Stage::Home { arrive_at: Some(t) } => (proto::place::COMMUTING, (t % clock::MIN_PER_DAY) as u16),
+        };
+        Packet::Clock {
+            day: p.day.min(u16::MAX as u32) as u16,
+            minute: self.clock.minute() as u16,
+            night: self.clock.is_night(),
+            place,
+            arrive,
+            pay: p.last_pay.0.clamp(0, u32::MAX as i64) as u32,
+            pay_minutes: p.last_pay.1.min(u16::MAX as u32) as u16,
+            today_minutes: (p.worked_ds / clock::DS_PER_MIN as u64).min(u16::MAX as u64) as u16,
         }
     }
 
@@ -1441,6 +1572,7 @@ impl Server {
     fn tick(&mut self) {
         self.tick = self.tick.wrapping_add(1);
         let now = Instant::now();
+        self.tick_clock();
 
         // 1. Timeouts.
         let stale: Vec<u16> = self
@@ -1804,6 +1936,13 @@ impl Server {
                     outgoing.push((p.addr, p.id, Packet::Say { id: npc_id, text: text.clone() }));
                 }
             }
+        }
+        // Game time for everyone (also at home / on the portal).
+        if self.clock_dirty || tick % CLOCK_RESEND_TICKS == 0 {
+            for p in self.players.values() {
+                outgoing.push((p.addr, p.id, self.clock_packet(p)));
+            }
+            self.clock_dirty = false;
         }
         for (addr, id, packet) in outgoing {
             let n = self.send(addr, &packet);

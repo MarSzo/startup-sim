@@ -43,6 +43,11 @@ fn start_server_full(start_access: u8, skip_recruitment: bool) -> (SocketAddr, u
 }
 
 fn start_server_cfg(start_access: u8, skip_recruitment: bool, start_employed: bool) -> (SocketAddr, u32) {
+    start_server_at(start_access, skip_recruitment, start_employed, 8 * 60, 1)
+}
+
+/// ... with the game clock starting at `start_minute`, `time_scale` faster.
+fn start_server_at(start_access: u8, skip_recruitment: bool, start_employed: bool, start_minute: u32, time_scale: u32) -> (SocketAddr, u32) {
     let map = building();
     let crc = map.crc;
     let cfg = Config {
@@ -60,6 +65,8 @@ fn start_server_cfg(start_access: u8, skip_recruitment: bool, start_employed: bo
         skip_recruitment,
         start_employed,
         needs_speed: 1,
+        start_minute,
+        time_scale,
     };
     let mut server = Server::new(map, cfg).unwrap();
     let port = server.local_addr().port();
@@ -1055,4 +1062,60 @@ fn shop_take_from_shelf_alarm_and_pay() {
     let pocket = slots[1..].iter().position(|s| s.kind == item_kind::SANDWICH_HAM).expect("paid sandwich");
     assert!(!slots[pocket + 1].label.contains("niezapłacone"));
     let _ = body;
+}
+
+/// Latest Clock packet matching `f` within `wait`.
+fn clock_until(c: &Client, wait: Duration, f: impl Fn(u16, u16, u8, u16, u32) -> bool) -> Option<(u16, u16, u8, u16, u32)> {
+    wait_for(c, &[], wait, |p| match p {
+        Packet::Clock { day, minute, place, arrive, pay, .. } if f(*day, *minute, *place, *arrive, *pay) => {
+            Some((*day, *minute, *place, *arrive, *pay))
+        }
+        _ => None,
+    })
+}
+
+#[test]
+fn office_closes_at_ten_pm_and_pays_the_day() {
+    use proto::place;
+    // 21:50, daytime 60x faster: 10 game minutes = 10 s / 60... ~2 s.
+    let (addr, _) = start_server_at(0, true, true, 21 * 60 + 50, 60);
+    let (ola, _) = Client::connect(addr, "Ola");
+    let (day, _, pl, _, _) = clock_until(&ola, Duration::from_millis(800), |_, _, _, _, _| true).expect("clock");
+    assert_eq!((day, pl), (2, place::BUILDING), "hired = day 2, in the building");
+    let home = clock_until(&ola, Duration::from_millis(6000), |_, _, pl, _, _| pl == place::HOME);
+    let (_, minute, _, _, pay) = home.expect("sent home at 22:00");
+    assert!(minute >= 22 * 60, "evening: {minute}");
+    // ~10 game minutes worked at 30 zł/h = ~5 zł.
+    assert!((4_00..=6_00).contains(&pay), "paid for the minutes worked: {pay}");
+    // No more snapshots: out of the building.
+    while ola.recv().is_some() {}
+    ola.ping();
+    std::thread::sleep(Duration::from_millis(200));
+    let mut snapshots = 0;
+    while let Some(p) = ola.recv() {
+        snapshots += matches!(p, Packet::Snapshot { .. }) as u32;
+    }
+    assert_eq!(snapshots, 0);
+}
+
+#[test]
+fn morning_random_arrival_between_seven_and_ten() {
+    use proto::place;
+    // 5:58 (night: at home), daytime 600x faster so the arrival comes quickly.
+    let (addr, _) = start_server_at(0, true, true, 5 * 60 + 58, 600);
+    let (ola, _) = Client::connect(addr, "Ola");
+    let (day, _, pl, _, _) = clock_until(&ola, Duration::from_millis(800), |_, _, _, _, _| true).expect("clock");
+    assert_eq!((day, pl), (2, place::HOME), "hired at night: at home until the morning");
+    let (day, _, _, arrive, _) =
+        clock_until(&ola, Duration::from_millis(3000), |_, _, pl, _, _| pl == place::COMMUTING).expect("on the way");
+    assert_eq!(day, 3, "a new day");
+    assert!((7 * 60..=10 * 60).contains(&arrive), "arrival 7:00-10:00: {arrive}");
+    let (_, minute, _, _, _) =
+        clock_until(&ola, Duration::from_millis(5000), |_, _, pl, _, _| pl == place::BUILDING).expect("arrived");
+    assert!(minute >= arrive, "arrived at {minute}, planned {arrive}");
+    let snap = wait_for(&ola, &[], Duration::from_millis(800), |p| match p {
+        Packet::Snapshot { floor, .. } => Some(*floor),
+        _ => None,
+    });
+    assert_eq!(snap, Some(0), "in front of the building");
 }

@@ -68,6 +68,9 @@ var lift_floor := 0      # elevator: where the car is (from Doors)
 var lift_target := 255   # ...and where it is heading (Protocol.NO_FLOOR = standing)
 var lift_moving := false
 var ride_mask := RideMask.new()
+var clock_label := Label.new()
+var daylight := CanvasModulate.new()   # time-of-day tint of the world
+var game_minute := 8 * 60
 var shelf_window := ShelfWindow.new()
 var _shelf_at := Vector2.ZERO     # where the shelf window was opened (walk away = close)
 var depts := {}          # id -> department (after the contract)
@@ -213,6 +216,21 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 	status_layer.add_child(hud)
 	hud.slot_clicked.connect(_pocket_key)
 	status_layer.add_child(stats_hud)
+	var cp := PanelContainer.new()
+	var csb := StyleBoxFlat.new()
+	csb.bg_color = Color(0.07, 0.08, 0.12, 0.82)
+	csb.set_corner_radius_all(8)
+	csb.content_margin_left = 12
+	csb.content_margin_right = 12
+	csb.content_margin_top = 6
+	csb.content_margin_bottom = 6
+	cp.add_theme_stylebox_override("panel", csb)
+	cp.position = Vector2(16, 16)
+	clock_label.add_theme_font_size_override("font_size", 18)
+	clock_label.add_theme_color_override("font_color", Color.WHITE)
+	cp.add_child(clock_label)
+	status_layer.add_child(cp)
+	add_child(daylight)
 	status_layer.add_child(shelf_window)
 	shelf_window.take.connect(func(shelf: int, kind: int): if net.is_playing(): net.send(Protocol.encode_shop_take(net.token, shelf, kind)))
 	screen_layer.layer = 12
@@ -497,6 +515,11 @@ func _on_packet(p: Dictionary) -> void:
 		Protocol.T_SHELF:
 			shelf_window.show_shelf(p)
 			_shelf_at = Movement.to_px(pred.pos)
+		Protocol.T_CLOCK:
+			game_minute = p.minute
+			var part := "noc" if p.night else ("rano" if p.minute < 10 * 60 else ("dzień" if p.minute < 18 * 60 else "wieczór"))
+			clock_label.text = "Dzień %d · %02d:%02d · %s" % [p.day, p.minute / 60, p.minute % 60, part]
+			daylight.color = daylight_color(p.minute)
 		Protocol.T_STATS:
 			stats_hud.update_stats(p)
 			me.set_smelly(p.hygiene < 25)
@@ -768,6 +791,27 @@ func _update_hint() -> void:
 					text = "Bramka wymaga przepustki — porozmawiaj z portierem (portiernia)" if (need & MapData.ACCESS_GUEST) else "Wstęp tylko dla obsługi"
 	hint_label.text = text
 	hint_label.visible = text != ""
+
+
+## World tint by the time of day: warm dawn, white day, golden evening,
+## blue dusk (the office closes at 22:00).
+static func daylight_color(minute: int) -> Color:
+	var keys := [
+		[6 * 60, Color(0.72, 0.68, 0.78)],
+		[7 * 60 + 30, Color(1.0, 0.93, 0.85)],
+		[9 * 60, Color(1, 1, 1)],
+		[17 * 60, Color(1, 1, 1)],
+		[19 * 60, Color(1.0, 0.88, 0.74)],
+		[21 * 60, Color(0.72, 0.72, 0.9)],
+		[22 * 60, Color(0.55, 0.57, 0.78)],
+	]
+	if minute <= keys[0][0]:
+		return keys[0][1]
+	for i in range(1, keys.size()):
+		if minute <= keys[i][0]:
+			var t := float(minute - keys[i - 1][0]) / float(keys[i][0] - keys[i - 1][0])
+			return (keys[i - 1][1] as Color).lerp(keys[i][1], t)
+	return keys[-1][1]
 
 
 ## Riding the elevator: only the cabin is visible, and it shakes a little.

@@ -12,6 +12,7 @@ const Game = preload("res://game/game.gd")
 const CharacterScreen = preload("res://ui/character_screen.gd")
 const Desktop = preload("res://ui/desktop.gd")
 const Protocol = preload("res://net/protocol.gd")
+const DayScreen = preload("res://ui/day_screen.gd")
 
 const BUILDING_PATH := "res://maps/building.json"
 
@@ -23,6 +24,8 @@ var profile := {}
 var game: Node = null
 var portal_layer := CanvasLayer.new()
 var portal := Desktop.new()
+var day_layer := CanvasLayer.new()
+var day_screen := DayScreen.new()
 
 
 func _ready() -> void:
@@ -41,6 +44,9 @@ func _ready() -> void:
 	portal_layer.visible = false
 	add_child(portal_layer)
 	portal_layer.add_child(portal)
+	day_layer.layer = 30  # above the world and the home computer
+	add_child(day_layer)
+	day_layer.add_child(day_screen)
 	portal.auto_offer = int(args.get("auto-recruit", "0"))
 	portal.auto_delay = float(args.get("auto-recruit-delay", "0"))
 	portal.apply.connect(func(offer, motivation): net.send(Protocol.encode_apply(net.token, offer, motivation)))
@@ -125,13 +131,18 @@ func _show_portal() -> void:
 func _sync_portal() -> void:
 	portal_layer.visible = portal.visible
 	if game:
-		game.input_blocked = portal.visible
+		game.input_blocked = portal.visible or day_screen.blocking()
 		game.set_job(portal.job_title, portal.department)
 
 
 func _on_packet(p: Dictionary) -> void:
 	portal.on_packet(p)
 	if p.type == Protocol.T_RECRUIT_RESULT:
+		_sync_portal()
+	if p.type == Protocol.T_CLOCK:
+		portal.game_day = p.day
+		portal.game_minute = p.minute
+		day_screen.on_clock(p)
 		_sync_portal()
 
 

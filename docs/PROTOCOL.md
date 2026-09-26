@@ -1,4 +1,4 @@
-# Protokół sieciowy (wersja 15)
+# Protokół sieciowy (wersja 16)
 
 Własny binarny protokół na UDP. Implementacje:
 - serwer: `server/src/protocol.rs` (źródło prawdy),
@@ -23,7 +23,7 @@ przez `cargo test` i czytane przez `client/tests/run_tests.gd`.
 | pole    | typ | wartość |
 |---------|-----|---------|
 | magic   | u16 | `0x5354` (bajty `54 53`, „TS”) |
-| version | u8  | `15` |
+| version | u8  | `16` |
 | type    | u8  | typ pakietu (niżej) |
 
 ## Jednostki
@@ -281,6 +281,18 @@ u8`, `stress u8`, `bladder u8`, `hygiene u8` (każda 0..100), `flags u8` (bit 0
 brudne ręce), `money u32` (portfel w groszach). Głód, stres i toaleta: 100 =
 źle; energia i higiena: 0 = źle. Liczy je tylko serwer.
 
+### 29 `Clock` (S→C)
+
+Czas gry dla każdego gracza (także w domu i na portalu), co 1 s i po każdej
+zmianie (koniec dnia, poranek, przyjazd): `day u16` (dzień gracza: 1 = szukanie
+pracy), `minute u16` (minuta doby 0..1439, zegar wspólny), `night u8` (biuro
+zamknięte, 22:00–6:00), `place u8` (0 w budynku, 1 w domu na noc, 2 w drodze do
+pracy, 3 na portalu), `arrive u16` (minuta przyjazdu albo 0xFFFF), `pay u32` i
+`pay_minutes u16` (ostatnia wypłata: grosze, minuty gry w pracy),
+`today_minutes u16` (minuty gry przepracowane dziś). Poza budynkiem (w domu /
+w drodze) serwer nie wysyła snapshotów; przyjazd = znowu snapshoty, postać
+przed budynkiem.
+
 ### 27 `Shelf` (S→C), 28 `ShopTake` (C→S)
 
 `Shelf` — odpowiedź na E przy półce sklepowej: shelf u8, title str16, n u8 (≤ 16),
@@ -352,6 +364,7 @@ szyfrowaniem.
 
 ## Historia wersji
 
+- **16** — zegar i dni: `Clock`.
 - **15** — sklep: `Stats` + `money`, `Shelf`, `ShopTake`, przedmioty 10–23.
 - **14** — `Doors` + `lift_moving`; limit 6 osób w windzie; mniejsza kabina (3×2).
 - **13** — higiena: `Stats` + `hygiene`, `flags` (brudne ręce), flaga encji 7 = niska higiena, czynność 6 = mycie rąk.

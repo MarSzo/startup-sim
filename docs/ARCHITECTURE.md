@@ -32,6 +32,7 @@ server/                 crate Rusta (lib `game` + binarki)
   src/coffee.rs         ekspresy do kawy (parzenie → kawa jako przedmiot)
   src/inventory.rs      przedmioty, kieszenie i ręce, uprawnienia z przedmiotów
   src/computer.rs       stanowiska (biurka działów), laptopy na biurkach, komunikator
+  src/clock.rs          zegar gry: doba, biuro 6–22, przewijana noc, pensja za minuty
   src/shop.rs           sklep: towary i ceny, półki, kasa, złotówki
   src/stalls.rs         kabiny toaletowe: znajdowanie drzwi, zamykanie od środka
   src/needs.rs          potrzeby postaci (głód, energia, stres, toaleta), sofa / toaleta / papieros / owoce
@@ -151,6 +152,16 @@ sprawdza `Map::blocks`, czyli wspólna reguła kolizji; klient trzyma tę samą
 nakładkę w `MapData.closed` (pakiet `Doors`). Mapy są przez to zmienne po
 stronie serwera (`Building::floor_mut`). Zamek zwalnia się, gdy zamykający
 opuści pokój kabiny albo grę; nie można zamknąć, gdy ktoś stoi w drzwiach.
+
+**Zegar** (`clock.rs`): czas w decysekundach gry od północy; w dzień 6 ds na
+tick (1 h gry = 5 min), w nocy 240 ds na tick (8 h w 1 min). `Clock::tick`
+zatrzymuje się dokładnie na 22:00 i 6:00 i zgłasza `Transition`. Serwer:
+wieczór → każdy `Stage::Working` idzie do `Stage::Home { arrive_at: None }`
+(koniec sesji komputera, odpoczynku; wypłata `PAY_PER_MIN` za `worked_ds`);
+poranek → `day += 1` wszystkim, a domownicy dostają losowy `arrive_at`
+(7:00–10:00); o tej minucie `arrive()` stawia postać przed budynkiem. Wszystko
+poza `Working` (portal, dom) jest poza światem: bez snapshotów i bez udziału w
+symulacji. `--start-time hh:mm`, `--time-scale N` do testów.
 
 **Sklep** (`shop.rs`): lista towarów (`PRODUCTS`: rodzaj przedmiotu, nazwa,
 cena w groszach, efekt na potrzeby, liczba sztuk) i półek (prostokąty kafli

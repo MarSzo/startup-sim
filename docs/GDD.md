@@ -177,7 +177,7 @@ Kolejność realizacji: (1) tworzenie postaci → (2) pulpit, portal, rozmowa �
 podpisaniu umowy, kanapki, przekąski, napoje, fast food, alkohol, papierosy
 (potrzebne do palenia) — zob. 10.20.
 
-**Czas i dni**
+**Czas i dni** — *zrobione (10.21), bez pogody*
 - Zegar gry (aktualna godzina na ekranie), pory dnia (światło), **zmienna
   pogoda** na zewnątrz.
 - Rozgrywka podzielona na **dni**: pierwszy dzień — pełnoekranowa plansza
@@ -629,6 +629,25 @@ Zastępuje prosty portal z 10.8. Po połączeniu gracz widzi pulpit komputera
 - **Palenie wymaga papierosów** (jeden z paczki na przerwę).
 - Do przemyślenia: konsekwencje alkoholu w pracy, zwroty, promocje.
 
+### 10.21 Zegar, pory dnia i dni gry
+
+- **Wspólny zegar serwera**: 1 godzina gry = 5 minut realnych. W HUD (lewy górny
+  róg): „Dzień N · 09:41 · rano”; na domowym pulpicie w pasku zadań.
+- **Biuro czynne 6:00–22:00.** O 22:00 wszyscy w budynku wracają do domu:
+  plansza „Koniec dnia” z przepracowanym czasem i wypłatą. **Noc przewija się
+  w ~1 minutę** (22:00 → 6:00).
+- **Rano (6:00)** każdy zatrudniony dostaje **losową godzinę przyjazdu
+  7:00–10:00**; do tego czasu plansza „Dzień N — dojazd do pracy… przyjazd o
+  8:36”, potem pojawia się przed budynkiem.
+- **Dni gracza**: dzień 1 = szukanie pracy (plansza „Dzień 1” nad pulpitem).
+  Zatrudnienie („Jadę do biura”) = dzień 2 — w dzień od razu do biura, w
+  nocy rano z losowym przyjazdem. Każdy poranek to kolejny dzień.
+- **Pensja: 30 zł za godzinę gry w biurze** (liczy się czas w budynku po
+  podpisaniu umowy), wypłacana o 22:00. Zaliczka 200 zł zostaje na start.
+- **Oświetlenie**: świt fioletowo-chłodny, dzień biały, wieczór złoty, a
+  przed 22:00 granatowy.
+- Do zrobienia z tej grupy: **pogoda** (backlog 9b).
+
 ### 10.6 Stan implementacji
 
 *Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie,
@@ -665,6 +684,9 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Ekwipunek**: kieszenie i ręce, przedmioty (przepustka, karta, laptop,
   kawa), upuszczanie / podnoszenie / podawanie, dostęp z przedmiotów (10.13);
   protokół v8.
+- **Zegar i dni gry**: wspólny zegar, biuro 6–22, noc przewijana, poranne
+  przyjazdy 7–10, dni gracza, pensja godzinowa, oświetlenie wg pory dnia
+  (10.21); protokół v16.
 - **Sklep i pieniądze**: portfel, zaliczka 200 zł, półki + kasa + bramka,
   14 towarów, jedzenie z efektami, papierosy do palenia (10.20); protokół v15.
 - **Higiena, winda, klatka schodowa**: pasek higieny i brudne ręce, umywalki i
@@ -687,12 +709,12 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Sieć mobilna**: serwer dual-stack IPv4/IPv6; gracz identyfikowany tokenem
   (zmiana adresu w trakcie gry przenosi sesję); klient przepina gniazdo po
   ciszy/powrocie z tła i sam łączy się ponownie po utracie sesji.
-- **Testy**: 75 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
+- **Testy**: 77 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
   zależna od uprawnień, bramki, ruch/kolizje, schody, winda, nawigacja,
-  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, protokół), 2 golden, 17 e2e serwera
+  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, zegar, protokół), 2 golden, 19 e2e serwera
   (m.in. portal: odrzucenie → przyjęcie → spawn; całe wdrożenie aż do karty;
   niewidoczność między piętrami; zgodność stanu serwera z predykcją) —
-  łącznie 94 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy i sklepu); 134 sprawdzenia w Godocie (parytet protokołu i ruchu, parsowanie
+  łącznie 98 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 i porannego przyjazdu); 135 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
   adresów).
 
 #### Pomiary (MacBook, wszystko lokalnie)

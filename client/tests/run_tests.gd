@@ -79,6 +79,10 @@ func test_protocol(path: String) -> void:
 	var st := Protocol.decode(golden["stats"].hex_decode())
 	expect(st.get("type") == Protocol.T_STATS and st.hunger == 35 and st.energy == 80 and st.stress == 12 and st.bladder == 64
 		and st.hygiene == 22 and st.stats_flags == Protocol.STATS_DIRTY_HANDS and st.money == 18750, "decode stats %s" % st)
+	var ck := Protocol.decode(golden["clock"].hex_decode())
+	expect(ck.get("type") == Protocol.T_CLOCK and ck.day == 2 and ck.minute == 492 and not ck.night
+		and ck.place == Protocol.PLACE_COMMUTING and ck.arrive == 545 and ck.pay == 23000 and ck.pay_minutes == 460
+		and ck.today_minutes == 0, "decode clock %s" % ck)
 	var sh := Protocol.decode(golden["shelf"].hex_decode())
 	expect(sh.get("type") == Protocol.T_SHELF and sh.shelf == 1 and sh.title == "Kanapki" and sh.goods.size() == 2
 		and sh.goods[1].name == "Kanapka z szynką" and sh.goods[1].price == 1400 and sh.goods[0].kind == 10, "decode shelf %s" % sh)
