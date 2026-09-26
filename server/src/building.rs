@@ -100,6 +100,11 @@ impl Building {
         self.floors.get(f as usize).filter(|fl| !fl.locked).and_then(|fl| fl.map.as_ref())
     }
 
+    /// Mutable map of an active floor (locking doors).
+    pub fn floor_mut(&mut self, f: u8) -> Option<&mut Map> {
+        self.floors.get_mut(f as usize).filter(|fl| !fl.locked).and_then(|fl| fl.map.as_mut())
+    }
+
     pub fn floor_name(&self, f: u8) -> &str {
         self.floors.get(f as usize).map_or("?", |fl| fl.name.as_str())
     }

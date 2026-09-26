@@ -3,7 +3,7 @@
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 10
+const VERSION := 11
 const MAX_PACKET := 1200
 const MAX_NICK_BYTES := 16
 const MAX_SAY_BYTES := 240
@@ -35,6 +35,8 @@ const T_COMPUTER := 21
 const T_COMPUTER_ACTION := 22
 const T_CHAT := 23
 const T_STATS := 24
+const T_DOORS := 25
+const T_DOOR_ACTION := 26
 
 const PC_CLOSE := 1
 const PC_LOCK := 2
@@ -208,6 +210,12 @@ static func encode_computer_action(token: int, action: int, conv: int, arg: int,
 	return b.data_array
 
 
+static func encode_door_action(token: int) -> PackedByteArray:
+	var b := _writer(T_DOOR_ACTION)
+	b.put_u32(token)
+	return b.data_array
+
+
 static func encode_disconnect(token: int, reason: int) -> PackedByteArray:
 	var b := _writer(T_DISCONNECT)
 	b.put_u32(token)
@@ -365,6 +373,13 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			for i in n:
 				convs.append({"conv": r.u16(), "unread": r.u8(), "title": r.str16(MAX_NICK_BYTES + 8)})
 			p.convs = convs
+		T_DOORS:
+			p.floor = r.u8()
+			var n := r.u8()
+			var tiles := []
+			for i in n:
+				tiles.append(Vector2i(r.u8(), r.u8()))
+			p.tiles = tiles
 		T_STATS:
 			p.hunger = r.u8()
 			p.energy = r.u8()

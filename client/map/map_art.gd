@@ -125,7 +125,7 @@ func _ground(x: int, y: int) -> void:
 			_blit(_tile_img(". %d" % v, func(im): _floor_office(im, v)), x, y)
 		",":
 			_blit(_tile_img(", %d" % v, func(im): _floor_carpet(im, v)), x, y)
-		":":
+		":", "k":  # stall doors stand on the bathroom tiles (the door is a node)
 			_blit(_tile_img(":", func(im): _floor_bath(im)), x, y)
 		"_":
 			_blit(_tile_img("_ %d" % v, func(im): _floor_lobby(im, v)), x, y)
@@ -403,7 +403,7 @@ func _wall_shadows() -> void:
 
 # ------------------------------------------------------------------- props
 
-const PROPS := ["W", "K", "H", "Q", "T", "P", "R", "N", "A", "U", "V", "X", "C", "J", "O"]
+const PROPS := ["W", "K", "H", "Q", "T", "P", "R", "N", "A", "U", "V", "X", "C", "J", "O", "|"]
 
 
 ## Connected components of the same furniture char -> one object each.
@@ -455,6 +455,7 @@ func _prop(c: String, tr: Rect2i, index: int) -> void:
 		"C": _coffee_machine(r)
 		"J": _kitchen_counter(r)
 		"O": _fruit_bowl(r)
+		"|": _partition(r)
 
 
 func _desks(tr: Rect2i, r: Rect2i, index: int) -> void:
@@ -675,6 +676,15 @@ func _kitchen_counter(r: Rect2i) -> void:
 	if r.size.x >= 32:
 		_rect(Rect2i(x + 20, y + 2, 6, 7), Color("#9aa4ab"))
 		_rect(Rect2i(x + 21, y + 2, 4, 1), Color("#c9d1d7"))
+
+
+## Toilet stall partitions: light panels with a darker front face.
+func _partition(r: Rect2i) -> void:
+	var body := Rect2i(r.position.x, r.position.y, r.size.x, r.size.y - 3)
+	_shadow(body)
+	_rect(body, Color("#c3c9d1"))
+	_rect(Rect2i(body.position.x, body.position.y, body.size.x, 2), Color("#e1e5ea"))
+	_rect(Rect2i(r.position.x, r.end.y - 3, r.size.x, 3), Color("#8f97a1"))
 
 
 ## Counter with a big bowl of free fruit ("owocowe czwartki", every day).

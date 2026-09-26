@@ -513,6 +513,18 @@ Zastępuje prosty portal z 10.8. Po połączeniu gracz widzi pulpit komputera
 - Inni widzą, co robisz: siedzenie (sofa, toaleta, komputer), papieros z
   dymkiem, „zzz” na sofie, zmęczenie.
 
+### 10.16 Kabiny toaletowe
+
+- W każdej łazience 3 kabiny (toaleta, miejsce do stania, drzwi); partycje
+  oddzielają je od siebie i od przejścia przy umywalkach.
+- **Nie widać, kto jest w kabinie** — ani z łazienki, ani z korytarza. Z
+  kabiny widać (i słychać) łazienkę.
+- **L** w kabinie zamyka / otwiera drzwi (znak na drzwiach: zielony = wolne,
+  czerwony = zajęte). Zamkniętych nie da się otworzyć z zewnątrz.
+- **Niezamkniętą kabinę można otworzyć**: kto wejdzie w drzwi, widzi osobę w
+  środku (i ona jego). Nie da się zamknąć drzwi, gdy ktoś w nich stoi.
+- Wyjście z kabiny albo z gry otwiera zamek automatycznie.
+
 ### 10.6 Stan implementacji
 
 *Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie,
@@ -549,6 +561,8 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Ekwipunek**: kieszenie i ręce, przedmioty (przepustka, karta, laptop,
   kawa), upuszczanie / podnoszenie / podawanie, dostęp z przedmiotów (10.13);
   protokół v8.
+- **Kabiny toaletowe**: zamykane od środka, ukrywają osobę w środku, otwarte
+  można podejrzeć (10.16); protokół v11.
 - **Statystyki postaci**: głód, energia, stres, toaleta; owoce, kawa, sofa,
   toaleta, papieros; ostrzeżenia, „wpadka”, wolny chód; łazienki wg płci
   (10.15); protokół v10.
@@ -563,12 +577,12 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Sieć mobilna**: serwer dual-stack IPv4/IPv6; gracz identyfikowany tokenem
   (zmiana adresu w trakcie gry przenosi sesję); klient przepina gniazdo po
   ciszy/powrocie z tła i sam łączy się ponownie po utracie sesji.
-- **Testy**: 66 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
+- **Testy**: 68 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
   zależna od uprawnień, bramki, ruch/kolizje, schody, winda, nawigacja,
-  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, protokół), 2 golden, 13 e2e serwera
+  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, kabiny, protokół), 2 golden, 14 e2e serwera
   (m.in. portal: odrzucenie → przyjęcie → spawn; całe wdrożenie aż do karty;
   niewidoczność między piętrami; zgodność stanu serwera z predykcją) —
-  łącznie 81 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem i potrzeb); 128 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
+  łącznie 84 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb i kabin); 132 sprawdzenia w Godocie (parytet protokołu i ruchu, parsowanie
   adresów).
 
 #### Pomiary (MacBook, wszystko lokalnie)

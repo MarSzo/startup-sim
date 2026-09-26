@@ -5,7 +5,7 @@
 //! `tests/golden/packets.json`.
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 10;
+pub const VERSION: u8 = 11;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
 pub const MAX_PACKET: usize = 1200;
@@ -55,6 +55,8 @@ pub mod ty {
     pub const COMPUTER_ACTION: u8 = 22;
     pub const CHAT: u8 = 23;
     pub const STATS: u8 = 24;
+    pub const DOORS: u8 = 25;
+    pub const DOOR_ACTION: u8 = 26;
 }
 
 /// `ItemAction::action`.
@@ -310,6 +312,11 @@ pub enum Packet {
     Chat { conv: u16, messages: Vec<ChatEntry> },
     /// Character needs, 0..=100 each (sent to the owner twice a second).
     Stats { hunger: u8, energy: u8, stress: u8, bladder: u8 },
+    /// Locked doors (toilet stalls) on the receiver's floor: solid for the
+    /// simulation. Sent on change and every 0.5 s.
+    Doors { floor: u8, tiles: Vec<(u8, u8)> },
+    /// Lock / unlock the stall the sender is in.
+    DoorAction { token: u32 },
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -437,6 +444,8 @@ impl Packet {
             Packet::ComputerAction { .. } => ty::COMPUTER_ACTION,
             Packet::Chat { .. } => ty::CHAT,
             Packet::Stats { .. } => ty::STATS,
+            Packet::Doors { .. } => ty::DOORS,
+            Packet::DoorAction { .. } => ty::DOOR_ACTION,
         }
     }
 
@@ -632,6 +641,15 @@ impl Packet {
                 w.u32(*arg);
                 w.str16(text, MAX_CHAT_BYTES);
             }
+            Packet::Doors { floor, tiles } => {
+                w.u8(*floor);
+                w.u8(tiles.len().min(255) as u8);
+                for (x, y) in tiles.iter().take(255) {
+                    w.u8(*x);
+                    w.u8(*y);
+                }
+            }
+            Packet::DoorAction { token } => w.u32(*token),
             Packet::Stats { hunger, energy, stress, bladder } => {
                 w.u8(*hunger);
                 w.u8(*energy);
@@ -835,6 +853,16 @@ impl Packet {
                 arg: r.u32()?,
                 text: r.str16(MAX_CHAT_BYTES)?,
             },
+            ty::DOORS => {
+                let floor = r.u8()?;
+                let n = r.u8()? as usize;
+                let mut tiles = Vec::with_capacity(n);
+                for _ in 0..n {
+                    tiles.push((r.u8()?, r.u8()?));
+                }
+                Packet::Doors { floor, tiles }
+            }
+            ty::DOOR_ACTION => Packet::DoorAction { token: r.u32()? },
             ty::STATS => Packet::Stats { hunger: r.u8()?, energy: r.u8()?, stress: r.u8()?, bladder: r.u8()? },
             ty::CHAT => {
                 let conv = r.u16()?;
@@ -1047,6 +1075,8 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
             Packet::ComputerAction { token: 0x01020304, action: computer_action::SEND, conv: 17, arg: 42, text: "Kto zjadł mój jogurt?".into() },
         ),
         ("stats", Packet::Stats { hunger: 35, energy: 80, stress: 12, bladder: 64 }),
+        ("doors", Packet::Doors { floor: 1, tiles: vec![(46, 27), (54, 31)] }),
+        ("door_action", Packet::DoorAction { token: 0x01020304 }),
         (
             "chat",
             Packet::Chat {
@@ -1114,7 +1144,7 @@ mod tests {
                 b[0] = 0x54;
                 b[1] = 0x53;
                 b[2] = VERSION;
-                b[3] = rng.u8(1..=24);
+                b[3] = rng.u8(1..=26);
             }
             let _ = Packet::decode(&b);
         }

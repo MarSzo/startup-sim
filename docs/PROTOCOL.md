@@ -1,4 +1,4 @@
-# Protokół sieciowy (wersja 10)
+# Protokół sieciowy (wersja 11)
 
 Własny binarny protokół na UDP. Implementacje:
 - serwer: `server/src/protocol.rs` (źródło prawdy),
@@ -23,7 +23,7 @@ przez `cargo test` i czytane przez `client/tests/run_tests.gd`.
 | pole    | typ | wartość |
 |---------|-----|---------|
 | magic   | u16 | `0x5354` (bajty `54 53`, „TS”) |
-| version | u8  | `10` |
+| version | u8  | `11` |
 | type    | u8  | typ pakietu (niżej) |
 
 ## Jednostki
@@ -251,6 +251,22 @@ więc zgubiony pakiet nie gubi wiadomości.
 Historia jest tylko w pamięci serwera (60 wiadomości na rozmowę); wiadomości
 prywatne gracza, który wyszedł, są usuwane (jego id może dostać ktoś inny).
 
+### 25 `Doors` (S→C), 26 `DoorAction` (C→S)
+
+Kabiny toaletowe: drzwi (typ kafla `stall_door`) zamknięte od środka są
+**nieprzechodnie dla wszystkich** — to część symulacji ruchu, więc klient musi
+je znać do predykcji. `Doors`: floor u8, n u8, n × {`x u8`, `y u8`} — lista
+zamkniętych drzwi na piętrze odbiorcy; wysyłana po każdej zmianie i co 0,5 s
+(zastępuje poprzednią listę dla tego piętra). `DoorAction`: token u32 —
+zamknij / otwórz kabinę, w której stoi nadawca (odmowy jako `Say`: nie w
+kabinie, ktoś stoi w drzwiach, sam stoi w drzwiach). Serwer otwiera kabinę
+sam, gdy zamykający z niej wyjdzie albo wyjdzie z gry.
+
+Każda kabina jest osobnym pokojem, który „widzi” łazienkę (ale nie odwrotnie):
+nikt z łazienki nie widzi, kto jest w środku; kto wejdzie w otwarte drzwi
+(pole drzwi należy do kabiny), ten widzi. `Say` trafia też do pokoi, które
+widzą pokój mówiącego.
+
 ### 24 `Stats` (S→C)
 
 Potrzeby postaci odbiorcy, co 0,5 s (tylko w budynku): `hunger u8`, `energy
@@ -315,6 +331,7 @@ szyfrowaniem.
 
 ## Historia wersji
 
+- **11** — kabiny toaletowe: `Doors`, `DoorAction`; zamknięte drzwi blokują ruch (także w predykcji klienta).
 - **10** — potrzeby: `activity` w encji (14 B) i `self_activity` w miejsce bitów `self_status`, `self_slow` (wolny chód w symulacji — też w wektorach golden ruchu), flaga 6 = wolny chód, pakiet `Stats`, przedmiot 5 = owoc.
 - **9** — komputer i komunikator: encja laptopa (`kind` 3), bit „przy komputerze” (`self_status` 0 / flaga 6, w miejsce „trzyma kawę”), `Computer`, `ComputerAction`, `Chat`.
 - **8** — ekwipunek: `held` w encji (13 B), encje przedmiotów na podłodze, `Inventory`, `ItemAction`; kubek kawy jako przedmiot.

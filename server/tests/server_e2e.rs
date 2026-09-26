@@ -854,8 +854,67 @@ fn needs_fruit_sofa_and_the_wrong_bathroom() {
     assert_eq!(activity(&ola), Some(proto::activity::NONE), "got up");
 
     // Ola is female: the men's room works, but it's embarrassing.
-    body = ola.walk_to(&b, body, (1, Tile { x: 55, y: 28 }), &[]);
+    body = ola.walk_to(&b, body, (1, Tile { x: 55, y: 27 }), &[]); // men's stall 1
     ola.press_e(&b, body);
     assert!(wait_for(&ola, &[], wait, said(nl::WRONG_BATHROOM)).is_some());
     assert_eq!(activity(&ola), Some(proto::activity::TOILET));
+}
+
+#[test]
+fn toilet_stall_hides_who_is_inside_and_locks() {
+    use game::stalls::lines as sl;
+    let (addr, _) = start_server_cfg(0, true, true);
+    let b = building();
+    let (mut ola, _) = Client::connect(addr, "Ola"); // IT
+    let (mut kuba, _) = Client::connect(addr, "Kuba"); // Biznes
+    let wait = Duration::from_millis(800);
+    let seat = |dept: &str| {
+        let ws = game::computer::find_workstations(&b);
+        let w = ws.iter().find(|w| w.room_name == dept).unwrap();
+        Body { access: access::CARD, ..Body::at(w.floor, Pos::tile_center(w.tile.x, w.tile.y + 1)) }
+    };
+    let said = |line: &'static str| move |p: &Packet| matches!(p, Packet::Say { text, .. } if text == line).then_some(());
+    let door_action = |c: &Client| c.sock.send(&Packet::DoorAction { token: c.token }.encode()).unwrap();
+    let locked_doors = |c: &Client, keep: &Client| {
+        wait_for(c, &[keep], wait, |p| if let Packet::Doors { tiles, .. } = p { Some(tiles.clone()) } else { None })
+    };
+
+    // Ola goes into women's stall 1 (without locking), Kuba waits by the sinks.
+    let o = ola.walk_to(&b, seat("IT / Produkt"), (1, Tile { x: 45, y: 27 }), &[&kuba]);
+    let k = kuba.walk_to(&b, seat("Biznes"), (1, Tile { x: 47, y: 27 }), &[&ola]);
+    assert!(!visible_ids(&kuba, &[&ola], wait).contains(&ola.id), "nobody sees who is in the stall");
+    assert!(visible_ids(&ola, &[&kuba], wait).contains(&kuba.id), "from the stall you see the bathroom");
+
+    // Kuba opens the unlocked door (steps into the doorway): now he sees her.
+    let k_door = kuba.walk_to(&b, k, (1, Tile { x: 46, y: 27 }), &[&ola]);
+    assert!(visible_ids(&kuba, &[&ola], wait).contains(&ola.id), "an open door shows who is inside");
+    // Too late to lock with Kuba in the doorway.
+    // (Drain first: during Kuba's walk Ola's socket buffer filled up with
+    // snapshots, and a full buffer drops new datagrams.)
+    while ola.recv().is_some() {}
+    door_action(&ola);
+    assert!(wait_for(&ola, &[&kuba], wait, said(sl::IN_DOORWAY)).is_some());
+
+    // Kuba steps back, Ola locks: the door is solid, Kuba can't get in or see her.
+    kuba.walk_to(&b, k_door, (1, Tile { x: 47, y: 27 }), &[&ola]);
+    while ola.recv().is_some() {}
+    door_action(&ola);
+    assert!(wait_for(&ola, &[&kuba], wait, said(sl::LOCKED)).is_some());
+    assert_eq!(locked_doors(&kuba, &ola), Some(vec![(46, 27)]));
+    kuba.send_inputs(sim::IN_LEFT, 6);
+    std::thread::sleep(Duration::from_millis(60));
+    kuba.send_inputs(sim::IN_LEFT, 6);
+    let (_, room, (x, _), ids, _) = kuba.latest_snapshot(Duration::from_millis(300)).unwrap();
+    assert!(x >= 47 * sim::TILE_UNITS, "stopped at the locked door (x = {x})");
+    assert!(!ids.contains(&ola.id));
+    assert_eq!(b.floor(1).unwrap().room_name(room), "Łazienka damska");
+    let _ = o;
+
+    // Ola leaves the game while locked in: the stall opens by itself.
+    ola.sock.send(&Packet::Disconnect { token: ola.token, reason: proto::disconnect::CLIENT_QUIT }.encode()).unwrap();
+    let opened = wait_for(&kuba, &[], wait, |p| match p {
+        Packet::Doors { tiles, .. } if tiles.is_empty() => Some(()),
+        _ => None,
+    });
+    assert!(opened.is_some(), "unlocked when the person inside left");
 }

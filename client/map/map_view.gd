@@ -26,6 +26,8 @@ func build(map, zoom: float) -> void:
 		sums[rid][0] += Vector2(i % map.width, i / map.width)
 		sums[rid][1] += 1
 	for rid in sums:
+		if map.room_types.get(rid, "") == "stall":
+			continue  # tiny rooms inside a bathroom: no label
 		var c: Vector2 = sums[rid][0] / float(sums[rid][1])
 		# Non-convex areas (the outside wraps the building): use the room's
 		# tile nearest to the centroid.

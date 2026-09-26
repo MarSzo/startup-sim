@@ -48,6 +48,10 @@ LEGEND = {
     "C": {"type": "coffee_machine", "solid": True, "color": "#2b2b30"},
     "J": {"type": "kitchen_counter", "solid": True, "color": "#d8d2c4"},
     "O": {"type": "fruit_bowl", "solid": True, "color": "#e0a040"},
+    # Toilet stalls: thin partitions and a door that can be locked from inside
+    # (locked = solid for everyone; the server tells clients which ones).
+    "|": {"type": "partition", "solid": True, "color": "#c3c9d1"},
+    "k": {"type": "stall_door", "solid": False, "color": "#9fb3c8"},
     "v": {"type": "grass", "solid": False, "color": "#5e8c4a"},
     "p": {"type": "sidewalk", "solid": False, "color": "#a8a8a0"},
     "z": {"type": "smoking_area", "solid": False, "color": "#8a7f6a"},
@@ -247,9 +251,21 @@ def floor1():
     f.box(51, 26, 56, 32, ":", "M")
     f.room("M", 9, "Łazienka męska", "bathroom", gender="male")
     f.area(53, 25, 53, 25, "D", "K")
-    for y in (28, 30, 32):
-        f.put(44, y, 44, y, "U")                         # toilets
-        f.put(56, y, 56, y, "U")
+    # Stalls along the toilet wall: toilet, a tile to stand on, the door.
+    # Each stall is its own room: nobody outside sees who is inside; from the
+    # stall you still see the bathroom.
+    stall_keys = {"W": "abc", "M": "xyz"}
+    for bath, toilet_x, step, gender, label in [("W", 44, 1, "female", "damska"), ("M", 56, -1, "male", "męska")]:
+        stand_x, door_x = toilet_x + step, toilet_x + 2 * step
+        f.area(min(toilet_x, stand_x), 26, max(toilet_x, stand_x), 26, "|")
+        for y in (28, 30, 32):
+            f.area(min(toilet_x, door_x), y, max(toilet_x, door_x), y, "|")
+        for i, y in enumerate((27, 29, 31)):
+            key = stall_keys[bath][i]
+            f.room(key, 30 + i + (3 if bath == "M" else 0), "Kabina %d (%s)" % (i + 1, label), "stall", see=[bath], gender=gender)
+            f.area(toilet_x, y, toilet_x, y, "U", key)
+            f.area(stand_x, y, stand_x, y, ":", key)
+            f.area(door_x, y, door_x, y, "k", key)
     f.put(49, 27, 49, 28, "V")                           # sinks
     f.put(51, 27, 51, 28, "V")
     for x, y in [(20, 14), (44, 20), (40, 26), (24, 26), (3, 26), (22, 32), (3, 22), (56, 22), (18, 3), (3, 3)]:

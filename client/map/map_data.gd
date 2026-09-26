@@ -27,6 +27,7 @@ var solid := PackedByteArray()
 var need := PackedByteArray()       # rights that open the tile (0 = none)
 var free_dir := PackedByteArray()   # direction always passable (exit), 0 = none
 var tile_chars := PackedStringArray()
+var closed := {}                     # tile index -> true: locked stall doors (dynamic)
 var room := PackedInt32Array()
 var room_names := {}  # id -> name
 var room_types := {}  # id -> type
@@ -110,9 +111,20 @@ func blocks(tx: int, ty: int, access: int, dir: int) -> bool:
 	if tx < 0 or ty < 0 or tx >= width or ty >= height:
 		return true
 	var i := ty * width + tx
-	if solid[i] != 0:
+	if solid[i] != 0 or closed.has(i):
 		return true
 	return need[i] != 0 and (access & need[i]) == 0 and free_dir[i] != dir
+
+
+## Doors locked right now (toilet stalls), from the server's Doors packet.
+func set_closed_tiles(tiles: Array) -> void:
+	closed.clear()
+	for t in tiles:
+		closed[t.y * width + t.x] = true
+
+
+func is_closed(tx: int, ty: int) -> bool:
+	return closed.has(ty * width + tx)
 
 
 func need_at(tx: int, ty: int) -> int:

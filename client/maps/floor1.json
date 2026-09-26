@@ -96,6 +96,16 @@
    "solid": true,
    "color": "#e0a040"
   },
+  "|": {
+   "type": "partition",
+   "solid": true,
+   "color": "#c3c9d1"
+  },
+  "k": {
+   "type": "stall_door",
+   "solid": false,
+   "color": "#9fb3c8"
+  },
   "~": {
    "type": "void",
    "solid": true,
@@ -129,13 +139,13 @@
   "~~#......................................................#~~",
   "~~#......................................................#~~",
   "~~##########DD##################DDD###########D######D####~~",
-  "~~#P,,,,,,,,,,,,,,,,,,,#P,,,,,,,,,,,CJJOP,,#::::::#::::::#~~",
-  "~~#,,,,,,,,,,,,,,,,,,,,#,,,,,,,,,,,,,,,,,,,#:::::V#V:::::#~~",
-  "~~#,,WWWWW,,,WWWWW,,,,,#,,,QQQ,,,,,,,,,,,,,#U::::V#V::::U#~~",
-  "~~#,,,,,,,,,,,,,,,,,,,,#,,,QQQ,,,,,,,,,,,,,#::::::#::::::#~~",
-  "~~#,,,,,,,,,,,,,,,,,,,,#,,,,,,,,,,,,TTTT,,,#U:::::#:::::U#~~",
-  "~~#,,WWWWW,,,WWWWW,,,,,#,,,,,,,,,,,,,,,,,,,#::::::#::::::#~~",
-  "~~#,,,,,,,,,,,,,,,,,,,P#,,,,,,,,,,,,,,,,,,,#U:::::#:::::U#~~",
+  "~~#P,,,,,,,,,,,,,,,,,,,#P,,,,,,,,,,,CJJOP,,#||::::#::::||#~~",
+  "~~#,,,,,,,,,,,,,,,,,,,,#,,,,,,,,,,,,,,,,,,,#U:k::V#V::k:U#~~",
+  "~~#,,WWWWW,,,WWWWW,,,,,#,,,QQQ,,,,,,,,,,,,,#|||::V#V::|||#~~",
+  "~~#,,,,,,,,,,,,,,,,,,,,#,,,QQQ,,,,,,,,,,,,,#U:k:::#:::k:U#~~",
+  "~~#,,,,,,,,,,,,,,,,,,,,#,,,,,,,,,,,,TTTT,,,#|||:::#:::|||#~~",
+  "~~#,,WWWWW,,,WWWWW,,,,,#,,,,,,,,,,,,,,,,,,,#U:k:::#:::k:U#~~",
+  "~~#,,,,,,,,,,,,,,,,,,,P#,,,,,,,,,,,,,,,,,,,#|||:::#:::|||#~~",
   "~~########################################################~~",
   "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
   "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
@@ -180,11 +190,11 @@
   "---KKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKKK---",
   "------------KK------------------KKK-----------K------K------",
   "---BBBBBBBBBBBBBBBBBBBB-HHHHHHHHHHHHHHHHHHH-WWWWWW-MMMMMM---",
+  "---BBBBBBBBBBBBBBBBBBBB-HHHHHHHHHHHHHHHHHHH-aaaWWW-MMMxxx---",
   "---BBBBBBBBBBBBBBBBBBBB-HHHHHHHHHHHHHHHHHHH-WWWWWW-MMMMMM---",
+  "---BBBBBBBBBBBBBBBBBBBB-HHHHHHHHHHHHHHHHHHH-bbbWWW-MMMyyy---",
   "---BBBBBBBBBBBBBBBBBBBB-HHHHHHHHHHHHHHHHHHH-WWWWWW-MMMMMM---",
-  "---BBBBBBBBBBBBBBBBBBBB-HHHHHHHHHHHHHHHHHHH-WWWWWW-MMMMMM---",
-  "---BBBBBBBBBBBBBBBBBBBB-HHHHHHHHHHHHHHHHHHH-WWWWWW-MMMMMM---",
-  "---BBBBBBBBBBBBBBBBBBBB-HHHHHHHHHHHHHHHHHHH-WWWWWW-MMMMMM---",
+  "---BBBBBBBBBBBBBBBBBBBB-HHHHHHHHHHHHHHHHHHH-cccWWW-MMMzzz---",
   "---BBBBBBBBBBBBBBBBBBBB-HHHHHHHHHHHHHHHHHHH-WWWWWW-MMMMMM---",
   "------------------------------------------------------------",
   "------------------------------------------------------------",
@@ -259,6 +269,60 @@
    "name": "Łazienka męska",
    "type": "bathroom",
    "gender": "male"
+  },
+  "a": {
+   "id": 30,
+   "name": "Kabina 1 (damska)",
+   "type": "stall",
+   "gender": "female",
+   "see": [
+    "W"
+   ]
+  },
+  "b": {
+   "id": 31,
+   "name": "Kabina 2 (damska)",
+   "type": "stall",
+   "gender": "female",
+   "see": [
+    "W"
+   ]
+  },
+  "c": {
+   "id": 32,
+   "name": "Kabina 3 (damska)",
+   "type": "stall",
+   "gender": "female",
+   "see": [
+    "W"
+   ]
+  },
+  "x": {
+   "id": 33,
+   "name": "Kabina 1 (męska)",
+   "type": "stall",
+   "gender": "male",
+   "see": [
+    "M"
+   ]
+  },
+  "y": {
+   "id": 34,
+   "name": "Kabina 2 (męska)",
+   "type": "stall",
+   "gender": "male",
+   "see": [
+    "M"
+   ]
+  },
+  "z": {
+   "id": 35,
+   "name": "Kabina 3 (męska)",
+   "type": "stall",
+   "gender": "male",
+   "see": [
+    "M"
+   ]
   }
  },
  "links": [

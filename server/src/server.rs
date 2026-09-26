@@ -15,6 +15,7 @@ use crate::npc::{self, Npc};
 use crate::protocol::{self as proto, EntityState, Packet, PlayerInfoEntry, Profile, SelfState};
 use crate::recruitment::{Attempt, Recruitment};
 use crate::sim::{self, Body, Pos};
+use crate::stalls::{self, Stall};
 
 pub const TICK_HZ: u32 = 20;
 pub const TICK: Duration = Duration::from_millis(1000 / TICK_HZ as u64);
@@ -181,6 +182,10 @@ pub struct Server {
     dropped: Vec<Dropped>,
     /// Sofas, toilets, ashtrays, the fruit bowl.
     spots: Vec<Spot>,
+    /// Toilet stalls and who locked them.
+    stalls: Vec<Stall>,
+    /// A stall door changed: send `Doors` to everyone this tick.
+    doors_dirty: bool,
     /// Desks where a laptop can stand, and the laptops standing on them.
     workstations: Vec<Workstation>,
     computers: Vec<Computer>,
@@ -214,6 +219,8 @@ impl Server {
             dropped: Vec::new(),
             workstations: computer::find_workstations(&building),
             spots: needs::find_spots(&building),
+            stalls: stalls::find_stalls(&building),
+            doors_dirty: false,
             computers: Vec::new(),
             messenger: Messenger::default(),
             next_item_id: 1,
@@ -311,7 +318,8 @@ impl Server {
             | Packet::Answer { token, .. }
             | Packet::PortalAction { token, .. }
             | Packet::ItemAction { token, .. }
-            | Packet::ComputerAction { token, .. } => *token,
+            | Packet::ComputerAction { token, .. }
+            | Packet::DoorAction { token } => *token,
             _ => return,
         };
         let Some(&id) = self.by_token.get(&token) else {
@@ -369,6 +377,7 @@ impl Server {
             Packet::PortalAction { action, arg, .. } => self.handle_portal_action(id, action, arg),
             Packet::ItemAction { action, slot, .. } => self.handle_item_action(id, action, slot),
             Packet::ComputerAction { action, conv, arg, text, .. } => self.handle_computer_action(id, action, conv, arg, &text),
+            Packet::DoorAction { .. } => self.handle_door_action(id),
             Packet::Answer { attempt, index, choice, .. } => self.handle_answer(id, attempt, index, choice),
             _ => {}
         }
@@ -866,6 +875,78 @@ impl Server {
         }
     }
 
+    // ------------------------------------------------------------ stalls
+
+    /// Lock / unlock the stall the player is in (from inside only).
+    fn handle_door_action(&mut self, pid: u16) {
+        let Some(p) = self.players.get(&pid) else { return };
+        if !matches!(p.stage, Stage::Working) {
+            return;
+        }
+        let (floor, room, pos) = (p.body.floor, p.room, p.body.pos);
+        let say = |line: &str| (pid, line.to_string(), None);
+        let Some(i) = self.stalls.iter().position(|s| s.floor == floor && s.room == room) else {
+            self.pending_says.push(say(stalls::lines::NO_STALL));
+            return;
+        };
+        let door = self.stalls[i].door;
+        if self.stalls[i].locked_by.is_some() {
+            self.set_stall_lock(i, None);
+            self.pending_says.push(say(stalls::lines::UNLOCKED));
+            return;
+        }
+        // Nobody may be standing in the doorway (they'd end up inside a wall).
+        if pos.tile() == (door.x, door.y) {
+            self.pending_says.push(say(stalls::lines::STEP_IN));
+            return;
+        }
+        if self.players.values().any(|o| o.id != pid && o.body.floor == floor && stalls::touches(o.body.pos, door)) {
+            self.pending_says.push(say(stalls::lines::IN_DOORWAY));
+            return;
+        }
+        self.set_stall_lock(i, Some(pid));
+        self.pending_says.push(say(stalls::lines::LOCKED));
+    }
+
+    fn set_stall_lock(&mut self, i: usize, by: Option<u16>) {
+        let s = &mut self.stalls[i];
+        s.locked_by = by;
+        let (floor, door) = (s.floor, s.door);
+        if let Some(m) = self.building.floor_mut(floor) {
+            m.set_closed(door.x, door.y, by.is_some());
+        }
+        self.doors_dirty = true;
+    }
+
+    /// Whoever locked a stall and isn't in it any more (left, disconnected)
+    /// unlocks it.
+    fn check_stalls(&mut self) {
+        let stale: Vec<usize> = self
+            .stalls
+            .iter()
+            .enumerate()
+            .filter(|(_, s)| {
+                s.locked_by.is_some_and(|pid| {
+                    self.players.get(&pid).is_none_or(|p| p.body.floor != s.floor || p.room != s.room)
+                })
+            })
+            .map(|(i, _)| i)
+            .collect();
+        for i in stale {
+            self.set_stall_lock(i, None);
+        }
+    }
+
+    fn doors_packet(&self, floor: u8) -> Packet {
+        let tiles = self
+            .stalls
+            .iter()
+            .filter(|s| s.floor == floor && s.locked_by.is_some())
+            .map(|s| (s.door.x as u8, s.door.y as u8))
+            .collect();
+        Packet::Doors { floor, tiles }
+    }
+
     // --------------------------------------------------------- computers
 
     /// `--start-employed`: contract, department, card and laptop, and a spot
@@ -1292,6 +1373,7 @@ impl Server {
             }
         }
         self.check_computer_sessions();
+        self.check_stalls();
 
         let bodies: HashMap<u16, Body> =
             self.players.values().filter(|p| matches!(p.stage, Stage::Working)).map(|p| (p.id, p.body)).collect();
@@ -1417,6 +1499,9 @@ impl Server {
             if p.inv_dirty || tick % INVENTORY_RESEND_TICKS == 0 {
                 outgoing.push((p.addr, id, inventory_packet(&p.inventory)));
             }
+            if self.doors_dirty || tick % STATS_EVERY_TICKS == 0 {
+                outgoing.push((p.addr, id, self.doors_packet(p.body.floor)));
+            }
             if tick % STATS_EVERY_TICKS == 0 {
                 let [hunger, energy, stress, bladder] = p.needs.points();
                 outgoing.push((p.addr, id, Packet::Stats { hunger, energy, stress, bladder }));
@@ -1433,8 +1518,10 @@ impl Server {
             p.known.extend(new_infos.iter().map(|e| e.id));
             p.inv_dirty = false;
         }
+        self.doors_dirty = false;
         // 6. Speech (NPCs, and players' own "thought" lines): to everyone in
-        //    the speaker's room, plus the addressee.
+        //    the speaker's room or seeing into it (e.g. from a toilet stall),
+        //    plus the addressee.
         for (npc_id, text, to) in says {
             let speaker = match self.npcs.iter().find(|n| n.id == npc_id) {
                 Some(n) => Some(((n.body.floor, n.room), n.name.clone())),
@@ -1449,7 +1536,9 @@ impl Server {
                 appearance: proto::Appearance::default(),
             });
             for p in self.players.values_mut() {
-                if (p.body.floor, p.room) == place || Some(p.id) == to || p.id == npc_id {
+                let sees = p.body.floor == place.0
+                    && self.building.floor(p.body.floor).is_some_and(|m| m.visible_from(p.room).contains(&place.1));
+                if (p.body.floor, p.room) == place || sees || Some(p.id) == to || p.id == npc_id {
                     // Name first, so the line isn't shown as "?".
                     if p.id != npc_id && p.known.insert(npc_id) {
                         outgoing.push((p.addr, p.id, Packet::PlayerInfo { players: vec![info.clone()] }));

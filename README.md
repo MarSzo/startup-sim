@@ -15,7 +15,7 @@ cd server && cargo run --release -- --start-with-card   # wariant dla botów: ws
 cd server && cargo run --release --bin bots -- --count 50 --room "Chill room" --all-in-room
 ```
 
-Sterowanie: WASD / strzałki, **E** — rozmowa z NPC / winda (stojąc w kabinie) / ekspres do kawy / podniesienie przedmiotu / biurko (połóż laptop, usiądź do komputera; Esc — wstań) / misa z owocami / sofa / toaleta / popielniczka (E ponownie — wstań), **1–3** — wyjmij / schowaj przedmiot z kieszeni, **Q** — upuść, **G** — podaj osobie obok, **F** — użyj (wypij kawę, zjedz owoc, pokaż kartę), **F3** — overlay debug.
+Sterowanie: WASD / strzałki, **E** — rozmowa z NPC / winda (stojąc w kabinie) / ekspres do kawy / podniesienie przedmiotu / biurko (połóż laptop, usiądź do komputera; Esc — wstań) / misa z owocami / sofa / toaleta / popielniczka (E ponownie — wstań), **1–3** — wyjmij / schowaj przedmiot z kieszeni, **Q** — upuść, **G** — podaj osobie obok, **F** — użyj (wypij kawę, zjedz owoc, pokaż kartę), **L** — zamknij / otwórz kabinę toaletową (od środka), **F3** — overlay debug.
 Na starcie tworzysz postać (imię, płeć, wiek, miejscowość, e-mail postaci,
 wygląd z podglądem; zapamiętywana lokalnie). Po połączeniu siedzisz w domu przy komputerze: w **przeglądarce** jest portal z
 ogłoszeniami (kilka firm; zatrudnia tylko nasz startup), wypełniasz formularz,
@@ -41,7 +41,7 @@ Np. RTT ~100 ms i 2% strat: `cargo run --release -- --lag-ms 50 --jitter-ms 10 -
 `--autowalk` (losowy ruch), `--goto="27,29;E;wait:2;34,6;Recepcja"` (kolejne
 kroki: kafel / pokój na bieżącym piętrze, `E` = wciśnij E, `wait:N` = czekaj —
 tu: rozmowa z portierem, potem schodami do recepcji; też `item:take0|put|drop|give|use` i
-ekran komputera: `pc:say:general|dept|dm:<imię>:<tekst>`, `pc:open:…`, `pc:lock`, `pc:unlock`,
+`L` = zamknij/otwórz kabinę, ekran komputera: `pc:say:general|dept|dm:<imię>:<tekst>`, `pc:open:…`, `pc:lock`, `pc:unlock`,
 `pc:take`, `pc:close`),
 `--screenshot=/tmp/x.png --screenshot-delay=5` (zapis klatki i wyjście; kilka czasów
 `--screenshot-delay=5,12,20` zapisuje `x_1.png`, `x_2.png`, … i wychodzi po ostatnim).

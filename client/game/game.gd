@@ -18,6 +18,7 @@ const InventoryHud = preload("res://ui/inventory_hud.gd")
 const ComputerView = preload("res://game/computer_view.gd")
 const ComputerScreen = preload("res://ui/computer_screen.gd")
 const StatsHud = preload("res://ui/stats_hud.gd")
+const StallDoorView = preload("res://game/stall_door_view.gd")
 
 const ZOOM := 3.0
 ## Remote players are rendered this far in the past (2 snapshots at 20 Hz).
@@ -58,6 +59,7 @@ var computers := {}      # entity id -> ComputerView (laptops on desks)
 var screen := ComputerScreen.new()
 var screen_layer := CanvasLayer.new()
 var stats_hud := StatsHud.new()
+var stall_doors := {}    # floor -> Array of StallDoorView
 var depts := {}          # id -> department (after the contract)
 var appearances := {}    # id -> appearance dict (from PlayerInfo)
 var own_appearance := {}
@@ -124,6 +126,18 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 		views[f] = view
 	world.y_sort_enabled = true
 	add_child(world)
+	for f in views:
+		var m = building.get_floor(f)
+		stall_doors[f] = []
+		for y in m.height:
+			for x in m.width:
+				if m.legend.get(m.tile_chars[y * m.width + x], {}).get("type") == "stall_door":
+					var dv := StallDoorView.new()
+					dv.tile = Vector2i(x, y)
+					dv.position = Movement.to_px(Movement.tile_center(x, y))
+					dv.visible = false
+					world.add_child(dv)
+					stall_doors[f].append(dv)
 
 	me.setup(net.player_id, nick, ZOOM)
 	me.highlight = true
@@ -185,6 +199,9 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 func _show_floor(f: int) -> void:
 	for k in views:
 		views[k].visible = (k == f)
+	for k in stall_doors:
+		for dv in stall_doors[k]:
+			dv.visible = (k == f)
 
 
 ## Session lost; the net client is getting a new one. Freeze local simulation.
@@ -210,6 +227,8 @@ func reset_session(welcome: Dictionary) -> void:
 	computers.clear()
 	screen.set_seated(false)
 	screen.chats.clear()
+	for f in views:
+		building.get_floor(f).set_closed_tiles([])
 	screen.my_id = net.player_id
 	inventory = []
 	hud.update_slots([])
@@ -295,6 +314,10 @@ func _goto_input(delta: float) -> int:
 			return Movement.IN_INTERACT
 		if leg.begins_with("wait:"):
 			goto_delay = float(leg.substr(5))
+			return 0
+		if leg == "L":  # lock / unlock the stall
+			net.send(Protocol.encode_door_action(net.token))
+			goto_delay = 0.3
 			return 0
 		if leg.begins_with("pc:"):  # computer screen, see ComputerScreen.dev_command
 			screen.dev_command(leg.substr(3))
@@ -389,6 +412,8 @@ func _process(delta: float) -> void:
 		if latest_tick - floor_items[id].last_seen_tick > REMOTE_TIMEOUT_TICKS:
 			floor_items[id].queue_free()
 			floor_items.erase(id)
+	if have_state:
+		_update_stall_doors()
 	for id in computers.keys():
 		if latest_tick - computers[id].last_seen_tick > REMOTE_TIMEOUT_TICKS:
 			computers[id].queue_free()
@@ -419,6 +444,10 @@ func _on_packet(p: Dictionary) -> void:
 			inventory = p.slots
 			hud.update_slots(inventory)
 			me.set_held(inventory[0].kind if not inventory.is_empty() else 0)
+		Protocol.T_DOORS:
+			var dm = building.get_floor(p.floor)
+			if dm:
+				dm.set_closed_tiles(p.tiles)
 		Protocol.T_STATS:
 			stats_hud.update_stats(p)
 		Protocol.T_COMPUTER:
@@ -588,6 +617,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			_item_action(Protocol.ITEM_GIVE, 0)
 		KEY_F:
 			_item_action(Protocol.ITEM_USE, 0)
+		KEY_L:
+			if net.is_playing():
+				net.send(Protocol.encode_door_action(net.token))
 
 
 ## Pocket key: take it out, or put back what's in hands if that pocket is empty.
@@ -656,6 +688,8 @@ func _update_hint() -> void:
 		text = _desk_hint(map)
 	if text == "" and map:
 		text = _spot_hint(map)
+	if map:
+		text = _stall_hint(map, t, text)
 	if text == "":
 		var me_px2 := Movement.to_px(pred.pos)
 		for id in floor_items:
@@ -676,6 +710,38 @@ func _update_hint() -> void:
 					text = "Bramka wymaga przepustki — porozmawiaj z portierem (portiernia)" if (need & MapData.ACCESS_GUEST) else "Wstęp tylko dla obsługi"
 	hint_label.text = text
 	hint_label.visible = text != ""
+
+
+## Doors open while somebody stands in them (and aren't locked).
+func _update_stall_doors() -> void:
+	var m = building.get_floor(pred.floor)
+	var people: Array[Vector2] = [me.position]
+	for id in remotes:
+		people.append(remotes[id].position)
+	for dv in stall_doors.get(pred.floor, []):
+		var busy := false
+		for pos in people:
+			if absf(pos.x - dv.position.x) < 12.0 and absf(pos.y - dv.position.y) < 11.0:
+				busy = true
+				break
+		dv.set_state(m.is_closed(dv.tile.x, dv.tile.y), busy)
+
+
+## In a stall: lock / unlock (L). Outside next to a locked stall: "Zajęte".
+func _stall_hint(map, t: Vector2i, text: String) -> String:
+	var in_doorway: bool = map.legend.get(map.tile_chars[t.y * map.width + t.x], {}).get("type") == "stall_door"
+	if map.room_types.get(room_id, "") == "stall" and not in_doorway:
+		var locked := false
+		for dv in stall_doors.get(pred.floor, []):
+			if map.room_at_tile(dv.tile.x, dv.tile.y) == room_id:
+				locked = map.is_closed(dv.tile.x, dv.tile.y)
+		var l := "[L] Otwórz kabinę" if locked else "[L] Zamknij kabinę"
+		return l if text == "" else "%s   %s" % [text, l]
+	if text == "":
+		for dv in stall_doors.get(pred.floor, []):
+			if map.is_closed(dv.tile.x, dv.tile.y) and absi(dv.tile.x - t.x) <= 1 and absi(dv.tile.y - t.y) <= 1:
+				return "Zajęte"
+	return text
 
 
 const SPOT_HINTS := {"sofa": "[E] Usiądź na sofie", "toilet": "[E] Skorzystaj z toalety", "ashtray": "[E] Zapal", "fruit_bowl": "[E] Weź owoc"}

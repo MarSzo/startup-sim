@@ -14,3 +14,4 @@ pub mod protocol;
 pub mod recruitment;
 pub mod server;
 pub mod sim;
+pub mod stalls;

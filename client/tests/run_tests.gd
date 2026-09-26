@@ -49,6 +49,7 @@ func test_protocol(path: String) -> void:
 		"apply": Protocol.encode_apply(0x01020304, 2, "Lubię kawę i wyzwania."),
 		"portal_action": Protocol.encode_portal_action(0x01020304, Protocol.PORTAL_GO_TO_OFFICE, 0),
 		"item_action": Protocol.encode_item_action(0x01020304, Protocol.ITEM_TAKE_OUT, 2),
+		"door_action": Protocol.encode_door_action(0x01020304),
 		"computer_action": Protocol.encode_computer_action(0x01020304, Protocol.PC_SEND, 17, 42, "Kto zjadł mój jogurt?"),
 		"answer": Protocol.encode_answer(0x01020304, 3, 1, 2),
 	}
@@ -71,6 +72,8 @@ func test_protocol(path: String) -> void:
 		var e1: Dictionary = s.entities[1]
 		expect(e0.id == 3 and e0.kind == 0 and e0.x == 4096 and e0.y == 8192 and e0.flags == 5 and e0.held == 3 and e0.activity == Protocol.ACT_COMPUTER, "entity 0 %s" % e0)
 		expect(e1.id == 65535 and e1.kind == 1 and e1.x == -1 and e1.y == 2000000 and e1.flags == Protocol.FLAG_SLOW, "entity 1 %s" % e1)
+	var dr := Protocol.decode(golden["doors"].hex_decode())
+	expect(dr.get("type") == Protocol.T_DOORS and dr.floor == 1 and dr.tiles == [Vector2i(46, 27), Vector2i(54, 31)], "decode doors %s" % dr)
 	var st := Protocol.decode(golden["stats"].hex_decode())
 	expect(st.get("type") == Protocol.T_STATS and st.hunger == 35 and st.energy == 80 and st.stress == 12 and st.bladder == 64, "decode stats %s" % st)
 	var pi := Protocol.decode(golden["player_info"].hex_decode())
@@ -145,6 +148,17 @@ func test_movement(path: String) -> void:
 		expect(ok, "movement case %d" % case_i)
 		case_i += 1
 	expect(floor_changes >= 3, "vectors exercise stairs/elevator (%d floor changes)" % floor_changes)
+	# Locked stall door (dynamic overlay): same result as stalls.rs in Rust.
+	var m = building.get_floor(1)
+	var walk_left := func() -> Dictionary:
+		var bd := Movement.body(1, Movement.tile_center(48, 27), 0, Movement.LOCK_NONE, MapData.ACCESS_CARD)
+		for i in 60:
+			bd = Movement.step(building, bd, Movement.IN_LEFT)
+		return bd
+	expect(walk_left.call().pos.x < Movement.tile_center(46, 27).x, "open stall door: walks in")
+	m.set_closed_tiles([Vector2i(46, 27)])
+	expect(walk_left.call().pos.x == 47 * 256 + 5 * 16, "locked stall door stops at the door (%d)" % walk_left.call().pos.x)
+	m.set_closed_tiles([])
 
 
 func test_rejects_garbage() -> void:

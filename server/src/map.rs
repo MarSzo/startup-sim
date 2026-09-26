@@ -186,6 +186,9 @@ pub struct Map {
     pub npcs: Vec<NpcDef>,
     /// Room id -> other room ids visible from it (from `RoomDef::see`).
     see: HashMap<u16, Vec<u16>>,
+    /// Doors locked right now (toilet stalls): solid for everyone. Changed
+    /// by the server; clients learn it from the `Doors` packet.
+    closed: Vec<bool>,
 }
 
 impl Map {
@@ -282,6 +285,7 @@ impl Map {
                 })
                 .collect(),
             see,
+            closed: vec![false; w * h],
         };
         for s in &map.spawns {
             if map.is_blocked(s.x, s.y) {
@@ -321,9 +325,22 @@ impl Map {
         match self.idx(tx, ty) {
             None => true,
             Some(i) => {
-                self.solid[i] || (self.need[i] != 0 && access & self.need[i] == 0 && self.free_dir[i] != d)
+                self.solid[i]
+                    || self.closed[i]
+                    || (self.need[i] != 0 && access & self.need[i] == 0 && self.free_dir[i] != d)
             }
         }
+    }
+
+    /// Lock / unlock a door (see `closed`).
+    pub fn set_closed(&mut self, tx: i32, ty: i32, on: bool) {
+        if let Some(i) = self.idx(tx, ty) {
+            self.closed[i] = on;
+        }
+    }
+
+    pub fn is_closed(&self, tx: i32, ty: i32) -> bool {
+        self.idx(tx, ty).is_some_and(|i| self.closed[i])
     }
 
     pub fn tile_char(&self, tx: i32, ty: i32) -> Option<char> {

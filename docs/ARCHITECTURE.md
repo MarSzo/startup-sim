@@ -31,6 +31,7 @@ server/                 crate Rusta (lib `game` + binarki)
   src/coffee.rs         ekspresy do kawy (parzenie → kawa jako przedmiot)
   src/inventory.rs      przedmioty, kieszenie i ręce, uprawnienia z przedmiotów
   src/computer.rs       stanowiska (biurka działów), laptopy na biurkach, komunikator
+  src/stalls.rs         kabiny toaletowe: znajdowanie drzwi, zamykanie od środka
   src/needs.rs          potrzeby postaci (głód, energia, stres, toaleta), sofa / toaleta / papieros / owoce
   data/recruitment.json oferty i pule pytań (pierwsza odpowiedź = poprawna)
   src/protocol.rs       pakiety: encode/decode, fragmentacja snapshotów
@@ -61,6 +62,7 @@ client/                 projekt Godota 4.7
   ui/inventory_hud.gd   pasek ekwipunku (ręce + 3 kieszenie)
   ui/computer_screen.gd ekran komputera: komunikator i ekran blokady
   ui/stats_hud.gd       paski potrzeb (prawy górny róg)
+  game/stall_door_view.gd drzwi kabiny (zielone wolne / czerwone zajęte, otwarte, gdy ktoś w nich stoi)
   game/computer_view.gd laptop na biurku (ekran: niebieski / czat / zablokowany)
   game/remote_player.gd bufor snapshotów + interpolacja
   ui/character_screen.gd tworzenie postaci (dane + wygląd z podglądem)
@@ -137,6 +139,14 @@ przepustkę i daje kartę (podpisaną imieniem i działem) oraz laptop — wymag
 wolnych rąk. Przedmioty na podłodze (`Dropped`) są encjami `kind` 2 w
 snapshotach; E podnosi najbliższy w zasięgu 1,25 kafla (po NPC i ekspresie).
 Gdy przedmiot się nie mieści, ląduje na podłodze pod nogami.
+
+**Kabiny** (`stalls.rs`): kabina to mały pokój (typ `stall`, `see` = łazienka),
+pole drzwi należy do kabiny — interest management sam ukrywa osobę w środku.
+Zamknięcie ustawia w mapie nakładkę `closed` (`Map::set_closed`), którą
+sprawdza `Map::blocks`, czyli wspólna reguła kolizji; klient trzyma tę samą
+nakładkę w `MapData.closed` (pakiet `Doors`). Mapy są przez to zmienne po
+stronie serwera (`Building::floor_mut`). Zamek zwalnia się, gdy zamykający
+opuści pokój kabiny albo grę; nie można zamknąć, gdy ktoś stoi w drzwiach.
 
 **Potrzeby** (`needs.rs`): `Needs` w stałym przecinku (10 000 jednostek na
 punkt), zmiana co tick: głód 0→100 w 25 min, energia 100→0 w 35 min, toaleta
