@@ -943,7 +943,9 @@ impl Server {
         p.position = Some(offer);
         let Stage::Portal(desk) = &mut p.stage else { return };
         desk.awaiting = None;
-        self.company.hired_on.insert(pid, self.clock.day);
+        // Days as the employee sees them (their own day count): they start
+        // at the office on their next day.
+        self.company.hired_on.insert(pid, p.day + 1);
         desk.hired = Some(o.department);
         desk.mail(
             &from,
@@ -1023,7 +1025,7 @@ impl Server {
         }
         self.company.founder = Some(pid);
         self.company.name = name.clone();
-        self.company.hired_on.insert(pid, self.clock.day);
+        self.company.hired_on.insert(pid, p.day);
         let nick = p.nick.clone();
         self.give_new(pid, item_kind::EMPLOYEE_CARD);
         self.give_new(pid, item_kind::LAPTOP);
@@ -2252,7 +2254,7 @@ impl Server {
         p.department = dept;
         p.contract = true;
         p.money += shop::ADVANCE;
-        self.company.hired_on.insert(id, self.clock.day);
+        self.company.hired_on.insert(id, p.day.max(2)); // --start-employed: day 2
         if let Some((floor, x, y)) = seat {
             p.body = Body::at(floor, Pos::tile_center(x, y));
             p.room = self.building.floor(floor).map_or(0, |m| m.room_at_tile(x, y));
@@ -2845,7 +2847,9 @@ impl Server {
                     }
                 }
                 npc::Event::Contract { player } => {
-                    self.company.hired_on.insert(player, self.clock.day);
+                    if let Some(p) = self.players.get(&player) {
+                        self.company.hired_on.entry(player).or_insert(p.day);
+                    }
                     if let Some(p) = self.players.get_mut(&player) {
                         p.contract = true;
                         p.money += shop::ADVANCE;

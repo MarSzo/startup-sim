@@ -318,6 +318,7 @@ func _close_window(name: String) -> void:
 		_body.erase(name)
 		var t := _taskbar.get_node_or_null("task_" + name)
 		if t:
+			_taskbar.remove_child(t)  # now: a reopened window reuses the name
 			t.queue_free()
 
 
@@ -705,11 +706,9 @@ func on_clock(p: Dictionary) -> void:
 		fired = true
 		job_title = ""
 		department = 0
-		mails.clear()  # a fresh inbox follows
-		unread.clear()
-		_refresh_mail_badge()
-		_browser_view = "list"
-		visible = true
+		# Start the job hunt afresh: the old windows (interview) go and a new
+		# inbox and offers follow this Clock.
+		reset()
 		redraw = true
 	elif fired and not hired and p.place != Protocol.PLACE_PORTAL:
 		on_entered_world()  # hired again: off to the office
