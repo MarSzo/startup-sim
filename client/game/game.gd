@@ -2,6 +2,9 @@
 ## floors and room-based visibility, camera and debug info.
 extends Node2D
 
+## First snapshot of a session arrived: we are in the world.
+signal entered_world
+
 const Protocol = preload("res://net/protocol.gd")
 const Movement = preload("res://sim/movement.gd")
 const MapView = preload("res://map/map_view.gd")
@@ -25,6 +28,8 @@ const TALK_RADIUS_PX := 56.0
 const NPC_COLORS := {1: Color(0.22, 0.32, 0.62), 2: Color(0.55, 0.3, 0.45)}  # by look
 const LOG_LINES := 4
 const LOG_TTL_SEC := 12.0
+const DEPT_SHORT := {1: "IT", 2: "Biznes"}
+const DEPT_NAMES := {1: "IT / Produkt", 2: "Biznes"}
 
 var net
 var building
@@ -41,6 +46,11 @@ var hint_label := Label.new()
 var log_label := Label.new()
 var _log: Array = []  # [msec, text]
 var kinds := {}          # id -> entity kind (player / NPC)
+var depts := {}          # id -> department (after the contract)
+## Set while a full-screen UI (job portal) is open: no movement input.
+var input_blocked := false
+var job_title := ""
+var department := 0
 var _pending_say := {}   # id -> [msec, text]: said before the speaker was visible
 var remotes := {}        # id -> RemotePlayer
 var nicks := {}          # id -> String
@@ -169,6 +179,7 @@ func reset_session(welcome: Dictionary) -> void:
 	remotes.clear()
 	nicks.clear()
 	kinds.clear()
+	depts.clear()
 	info_requested.clear()
 	pending.clear()
 	seq = 0
@@ -188,7 +199,25 @@ func _color_for(id: int) -> Color:
 	return Color.from_hsv(fmod(id * 0.618034, 1.0), 0.55, 0.95)
 
 
+## Position from the job portal (department becomes official with the contract).
+func set_job(title: String, dept: int) -> void:
+	job_title = title
+	department = dept
+	_refresh_own_label()
+
+
+func _label_for(nick_text: String, dept: int) -> String:
+	return "%s · %s" % [nick_text, DEPT_SHORT[dept]] if DEPT_SHORT.has(dept) else nick_text
+
+
+func _refresh_own_label() -> void:
+	var official: bool = have_state and (pred.access & MapData.ACCESS_CARD) != 0
+	me.set_nick(_label_for(nick, department if official else 0))
+
+
 func _sample_input(delta: float) -> int:
+	if input_blocked:
+		return 0
 	if not goto_legs.is_empty() or not _goto_path.is_empty():
 		return _goto_input(delta)
 	if autowalk:
@@ -336,9 +365,10 @@ func _on_packet(p: Dictionary) -> void:
 		Protocol.T_PLAYER_INFO:
 			for e in p.players:
 				nicks[e.id] = e.nick
+				depts[e.id] = e.department
 				info_requested.erase(e.id)
 				if remotes.has(e.id):
-					remotes[e.id].set_nick(e.nick)
+					remotes[e.id].set_nick(_label_for(e.nick, e.department))
 
 
 func _on_snapshot(p: Dictionary) -> void:
@@ -370,7 +400,7 @@ func _on_snapshot(p: Dictionary) -> void:
 			r = RemotePlayer.new()
 			var npc: bool = e.kind == Protocol.KIND_NPC
 			r.look = (e.flags >> 3) & 7 if npc else 0
-			r.setup(NPC_COLORS.get(r.look, Color.GRAY) if npc else _color_for(e.id), nicks.get(e.id, "..."), ZOOM)
+			r.setup(NPC_COLORS.get(r.look, Color.GRAY) if npc else _color_for(e.id), _label_for(nicks.get(e.id, "..."), depts.get(e.id, 0)), ZOOM)
 			world.add_child(r)
 			remotes[e.id] = r
 			if _pending_say.has(e.id):
@@ -403,6 +433,8 @@ func _reconcile(server_body: Dictionary, ack: int) -> void:
 		me.position = Movement.to_px(nb.pos)
 		me.visible = true
 		_show_floor(nb.floor)
+		_refresh_own_label()
+		entered_world.emit()
 		return
 	if nb.pos != pred.pos or nb.floor != pred.floor:
 		corrections += 1
@@ -415,7 +447,10 @@ func _reconcile(server_body: Dictionary, ack: int) -> void:
 			if error_offset.length() > 48.0:
 				error_offset = Vector2.ZERO  # large jump: snap
 			prev_pos += nb.pos - pred.pos
+	var access_changed: bool = nb.access != pred.access
 	pred = nb  # also picks up server-side changes (e.g. a new pass)
+	if access_changed:
+		_refresh_own_label()
 
 
 ## Context hint at the bottom of the screen: elevator, NPC to talk to, or a
@@ -474,6 +509,7 @@ func debug_text() -> String:
 		"Widoczni gracze: %d" % visible_count,
 		"Gracz #%d %s  kafel (%d, %d)" % [net.player_id, nick, t.x, t.y],
 		"Uprawnienia: %s" % _access_text(),
+		"Stanowisko: %s" % (("%s (dział %s), umowa %s" % [job_title, DEPT_NAMES.get(department, "?"), "podpisana" if have_state and (pred.access & MapData.ACCESS_CARD) else "jeszcze nie"]) if department else "-"),
 		"Inputy w locie: %d  korekty: %d" % [pending.size(), corrections],
 		"Bufor interpolacji pusty: %.2f%% klatek" % (100.0 * interp_underruns / maxi(interp_frames, 1)),
 		"Ruch: %.1f KB/s in / %.1f KB/s out" % [net.bytes_in_per_sec / 1024.0, net.bytes_out_per_sec / 1024.0],

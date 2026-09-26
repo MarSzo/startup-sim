@@ -153,12 +153,14 @@ Sekcja techniczna prowadzona przez zespół; sekcje 1–9 to design.
 | Transport | „np. renet” | własny protokół na UDP (decyzja z briefu etapu 1: klient w GDScript nie obsłuży renet) |
 | Platformy | desktop: Windows, macOS, Linux, Steam Deck | w rozmowie 2026-09-26 rozszerzone o Android/iOS z crossplayem („później”); konsole „może kiedyś”. Obecny priorytet: **macOS** |
 | Konta / tożsamość | Steam + backend kont (Rails) | nick + token sesji, bez kont i zapisu postępu |
-| Przydział do działu | po umowie przydział do działu / zespołu | HR wydaje kartę bez działu (decyzja 2026-09-26); przydział dojdzie z rekrutacją |
+| Skutki działu | zespoły, zadania działów | dział jest przypisany i widoczny, ale na razie nic nie zmienia (decyzja 2026-09-26) |
+| Rekrutacja AI | później rozmowa z NPC napędzana AI | quiz (sekcja 10.8) |
 | Trwałość | umowa, karta, stanowisko zapisują się między sesjami | przepustka i karta żyją do końca sesji (brak kont) |
 
 Rozwiązane 2026-09-26: układ parteru i piętra 1 zgodny z sekcją 3 (10.5);
 bramki na kartę działają, portier wpuszcza i odprowadza osoby bez karty,
-recepcja prowadzi do HR, HR wydaje kartę pracownika (10.7).
+recepcja prowadzi do HR, HR wydaje kartę pracownika (10.7); portal z ofertami
+i rekrutacja z przydziałem do działu (10.8).
 
 ### 10.2 Stack (zaimplementowany)
 - Klient: Godot 4.7, GDScript.
@@ -347,12 +349,33 @@ neutralne nazwy stanowisk. Wciśnięcie E trafia najpierw do NPC stojącego na
 swoim stanowisku (portier, który właśnie przyprowadził gościa pod ladę, nie
 zasłania recepcji).
 
+### 10.8 Portal z ofertami i rekrutacja
+
+Ustalenia 2026-09-26: **portal na starcie** (zgodnie z sekcją 4), quiz
+**3 pytania, 2 poprawne = przyjęcie**, ponowna próba od razu (inne pytania)
+lub inna oferta; pytania **humorystyczne**, w klimacie startupu, z jedną
+poprawną odpowiedzią.
+
+- Po połączeniu gracz widzi „Portal z ofertami pracy · Startup Sim sp. z o.o.”
+  z dwiema ofertami: **Programista/ka** (dział IT / Produkt) i **Marketing i
+  sprzedaż** (dział Biznes). Nazwa firmy to zaślepka (otwarta kwestia z sekcji 8).
+- „Aplikuj” → 3 losowe pytania z puli oferty (po 8 w puli), odpowiedzi w losowej
+  kolejności → wynik: przyjęcie („zapraszamy na dzień próbny”) albo „Tym razem
+  się nie udało” z możliwością ponownej próby.
+- Po przyjęciu gracz pojawia się przed budynkiem i przechodzi wdrożenie (10.7);
+  HR podpisuje umowę **na dział z rekrutacji**: „Umowa podpisana — witamy w
+  dziale IT / Produkt! Oto karta pracownika.” Od tej chwili inni widzą przy
+  nicku dział („Ala · IT”).
+- Pytania i oferty są w `server/data/recruitment.json` (edycja bez zmiany kodu;
+  pierwsza odpowiedź w pliku jest poprawna — gra ją tasuje). Ocenia serwer.
+
 ### 10.6 Stan implementacji
 
 *Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie,
 automatyczne ponowne łączenie, budynek wg GDD (parter z terenem zewnętrznym,
-piętro 1, schody, winda), uprawnienia (bramki) oraz wdrożenie nowego gracza:
-portier → recepcja → HR → karta pracownika.*
+piętro 1, schody, winda), uprawnienia (bramki) oraz cała ścieżka nowego
+gracza: portal z ofertami → rekrutacja → portier → recepcja → HR → karta
+pracownika z działem.*
 
 #### Zrobione
 - **Serwer Rust** (`server/`): tick 20 Hz bez dryfu z liczeniem zgubionych
@@ -373,18 +396,22 @@ portier → recepcja → HR → karta pracownika.*
   gościa, odprowadza na recepcję), recepcja (odprowadza do HR), HR (umowa →
   karta pracownika); dymki wypowiedzi, podpowiedzi, wygląd NPC; protokół v3
   (uprawnienia w snapshocie, pakiet `Say`, encje NPC).
+- **Portal i rekrutacja**: oferty, quiz oceniany na serwerze (3 pytania,
+  2 poprawne), ponawianie ekranu przy stratach UDP, przydział do działu z
+  umową w HR, dział przy nicku; protokół v4.
 - **Boty** (`cargo run --release --bin bots`): 50 domyślnie, chodzą po BFS po
   całym budynku (schodami), część zbiera się w wybranym pokoju (domyślnie
   Chill room na piętrze 1).
 - **Sieć mobilna**: serwer dual-stack IPv4/IPv6; gracz identyfikowany tokenem
   (zmiana adresu w trakcie gry przenosi sesję); klient przepina gniazdo po
   ciszy/powrocie z tła i sam łączy się ponownie po utracie sesji.
-- **Testy**: 41 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
+- **Testy**: 46 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
   zależna od uprawnień, bramki, ruch/kolizje, schody, winda, nawigacja,
-  portier, recepcja, HR, protokół), 2 golden, 7 e2e serwera (m.in. całe
-  wdrożenie przez sieć aż do karty, niewidoczność między piętrami, zgodność
-  stanu serwera z predykcją) — łącznie 50; 107 sprawdzeń w Godocie (parytet
-  protokołu i ruchu z bramkami i piętrami, parsowanie adresów).
+  portier, recepcja, HR, rekrutacja, protokół), 2 golden, 8 e2e serwera
+  (m.in. portal: odrzucenie → przyjęcie → spawn; całe wdrożenie aż do karty;
+  niewidoczność między piętrami; zgodność stanu serwera z predykcją) —
+  łącznie 56; 112 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
+  adresów).
 
 #### Pomiary (MacBook, wszystko lokalnie)
 | scenariusz | wynik |
@@ -398,6 +425,8 @@ portier → recepcja → HR → karta pracownika.*
 | klient w recepcji piętra 1, 26 widocznych | 60 FPS, 0 korekt, bufor interpolacji pusty w 0,00% klatek |
 | gość bez przepustki: bramka → rozmowa z portierem → schody → recepcja | zatrzymany na bramce, przepustka po rozmowie, portier doprowadza na recepcję; 0 korekt |
 | pełne wdrożenie w oknie klienta: portier → recepcja → HR | karta pracownika w ~35 s gry, 0 korekt, 60 FPS |
+| rekrutacja + wdrożenie w oknie klienta (zgadywanie odpowiedzi) | przyjęta (2/3) po kilku próbach, umowa „IT / Produkt”, przy nicku „Zosia · IT” |
+| 50 botów: portal (zgadywanie) → Chill room (`--start-with-card`) | 50/50 przyjętych w < 5 s, 0 zgubionych ticków, 0 błędnych predykcji |
 | 50 botów z kartą (`--start-with-card`) w Chill roomie | 50/50 dochodzi przez bramki i schody, 0 zgubionych ticków, 0 błędnych predykcji |
 | klient IPv6 + klient IPv4, serwer zamrożony na 3 s | obie sesje zachowane (nowe porty, te same id) |
 | restart serwera | obaj klienci połączeni ponownie automatycznie w < 1 s od startu serwera |
@@ -409,13 +438,13 @@ portier → recepcja → HR → karta pracownika.*
   nie-Godotowych, inaczej `maps/*.json` nie trafią do paczki.
 - Kilka okien klienta naraz na jednym Macu: macOS spowalnia zasłonięte okna,
   więc ich metryki płynności (F3) są wtedy zaniżone — to nie błąd gry.
-- Przepustka i karta znikają po rozłączeniu (brak kont i zapisu postępu) —
-  po każdym połączeniu wdrożenie trzeba przejść od nowa.
+- Przepustka, karta i dział znikają po rozłączeniu (brak kont i zapisu
+  postępu) — po każdym połączeniu rekrutację i wdrożenie trzeba przejść od nowa.
 - Boty bez `--start-with-card` zostają w strefie publicznej (nie rozmawiają z
   portierem).
 
 #### Następne kroki (propozycja)
-Zgodnie z MVP (sekcja 9): uproszczona rekrutacja (portal ofert + pytania) z
-przydziałem do działu, NPC Zarządu, zadania działów, palenie + alarm; do tego
-trwałość postępu (konta). Punkty
+Zgodnie z MVP (sekcja 9): zadania działów (1–2 na dział), NPC Zarządu,
+palenie + alarm; do tego trwałość postępu (konta), żeby nie przechodzić
+rekrutacji przy każdym połączeniu. Punkty
 wpięcia opisane w `docs/ARCHITECTURE.md` („Gotowość na rozbudowę”).

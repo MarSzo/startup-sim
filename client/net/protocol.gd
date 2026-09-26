@@ -3,10 +3,12 @@
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 3
+const VERSION := 4
 const MAX_PACKET := 1200
 const MAX_NICK_BYTES := 16
 const MAX_SAY_BYTES := 240
+const MAX_TEXT_BYTES := 240
+const MAX_OPTIONS := 4
 const MAX_INPUTS_PER_PACKET := 8
 
 const T_CONNECT := 1
@@ -20,6 +22,11 @@ const T_PING := 8
 const T_PONG := 9
 const T_DISCONNECT := 10
 const T_SAY := 11
+const T_JOB_OFFERS := 12
+const T_APPLY := 13
+const T_QUESTION := 14
+const T_ANSWER := 15
+const T_RECRUIT_RESULT := 16
 
 const KIND_PLAYER := 0
 const KIND_NPC := 1
@@ -89,6 +96,22 @@ static func encode_ping(token: int, client_time: int) -> PackedByteArray:
 	var b := _writer(T_PING)
 	b.put_u32(token)
 	b.put_u32(client_time & 0xFFFFFFFF)
+	return b.data_array
+
+
+static func encode_apply(token: int, offer: int) -> PackedByteArray:
+	var b := _writer(T_APPLY)
+	b.put_u32(token)
+	b.put_u8(offer)
+	return b.data_array
+
+
+static func encode_answer(token: int, attempt: int, index: int, choice: int) -> PackedByteArray:
+	var b := _writer(T_ANSWER)
+	b.put_u32(token)
+	b.put_u8(attempt)
+	b.put_u8(index)
+	b.put_u8(choice)
 	return b.data_array
 
 
@@ -185,7 +208,7 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			var n := r.u8()
 			var players := []
 			for i in n:
-				players.append({"id": r.u16(), "nick": r.str8()})
+				players.append({"id": r.u16(), "nick": r.str8(), "department": r.u8()})
 			p.players = players
 		T_PONG:
 			p.client_time = r.u32()
@@ -196,6 +219,35 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 		T_SAY:
 			p.id = r.u16()
 			p.text = r.str16(MAX_SAY_BYTES)
+		T_JOB_OFFERS:
+			var n := r.u8()
+			if n > 16:
+				return {}
+			var offers := []
+			for i in n:
+				offers.append({"id": r.u8(), "department": r.u8(), "title": r.str16(MAX_TEXT_BYTES), "description": r.str16(MAX_TEXT_BYTES)})
+			p.offers = offers
+		T_QUESTION:
+			p.attempt = r.u8()
+			p.index = r.u8()
+			p.total = r.u8()
+			p.text = r.str16(MAX_TEXT_BYTES)
+			var n := r.u8()
+			if n > MAX_OPTIONS:
+				return {}
+			var options := []
+			for i in n:
+				options.append(r.str16(MAX_TEXT_BYTES))
+			p.options = options
+		T_RECRUIT_RESULT:
+			p.attempt = r.u8()
+			var passed := r.u8()
+			if passed > 1:
+				return {}
+			p.passed = passed == 1
+			p.score = r.u8()
+			p.total = r.u8()
+			p.department = r.u8()
 		_:
 			return {}
 	if not r.ok or not r.at_end():

@@ -7,5 +7,6 @@ pub mod nav;
 pub mod npc;
 pub mod net;
 pub mod protocol;
+pub mod recruitment;
 pub mod server;
 pub mod sim;

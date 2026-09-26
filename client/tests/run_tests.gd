@@ -45,6 +45,8 @@ func test_protocol(path: String) -> void:
 		"input": Protocol.encode_input(0x01020304, 1200, 99, PackedByteArray([0, 1, 9, 6])),
 		"info_request": Protocol.encode_info_request(0x01020304, [3, 4, 500]),
 		"ping": Protocol.encode_ping(0x01020304, 777000),
+		"apply": Protocol.encode_apply(0x01020304, 2),
+		"answer": Protocol.encode_answer(0x01020304, 3, 1, 2),
 	}
 	for name in enc:
 		expect(enc[name].hex_encode() == golden[name], "encode %s: %s != %s" % [name, enc[name].hex_encode(), golden[name]])
@@ -65,7 +67,16 @@ func test_protocol(path: String) -> void:
 		expect(e0.id == 3 and e0.kind == 0 and e0.x == 4096 and e0.y == 8192 and e0.flags == 5, "entity 0 %s" % e0)
 		expect(e1.id == 65535 and e1.kind == 1 and e1.x == -1 and e1.y == 2000000, "entity 1 %s" % e1)
 	var pi := Protocol.decode(golden["player_info"].hex_decode())
-	expect(pi.get("players", []).size() == 2 and pi.players[0].nick == "Ala" and pi.players[1].nick == "bot_07" and pi.players[1].id == 4, "decode player_info %s" % pi)
+	expect(pi.get("players", []).size() == 2 and pi.players[0].nick == "Ala" and pi.players[0].department == 1
+		and pi.players[1].nick == "bot_07" and pi.players[1].id == 4 and pi.players[1].department == 0, "decode player_info %s" % pi)
+	var jo := Protocol.decode(golden["job_offers"].hex_decode())
+	expect(jo.get("offers", []).size() == 2 and jo.offers[1].title == "Marketing i sprzedaż" and jo.offers[1].department == 2
+		and jo.offers[0].description == "Owocowe czwartki.", "decode job_offers %s" % jo)
+	var q := Protocol.decode(golden["question"].hex_decode())
+	expect(q.get("attempt") == 3 and q.index == 1 and q.total == 3 and q.text == "Co oznacza kod HTTP 404?"
+		and q.options.size() == 3 and q.options[1] == "Skończyła się kawa", "decode question %s" % q)
+	var rr := Protocol.decode(golden["recruit_result"].hex_decode())
+	expect(rr.get("attempt") == 3 and rr.passed == true and rr.score == 2 and rr.total == 3 and rr.department == 1, "decode recruit_result %s" % rr)
 	var po := Protocol.decode(golden["pong"].hex_decode())
 	expect(po.get("client_time") == 777000 and po.server_tick == 1234, "decode pong")
 	var d := Protocol.decode(golden["disconnect"].hex_decode())

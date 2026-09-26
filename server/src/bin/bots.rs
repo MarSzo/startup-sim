@@ -30,8 +30,9 @@ OPTIONS:
   --duration <secs>     stop after N seconds (0 = run forever) [default: 0]
   --map <path>          building JSON (must match the server)
 
-Bots can only get past the card gates if the server runs with
---start-with-card; otherwise they stay in the public area.
+Bots pass the job-portal recruitment by guessing (retrying until hired).
+They only get past the card gates if the server runs with --start-with-card;
+otherwise they stay in the public area.
 ";
 
 const INPUT_REDUNDANCY: usize = 4;
@@ -62,6 +63,7 @@ struct Bot {
     next_ping: Instant,
     // stats
     rtt_ms: f64,
+    hired: bool,
     bytes_in: u64,
     visible: usize,
     corrections: u64,
@@ -128,6 +130,7 @@ fn main() {
                 stuck_frames: 0,
                 next_ping: start,
                 rtt_ms: 0.0,
+                hired: false,
                 bytes_in: 0,
                 visible: 0,
                 corrections: 0,
@@ -191,10 +194,11 @@ fn main() {
             let n = playing.len().max(1) as f64;
             let in_room = playing.iter().filter(|b| (b.floor, b.room) == (target_floor, target)).count();
             println!(
-                "[{:>6.1}s] connected {}/{} | in '{}' {} | rtt avg {:.1} ms | recv avg {:.1} KB/s/bot | visible avg {:.1} max {} | mispredictions {}",
+                "[{:>6.1}s] connected {}/{} | hired {} | in '{}' {} | rtt avg {:.1} ms | recv avg {:.1} KB/s/bot | visible avg {:.1} max {} | mispredictions {}",
                 now.duration_since(start).as_secs_f64(),
                 playing.len(),
                 bots.len(),
+                playing.iter().filter(|b| b.hired || b.have_pos).count(),
                 room_name,
                 in_room,
                 playing.iter().map(|b| b.rtt_ms).sum::<f64>() / n,
@@ -233,6 +237,18 @@ impl Bot {
                 }
             }
             Packet::Reject { reason } => eprintln!("{} rejected: {reason}", self.nick),
+            // Job portal: apply for a random offer, answer at random; the
+            // server resends the screen, so answering each one we see is enough.
+            Packet::JobOffers { offers } => {
+                if let Some(o) = offers.get(fastrand::usize(..offers.len().max(1))) {
+                    let _ = self.sock.send(&Packet::Apply { token: self.token, offer: o.id }.encode());
+                }
+            }
+            Packet::Question { attempt, index, options, .. } => {
+                let choice = fastrand::u8(..options.len().max(1) as u8);
+                let _ = self.sock.send(&Packet::Answer { token: self.token, attempt, index, choice }.encode());
+            }
+            Packet::RecruitResult { passed: true, .. } => self.hired = true,
             Packet::Snapshot {
                 tick,
                 last_input_seq,

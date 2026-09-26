@@ -16,18 +16,23 @@ cd server && cargo run --release --bin bots -- --count 50 --room "Chill room" --
 ```
 
 Sterowanie: WASD / strzałki, **E** — rozmowa z NPC / winda (stojąc w kabinie), **F3** — overlay debug.
-Gracz startuje przed budynkiem bez przepustki: bramki w holu go nie wpuszczą,
+Po połączeniu widać **portal z ofertami pracy**: wybierz stanowisko i odpowiedz
+na 3 pytania (2 poprawne = przyjęcie; nie wyszło — spróbuj jeszcze raz).
+Przyjęty gracz startuje przed budynkiem bez przepustki: bramki w holu go nie wpuszczą,
 więc trzeba podejść do portierni i porozmawiać z portierem (E) — da przepustkę
 gościa i zaprowadzi na recepcję na piętrze 1 (schodami). Recepcja (E) zaprowadzi
 do HR, a HR (E) podpisze umowę i wyda kartę pracownika.
 
 ### Serwer — opcje
-`--bind`, `--map`, `--max-players`, `--stats-secs`, `--start-with-card` (każdy gracz z kartą — do testów z botami), oraz symulacja sieci:
+`--bind`, `--map`, `--max-players`, `--stats-secs`, `--start-with-card` (każdy gracz z kartą — do testów z botami),
+`--skip-recruitment` (bez portalu, od razu do świata), `--recruitment <plik>` (oferty i pytania,
+domyślnie `server/data/recruitment.json`), oraz symulacja sieci:
 `--lag-ms <ms>` (opóźnienie w jedną stronę, RTT rośnie 2×), `--jitter-ms <ms>`, `--loss <0..1>`.
 Np. RTT ~100 ms i 2% strat: `cargo run --release -- --lag-ms 50 --jitter-ms 10 --loss 0.02`.
 
 ### Klient — argumenty deweloperskie (po `--`)
-`--nick=Ala --server=127.0.0.1:7777 --autoconnect --debug` (adres może być też IPv6: `--server=[::1]:7777`) (F3 od startu),
+`--nick=Ala --server=127.0.0.1:7777 --autoconnect --debug`, `--auto-recruit=1 [--auto-recruit-delay=2]`
+(sam aplikuje na ofertę 1 i zgaduje odpowiedzi do skutku), (adres może być też IPv6: `--server=[::1]:7777`) (F3 od startu),
 `--autowalk` (losowy ruch), `--goto="27,29;E;wait:2;34,6;Recepcja"` (kolejne
 kroki: kafel / pokój na bieżącym piętrze, `E` = wciśnij E, `wait:N` = czekaj —
 tu: rozmowa z portierem, potem schodami do recepcji),

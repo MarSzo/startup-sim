@@ -1,4 +1,4 @@
-# Protokół sieciowy (wersja 3)
+# Protokół sieciowy (wersja 4)
 
 Własny binarny protokół na UDP. Implementacje:
 - serwer: `server/src/protocol.rs` (źródło prawdy),
@@ -23,7 +23,7 @@ przez `cargo test` i czytane przez `client/tests/run_tests.gd`.
 | pole    | typ | wartość |
 |---------|-----|---------|
 | magic   | u16 | `0x5354` (bajty `54 53`, „TS”) |
-| version | u8  | `3` |
+| version | u8  | `4` |
 | type    | u8  | typ pakietu (niżej) |
 
 ## Jednostki
@@ -121,11 +121,13 @@ każdy z pełnymi polami `self_*`. Pusty pokój → 1 fragment z `n = 0`.
 | pole    | typ |
 |---------|-----|
 | n       | u8 |
-| players | n × (`id u16`, nick `u8 len + UTF-8`) |
+| players | n × (`id u16`, nick `u8 len + UTF-8`, `department u8`) |
 
 Wysyłany, gdy encja (gracz lub NPC — wtedy `nick` to jego imię, np. „Portier”)
 pierwszy raz staje się widoczna dla odbiorcy, przed pierwszą skierowaną do niego
 wypowiedzią NPC oraz w odpowiedzi na `InfoRequest`. Max 55 wpisów na pakiet.
+`department` — dział gracza po podpisaniu umowy w HR (1 IT / Produkt, 2 Biznes,
+0 brak / NPC). Po podpisaniu umowy serwer rozsyła `PlayerInfo` ponownie.
 
 ### 7 `InfoRequest` (C→S)
 | pole  | typ |
@@ -157,6 +159,27 @@ sesja wygasła albo serwer był restartowany).
 Wypowiedź pokazywana w dymku nad postacią i w logu na dole ekranu. Trafia do
 wszystkich w tym samym `(piętro, pokój)` co mówiący oraz do gracza, do którego
 jest skierowana. Bez retransmisji (zgubiona linia przepada — to tylko dialog).
+
+### 12–16 Portal z ofertami i rekrutacja
+
+Nowy gracz po `Welcome` **nie jest jeszcze w świecie** (nie dostaje
+snapshotów, jego inputy są ignorowane): jest na portalu z ofertami. Serwer
+**co 1 s ponawia bieżący ekran** (oferty albo aktualne pytanie), więc zgubiony
+pakiet nie blokuje rekrutacji; klient, widząc ponownie ekran, na który już
+odpowiedział, wysyła swoją odpowiedź jeszcze raz.
+
+| typ | kierunek | treść |
+|-----|----------|-------|
+| 12 `JobOffers` | S→C | n u8, n × {`id u8`, `department u8`, `title` u16 len + UTF-8, `description` u16 len + UTF-8} |
+| 13 `Apply` | C→S | token u32, offer u8 — zaczyna nową próbę (losowe pytania oferty) |
+| 14 `Question` | S→C | attempt u8, index u8, total u8, `text` str16, n u8 (≤ 4), n × `option` str16 (kolejność potasowana) |
+| 15 `Answer` | C→S | token u32, attempt u8, index u8, choice u8 — odpowiedzi nieaktualne (inna próba / pytanie) są ignorowane |
+| 16 `RecruitResult` | S→C | attempt u8, passed u8 (0/1), score u8, total u8, department u8 — wysyłany 2× |
+
+Zasady (`server/data/recruitment.json`): 3 losowe pytania z puli oferty, 2
+poprawne = przyjęcie. Poprawne odpowiedzi zna tylko serwer. Po przyjęciu
+gracz pojawia się przed budynkiem (pierwszy `Snapshot` = potwierdzenie, nawet
+gdy `RecruitResult` zginie); po porażce wraca na listę ofert.
 
 ## Połączenie i timeouty
 
@@ -216,6 +239,7 @@ szyfrowaniem.
 
 ## Historia wersji
 
+- **4** — portal i rekrutacja (typy 12–16); `department` w `PlayerInfo`.
 - **3** — snapshot: `self_access`; pakiet `Say`; encje NPC (`kind` 1) z imionami w
   `PlayerInfo`; wygląd w bitach 3–5 `flags` (dodany bez zmiany formatu).
 - **2** — snapshot: pola `self_lock`, `self_prev_input`; bit inputu 16 (interakcja);

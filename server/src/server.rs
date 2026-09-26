@@ -9,6 +9,7 @@ use crate::building::Building;
 use crate::net::{canonical, LinkConditions, Net};
 use crate::npc::{self, Npc};
 use crate::protocol::{self as proto, EntityState, Packet, PlayerInfoEntry, SelfState};
+use crate::recruitment::{Attempt, Recruitment};
 use crate::sim::{self, Body, Pos};
 
 pub const TICK_HZ: u32 = 20;
@@ -31,10 +32,32 @@ pub struct Config {
     /// Rights every new player starts with (`map::access::*`); 0 in normal
     /// play, CARD for load tests (`--start-with-card`) so bots pass the gates.
     pub start_access: u8,
+    /// Job portal offers and quizzes.
+    pub recruitment: Recruitment,
+    /// Spawn straight into the world (dev / tests), no job portal.
+    pub skip_recruitment: bool,
 }
+
+/// Where a connected player is in the game.
+enum Stage {
+    /// On the job portal (not in the world yet); `attempt` = quiz in progress.
+    Portal { attempt: Option<Attempt> },
+    /// Hired: in the building.
+    Working,
+}
+
+/// Resend the current portal screen this often (ticks) - UDP may drop it.
+const PORTAL_RESEND_TICKS: u32 = 20;
 
 struct Player {
     id: u16,
+    stage: Stage,
+    /// Department of the position the player was recruited for (0 = none).
+    department: u8,
+    /// Contract signed at HR: the department is official (shown to others).
+    contract: bool,
+    /// Recruitment attempts so far (numbers the attempts).
+    attempts: u8,
     token: u32,
     nonce: u32,
     addr: SocketAddr,
@@ -172,7 +195,9 @@ impl Server {
             Packet::Input { token, .. }
             | Packet::InfoRequest { token, .. }
             | Packet::Ping { token, .. }
-            | Packet::Disconnect { token, .. } => *token,
+            | Packet::Disconnect { token, .. }
+            | Packet::Apply { token, .. }
+            | Packet::Answer { token, .. } => *token,
             _ => return,
         };
         let Some(&id) = self.by_token.get(&token) else {
@@ -212,8 +237,7 @@ impl Server {
                 }
             }
             Packet::InfoRequest { ids, .. } => {
-                let entries: Vec<PlayerInfoEntry> =
-                    ids.iter().filter_map(|&i| self.name_of(i).map(|nick| PlayerInfoEntry { id: i, nick })).collect();
+                let entries: Vec<PlayerInfoEntry> = ids.iter().filter_map(|&i| self.info_of(i)).collect();
                 let p = self.players.get_mut(&id).unwrap();
                 p.known.extend(entries.iter().map(|e| e.id));
                 for chunk in entries.chunks(INFO_PER_PACKET) {
@@ -227,6 +251,8 @@ impl Server {
             Packet::Disconnect { .. } => {
                 self.remove_player(id, "left");
             }
+            Packet::Apply { offer, .. } => self.handle_apply(id, offer),
+            Packet::Answer { attempt, index, choice, .. } => self.handle_answer(id, attempt, index, choice),
             _ => {}
         }
     }
@@ -261,8 +287,13 @@ impl Server {
         let (spawn_floor, spawn) = spawns[self.next_spawn % spawns.len()];
         self.next_spawn += 1;
         let pos = Pos::tile_center(spawn.x, spawn.y);
+        let skip = self.cfg.skip_recruitment;
         let player = Player {
             id,
+            stage: if skip { Stage::Working } else { Stage::Portal { attempt: None } },
+            department: 0,
+            contract: false,
+            attempts: 0,
             token,
             nonce,
             addr,
@@ -283,13 +314,91 @@ impl Server {
         self.by_token.insert(token, id);
         let welcome = self.welcome(id);
         self.send(addr, &welcome);
+        if !skip {
+            self.send_portal(id);
+        }
     }
 
-    /// Display name of a player or NPC.
-    fn name_of(&self, id: u16) -> Option<String> {
+    /// (Re)send the portal screen a player is on: offers or current question.
+    fn send_portal(&mut self, id: u16) {
+        let Some(p) = self.players.get(&id) else { return };
+        let packet = match &p.stage {
+            Stage::Working => return,
+            Stage::Portal { attempt: None } => Packet::JobOffers { offers: self.cfg.recruitment.portal() },
+            Stage::Portal { attempt: Some(a) } => match a.current(&self.cfg.recruitment) {
+                Some(q) => Packet::Question { attempt: a.number, index: q.index, total: q.total, text: q.text, options: q.options },
+                None => return,
+            },
+        };
+        let addr = p.addr;
+        self.send(addr, &packet);
+    }
+
+    fn handle_apply(&mut self, id: u16, offer: u8) {
+        let p = self.players.get_mut(&id).unwrap();
+        if !matches!(p.stage, Stage::Portal { .. }) {
+            return;
+        }
+        p.attempts = p.attempts.wrapping_add(1);
+        let Some(attempt) = self.cfg.recruitment.start(offer, p.attempts, &mut self.rng) else { return };
+        p.stage = Stage::Portal { attempt: Some(attempt) };
+        self.send_portal(id);
+    }
+
+    fn handle_answer(&mut self, id: u16, attempt_no: u8, index: u8, choice: u8) {
+        let p = self.players.get_mut(&id).unwrap();
+        let Stage::Portal { attempt: Some(a) } = &mut p.stage else { return };
+        if a.number != attempt_no || !a.answer(index, choice) {
+            return; // stale / duplicate: the resend loop shows the current state
+        }
+        if !a.finished() {
+            self.send_portal(id);
+            return;
+        }
+        let r = &self.cfg.recruitment;
+        let (score, total, offer) = (a.score(), a.total(), a.offer);
+        let passed = score >= r.pass_score;
+        let department = r.offer(offer).map_or(0, |o| o.department);
+        let result = Packet::RecruitResult {
+            attempt: attempt_no,
+            passed,
+            score: score as u8,
+            total: total as u8,
+            department: if passed { department } else { 0 },
+        };
+        let addr = p.addr;
+        if passed {
+            p.stage = Stage::Working;
+            p.department = department;
+            let msg = format!(
+                "* player {id} '{}' hired: {} ({score}/{total})",
+                p.nick,
+                r.department_name(department).unwrap_or("?")
+            );
+            self.log(msg);
+        } else {
+            p.stage = Stage::Portal { attempt: None };
+        }
+        self.send(addr, &result);
+        self.send(addr, &result); // tiny packet; a duplicate makes loss unlikely
+        if !passed {
+            self.send_portal(id);
+        }
+    }
+
+    /// Name (and official department) of a player or NPC.
+    fn info_of(&self, id: u16) -> Option<PlayerInfoEntry> {
         match self.players.get(&id) {
-            Some(p) => Some(p.nick.clone()),
-            None => self.npcs.iter().find(|n| n.id == id).map(|n| n.name.clone()),
+            Some(p) => Some(PlayerInfoEntry {
+                id,
+                nick: p.nick.clone(),
+                department: if p.contract { p.department } else { 0 },
+            }),
+            None => self
+                .npcs
+                .iter()
+                .find(|n| n.id == id)
+                .map(|n| PlayerInfoEntry { id, nick: n.name.clone(), department: 0 }),
         }
     }
 
@@ -363,7 +472,15 @@ impl Server {
 
         // 2. Simulation: apply queued inputs in sequence order.
         let mut talks: Vec<(u16, Body)> = Vec::new();
+        let mut portal_resend = Vec::new();
         for p in self.players.values_mut() {
+            if !matches!(p.stage, Stage::Working) {
+                p.inputs.clear(); // not in the world yet
+                if self.tick % PORTAL_RESEND_TICKS == 0 {
+                    portal_resend.push(p.id);
+                }
+                continue;
+            }
             let mut moved = false;
             for _ in 0..MAX_INPUTS_PER_TICK {
                 let Some((seq, bits)) = p.inputs.pop_front() else { break };
@@ -386,9 +503,15 @@ impl Server {
             p.room = self.building.floor(p.body.floor).map_or(0, |m| m.room_at(p.body.pos.x, p.body.pos.y));
         }
 
+        for id in portal_resend {
+            self.send_portal(id);
+        }
+
         // 3. NPCs: conversations, then their own behaviour.
         let mut events = Vec::new();
         for (pid, body) in talks {
+            let p = &self.players[&pid];
+            let dept = self.cfg.recruitment.department_name(p.department).map(str::to_string);
             let nearest = self
                 .npcs
                 .iter_mut()
@@ -397,14 +520,15 @@ impl Server {
                 // the guest he just brought mustn't shadow the receptionist).
                 .min_by_key(|n| (!n.is_idle(), (n.body.pos.x - body.pos.x).abs() + (n.body.pos.y - body.pos.y).abs()));
             if let Some(n) = nearest {
-                events.extend(n.interact(&self.building, pid, body.access));
+                events.extend(n.interact(&self.building, pid, body.access, dept.as_deref()));
             }
         }
-        let bodies: HashMap<u16, Body> = self.players.values().map(|p| (p.id, p.body)).collect();
+        let bodies: HashMap<u16, Body> =
+            self.players.values().filter(|p| matches!(p.stage, Stage::Working)).map(|p| (p.id, p.body)).collect();
         for n in &mut self.npcs {
             events.extend(n.tick(&self.building, &bodies));
         }
-        let mut says: Vec<(u16, &'static str, Option<u16>)> = Vec::new();
+        let mut says: Vec<(u16, String, Option<u16>)> = Vec::new();
         for e in events {
             match e {
                 npc::Event::Grant { player, access } => {
@@ -418,12 +542,27 @@ impl Server {
                     }
                 }
                 npc::Event::Say { npc, text, to } => says.push((npc, text, to)),
+                npc::Event::Contract { player } => {
+                    if let Some(p) = self.players.get_mut(&player) {
+                        p.contract = true;
+                        let msg = format!(
+                            "* player {player} '{}' signed a contract: {}",
+                            p.nick,
+                            self.cfg.recruitment.department_name(p.department).unwrap_or("-")
+                        );
+                        self.log(msg);
+                    }
+                    // Everyone gets the updated PlayerInfo (department) again.
+                    for other in self.players.values_mut() {
+                        other.known.remove(&player);
+                    }
+                }
             }
         }
 
         // 4. Interest management: group entities by (floor, room).
         let mut groups: HashMap<(u8, u16), Vec<EntityState>> = HashMap::new();
-        for p in self.players.values() {
+        for p in self.players.values().filter(|p| matches!(p.stage, Stage::Working)) {
             groups.entry((p.body.floor, p.room)).or_default().push(EntityState {
                 id: p.id,
                 kind: proto::kind::PLAYER,
@@ -444,7 +583,8 @@ impl Server {
 
         // 5. Snapshots + PlayerInfo for newly visible entities.
         let tick = self.tick;
-        let ids: Vec<u16> = self.players.keys().copied().collect();
+        let ids: Vec<u16> =
+            self.players.values().filter(|p| matches!(p.stage, Stage::Working)).map(|p| p.id).collect();
         let mut outgoing: Vec<(SocketAddr, u16, Packet)> = Vec::new();
         for id in ids {
             let p = &self.players[&id];
@@ -454,7 +594,7 @@ impl Server {
             let new_infos: Vec<PlayerInfoEntry> = visible
                 .iter()
                 .filter(|e| !p.known.contains(&e.id))
-                .filter_map(|e| self.name_of(e.id).map(|nick| PlayerInfoEntry { id: e.id, nick }))
+                .filter_map(|e| self.info_of(e.id))
                 .collect();
             let me = SelfState {
                 x: p.body.pos.x,
@@ -482,10 +622,10 @@ impl Server {
                 if (p.body.floor, p.room) == place || Some(p.id) == to {
                     // Name first, so the line isn't shown as "?".
                     if p.known.insert(npc_id) {
-                        let info = vec![PlayerInfoEntry { id: npc_id, nick: name.clone() }];
+                        let info = vec![PlayerInfoEntry { id: npc_id, nick: name.clone(), department: 0 }];
                         outgoing.push((p.addr, p.id, Packet::PlayerInfo { players: info }));
                     }
-                    outgoing.push((p.addr, p.id, Packet::Say { id: npc_id, text: text.to_string() }));
+                    outgoing.push((p.addr, p.id, Packet::Say { id: npc_id, text: text.clone() }));
                 }
             }
         }

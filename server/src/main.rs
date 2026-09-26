@@ -3,6 +3,7 @@ use std::time::Duration;
 
 use game::args::Args;
 use game::building::{default_building_path, Building};
+use game::recruitment::{default_recruitment_path, Recruitment};
 use game::net::LinkConditions;
 use game::server::{Config, Server, DEFAULT_CLIENT_TIMEOUT, TICK_HZ};
 
@@ -21,6 +22,8 @@ OPTIONS:
   --jitter-ms <ms>      simulated extra random delay 0..=ms
   --loss <p>            simulated packet loss per direction, e.g. 0.02
   --start-with-card     every player starts with an employee card (load tests / bots)
+  --skip-recruitment    spawn straight into the building, no job portal (dev)
+  --recruitment <path>  recruitment JSON  [default: data/recruitment.json]
 ";
 
 fn main() {
@@ -32,6 +35,11 @@ fn main() {
     let map_path = args.str("map").map(PathBuf::from).unwrap_or_else(default_building_path);
     let building = Building::load(&map_path).unwrap_or_else(|e| {
         eprintln!("failed to load map: {e}");
+        std::process::exit(1);
+    });
+    let rec_path = args.str("recruitment").map(PathBuf::from).unwrap_or_else(default_recruitment_path);
+    let recruitment = Recruitment::load(&rec_path).unwrap_or_else(|e| {
+        eprintln!("failed to load recruitment: {e}");
         std::process::exit(1);
     });
     let link = LinkConditions {
@@ -46,6 +54,8 @@ fn main() {
         stats_every: Duration::from_secs(args.get("stats-secs", 5)),
         client_timeout: DEFAULT_CLIENT_TIMEOUT,
         start_access: if args.flag("start-with-card") { game::map::access::CARD } else { 0 },
+        recruitment,
+        skip_recruitment: args.flag("skip-recruitment"),
     };
     let mut cfg = cfg;
     if args.str("bind").is_none() && game::net::bind_udp(cfg.bind).is_err() {

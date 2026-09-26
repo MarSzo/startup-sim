@@ -5,13 +5,16 @@
 //! `tests/golden/packets.json`.
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 3;
+pub const VERSION: u8 = 4;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
 pub const MAX_PACKET: usize = 1200;
 pub const MAX_NICK_BYTES: usize = 16;
-/// Max UTF-8 bytes of a speech line (`Say`).
-pub const MAX_SAY_BYTES: usize = 240;
+/// Max UTF-8 bytes of longer texts (speech, offers, questions, options).
+pub const MAX_TEXT_BYTES: usize = 240;
+pub const MAX_SAY_BYTES: usize = MAX_TEXT_BYTES;
+/// Max answer options of a recruitment question.
+pub const MAX_OPTIONS: usize = 4;
 /// Max inputs carried in one Input packet.
 pub const MAX_INPUTS_PER_PACKET: usize = 8;
 
@@ -33,6 +36,11 @@ pub mod ty {
     pub const PONG: u8 = 9;
     pub const DISCONNECT: u8 = 10;
     pub const SAY: u8 = 11;
+    pub const JOB_OFFERS: u8 = 12;
+    pub const APPLY: u8 = 13;
+    pub const QUESTION: u8 = 14;
+    pub const ANSWER: u8 = 15;
+    pub const RECRUIT_RESULT: u8 = 16;
 }
 
 pub mod reject {
@@ -71,6 +79,17 @@ pub struct EntityState {
 pub struct PlayerInfoEntry {
     pub id: u16,
     pub nick: String,
+    /// Department (after signing the contract; 0 = none / NPC).
+    pub department: u8,
+}
+
+/// A job offer on the portal.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OfferInfo {
+    pub id: u8,
+    pub department: u8,
+    pub title: String,
+    pub description: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -104,6 +123,15 @@ pub enum Packet {
     Disconnect { token: u32, reason: u8 },
     /// Something an entity (NPC) says; shown as a speech bubble.
     Say { id: u16, text: String },
+    /// Job portal: the offers (resent every second while on the portal).
+    JobOffers { offers: Vec<OfferInfo> },
+    /// Candidate applies for an offer: starts a new attempt.
+    Apply { token: u32, offer: u8 },
+    /// Current recruitment question (resent every second until answered).
+    Question { attempt: u8, index: u8, total: u8, text: String, options: Vec<String> },
+    Answer { token: u32, attempt: u8, index: u8, choice: u8 },
+    /// Outcome of an attempt. On success the player spawns in the world.
+    RecruitResult { attempt: u8, passed: bool, score: u8, total: u8, department: u8 },
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -210,6 +238,11 @@ impl Packet {
             Packet::Pong { .. } => ty::PONG,
             Packet::Disconnect { .. } => ty::DISCONNECT,
             Packet::Say { .. } => ty::SAY,
+            Packet::JobOffers { .. } => ty::JOB_OFFERS,
+            Packet::Apply { .. } => ty::APPLY,
+            Packet::Question { .. } => ty::QUESTION,
+            Packet::Answer { .. } => ty::ANSWER,
+            Packet::RecruitResult { .. } => ty::RECRUIT_RESULT,
         }
     }
 
@@ -283,6 +316,7 @@ impl Packet {
                 for p in players.iter().take(255) {
                     w.u16(p.id);
                     w.str8(&p.nick);
+                    w.u8(p.department);
                 }
             }
             Packet::InfoRequest { token, ids } => {
@@ -307,6 +341,42 @@ impl Packet {
             Packet::Say { id, text } => {
                 w.u16(*id);
                 w.str16(text, MAX_SAY_BYTES);
+            }
+            Packet::JobOffers { offers } => {
+                w.u8(offers.len().min(16) as u8);
+                for o in offers.iter().take(16) {
+                    w.u8(o.id);
+                    w.u8(o.department);
+                    w.str16(&o.title, MAX_TEXT_BYTES);
+                    w.str16(&o.description, MAX_TEXT_BYTES);
+                }
+            }
+            Packet::Apply { token, offer } => {
+                w.u32(*token);
+                w.u8(*offer);
+            }
+            Packet::Question { attempt, index, total, text, options } => {
+                w.u8(*attempt);
+                w.u8(*index);
+                w.u8(*total);
+                w.str16(text, MAX_TEXT_BYTES);
+                w.u8(options.len().min(MAX_OPTIONS) as u8);
+                for o in options.iter().take(MAX_OPTIONS) {
+                    w.str16(o, MAX_TEXT_BYTES);
+                }
+            }
+            Packet::Answer { token, attempt, index, choice } => {
+                w.u32(*token);
+                w.u8(*attempt);
+                w.u8(*index);
+                w.u8(*choice);
+            }
+            Packet::RecruitResult { attempt, passed, score, total, department } => {
+                w.u8(*attempt);
+                w.u8(*passed as u8);
+                w.u8(*score);
+                w.u8(*total);
+                w.u8(*department);
             }
         }
         w.0
@@ -380,7 +450,7 @@ impl Packet {
                 let n = r.u8()? as usize;
                 let mut players = Vec::with_capacity(n);
                 for _ in 0..n {
-                    players.push(PlayerInfoEntry { id: r.u16()?, nick: r.str8()? });
+                    players.push(PlayerInfoEntry { id: r.u16()?, nick: r.str8()?, department: r.u8()? });
                 }
                 Packet::PlayerInfo { players }
             }
@@ -397,6 +467,46 @@ impl Packet {
             ty::PONG => Packet::Pong { client_time: r.u32()?, server_tick: r.u32()? },
             ty::DISCONNECT => Packet::Disconnect { token: r.u32()?, reason: r.u8()? },
             ty::SAY => Packet::Say { id: r.u16()?, text: r.str16(MAX_SAY_BYTES)? },
+            ty::JOB_OFFERS => {
+                let n = r.u8()? as usize;
+                if n > 16 {
+                    return Err(DecodeError::Invalid("too many offers"));
+                }
+                let mut offers = Vec::with_capacity(n);
+                for _ in 0..n {
+                    offers.push(OfferInfo {
+                        id: r.u8()?,
+                        department: r.u8()?,
+                        title: r.str16(MAX_TEXT_BYTES)?,
+                        description: r.str16(MAX_TEXT_BYTES)?,
+                    });
+                }
+                Packet::JobOffers { offers }
+            }
+            ty::APPLY => Packet::Apply { token: r.u32()?, offer: r.u8()? },
+            ty::QUESTION => {
+                let (attempt, index, total) = (r.u8()?, r.u8()?, r.u8()?);
+                let text = r.str16(MAX_TEXT_BYTES)?;
+                let n = r.u8()? as usize;
+                if n > MAX_OPTIONS {
+                    return Err(DecodeError::Invalid("too many options"));
+                }
+                let mut options = Vec::with_capacity(n);
+                for _ in 0..n {
+                    options.push(r.str16(MAX_TEXT_BYTES)?);
+                }
+                Packet::Question { attempt, index, total, text, options }
+            }
+            ty::ANSWER => Packet::Answer { token: r.u32()?, attempt: r.u8()?, index: r.u8()?, choice: r.u8()? },
+            ty::RECRUIT_RESULT => {
+                let attempt = r.u8()?;
+                let passed = match r.u8()? {
+                    0 => false,
+                    1 => true,
+                    _ => return Err(DecodeError::Invalid("bad bool")),
+                };
+                Packet::RecruitResult { attempt, passed, score: r.u8()?, total: r.u8()?, department: r.u8()? }
+            }
             other => return Err(DecodeError::UnknownType(other)),
         };
         if r.pos != b.len() {
@@ -479,13 +589,40 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
         ),
         (
             "player_info",
-            Packet::PlayerInfo { players: vec![PlayerInfoEntry { id: 3, nick: "Ala".into() }, PlayerInfoEntry { id: 4, nick: "bot_07".into() }] },
+            Packet::PlayerInfo {
+                players: vec![
+                    PlayerInfoEntry { id: 3, nick: "Ala".into(), department: 1 },
+                    PlayerInfoEntry { id: 4, nick: "bot_07".into(), department: 0 },
+                ],
+            },
         ),
         ("info_request", Packet::InfoRequest { token: 0x01020304, ids: vec![3, 4, 500] }),
         ("ping", Packet::Ping { token: 0x01020304, client_time: 777_000 }),
         ("pong", Packet::Pong { client_time: 777_000, server_tick: 1234 }),
         ("disconnect", Packet::Disconnect { token: 0x01020304, reason: disconnect::TIMEOUT }),
         ("say", Packet::Say { id: 61440, text: "Dzień dobry! Proszę za mną.".into() }),
+        (
+            "job_offers",
+            Packet::JobOffers {
+                offers: vec![
+                    OfferInfo { id: 1, department: 1, title: "Programista/ka".into(), description: "Owocowe czwartki.".into() },
+                    OfferInfo { id: 2, department: 2, title: "Marketing i sprzedaż".into(), description: "Kubek z logo.".into() },
+                ],
+            },
+        ),
+        ("apply", Packet::Apply { token: 0x01020304, offer: 2 }),
+        (
+            "question",
+            Packet::Question {
+                attempt: 3,
+                index: 1,
+                total: 3,
+                text: "Co oznacza kod HTTP 404?".into(),
+                options: vec!["Nie znaleziono zasobu".into(), "Skończyła się kawa".into(), "Wszystko w porządku".into()],
+            },
+        ),
+        ("answer", Packet::Answer { token: 0x01020304, attempt: 3, index: 1, choice: 2 }),
+        ("recruit_result", Packet::RecruitResult { attempt: 3, passed: true, score: 2, total: 3, department: 1 }),
     ]
 }
 
@@ -543,7 +680,7 @@ mod tests {
                 b[0] = 0x54;
                 b[1] = 0x53;
                 b[2] = VERSION;
-                b[3] = rng.u8(1..=11);
+                b[3] = rng.u8(1..=16);
             }
             let _ = Packet::decode(&b);
         }

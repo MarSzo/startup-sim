@@ -27,6 +27,8 @@ server/                 crate Rusta (lib `game` + binarki)
   src/sim.rs            deterministyczny krok: ruch, kolizje, schody, winda
   src/nav.rs            podążanie ścieżką (boty, NPC)
   src/npc.rs            NPC po stronie serwera (portier, recepcja, HR)
+  src/recruitment.rs    portal z ofertami i quiz rekrutacyjny
+  data/recruitment.json oferty i pule pytań (pierwsza odpowiedź = poprawna)
   src/protocol.rs       pakiety: encode/decode, fragmentacja snapshotów
   src/net.rs            UdpSocket + symulator opóźnienia/jittera/strat
   src/server.rs         pętla ticka, handshake, inputy, interest mgmt, statystyki
@@ -51,6 +53,7 @@ client/                 projekt Godota 4.7
   game/player_view.gd   placeholder postaci + nick
   game/remote_player.gd bufor snapshotów + interpolacja
   ui/start_screen.gd    ekran startowy
+  ui/portal.gd          portal z ofertami, pytania, wynik rekrutacji
   ui/debug_overlay.gd   F3
   tests/run_tests.gd    testy headless (parytet z Rustem)
 tools/build_maps.py     generator map z czytelnego opisu (wynik = JSON-y wyżej)
@@ -111,6 +114,15 @@ przepustki); osobę z kartą tylko wita. **HR** stoi za biurkiem: gościowi
 portiernię. Role (`npc::Role`) i ich kwestie są w `npc.rs`; wygląd idzie w
 bitach 3–5 flag encji.
 
+**Etapy gracza** (`Stage`): `Portal` (po połączeniu — portal z ofertami i
+quiz; poza światem: brak snapshotów, inputy ignorowane, ekran ponawiany co
+20 ticków) → `Working` (po przyjęciu: spawn przed budynkiem). Rekrutacja
+(`recruitment.rs`) losuje 3 pytania oferty i tasuje odpowiedzi; odpowiedź
+jest sprawdzana na serwerze. Dział z oferty trafia do umowy: HR emituje
+`Event::Contract`, serwer ustawia `contract` i rozsyła `PlayerInfo` z działem
+na nowo (usuwa gracza z `known` wszystkich). `--skip-recruitment` wpuszcza od
+razu do świata (dev/testy); boty przechodzą quiz, zgadując do skutku.
+
 **Sesje** są indeksowane tokenem (`by_token`), nie adresem: pakiet z ważnym
 tokenem z nowego adresu przenosi sesję (`migrate`), jeśli dowodzi „świeżości”
 (`Ping` albo nowe inputy). Nieznany token dostaje `Disconnect(4)`. `by_addr`
@@ -159,6 +171,12 @@ schodach i w windzie + scenariusz: spawn → schody → Chill room → winda w d
 i w górę) jest generowany przez Rust i odtwarzany w Godocie.
 
 ## Klient
+
+**Portal** (`ui/portal.gd`, osobna warstwa nad grą): pokazuje ostatni ekran
+wysłany przez serwer (oferty / pytanie / wynik), ponawia swoją ostatnią akcję,
+gdy serwer pokaże ten sam ekran (zgubiony UDP), i znika po „Idę do biura”
+albo gdy przyjdą pierwsze snapshoty. Dopóki jest widoczny, postać nie
+dostaje inputu. Dział gracza widać przy nicku („Ala · IT”, po umowie) i w F3.
 
 **Połączenie** (`net_client.gd`): parsowanie adresów z IPv6, rozwiązywanie
 nazw `TYPE_ANY`, nowe gniazdo po 1,5 s ciszy lub powrocie z tła (ta sama
@@ -238,7 +256,8 @@ stojąc w drzwiach widzisz korytarz.
 | **Piętro 2** | wpis w `building.json` z `locked: true`; odblokowanie = plik mapy + `locked: false` (winda i schody same go obsłużą; do ustalenia: odblokowanie w trakcie gry wymaga zmiany CRC albo osobnego komunikatu). |
 | **Trwałość karty** | karta żyje tyle, co sesja; zapis między sesjami wymaga kont (backend). |
 | **Kolejne NPC** | np. Zarząd: nowy `kind` w `npcs` mapy + `Role` w `npc.rs`; rozmowa, odprowadzanie, dymki i widoczność są wspólne. |
-| **Dział / stanowisko** | HR na razie wydaje kartę bez działu; przydział dojdzie z rekrutacją (wybór w UI → nowe uprawnienie lub pole w stanie gracza). |
+| **Skutki działu** | dział jest w stanie gracza i w `PlayerInfo`; ograniczenia (np. drzwi działów, zadania) dojdą z zadaniami. |
+| **Rekrutacja z AI** | `Attempt` to jedyne miejsce oceniania — rozmowę z NPC napędzaną AI można podpiąć zamiast quizu bez zmian w protokole świata. |
 | **Akcje / interakcje** | bit 16 (E) działa jak w windzie: kontekst = link/kafel, na którym stoisz; bity 5–7 wolne. |
 | **Więcej graczy w pokoju** | fragmentacja snapshotów już działa; następny krok to delta względem `ack_tick` i/lub priorytet po odległości. |
 
@@ -256,5 +275,5 @@ połączeni, liczba w docelowym pokoju, RTT, odbierany transfer, widoczni.
 
 | polecenie | co sprawdza |
 |-----------|-------------|
-| `cd server && cargo test` | 41 testów jednostkowych (budynek i mapy wg GDD, osiągalność zależna od uprawnień, bramki z wolnym wyjściem, ruch/kolizje, schody, winda, nawigacja, portier, recepcja i HR; protokół), 2 golden, 7 e2e (m.in. całe wdrożenie przez sieć: portier → recepcja → HR → karta; widoczność między piętrami; stan serwera = predykcja) |
+| `cd server && cargo test` | 46 testów jednostkowych (budynek i mapy wg GDD, osiągalność zależna od uprawnień, bramki, ruch/kolizje, schody, winda, nawigacja, portier, recepcja, HR, rekrutacja: zaliczenie/oblanie, ignorowanie nieaktualnych odpowiedzi, losowanie i tasowanie; protokół), 2 golden, 8 e2e (m.in. portal: odrzucenie → przyjęcie → spawn; całe wdrożenie aż do karty; widoczność między piętrami; stan serwera = predykcja) |
 | `godot --headless --path client -s tests/run_tests.gd` | parytet protokołu (bajt w bajt) i ruchu — z bramkami, uprawnieniami i przejściami między piętrami — z Rustem, zgodność CRC budynku, parsowanie adresów |
