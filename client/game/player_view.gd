@@ -1,30 +1,53 @@
-## Placeholder character: colored body + nick label (+ speech bubble).
-## Position is in world px.
+## Pixel-art character (+ nick label and speech bubble). Position is in world
+## px; the node origin is the feet (collision box center).
+## Appearance comes from a seed (the entity id) or a fixed look for NPC staff;
+## the walk cycle is driven by the distance actually travelled, so it matches
+## the movement for both the local player and interpolated remote ones.
 extends Node2D
 
-const BODY := Vector2(10, 14)
-const FACING_OFFSETS := [Vector2(0, 1), Vector2(0, -1), Vector2(-1, 0), Vector2(1, 0)]
+const FACING_DOWN := 0
+const FACING_UP := 1
+const FACING_LEFT := 2
+const FACING_RIGHT := 3
 const BUBBLE_WIDTH := 260.0
+const HEAD_TOP := -21.0  # sprite top relative to the feet
 
-var color := Color.WHITE
-var outline := Color(0, 0, 0, 0.8)
-var facing := 0
 ## Appearance (entity flags bits 3..5): 0 player, 1 porter (uniform + cap),
 ## 2 office staff (shirt + tie).
 const LOOK_PLAYER := 0
 const LOOK_PORTER := 1
 const LOOK_OFFICE := 2
+
+const SKINS := [Color("#f2cfae"), Color("#e3b08c"), Color("#c68c63"), Color("#8d5a3b")]
+const HAIRS := [Color("#2b2118"), Color("#5a3b22"), Color("#a0703a"), Color("#d9b66b"), Color("#8a8a8a"), Color("#b5462e"), Color("#1d1d27")]
+const SHIRTS := [Color("#d64541"), Color("#2e86de"), Color("#27ae60"), Color("#f39c12"), Color("#8e44ad"), Color("#16a085"), Color("#e84393"), Color("#f5f6fa"), Color("#34495e"), Color("#c0a16b")]
+const PANTS := [Color("#2f3a56"), Color("#3b3b3b"), Color("#5a4a3a"), Color("#4a5a3a"), Color("#6b7a8f")]
+const OUTLINE := Color(0.08, 0.08, 0.1)
+
 var look := LOOK_PLAYER
+var facing := FACING_DOWN
+## White outline marks the local player.
+var highlight := false
+var skin := SKINS[0]
+var hair := HAIRS[0]
+var hair_style := 0   # 0 short, 1 long, 2 bun, 3 spiky
+var shirt := SHIRTS[0]
+var pants := PANTS[0]
+var tie := Color("#c0392b")
+
 var nick_label := Label.new()
 var bubble := PanelContainer.new()
 var bubble_label := Label.new()
 var _bubble_time := 0.0
 var _zoom := 1.0
+var _last_pos := Vector2.INF
+var _walk := 0.0      # distance-driven walk phase
+var _idle := 1.0      # seconds since the last movement
 
 
-func setup(p_color: Color, nick: String, zoom: float) -> void:
-	color = p_color
+func setup(seed_id: int, nick: String, zoom: float) -> void:
 	_zoom = zoom
+	set_seed(seed_id)
 	nick_label.text = nick
 	var ls := LabelSettings.new()
 	ls.font_size = 16
@@ -36,10 +59,29 @@ func setup(p_color: Color, nick: String, zoom: float) -> void:
 	# Render the label at screen resolution regardless of camera zoom.
 	nick_label.scale = Vector2.ONE / zoom
 	nick_label.size = Vector2(200, 24)
-	nick_label.position = Vector2(-100 / zoom, -BODY.y - 26 / zoom)
+	nick_label.position = Vector2(-100 / zoom, HEAD_TOP - 24 / zoom)
 	if nick_label.get_parent() == null:
 		add_child(nick_label)
 		_build_bubble()
+	queue_redraw()
+
+
+## Deterministic look from an id (players) - same on every client.
+func set_seed(seed_id: int) -> void:
+	var h := absi(seed_id * 2654435761) >> 3
+	skin = SKINS[h % SKINS.size()]
+	hair = HAIRS[(h / 7) % HAIRS.size()]
+	hair_style = (h / 53) % 4
+	shirt = SHIRTS[(h / 211) % SHIRTS.size()]
+	pants = PANTS[(h / 1237) % PANTS.size()]
+	tie = [Color("#c0392b"), Color("#2e86de"), Color("#27ae60")][(h / 17) % 3]
+	match look:
+		LOOK_PORTER:
+			shirt = Color("#2c3e6b")
+			pants = Color("#1f2a44")
+		LOOK_OFFICE:
+			shirt = Color("#f4f6f8")
+			pants = Color("#2d3036")
 	queue_redraw()
 
 
@@ -78,7 +120,13 @@ func say(text: String) -> void:
 
 func _place_bubble() -> void:
 	var sz := bubble.get_combined_minimum_size() / _zoom
-	bubble.position = Vector2(-sz.x / 2, -BODY.y - 30 / _zoom - sz.y)
+	bubble.position = Vector2(-sz.x / 2, HEAD_TOP - 28 / _zoom - sz.y)
+
+
+func set_facing(f: int) -> void:
+	if f != facing:
+		facing = f
+		queue_redraw()
 
 
 func _process(delta: float) -> void:
@@ -88,32 +136,134 @@ func _process(delta: float) -> void:
 			bubble.visible = false
 		else:
 			_place_bubble()
+	# Walk cycle from the distance travelled since the last frame.
+	if _last_pos != Vector2.INF:
+		var d := position.distance_to(_last_pos)
+		if d > 0.01 and d < 8.0:
+			_walk += d / 3.5
+			_idle = 0.0
+			queue_redraw()
+		else:
+			if _idle < 0.12 and _idle + delta >= 0.12:
+				queue_redraw()  # settle into the standing pose
+			_idle += delta
+	_last_pos = position
 
 
-func set_facing(f: int) -> void:
-	if f != facing:
-		facing = f
-		queue_redraw()
+func _frame() -> int:
+	return 0 if _idle >= 0.12 else int(_walk) % 4
+
+
+# ------------------------------------------------------------------- drawing
+
+func _r(x: float, y: float, w: float, h: float, c: Color) -> void:
+	draw_rect(Rect2(x, y, w, h), c)
 
 
 func _draw() -> void:
-	# Feet are at the node origin (collision box center); body extends upward.
-	var r := Rect2(-BODY.x / 2, -BODY.y + 4, BODY.x, BODY.y)
-	draw_rect(Rect2(r.position + Vector2(0, 1), r.size), Color(0, 0, 0, 0.25))
-	draw_rect(r, color)
-	if look == LOOK_OFFICE:
-		# White shirt with a tie, dark trousers.
-		draw_rect(Rect2(r.position.x + 2, r.position.y + 4, r.size.x - 4, 5), Color(0.96, 0.96, 0.96))
-		draw_rect(Rect2(-0.5, r.position.y + 4, 1.5, 5), color.darkened(0.3))
-		draw_rect(Rect2(r.position.x, r.end.y - 5, r.size.x, 5), Color(0.18, 0.18, 0.22))
-	elif look == LOOK_PORTER:
-		# Dark trousers, light shirt collar and a peaked cap.
-		draw_rect(Rect2(r.position.x, r.end.y - 5, r.size.x, 5), color.darkened(0.5))
-		draw_rect(Rect2(-2, r.position.y + 5, 4, 2), Color(0.95, 0.95, 0.9))
-		draw_rect(Rect2(r.position.x - 1, r.position.y - 2, r.size.x + 2, 3), Color(0.1, 0.12, 0.25))
-		draw_rect(Rect2(-2, r.position.y - 1, 4, 1), Color(0.9, 0.75, 0.2))
-	draw_rect(r, outline, false, 1.0)
-	# Head/eyes hint facing direction.
-	var eye: Vector2 = FACING_OFFSETS[facing]
-	var c := Vector2(0, -BODY.y + 8) + eye * 2.5
-	draw_rect(Rect2(c - Vector2(1, 1), Vector2(2, 2)), Color(0.1, 0.1, 0.1))
+	var f := _frame()
+	var step: int = [0, 1, 0, -1][f]    # leg swing
+	var bob := 1 if f % 2 == 1 else 0     # body bounces while walking
+	var side := facing == FACING_LEFT or facing == FACING_RIGHT
+	var dir := -1 if facing == FACING_LEFT else 1
+
+	# Shadow.
+	draw_rect(Rect2(-5, 1, 10, 3), Color(0, 0, 0, 0.28))
+	draw_rect(Rect2(-4, 0, 8, 1), Color(0, 0, 0, 0.18))
+
+	var top := HEAD_TOP + bob  # head top
+	# Outline silhouette first (1px bigger), then the parts.
+	var ol := OUTLINE if not highlight else Color(1, 1, 1, 0.95)
+	_r(-4, top - 1, 8, 9, ol)           # head
+	_r(-5, top + 7, 10, 9, ol)          # torso + arms
+	_r(-4, top + 15, 8, 6 - bob, ol)    # legs
+
+	# Legs + shoes.
+	var leg_y := top + 15
+	var leg_h := 5 - bob
+	if side:
+		_r(-2 + step, leg_y, 3, leg_h, pants)
+		_r(-1 - step, leg_y, 3, leg_h, pants.darkened(0.2))
+		_r(-2 + step + (1 if dir > 0 else -1), leg_y + leg_h - 1, 3, 1, Color("#1c1c1c"))
+	else:
+		var l_lift := 1 if step > 0 else 0
+		var r_lift := 1 if step < 0 else 0
+		_r(-3, leg_y, 3, leg_h - l_lift, pants)
+		_r(0, leg_y, 3, leg_h - r_lift, pants.darkened(0.12))
+		_r(-3, leg_y + leg_h - 1 - l_lift, 3, 1, Color("#1c1c1c"))
+		_r(0, leg_y + leg_h - 1 - r_lift, 3, 1, Color("#1c1c1c"))
+
+	# Torso and arms (arms swing opposite to the legs).
+	var ty := top + 8
+	_r(-4, ty, 8, 7, shirt)
+	_r(-4, ty, 8, 1, shirt.lightened(0.15))
+	if look == LOOK_OFFICE and facing != FACING_UP:
+		_r(-0.5 if not side else dir * 1.5 - 0.5, ty + 1, 1.5, 5, tie)
+	if look == LOOK_PORTER:
+		_r(-4, ty + 5, 8, 1, Color("#d4ac2b"))  # belt
+		if facing != FACING_UP and not side:
+			_r(1, ty + 1, 2, 2, Color("#d4ac2b"))  # badge
+	var swing: int = -step
+	if side:
+		_r(-1 + swing * dir, ty + 1, 3, 5, shirt.darkened(0.18))
+		_r(-1 + swing * dir, ty + 6, 2, 2, skin)
+	else:
+		_r(-5, ty + 1 + maxi(swing, 0), 2, 5, shirt.darkened(0.18))
+		_r(3, ty + 1 + maxi(-swing, 0), 2, 5, shirt.darkened(0.18))
+		_r(-5, ty + 6 + maxi(swing, 0), 2, 1, skin)
+		_r(3, ty + 6 + maxi(-swing, 0), 2, 1, skin)
+
+	# Head.
+	_r(-3, top, 6, 8, skin)
+	_r(-3, top + 7, 6, 1, skin.darkened(0.12))
+	_draw_hair(top, side, dir)
+	# Face.
+	var eye := Color("#1f1f24")
+	match facing:
+		FACING_DOWN:
+			_r(-2, top + 4, 1, 1, eye)
+			_r(1, top + 4, 1, 1, eye)
+			_r(-1, top + 6, 2, 1, skin.darkened(0.25))
+		FACING_LEFT, FACING_RIGHT:
+			_r(dir * 1.5 - 0.5, top + 4, 1, 1, eye)
+			_r(dir * 3 - (1 if dir > 0 else 0), top + 5, 1, 1, skin.darkened(0.15))  # nose
+	if look == LOOK_PORTER:
+		_r(-4, top - 1, 8, 3, Color("#1b2440"))           # cap
+		_r(-2, top, 4, 1, Color("#d4ac2b"))                # cap badge
+		if facing == FACING_DOWN:
+			_r(-4, top + 2, 8, 1, Color("#10162a"))        # visor
+		elif side:
+			_r(dir * 2 - (2 if dir < 0 else 0) + (1 if dir > 0 else -1), top + 2, 3, 1, Color("#10162a"))
+
+
+func _draw_hair(top: float, side: bool, dir: int) -> void:
+	if look == LOOK_PORTER:
+		_r(-3, top + 1, 6, 2, hair)  # a bit of hair under the cap
+		return
+	var h := hair
+	var hl := hair.lightened(0.18)
+	match facing:
+		FACING_UP:
+			_r(-3, top, 6, 7 if hair_style != 1 else 8, h)
+			_r(-2, top, 3, 1, hl)
+			if hair_style == 1:
+				_r(-3, top + 7, 6, 3, h)
+			elif hair_style == 2:
+				_r(-1, top - 2, 3, 2, h)
+		_:
+			_r(-3, top, 6, 3, h)
+			_r(-2, top, 3, 1, hl)
+			match hair_style:
+				1:  # long
+					if side:
+						_r(-3 if dir > 0 else 1, top + 2, 2, 7, h)
+					else:
+						_r(-4, top + 1, 2, 8, h)
+						_r(2, top + 1, 2, 8, h)
+				2:  # bun
+					_r(-1, top - 3, 3, 3, h)
+				3:  # spiky
+					for i in 3:
+						_r(-3 + i * 2, top - 1, 1, 1, h)
+			if side:
+				_r(-3 if dir > 0 else 1, top, 2, 5, h)  # back of the head

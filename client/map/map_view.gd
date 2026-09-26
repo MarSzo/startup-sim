@@ -1,22 +1,16 @@
-## Renders the tile map once into a texture (placeholder colored tiles)
+## Renders the floor once into a texture (procedural pixel art, map_art.gd)
 ## plus faint room-name labels.
 extends Node2D
 
 
+const MapArt = preload("res://map/map_art.gd")
+
+
 func build(map, zoom: float) -> void:
+	var t0 := Time.get_ticks_msec()
 	var tp: int = map.tile_px
-	var img := Image.create(map.width * tp, map.height * tp, false, Image.FORMAT_RGBA8)
-	for y in map.height:
-		for x in map.width:
-			var c: String = map.tile_chars[y * map.width + x]
-			var col := Color.html(map.legend[c]["color"])
-			var r := Rect2i(x * tp, y * tp, tp, tp)
-			img.fill_rect(r, col)
-			if map.legend[c]["solid"]:
-				img.fill_rect(Rect2i(r.position.x, r.end.y - 3, tp, 3), col.darkened(0.3))
-			else:
-				img.fill_rect(Rect2i(r.position.x, r.position.y, tp, 1), col.darkened(0.06))
-				img.fill_rect(Rect2i(r.position.x, r.position.y, 1, tp), col.darkened(0.06))
+	var img: Image = MapArt.new().build(map)
+	print("map art floor %d: %d ms" % [map.floor_index, Time.get_ticks_msec() - t0])
 	var sprite := Sprite2D.new()
 	sprite.texture = ImageTexture.create_from_image(img)
 	sprite.centered = false
@@ -49,8 +43,8 @@ func build(map, zoom: float) -> void:
 		var l := Label.new()
 		l.text = map.room_name(rid)
 		var ls := LabelSettings.new()
-		ls.font_size = 28
-		ls.font_color = Color(1, 1, 1, 0.35)
+		ls.font_size = 22
+		ls.font_color = Color(1, 1, 1, 0.28)
 		ls.outline_size = 6
 		ls.outline_color = Color(0, 0, 0, 0.25)
 		l.label_settings = ls

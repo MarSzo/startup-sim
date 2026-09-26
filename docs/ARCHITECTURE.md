@@ -48,14 +48,16 @@ client/                 projekt Godota 4.7
   sim/movement.gd       lustro sim.rs
   map/building.gd       lustro building.rs (bez BFS)
   map/map_data.gd       lustro map.rs (bez BFS)
-  map/map_view.gd       render mapy do jednej tekstury
+  map/map_art.gd        proceduralny pixel art piętra (podłogi, ściany 3/4, meble)
+  map/map_view.gd       tekstura piętra + podpisy pomieszczeń
   game/game.gd          logika sieciowa gry po stronie klienta
-  game/player_view.gd   placeholder postaci + nick
+  game/player_view.gd   pixel-artowa postać z animacją chodu + nick + dymek
   game/remote_player.gd bufor snapshotów + interpolacja
   ui/start_screen.gd    ekran startowy
   ui/portal.gd          portal z ofertami, pytania, wynik rekrutacji
   ui/debug_overlay.gd   F3
   tests/run_tests.gd    testy headless (parytet z Rustem)
+  tests/render_maps.gd  narzędzie: zapis grafiki pięter do PNG (headless)
 tools/build_maps.py     generator map z czytelnego opisu (wynik = JSON-y wyżej)
 docs/                   GDD, PROTOCOL, ARCHITECTURE
 ```
@@ -84,7 +86,9 @@ Pakiety są obsługiwane od razu po odebraniu: `Input` trafia do kolejki gracza,
 2. Symulacja: z kolejki inputów każdego gracza max 6 kroków `sim::step`
    (średnio 3 = 60 Hz / 20 Hz) na jego `Body` (piętro, pozycja, poprzedni
    input, blokada schodów); aktualizacja pokoju i flag.
-3. Grupowanie encji po `(floor, room)`.
+3. Grupowanie encji po `(floor, room)`. Odbiorca dostaje encje swojego pokoju
+   i pokoi wymienionych w `see` jego pokoju (np. portiernia ↔ hol wejściowy —
+   portiera widać przez otwarte drzwi).
 4. Dla każdego gracza snapshot z encji jego grupy (fragmentowany ≤ 1200 B)
    + `PlayerInfo` dla encji, których nicku jeszcze nie dostał.
 
@@ -205,12 +209,29 @@ zegarem lokalnym i jest łagodnie (10%/snapshot) korygowany do ticku ostatnio
 odebranego snapshotu; przy dużym rozjeździe (>5 ticków) jest przestawiany.
 Gdy brakuje danych, krótka ekstrapolacja (max 2 ticki), potem stop.
 
-**Widoczność**: przy zmianie `(floor, room)` klient usuwa wszystkich
-zdalnych graczy — nowy zestaw przychodzi w tym samym snapshocie. Gracz
+**Widoczność**: przy zmianie piętra klient usuwa wszystkich zdalnych graczy;
+przy zmianie pokoju — tych, których nie ma w nowym snapshocie (osoby widoczne
+z obu pokoi, np. portier, zostają bez mrugnięcia). Gracz
 nieobecny w snapshotach przez 5 ticków znika.
 
-**Render**: każde piętro rysowane raz do `ImageTexture` (jeden sprite na
-piętro, widoczne tylko bieżące), postacie to
+**Grafika** — proceduralny pixel art (16 px), bez zewnętrznych plików:
+- `map_art.gd` rysuje piętro raz, przy wczytaniu (~20–40 ms): podłogi z
+  wariantami tekstur (bez powtarzalnego wzoru), ściany w rzucie 3/4 (ciemny
+  wierzch, jasny front z listwą i obrazkami tam, gdzie widać pokój poniżej),
+  cienie ścian, drzwi / bramki / szklane drzwi / schody / winda, a meble jako
+  całe obiekty (spójne grupy tego samego znaku: biurka z monitorami i
+  krzesłami, lady, regały z towarem, sofa, stoły z krzesłami, rośliny, szafy
+  serwerowe, ławka, popielniczka, toalety, umywalki, samochody z liniami
+  miejsc). Typ mebla bierze się z legendy mapy; kolizje zależą tylko od
+  `solid`, więc zmiana wyglądu nie rusza symulacji.
+- `player_view.gd` rysuje postać prostokątami w `_draw()`: głowa, fryzura
+  (4 style), koszula, ręce, spodnie, buty; 4 kierunki; cykl chodu liczony z
+  przebytej drogi (ten sam dla własnej postaci i interpolowanych innych).
+  Wygląd gracza wynika z jego id (identyczny u wszystkich); NPC mają stroje
+  (portier: mundur i czapka, personel: koszula z krawatem). Własna postać ma
+  jasny obrys.
+
+**Render**: każde piętro to jeden sprite (widoczne tylko bieżące), postacie to
 `Node2D._draw()` z `Label`em (y-sort). Kamera `Camera2D` z zoomem 3×, bez
 wygładzania, z limitami mapy. Etykiety mają skalę `1/zoom` i rozmiar czcionki
 ekranowej, więc są ostre mimo zoomu.
@@ -240,7 +261,8 @@ Format piętra:
   lub karta) dla bramek i bramy garażowej, „service” dla zaplecza;
   `free_dir`: kierunek, w którym kafel zawsze przepuszcza.
 - `rooms`: druga warstwa znaków tej samej wielkości; `room_defs` mapuje znak →
-  `{id, name, type}`, `-` = brak pokoju (ściany). Id są unikalne w obrębie piętra.
+  `{id, name, type, see?}`, `-` = brak pokoju (ściany). Id są unikalne w obrębie
+  piętra; `see` — klucze pokoi, których ludzi też widać (interest management).
 - `links`: `{kind: "stairs", area: [x,y,w,h], to_floor, to: [x,y]}` albo
   `{kind: "elevator", id, area}`.
 - `spawns`: kafle startowe (tylko parter: chodnik przed wejściem).

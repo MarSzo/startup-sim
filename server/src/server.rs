@@ -588,8 +588,14 @@ impl Server {
         let mut outgoing: Vec<(SocketAddr, u16, Packet)> = Vec::new();
         for id in ids {
             let p = &self.players[&id];
-            let visible: Vec<EntityState> =
-                groups[&(p.body.floor, p.room)].iter().filter(|e| e.id != id).copied().collect();
+            let also: &[u16] = self.building.floor(p.body.floor).map_or(&[], |m| m.visible_from(p.room));
+            let visible: Vec<EntityState> = std::iter::once(&p.room)
+                .chain(also)
+                .filter_map(|r| groups.get(&(p.body.floor, *r)))
+                .flatten()
+                .filter(|e| e.id != id)
+                .copied()
+                .collect();
             self.stats.max_visible = self.stats.max_visible.max(visible.len());
             let new_infos: Vec<PlayerInfoEntry> = visible
                 .iter()

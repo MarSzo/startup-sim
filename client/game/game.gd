@@ -25,7 +25,6 @@ const ERROR_DECAY := 15.0
 const MAX_PENDING := 240
 ## Talk range to NPCs (same as npc::TALK_RADIUS on the server): 3.5 tiles.
 const TALK_RADIUS_PX := 56.0
-const NPC_COLORS := {1: Color(0.22, 0.32, 0.62), 2: Color(0.55, 0.3, 0.45)}  # by look
 const LOG_LINES := 4
 const LOG_TTL_SEC := 12.0
 const DEPT_SHORT := {1: "IT", 2: "Biznes"}
@@ -111,8 +110,8 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 	world.y_sort_enabled = true
 	add_child(world)
 
-	me.setup(_color_for(net.player_id), nick, ZOOM)
-	me.outline = Color.WHITE
+	me.setup(net.player_id, nick, ZOOM)
+	me.highlight = true
 	me.visible = false
 	world.add_child(me)
 	camera.zoom = Vector2(ZOOM, ZOOM)
@@ -190,13 +189,8 @@ func reset_session(welcome: Dictionary) -> void:
 	latest_tick = 0
 	room_id = 0
 	me.visible = false
-	me.color = _color_for(net.player_id)
-	me.queue_redraw()
+	me.set_seed(net.player_id)
 	status_label.visible = false
-
-
-func _color_for(id: int) -> Color:
-	return Color.from_hsv(fmod(id * 0.618034, 1.0), 0.55, 0.95)
 
 
 ## Position from the job portal (department becomes official with the contract).
@@ -378,13 +372,23 @@ func _on_snapshot(p: Dictionary) -> void:
 	if tick > latest_tick:
 		latest_tick = tick
 		visible_count = 0
-		if p.room != room_id or p.floor != floor_index:
-			# Entered another room: the visible set is replaced wholesale.
+		if p.floor != floor_index:
+			# Another floor: nobody from the old one is visible any more.
 			for r in remotes.values():
 				r.queue_free()
 			remotes.clear()
-			room_id = p.room
-			floor_index = p.floor
+		elif p.room != room_id and p.frag_cnt == 1:
+			# Another room: drop whoever isn't in the new (complete) set right
+			# away; people visible from both rooms (e.g. the porter) stay.
+			var present := {}
+			for e in p.entities:
+				present[e.id] = true
+			for id in remotes.keys():
+				if not present.has(id):
+					remotes[id].queue_free()
+					remotes.erase(id)
+		room_id = p.room
+		floor_index = p.floor
 		if not have_time or absf(tick - est_tick) > 5.0:
 			est_tick = tick
 			have_time = true
@@ -400,7 +404,7 @@ func _on_snapshot(p: Dictionary) -> void:
 			r = RemotePlayer.new()
 			var npc: bool = e.kind == Protocol.KIND_NPC
 			r.look = (e.flags >> 3) & 7 if npc else 0
-			r.setup(NPC_COLORS.get(r.look, Color.GRAY) if npc else _color_for(e.id), _label_for(nicks.get(e.id, "..."), depts.get(e.id, 0)), ZOOM)
+			r.setup(e.id, _label_for(nicks.get(e.id, "..."), depts.get(e.id, 0)), ZOOM)
 			world.add_child(r)
 			remotes[e.id] = r
 			if _pending_say.has(e.id):

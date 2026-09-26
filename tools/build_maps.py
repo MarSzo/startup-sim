@@ -32,7 +32,18 @@ LEGEND = {
     "E": {"type": "elevator_door", "solid": False, "color": "#b8c4cc"},
     "e": {"type": "elevator", "solid": False, "color": "#9aa8b0"},
     "S": {"type": "stairs", "solid": False, "color": "#b09070"},
-    "T": {"type": "furniture", "solid": True, "color": "#8b6b4a"},
+    # Furniture: all solid, the type only decides how the client draws it.
+    "T": {"type": "table", "solid": True, "color": "#8b6b4a"},
+    "W": {"type": "desk", "solid": True, "color": "#9a7650"},
+    "K": {"type": "counter", "solid": True, "color": "#c9a37a"},
+    "H": {"type": "shelf", "solid": True, "color": "#7a7f8a"},
+    "Q": {"type": "sofa", "solid": True, "color": "#5b7fbf"},
+    "P": {"type": "plant", "solid": True, "color": "#3f8a3a"},
+    "R": {"type": "rack", "solid": True, "color": "#2a2d34"},
+    "N": {"type": "bench", "solid": True, "color": "#8a6a45"},
+    "A": {"type": "ashtray", "solid": True, "color": "#6d6d6d"},
+    "U": {"type": "toilet", "solid": True, "color": "#f2f2f2"},
+    "V": {"type": "sink", "solid": True, "color": "#dfe8ee"},
     "X": {"type": "car", "solid": True, "color": "#b03a2e"},
     "v": {"type": "grass", "solid": False, "color": "#5e8c4a"},
     "p": {"type": "sidewalk", "solid": False, "color": "#a8a8a0"},
@@ -52,8 +63,11 @@ class Floor:
         self.spawns = []
         self.npcs = []
 
-    def room(self, key, rid, name, kind):
+    def room(self, key, rid, name, kind, see=None):
         self.rooms[key] = {"id": rid, "name": name, "type": kind}
+        if see:
+            # Rooms whose people are visible from here (open door / window).
+            self.rooms[key]["see"] = see
 
     def area(self, x0, y0, x1, y1, tile, room=None):
         for y in range(y0, y1 + 1):
@@ -124,16 +138,16 @@ def floor0():
 
     f.box(40, 3, 47, 12, ":", "Y")
     f.room("Y", 9, "Zaplecze techniczne", "service")
-    f.put(41, 4, 46, 4, "T")                             # racks
-    f.put(41, 8, 42, 11, "T")
+    f.put(41, 4, 46, 4, "R")                             # server racks
+    f.put(41, 8, 42, 11, "R")
     f.area(43, 13, 44, 13, "L", "H")                     # locked (service access)
 
     f.box(20, 22, 25, 32, ".", "P")
-    f.room("P", 4, "Portiernia", "reception")
-    f.put(21, 27, 21, 30, "T")                           # porter's desk
+    f.room("P", 4, "Portiernia", "reception", see=["E"])
+    f.put(21, 27, 21, 30, "K")                           # porter's desk
 
     f.box(27, 22, 40, 32, "_", "E")
-    f.room("E", 5, "Wejście", "entrance")
+    f.room("E", 5, "Wejście", "entrance", see=["P"])
     f.area(26, 28, 26, 29, "D", "E")                     # portiernia <-> lobby
     for x in range(28, 40, 2):                           # card gates hall <-> lobby
         f.area(x, 21, x, 21, "B", "E")
@@ -143,8 +157,10 @@ def floor0():
     f.room("Z", 6, "Sklep", "shop")
     f.area(41, 29, 41, 30, "D", "E")                     # shop <-> lobby
     for y in (24, 27):
-        f.put(45, y, 54, y, "T")                         # shelves
-    f.put(51, 31, 55, 31, "T")                           # counter
+        f.put(45, y, 54, y, "H")                         # shelves
+    f.put(51, 31, 55, 31, "K")                           # checkout counter
+    for x, y in [(27, 22), (40, 22), (27, 32), (40, 32), (20, 14), (56, 14), (42, 22)]:
+        f.put(x, y, x, y, "P")                           # potted plants
 
     # --- outside ---
     f.area(1, 34, W - 2, 36, "p", "O")                   # sidewalk
@@ -156,8 +172,8 @@ def floor0():
         f.put(x, 43, x + 2, 44, "X")
     f.area(42, 39, 54, 45, "z", "M")
     f.room("M", 8, "Strefa palenia", "smoking")
-    f.put(44, 41, 46, 41, "T")                           # bench
-    f.put(50, 43, 50, 43, "T")                           # ashtray
+    f.put(44, 41, 46, 41, "N")                           # bench
+    f.put(50, 43, 50, 43, "A")                           # ashtray
 
     f.spawns = [[x, y] for y in (35, 36) for x in range(28, 39)]
     # Porter: sits in the lodge; escorts newcomers to the 1st floor reception.
@@ -172,7 +188,7 @@ def floor1():
     f.box(20, 14, 44, 20, ".", "C")
     f.room("C", 1, "Recepcja", "reception")
     elevator_and_stairs(f, "C")
-    f.put(30, 17, 34, 17, "T")                           # reception desk
+    f.put(30, 17, 34, 17, "K")                           # reception desk
 
     f.box(46, 14, 56, 20, ",", "Z")
     f.room("Z", 2, "Zarząd", "management")
@@ -181,12 +197,12 @@ def floor1():
     f.box(3, 3, 18, 20, ",", "I")
     f.room("I", 3, "IT / Produkt", "department")
     for y in (5, 9, 13, 17):
-        f.put(5, y, 9, y, "T")
-        f.put(12, y, 16, y, "T")
+        f.put(5, y, 9, y, "W")
+        f.put(12, y, 16, y, "W")
 
     f.box(40, 3, 47, 12, ",", "R")
     f.room("R", 4, "HR", "department")
-    f.put(42, 6, 45, 6, "T")                             # HR desk
+    f.put(42, 6, 45, 6, "W")                             # HR desk
 
     # Receptionist behind the desk (guests arrive in front of it, row 18) takes
     # newcomers to HR; HR signs the contract and hands out the employee card.
@@ -205,13 +221,13 @@ def floor1():
     f.box(3, 26, 22, 32, ",", "B")
     f.room("B", 6, "Biznes", "department")
     for y in (28, 31):
-        f.put(5, y, 9, y, "T")
-        f.put(13, y, 17, y, "T")
+        f.put(5, y, 9, y, "W")
+        f.put(13, y, 17, y, "W")
     f.area(12, 25, 13, 25, "D", "K")
 
     f.box(24, 26, 42, 32, ",", "H")
     f.room("H", 7, "Chill room", "common")
-    f.put(27, 28, 29, 29, "T")                           # sofa
+    f.put(27, 28, 29, 29, "Q")                           # sofa
     f.put(36, 30, 39, 30, "T")                           # table
     f.area(32, 25, 34, 25, "D", "K")
 
@@ -221,6 +237,13 @@ def floor1():
     f.box(51, 26, 56, 32, ":", "M")
     f.room("M", 9, "Łazienka męska", "bathroom")
     f.area(53, 25, 53, 25, "D", "K")
+    for y in (28, 30, 32):
+        f.put(44, y, 44, y, "U")                         # toilets
+        f.put(56, y, 56, y, "U")
+    f.put(49, 27, 49, 28, "V")                           # sinks
+    f.put(51, 27, 51, 28, "V")
+    for x, y in [(20, 14), (44, 20), (40, 26), (24, 26), (3, 26), (22, 32), (3, 22), (56, 22), (18, 3), (3, 3)]:
+        f.put(x, y, x, y, "P")                           # potted plants
     return f
 
 

@@ -55,6 +55,7 @@ Budynek jest w `client/maps/` (`building.json` + `floorN.json`) — to jedno
 
 ```bash
 python3 tools/build_maps.py --preview   # podgląd ASCII
+godot --headless --path client -s tests/render_maps.gd -- /tmp   # grafika pięter do PNG
 python3 tools/build_maps.py             # zapis JSON-ów
 cd server && UPDATE_GOLDEN=1 cargo test --test golden   # nowe wektory testowe
 ```

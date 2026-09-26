@@ -76,10 +76,35 @@
    "solid": false,
    "color": "#b09070"
   },
-  "T": {
-   "type": "furniture",
+  "K": {
+   "type": "counter",
    "solid": true,
-   "color": "#8b6b4a"
+   "color": "#c9a37a"
+  },
+  "H": {
+   "type": "shelf",
+   "solid": true,
+   "color": "#7a7f8a"
+  },
+  "P": {
+   "type": "plant",
+   "solid": true,
+   "color": "#3f8a3a"
+  },
+  "R": {
+   "type": "rack",
+   "solid": true,
+   "color": "#2a2d34"
+  },
+  "N": {
+   "type": "bench",
+   "solid": true,
+   "color": "#8a6a45"
+  },
+  "A": {
+   "type": "ashtray",
+   "solid": true,
+   "color": "#6d6d6d"
   },
   "X": {
    "type": "car",
@@ -112,17 +137,17 @@
   "FvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvF",
   "Fv###############################################vvvvvvvvvvF",
   "Fv#================#####################::::::::#vvvvvvvvvvF",
-  "Fv#================#####################:TTTTTT:#vvvvvvvvvvF",
+  "Fv#================#####################:RRRRRR:#vvvvvvvvvvF",
   "Fv#==XXX======XXX==#####################::::::::#vvvvvvvvvvF",
   "Fv#==XXX======XXX==############.SSSSSS.#::::::::#vvvvvvvvvvF",
   "Fv#================############.SSSSSS.#::::::::#vvvvvvvvvvF",
-  "Fv#================#####eeeee##........#:TT:::::#vvvvvvvvvvF",
-  "Fv#================#####eeeee##........#:TT:::::#vvvvvvvvvvF",
-  "Fv#================#####eeeee##........#:TT:::::#vvvvvvvvvvF",
-  "Fv#==XXX======XXX==#####eeeee##........#:TT:::::#vvvvvvvvvvF",
+  "Fv#================#####eeeee##........#:RR:::::#vvvvvvvvvvF",
+  "Fv#================#####eeeee##........#:RR:::::#vvvvvvvvvvF",
+  "Fv#================#####eeeee##........#:RR:::::#vvvvvvvvvvF",
+  "Fv#==XXX======XXX==#####eeeee##........#:RR:::::#vvvvvvvvvvF",
   "Fv#==XXX======XXX==#####eeeee##........#::::::::#vvvvvvvvvvF",
   "Fv#================######EEE######DD#######LL#############vF",
-  "Fv#================#.....................................#vF",
+  "Fv#================#P...................................P#vF",
   "Fv#================#.....................................#vF",
   "Fv#================D.....................................#vF",
   "Fv#==XXX======XXX==D.....................................#vF",
@@ -130,17 +155,17 @@
   "Fv#================#.....................................#vF",
   "Fv#================#.....................................#vF",
   "Fv#================#########B#B#B#B#B#B###################vF",
-  "Fv#================#......#______________#...............#vF",
+  "Fv#================#......#P____________P#P..............#vF",
   "Fv#==XXX======XXX==#......#______________#...............#vF",
-  "Fv#==XXX======XXX==#......#______________#...TTTTTTTTTT..#vF",
+  "Fv#==XXX======XXX==#......#______________#...HHHHHHHHHH..#vF",
   "Fv#================#......#______________#...............#vF",
   "Fv#================#......#______________#...............#vF",
-  "Fv#================#.T....#______________#...TTTTTTTTTT..#vF",
-  "Fv#================#.T....D______________#...............#vF",
-  "Fv#==XXX======XXX==#.T....D______________D...............#vF",
-  "Fv#==XXX======XXX==#.T....#______________D...............#vF",
-  "Fv#================#......#______________#.........TTTTT.#vF",
-  "Fv#================#......#______________#...............#vF",
+  "Fv#================#.K....#______________#...HHHHHHHHHH..#vF",
+  "Fv#================#.K....D______________#...............#vF",
+  "Fv#==XXX======XXX==#.K....D______________D...............#vF",
+  "Fv#==XXX======XXX==#.K....#______________D...............#vF",
+  "Fv#================#......#______________#.........KKKKK.#vF",
+  "Fv#================#......#P____________P#...............#vF",
   "Fv######ggggg##################GGGGG######################vF",
   "Fpppppp=======pppppppppppppppppppppppppppppppppppppppppppppF",
   "Fpppppp=======pppppppppppppppppppppppppppppppppppppppppppppF",
@@ -149,9 +174,9 @@
   "Fvv============================vvvvvvvvvvvvvvvvvvvvvvvvvvvvF",
   "Fvv=XXX==XXX==XXX==XXX==XXX====vvvvvvvvvvvzzzzzzzzzzzzzvvvvF",
   "Fvv=XXX==XXX==XXX==XXX==XXX====vvvvvvvvvvvzzzzzzzzzzzzzvvvvF",
-  "Fvv============================vvvvvvvvvvvzzTTTzzzzzzzzvvvvF",
+  "Fvv============================vvvvvvvvvvvzzNNNzzzzzzzzvvvvF",
   "Fvv============================vvvvvvvvvvvzzzzzzzzzzzzzvvvvF",
-  "Fvv=XXX==XXX==XXX==XXX==XXX====vvvvvvvvvvvzzzzzzzzTzzzzvvvvF",
+  "Fvv=XXX==XXX==XXX==XXX==XXX====vvvvvvvvvvvzzzzzzzzAzzzzvvvvF",
   "Fvv=XXX==XXX==XXX==XXX==XXX====vvvvvvvvvvvzzzzzzzzzzzzzvvvvF",
   "Fvv============================vvvvvvvvvvvzzzzzzzzzzzzzvvvvF",
   "FvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvF",
@@ -241,12 +266,18 @@
   "P": {
    "id": 4,
    "name": "Portiernia",
-   "type": "reception"
+   "type": "reception",
+   "see": [
+    "E"
+   ]
   },
   "E": {
    "id": 5,
    "name": "Wejście",
-   "type": "entrance"
+   "type": "entrance",
+   "see": [
+    "P"
+   ]
   },
   "Z": {
    "id": 6,

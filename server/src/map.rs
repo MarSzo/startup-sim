@@ -90,6 +90,10 @@ pub struct RoomDef {
     pub name: String,
     #[serde(rename = "type")]
     pub kind: String,
+    /// Keys of rooms whose people are also visible from here (e.g. the
+    /// porter's lodge seen through its open door). Interest management only.
+    #[serde(default)]
+    pub see: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -176,6 +180,8 @@ pub struct Map {
     pub links: Vec<Link>,
     pub spawns: Vec<Tile>,
     pub npcs: Vec<NpcDef>,
+    /// Room id -> other room ids visible from it (from `RoomDef::see`).
+    see: HashMap<u16, Vec<u16>>,
 }
 
 impl Map {
@@ -236,6 +242,15 @@ impl Map {
             };
             links.push(Link { area, kind });
         }
+        let mut see = HashMap::new();
+        for def in file.room_defs.values() {
+            let ids: Result<Vec<u16>, String> = def
+                .see
+                .iter()
+                .map(|k| file.room_defs.get(k).map(|d| d.id).ok_or(format!("room '{}': unknown see '{k}'", def.name)))
+                .collect();
+            see.insert(def.id, ids?);
+        }
         let mut rooms: Vec<RoomDef> = file.room_defs.into_values().collect();
         rooms.sort_by_key(|r| r.id);
         let map = Map {
@@ -261,6 +276,7 @@ impl Map {
                     escort_to: n.escort_to.map(|e| (e[0] as u8, Tile { x: e[1], y: e[2] })),
                 })
                 .collect(),
+            see,
         };
         for s in &map.spawns {
             if map.is_blocked(s.x, s.y) {
@@ -329,6 +345,11 @@ impl Map {
 
     pub fn room_name(&self, id: u16) -> &str {
         self.rooms.iter().find(|r| r.id == id).map_or("-", |r| r.name.as_str())
+    }
+
+    /// Other rooms whose people are visible from `room`.
+    pub fn visible_from(&self, room: u16) -> &[u16] {
+        self.see.get(&room).map_or(&[], |v| v.as_slice())
     }
 
     pub fn link_at(&self, tx: i32, ty: i32) -> Option<&Link> {
@@ -457,6 +478,17 @@ mod tests {
                 assert_eq!(nobody, is_public, "floor {f} {} without any pass", r.name);
             }
         }
+    }
+
+    #[test]
+    fn lodge_and_lobby_see_each_other() {
+        let b = b();
+        let m = b.floor(0).unwrap();
+        let lobby = m.room_by_name("Wejście").unwrap().id;
+        let lodge = m.room_by_name("Portiernia").unwrap().id;
+        assert_eq!(m.visible_from(lobby), &[lodge]);
+        assert_eq!(m.visible_from(lodge), &[lobby]);
+        assert!(m.visible_from(m.room_by_name("Hol").unwrap().id).is_empty());
     }
 
     #[test]

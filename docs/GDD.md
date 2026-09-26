@@ -369,13 +369,33 @@ poprawną odpowiedzią.
 - Pytania i oferty są w `server/data/recruitment.json` (edycja bez zmiany kodu;
   pierwsza odpowiedź w pliku jest poprawna — gra ją tasuje). Ocenia serwer.
 
+### 10.9 Oprawa graficzna (placeholder → pixel art)
+
+Ustalenia 2026-09-26: grafika **rysowana proceduralnie w kodzie** (bez
+zewnętrznych pakietów i licencji), jeden spójny przeskok: otoczenie, meble i
+postacie naraz.
+
+- Kafle 16 px, kamera 3×; ściany w rzucie 3/4 z frontem, listwą i obrazkami;
+  podłogi z fakturą: deski/płytki biurowe, niebieska wykładzina w działach,
+  płytki w łazienkach, kamienna posadzka holu, asfalt z liniami miejsc, kostka
+  chodnika, trawa z kwiatkami, żwir strefy palenia, żywopłot.
+- Meble: biurka z monitorami i krzesłami (IT, Biznes, HR), lady (portiernia,
+  recepcja, kasa sklepu), regały z towarem, sofa i stolik (chill room), stół
+  Zarządu z krzesłami, rośliny, szafy serwerowe (zaplecze), toalety i
+  umywalki, ławka i popielniczka (strefa palenia), samochody w kolorach.
+- Postacie: fryzura, kolor skóry i ubrań losowane z id gracza, 4 kierunki,
+  animacja chodu; portier w mundurze z czapką, recepcja i HR w koszulach z
+  krawatem.
+- Przy okazji: portiera widać z holu wejściowego przez drzwi portierni
+  (pokoje mogą „widzieć” inne pokoje — ustawienie w mapie).
+
 ### 10.6 Stan implementacji
 
 *Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie,
 automatyczne ponowne łączenie, budynek wg GDD (parter z terenem zewnętrznym,
 piętro 1, schody, winda), uprawnienia (bramki) oraz cała ścieżka nowego
 gracza: portal z ofertami → rekrutacja → portier → recepcja → HR → karta
-pracownika z działem.*
+pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 
 #### Zrobione
 - **Serwer Rust** (`server/`): tick 20 Hz bez dryfu z liczeniem zgubionych
@@ -399,18 +419,19 @@ pracownika z działem.*
 - **Portal i rekrutacja**: oferty, quiz oceniany na serwerze (3 pytania,
   2 poprawne), ponawianie ekranu przy stratach UDP, przydział do działu z
   umową w HR, dział przy nicku; protokół v4.
+- **Grafika**: proceduralny pixel art otoczenia, mebli i postaci (10.9).
 - **Boty** (`cargo run --release --bin bots`): 50 domyślnie, chodzą po BFS po
   całym budynku (schodami), część zbiera się w wybranym pokoju (domyślnie
   Chill room na piętrze 1).
 - **Sieć mobilna**: serwer dual-stack IPv4/IPv6; gracz identyfikowany tokenem
   (zmiana adresu w trakcie gry przenosi sesję); klient przepina gniazdo po
   ciszy/powrocie z tła i sam łączy się ponownie po utracie sesji.
-- **Testy**: 46 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
+- **Testy**: 47 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
   zależna od uprawnień, bramki, ruch/kolizje, schody, winda, nawigacja,
   portier, recepcja, HR, rekrutacja, protokół), 2 golden, 8 e2e serwera
   (m.in. portal: odrzucenie → przyjęcie → spawn; całe wdrożenie aż do karty;
   niewidoczność między piętrami; zgodność stanu serwera z predykcją) —
-  łącznie 56; 112 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
+  łącznie 57; 112 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
   adresów).
 
 #### Pomiary (MacBook, wszystko lokalnie)
