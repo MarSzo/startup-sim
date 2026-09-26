@@ -1,10 +1,11 @@
-//! Deterministic movement and wall collision.
+//! Deterministic movement, wall collision and floor transitions.
 //!
 //! All positions are integer sub-pixel units (1 px = 16 units, 1 tile = 256).
 //! `client/sim/movement.gd` implements exactly the same algorithm; parity is
 //! checked by the golden vectors in `tests/golden/movement_vectors.json`.
 
-use crate::map::Map;
+use crate::building::Building;
+use crate::map::{LinkKind, Map};
 
 pub const SUBPIXELS: i32 = 16;
 pub const TILE_UNITS: i32 = 16 * SUBPIXELS;
@@ -24,8 +25,17 @@ pub const IN_UP: u8 = 1;
 pub const IN_DOWN: u8 = 2;
 pub const IN_LEFT: u8 = 4;
 pub const IN_RIGHT: u8 = 8;
-/// Bits 4..7 are reserved for future actions (interact, run, ...).
+/// Interact (E): uses the elevator now; doors, shop, NPCs later.
+pub const IN_INTERACT: u8 = 16;
+/// Bits 5..7 are reserved for future actions (run, ...).
 pub const IN_MOVE_MASK: u8 = 0x0f;
+
+/// Stairs re-trigger lock (see `step`).
+pub const LOCK_NONE: u8 = 0;
+/// Just changed floors; the same movement keys are still held.
+pub const LOCK_HELD: u8 = 1;
+/// Keys changed since the transition; unlocks once off the link area.
+pub const LOCK_RELEASED: u8 = 2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Pos {
@@ -55,9 +65,9 @@ pub fn input_dir(input: u8) -> (i32, i32) {
     (dx, dy)
 }
 
-/// Apply one input step. Movement is resolved per axis (X, then Y) so the
-/// player slides along walls.
-pub fn step(map: &Map, pos: Pos, input: u8) -> Pos {
+/// Move by one input step on a single floor. Movement is resolved per axis
+/// (X, then Y) so the player slides along walls.
+pub fn move_on(map: &Map, pos: Pos, input: u8) -> Pos {
     let (dx, dy) = input_dir(input);
     if dx == 0 && dy == 0 {
         return pos;
@@ -121,79 +131,220 @@ pub fn box_is_free(map: &Map, p: Pos) -> bool {
     true
 }
 
+
+/// Full simulated state of a character. Everything `step` depends on is
+/// here, and the server sends all of it back in each snapshot so the client
+/// can replay unacknowledged inputs from exactly the same state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Body {
+    pub floor: u8,
+    pub pos: Pos,
+    /// Input applied on the previous step (for edge-triggered actions).
+    pub prev_input: u8,
+    /// `LOCK_*`: prevents bouncing straight back after taking the stairs
+    /// while the movement key is still held.
+    pub lock: u8,
+}
+
+impl Body {
+    pub fn at(floor: u8, pos: Pos) -> Body {
+        Body { floor, pos, prev_input: 0, lock: LOCK_NONE }
+    }
+}
+
+/// One input step (1/60 s) in the building: movement, then floor links.
+///
+/// - Stairs: stepping onto a stairs tile moves you to its arrival tile on the
+///   other floor, unless locked. The lock is set on arrival and released once
+///   the movement keys change *and* you are off any link area - so holding
+///   "up" after arriving doesn't take you straight back down.
+/// - Elevator: pressing interact (edge: not pressed on the previous step)
+///   inside the cabin moves you to the next active floor, same position.
+pub fn step(b: &Building, body: Body, input: u8) -> Body {
+    let Some(map) = b.floor(body.floor) else { return body };
+    let mut n = body;
+    n.pos = move_on(map, body.pos, input);
+    if n.lock == LOCK_HELD && (input & IN_MOVE_MASK) != (body.prev_input & IN_MOVE_MASK) {
+        n.lock = LOCK_RELEASED;
+    }
+    let (tx, ty) = n.pos.tile();
+    let link = map.link_at(tx, ty).map(|l| &l.kind);
+    if n.lock == LOCK_RELEASED && link.is_none() {
+        n.lock = LOCK_NONE;
+    }
+    match link {
+        Some(LinkKind::Stairs { to_floor, to }) if n.lock == LOCK_NONE && b.floor(*to_floor).is_some() => {
+            n.floor = *to_floor;
+            n.pos = Pos::tile_center(to.x, to.y);
+            n.lock = LOCK_HELD;
+        }
+        Some(LinkKind::Elevator { id }) if input & IN_INTERACT != 0 && body.prev_input & IN_INTERACT == 0 => {
+            if let Some(f) = b.next_elevator_floor(n.floor, id) {
+                n.floor = f;
+                n.lock = LOCK_HELD;
+            }
+        }
+        _ => {}
+    }
+    n.prev_input = input;
+    n
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map::default_map_path;
+    use crate::building::default_building_path;
 
-    fn map() -> Map {
-        Map::load(&default_map_path()).unwrap()
+    fn building() -> Building {
+        Building::load(&default_building_path()).unwrap()
     }
 
     fn run(map: &Map, mut p: Pos, input: u8, n: usize) -> Pos {
         for _ in 0..n {
-            p = step(map, p, input);
+            p = move_on(map, p, input);
         }
         p
     }
 
+    fn walk(b: &Building, mut body: Body, input: u8, n: usize) -> Body {
+        for _ in 0..n {
+            body = step(b, body, input);
+        }
+        body
+    }
+
+    /// Hold `input` until the floor changes (or `max` steps).
+    fn until_floor_change(b: &Building, mut body: Body, input: u8, max: usize) -> Body {
+        let f = body.floor;
+        for _ in 0..max {
+            body = step(b, body, input);
+            if body.floor != f {
+                break;
+            }
+        }
+        body
+    }
+
     #[test]
     fn moves_at_constant_speed() {
-        let m = map();
-        let p = Pos::tile_center(40, 30); // lobby
-        assert_eq!(step(&m, p, IN_RIGHT), Pos { x: p.x + SPEED, y: p.y });
-        assert_eq!(step(&m, p, IN_UP), Pos { x: p.x, y: p.y - SPEED });
-        assert_eq!(step(&m, p, IN_UP | IN_LEFT), Pos { x: p.x - SPEED_DIAG, y: p.y - SPEED_DIAG });
-        assert_eq!(step(&m, p, IN_LEFT | IN_RIGHT), p, "opposite keys cancel");
-        assert_eq!(step(&m, p, 0), p);
+        let b = building();
+        let m = b.floor(0).unwrap();
+        let p = Pos::tile_center(33, 27); // lobby
+        assert_eq!(move_on(m, p, IN_RIGHT), Pos { x: p.x + SPEED, y: p.y });
+        assert_eq!(move_on(m, p, IN_UP), Pos { x: p.x, y: p.y - SPEED });
+        assert_eq!(move_on(m, p, IN_UP | IN_LEFT), Pos { x: p.x - SPEED_DIAG, y: p.y - SPEED_DIAG });
+        assert_eq!(move_on(m, p, IN_LEFT | IN_RIGHT), p, "opposite keys cancel");
+        assert_eq!(move_on(m, p, IN_INTERACT), p, "interact alone doesn't move");
     }
 
     #[test]
     fn stops_flush_against_wall() {
-        let m = map();
-        // Lobby spans x 32..=50; wall at x=51 (except door rows 30,31).
-        let p = run(&m, Pos::tile_center(45, 27), IN_RIGHT, 200);
-        assert_eq!(p.x, 51 * TILE_UNITS - HALF_W);
-        let p = run(&m, Pos::tile_center(45, 27), IN_UP, 200);
-        assert_eq!(p.y, 25 * TILE_UNITS + HALF_H);
-        assert!(box_is_free(&m, p));
+        let b = building();
+        let m = b.floor(0).unwrap();
+        // Lobby spans x 27..=40; wall at x=41 (door only at rows 29, 30).
+        let p = run(m, Pos::tile_center(35, 24), IN_RIGHT, 200);
+        assert_eq!(p.x, 41 * TILE_UNITS - HALF_W);
+        // Row 21 is wall at odd x (gates at even x).
+        let p = run(m, Pos::tile_center(35, 24), IN_UP, 200);
+        assert_eq!(p.y, 22 * TILE_UNITS + HALF_H);
+        assert!(box_is_free(m, p));
+    }
+
+    #[test]
+    fn walks_through_open_card_gate() {
+        let b = building();
+        let m = b.floor(0).unwrap();
+        let p = run(m, Pos::tile_center(34, 24), IN_UP, 100);
+        assert_eq!(m.room_name(m.room_at(p.x, p.y)), "Hol");
     }
 
     #[test]
     fn slides_along_wall_on_diagonal() {
-        let m = map();
-        let start = Pos::tile_center(45, 26);
-        let p = run(&m, start, IN_UP | IN_RIGHT, 20);
-        assert_eq!(p.y, 25 * TILE_UNITS + HALF_H, "pinned to top wall");
+        let b = building();
+        let m = b.floor(0).unwrap();
+        let start = Pos::tile_center(45, 23); // shop, solid wall above
+        let p = run(m, start, IN_UP | IN_RIGHT, 20);
+        assert_eq!(p.y, 22 * TILE_UNITS + HALF_H, "pinned to top wall");
         assert!(p.x > start.x, "still slides right");
     }
 
     #[test]
     fn passes_through_door() {
-        let m = map();
-        // Door lobby <-> shop at x=51, y=30..31. Walk right from lobby row 30/31 boundary.
-        let start = Pos { x: 49 * TILE_UNITS, y: 31 * TILE_UNITS };
-        let p = run(&m, start, IN_RIGHT, 100);
-        assert!(p.x > 52 * TILE_UNITS, "entered the shop: {p:?}");
-        assert_eq!(m.room_at(p.x, p.y), m.room_by_name("Sklep").unwrap().id);
+        let b = building();
+        let m = b.floor(0).unwrap();
+        // Lobby -> shop door at x=41, rows 29..30.
+        let p = run(m, Pos { x: 39 * TILE_UNITS, y: 30 * TILE_UNITS }, IN_RIGHT, 100);
+        assert!(p.x > 42 * TILE_UNITS, "entered the shop: {p:?}");
+        assert_eq!(m.room_name(m.room_at(p.x, p.y)), "Sklep");
     }
 
     #[test]
-    fn furniture_blocks() {
-        let m = map();
-        // Desk row at y=3, x=23..28 in the open space; walk down from y=1.
-        let p = run(&m, Pos::tile_center(25, 1), IN_DOWN, 100);
-        assert_eq!(p.y, 3 * TILE_UNITS - HALF_H);
+    fn furniture_and_locked_door_block() {
+        let b = building();
+        let m = b.floor(0).unwrap();
+        let p = run(m, Pos::tile_center(48, 22), IN_DOWN, 100); // shop shelf at row 24
+        assert_eq!(p.y, 24 * TILE_UNITS - HALF_H);
+        let p = run(m, Pos::tile_center(43, 16), IN_UP, 100); // locked service door at row 13
+        assert_eq!(p.y, 14 * TILE_UNITS + HALF_H);
+    }
+
+    #[test]
+    fn stairs_take_you_up_without_bouncing_back() {
+        let b = building();
+        // Hall below the stairwell door (x 34..35, row 13); hold UP.
+        let body = until_floor_change(&b, Body::at(0, Pos::tile_center(34, 16)), IN_UP, 200);
+        assert_eq!(body.floor, 1, "took the stairs up");
+        assert_eq!(body.pos, Pos::tile_center(34, 10), "arrival tile");
+        assert_eq!(body.lock, LOCK_HELD);
+        // Keep holding UP: walks onto floor 1's flight but stays upstairs.
+        let body = walk(&b, body, IN_UP, 120);
+        assert_eq!(body.floor, 1);
+        assert_eq!(b.floor(1).unwrap().tile_char(body.pos.tile().0, body.pos.tile().1), Some('S'));
+        // Letting go while standing on the flight doesn't trigger either.
+        let body = walk(&b, body, 0, 10);
+        assert_eq!((body.floor, body.lock), (1, LOCK_RELEASED));
+        // Step off, then walk back onto the flight: down to the ground floor.
+        let body = walk(&b, body, IN_DOWN, 30);
+        assert_eq!(body.lock, LOCK_NONE);
+        let body = until_floor_change(&b, body, IN_UP, 200);
+        assert_eq!(body.floor, 0, "stairs back down");
+        assert_eq!(body.pos, Pos::tile_center(34, 10));
+    }
+
+    #[test]
+    fn elevator_needs_an_interact_press() {
+        let b = building();
+        let body = walk(&b, Body::at(0, Pos::tile_center(26, 16)), IN_UP, 60); // into the cabin
+        assert_eq!(b.floor(0).unwrap().room_name(b.floor(0).unwrap().room_at(body.pos.x, body.pos.y)), "Winda");
+        let pos = body.pos;
+        let body = step(&b, body, IN_INTERACT);
+        assert_eq!((body.floor, body.pos), (1, pos), "same spot, next floor");
+        let body = walk(&b, body, IN_INTERACT, 30);
+        assert_eq!(body.floor, 1, "holding E doesn't ride again");
+        let body = step(&b, step(&b, body, 0), IN_INTERACT);
+        assert_eq!(body.floor, 0, "second press rides back (floor 2 is locked)");
+        let body = walk(&b, body, IN_DOWN | IN_INTERACT, 60);
+        let m = b.floor(0).unwrap();
+        assert_eq!(m.room_name(m.room_at(body.pos.x, body.pos.y)), "Hol");
+        let body = step(&b, step(&b, body, 0), IN_INTERACT);
+        assert_eq!(body.floor, 0, "interact outside the cabin does nothing");
     }
 
     #[test]
     fn never_ends_inside_walls_random_walk() {
-        let m = map();
+        let b = building();
         let mut rng = fastrand::Rng::with_seed(7);
-        let mut p = Pos::tile_center(40, 35);
-        for _ in 0..50_000 {
-            p = step(&m, p, rng.u8(0..16));
-            assert!(box_is_free(&m, p), "box overlaps wall at {p:?}");
+        let mut body = Body::at(0, Pos::tile_center(33, 35));
+        let mut floors_seen = [false; 2];
+        let mut held = 0;
+        for _ in 0..200_000 {
+            if rng.u8(0..20) == 0 {
+                held = rng.u8(0..32);
+            }
+            body = step(&b, body, held);
+            floors_seen[body.floor as usize] = true;
+            assert!(box_is_free(b.floor(body.floor).unwrap(), body.pos), "box overlaps wall at {body:?}");
         }
+        assert!(floors_seen[0]);
     }
 }

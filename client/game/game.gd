@@ -1,5 +1,5 @@
 ## In-game world: local prediction + reconciliation, remote interpolation,
-## room-based visibility, camera and debug info.
+## floors and room-based visibility, camera and debug info.
 extends Node2D
 
 const Protocol = preload("res://net/protocol.gd")
@@ -21,7 +21,8 @@ const ERROR_DECAY := 15.0
 const MAX_PENDING := 240
 
 var net
-var map
+var building
+var views := {}          # floor -> MapView (only the current floor is visible)
 var tick_hz := 20
 var nick := ""
 var world := Node2D.new()
@@ -30,14 +31,15 @@ var camera := Camera2D.new()
 var overlay := DebugOverlay.new()
 var status_layer := CanvasLayer.new()
 var status_label := Label.new()
+var hint_label := Label.new()
 var remotes := {}        # id -> RemotePlayer
 var nicks := {}          # id -> String
 var info_requested := {} # id -> msec of last request
 
-# Local prediction state (sub-pixel units).
+# Local prediction state: pred is a Movement.body() (floor, pos, prev, lock).
 var have_state := false
-var pred := Vector2i.ZERO
-var prev_pred := Vector2i.ZERO
+var pred := {}
+var prev_pos := Vector2i.ZERO   # position one physics step ago (render lerp)
 var pending: Array = []  # [seq, bits], oldest first
 var seq := 0
 var last_ack := 0
@@ -54,28 +56,38 @@ var visible_count := 0
 var interp_frames := 0
 var interp_underruns := 0
 
-# Dev helpers: --autowalk (random walk), --goto=<room name> (walk to a room).
+# Dev helpers: --autowalk (random walk), --goto=<leg>;<leg>;... where a leg is
+# a room name or "x,y" tile on the current floor (e.g. "34,6;Recepcja" takes
+# the stairs up, then walks to the reception), --goto-press=E at the end.
 var autowalk := false
 var _autowalk_bits := 0
 var _autowalk_timer := 0.0
-var goto_room := ""
+var goto_legs: PackedStringArray = []
 var goto_delay := 3.0
 var _goto_path: Array[Vector2i] = []
 
 
-func setup(p_net, p_map, welcome: Dictionary, p_nick: String, args: Dictionary) -> void:
+func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Dictionary) -> void:
 	net = p_net
-	map = p_map
+	building = p_building
 	nick = p_nick
 	tick_hz = welcome.tick_hz
 	autowalk = args.has("autowalk")
-	goto_room = args.get("goto", "")
+	if args.get("goto", "") != "":
+		goto_legs = args["goto"].split(";")
 	goto_delay = float(args.get("goto-delay", "3"))
 	net.packet_received.connect(_on_packet)
 
-	var view := MapView.new()
-	view.build(map, ZOOM)
-	add_child(view)
+	var map0 = building.get_floor(0)
+	for f in building.floors.size():
+		var m = building.get_floor(f)
+		if m == null:
+			continue
+		var view := MapView.new()
+		view.build(m, ZOOM)
+		view.visible = false
+		add_child(view)
+		views[f] = view
 	world.y_sort_enabled = true
 	add_child(world)
 
@@ -86,8 +98,8 @@ func setup(p_net, p_map, welcome: Dictionary, p_nick: String, args: Dictionary) 
 	camera.zoom = Vector2(ZOOM, ZOOM)
 	camera.limit_left = 0
 	camera.limit_top = 0
-	camera.limit_right = map.width * map.tile_px
-	camera.limit_bottom = map.height * map.tile_px
+	camera.limit_right = map0.width * map0.tile_px
+	camera.limit_bottom = map0.height * map0.tile_px
 	me.add_child(camera)
 	camera.make_current()
 
@@ -106,6 +118,21 @@ func setup(p_net, p_map, welcome: Dictionary, p_nick: String, args: Dictionary) 
 	status_label.add_theme_color_override("font_outline_color", Color.BLACK)
 	status_label.visible = false
 	status_layer.add_child(status_label)
+	hint_label.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	hint_label.position = Vector2(-250, -64)
+	hint_label.size = Vector2(500, 36)
+	hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint_label.add_theme_font_size_override("font_size", 20)
+	hint_label.add_theme_constant_override("outline_size", 6)
+	hint_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	hint_label.visible = false
+	status_layer.add_child(hint_label)
+	_show_floor(0)
+
+
+func _show_floor(f: int) -> void:
+	for k in views:
+		views[k].visible = (k == f)
 
 
 ## Session lost; the net client is getting a new one. Freeze local simulation.
@@ -142,7 +169,7 @@ func _color_for(id: int) -> Color:
 
 
 func _sample_input(delta: float) -> int:
-	if goto_room != "":
+	if not goto_legs.is_empty() or not _goto_path.is_empty():
 		return _goto_input(delta)
 	if autowalk:
 		_autowalk_timer -= delta
@@ -161,29 +188,37 @@ func _sample_input(delta: float) -> int:
 		b |= Movement.IN_LEFT
 	if Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT):
 		b |= Movement.IN_RIGHT
+	if Input.is_physical_key_pressed(KEY_E):
+		b |= Movement.IN_INTERACT
 	return b
 
 
 func _goto_input(delta: float) -> int:
 	if goto_delay > 0.0:
 		goto_delay -= delta
-		if goto_delay <= 0.0:
-			_goto_path = _plan_path_to_room(goto_room)
 		return 0
+	if _goto_path.is_empty() and not goto_legs.is_empty():
+		var leg := goto_legs[0]
+		goto_legs.remove_at(0)
+		_goto_path = _plan_path(leg)
+		goto_delay = 0.3
 	while not _goto_path.is_empty():
 		var c := Movement.tile_center(_goto_path[0].x, _goto_path[0].y)
+		var p: Vector2i = pred.pos
 		var b := 0
-		if c.x - pred.x > Movement.SPEED / 2: b |= Movement.IN_RIGHT
-		elif c.x - pred.x < -Movement.SPEED / 2: b |= Movement.IN_LEFT
-		if c.y - pred.y > Movement.SPEED / 2: b |= Movement.IN_DOWN
-		elif c.y - pred.y < -Movement.SPEED / 2: b |= Movement.IN_UP
+		if c.x - p.x > Movement.SPEED / 2: b |= Movement.IN_RIGHT
+		elif c.x - p.x < -Movement.SPEED / 2: b |= Movement.IN_LEFT
+		if c.y - p.y > Movement.SPEED / 2: b |= Movement.IN_DOWN
+		elif c.y - p.y < -Movement.SPEED / 2: b |= Movement.IN_UP
 		if b != 0:
 			return b
 		_goto_path.pop_front()
 	return 0
 
 
-func _plan_path_to_room(room_name: String) -> Array[Vector2i]:
+## Dev helper; plans on the current floor only.
+func _plan_path(leg: String) -> Array[Vector2i]:
+	var map = building.get_floor(pred.floor)
 	var astar := AStarGrid2D.new()
 	astar.region = Rect2i(0, 0, map.width, map.height)
 	astar.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_NEVER
@@ -193,13 +228,14 @@ func _plan_path_to_room(room_name: String) -> Array[Vector2i]:
 		for x in map.width:
 			if map.is_blocked(x, y):
 				astar.set_point_solid(Vector2i(x, y))
-			elif goal.x < 0 and map.room_name(map.room_at_tile(x, y)) == room_name:
+			elif goal.x < 0 and map.room_name(map.room_at_tile(x, y)) == leg:
 				goal = Vector2i(x + 2, y + 2)  # a bit inside the room
+	if leg.contains(","):
+		goal = Vector2i(int(leg.get_slice(",", 0)), int(leg.get_slice(",", 1)))
 	if goal.x < 0 or map.is_blocked(goal.x, goal.y):
-		push_warning("goto: no room '%s'" % room_name)
+		push_warning("goto: can't find '%s'" % leg)
 		return []
-	var from := Vector2i(pred.x / Movement.TILE_UNITS, pred.y / Movement.TILE_UNITS)
-	return astar.get_id_path(from, goal)
+	return astar.get_id_path(Movement.tile_of_pos(pred.pos), goal)
 
 
 func _physics_process(delta: float) -> void:
@@ -210,8 +246,12 @@ func _physics_process(delta: float) -> void:
 	pending.append([seq, bits])
 	if pending.size() > MAX_PENDING:
 		pending.pop_front()
-	prev_pred = pred
-	pred = Movement.step(map, pred, bits)
+	var before_floor: int = pred.floor
+	prev_pos = pred.pos
+	pred = Movement.step(building, pred, bits)
+	if pred.floor != before_floor:
+		prev_pos = pred.pos  # changed floors: no lerp across the jump
+		_show_floor(pred.floor)
 	var d := Movement.input_dir(bits)
 	if d.y > 0: me.set_facing(0)
 	elif d.y < 0: me.set_facing(1)
@@ -230,7 +270,8 @@ func _process(delta: float) -> void:
 		if error_offset.length_squared() < 0.0025:
 			error_offset = Vector2.ZERO
 		var frac := Engine.get_physics_interpolation_fraction()
-		me.position = Movement.to_px(prev_pred).lerp(Movement.to_px(pred), frac) + error_offset
+		me.position = Movement.to_px(prev_pos).lerp(Movement.to_px(pred.pos), frac) + error_offset
+		_update_hint()
 	if have_time:
 		est_tick += delta * tick_hz
 		var render_tick := est_tick - INTERP_DELAY_SEC * tick_hz
@@ -280,7 +321,7 @@ func _on_snapshot(p: Dictionary) -> void:
 			have_time = true
 		else:
 			est_tick += (tick - est_tick) * 0.1
-		_reconcile(Vector2i(p.self_x, p.self_y), p.last_input_seq)
+		_reconcile(Movement.body(p.floor, Vector2i(p.self_x, p.self_y), p.self_prev_input, p.self_lock), p.last_input_seq)
 	visible_count += p.entities.size()
 	var unknown := []
 	var now := Time.get_ticks_msec()
@@ -299,41 +340,61 @@ func _on_snapshot(p: Dictionary) -> void:
 		net.send(Protocol.encode_info_request(net.token, unknown))
 
 
-func _reconcile(server_pos: Vector2i, ack: int) -> void:
+## Server state (at input `ack`) + replay of the inputs it hasn't seen yet.
+func _reconcile(server_body: Dictionary, ack: int) -> void:
 	if ack < last_ack:
 		return
 	last_ack = ack
 	while not pending.is_empty() and pending[0][0] <= ack:
 		pending.pop_front()
-	var np := server_pos
+	var nb := server_body
 	for inp in pending:
-		np = Movement.step(map, np, inp[1])
+		nb = Movement.step(building, nb, inp[1])
 	if not have_state:
 		have_state = true
-		pred = np
-		prev_pred = np
-		me.position = Movement.to_px(np)
+		pred = nb
+		prev_pos = nb.pos
+		me.position = Movement.to_px(nb.pos)
 		me.visible = true
+		_show_floor(nb.floor)
 		return
-	if np != pred:
+	if nb != pred:
 		corrections += 1
-		error_offset += Movement.to_px(pred) - Movement.to_px(np)
-		if error_offset.length() > 48.0:
-			error_offset = Vector2.ZERO  # large jump (e.g. teleport): snap
-		prev_pred += np - pred
-		pred = np
+		if nb.floor != pred.floor:
+			error_offset = Vector2.ZERO  # different floor: snap
+			prev_pos = nb.pos
+			_show_floor(nb.floor)
+		else:
+			error_offset += Movement.to_px(pred.pos) - Movement.to_px(nb.pos)
+			if error_offset.length() > 48.0:
+				error_offset = Vector2.ZERO  # large jump: snap
+			prev_pos += nb.pos - pred.pos
+		pred = nb
+
+
+## "Press E" hint while standing in the elevator cabin.
+func _update_hint() -> void:
+	var map = building.get_floor(pred.floor)
+	var t := Movement.tile_of_pos(pred.pos)
+	var link: Dictionary = map.link_at(t.x, t.y) if map else {}
+	if not link.is_empty() and link.kind == "elevator":
+		var target: int = building.next_elevator_floor(pred.floor, link.id)
+		if target >= 0:
+			hint_label.text = "[E] Winda: jedź na %s" % building.floor_name(target)
+			hint_label.visible = true
+			return
+	hint_label.visible = false
 
 
 func debug_text() -> String:
-	var tx: int = pred.x / Movement.TILE_UNITS
-	var ty: int = pred.y / Movement.TILE_UNITS
+	var t := Movement.tile_of_pos(pred.pos) if have_state else Vector2i.ZERO
 	return "\n".join([
 		"FPS: %d" % Engine.get_frames_per_second(),
 		"Ping: %.0f ms" % net.rtt_ms,
 		"Tick serwera: %d  (render %.1f)" % [latest_tick, est_tick - INTERP_DELAY_SEC * tick_hz],
-		"Pokój: %s (id %d, piętro %d)" % [map.room_name(room_id), room_id, floor_index],
+		"Piętro: %s  Pokój: %s (id %d)" % [building.floor_name(floor_index), building.room_name(floor_index, room_id), room_id],
 		"Widoczni gracze: %d" % visible_count,
-		"Gracz #%d %s  kafel (%d, %d)" % [net.player_id, nick, tx, ty],
+		"Gracz #%d %s  kafel (%d, %d)" % [net.player_id, nick, t.x, t.y],
 		"Inputy w locie: %d  korekty: %d" % [pending.size(), corrections],
 		"Bufor interpolacji pusty: %.2f%% klatek" % (100.0 * interp_underruns / maxi(interp_frames, 1)),
 		"Ruch: %.1f KB/s in / %.1f KB/s out" % [net.bytes_in_per_sec / 1024.0, net.bytes_out_per_sec / 1024.0],

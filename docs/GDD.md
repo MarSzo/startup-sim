@@ -1,42 +1,178 @@
-# GDD — „symulator pracy w startupie IT”
+# Symulator pracy — Game Design Document
 
-2D multiplayer, widok z góry, pikselowa grafika w stylu The Escapists.
+*Wersja robocza. Aktualizowana na bieżąco wraz z kolejnymi ustaleniami.*
 
-> **Uwaga:** pełne ustalenia projektowe (rozgrywka, rekrutacja, sklep, palenie,
-> NPC, zadania, piętra, winda, karty dostępu) nie zostały jeszcze spisane w tym
-> pliku — do uzupełnienia. Poniżej jest to, co wiemy na etapie 1.
+## 1. Koncepcja
 
-## Stack
+Gra 2D multiplayer — symulator pracy w startupie IT. Gracz zaczyna od szukania
+pracy, przechodzi rekrutację, dostaje umowę i kartę dostępu, a potem wykonuje
+obowiązki na swoim stanowisku. Firma rośnie razem z graczami — od małego
+startupu do korporacji.
 
-- Klient: Godot 4 (4.7), GDScript.
-- Serwer: dedykowany, autorytatywny, Rust (`std::net::UdpSocket`, jeden wątek).
-- Transport: UDP, własny binarny protokół (`docs/PROTOCOL.md`).
+- **Grafika:** płaska, pikselowa, widok z góry — w stylu The Escapists (tylko jako inspiracja wizualna).
+- **Gatunek:** symulator + social + rywalizacja.
 
-## Platformy i crossplay
+**Filary rozgrywki:**
+- **Cele i rywalizacja** — wydajność, awanse, rankingi, biurowa polityka.
+- **Social i zadania** — współpraca w zespołach, wspólne przestrzenie, wydarzenia dla całego budynku.
+- **Świat trwały** — umowa, stanowisko, karta, zespół i postęp zapisują się między sesjami.
 
+## 2. Założenia techniczne
+
+| Obszar | Decyzja |
+|--------|---------|
+| Platforma | Aplikacja desktopowa (Windows, macOS, Linux, Steam Deck), nie przeglądarka — ze względu na płynność i UDP |
+| Klient | Godot 4 (GDScript) |
+| Serwer gry | Dedykowany, autorytatywny, w Ruście (UDP, np. renet). Na etapie prototypu możliwy Godot headless |
+| Backend kont i postępu | Konta, profile, umowy, stanowiska, statystyki — np. Rails (API) + baza danych |
+| Dystrybucja | Steam (logowanie, znajomi, aktualizacje) |
+| Hosting | VPS w Europie; jedna instancja świata („biuro”) do ~50 graczy, kilka instancji na serwer |
+| Skala | Do ~50 graczy jednocześnie w jednym świecie, w tym wszyscy naraz w jednym pomieszczeniu |
+
+### Założenia sieciowe
+- Klient wysyła tylko inputy, serwer liczy stan (ochrona przed cheatami).
+- Tick serwera ~20 Hz, niezależny od FPS klienta.
+- Predykcja ruchu własnej postaci, interpolacja pozostałych graczy.
+- Binarny protokół, wysyłanie tylko zmian stanu (delta).
+- Interest management po pomieszczeniach — gracz dostaje aktualizacje głównie o osobach w swoim pokoju.
+
+## 3. Świat — budynek firmy
+
+### Na zewnątrz
+- Parking zewnętrzny
+- Strefa palenia — jedyne miejsce, gdzie palenie jest bez konsekwencji
+
+### Parter
+- Wejście z portiernią — bramki na kartę; portier (NPC) wpuszcza osoby bez karty
+- Parking wewnętrzny
+- Sklep — zakupy (np. kawa, przekąski, papierosy)
+- Winda — dwa piętra do wyboru, na początku aktywne tylko jedno
+- Schody — alternatywa dla windy
+
+### Piętro 1 (aktywne od startu)
+- Recepcja przy wejściu na piętro
+- Pokój działu IT / Produkt
+- Pokój działu Biznesu (marketing + sprzedaż)
+- Pokój Zarządu
+- Pokój HR
+- Korytarz
+- Chill room — wspólna przestrzeń dla wszystkich
+- Łazienka damska i męska
+
+Gracze mogą swobodnie chodzić po korytarzu, pokojach i wspólnych przestrzeniach.
+
+### Piętro 2 (zablokowane)
+Odblokowywane wraz z rozwojem firmy (patrz sekcja 6).
+
+## 4. Ścieżka nowego gracza
+1. Portal z ogłoszeniami o pracę — gra zaczyna się od widoku strony z ofertami.
+2. Wybór stanowiska i aplikacja.
+3. Rekrutacja — pytania zależne od stanowiska.
+4. Dzień próbny — gracz nie ma karty, więc portier wprowadza go do budynku i odprowadza na recepcję.
+5. Podpisanie umowy (w HR).
+6. Otrzymanie karty dostępu — od tej pory swobodne wejście do budynku.
+7. Przydział do działu / zespołu i rozpoczęcie właściwej pracy.
+
+**Do ustalenia:** forma rekrutacji: quiz / minigry zadaniowe / rozmowa z NPC
+napędzana AI (propozycja: na start quizy i minigry, AI później).
+
+## 5. Struktura firmy — start (startup)
+
+| Dział | Kto | Uwagi |
+|-------|-----|-------|
+| IT / Produkt | Gracze — programiści | Na start bez podziału na backend/frontend |
+| Biznes | Gracze — marketing + sprzedaż | Zadania powiązane z IT (klienci, potrzeby produktu) |
+| Zarząd | NPC | Wyznacza cele firmy, decyduje o awansach |
+| HR | NPC | Rekrutacja, dzień próbny, umowy, później konflikty i skargi |
+
+Zespoły na start = działy (każdy dział ma swój pokój).
+
+**NPC na start:** portier; recepcjonista/recepcjonistka; Zarząd (CEO / założyciele); HR.
+
+## 6. Rozwój firmy (wspólny cel serwera)
+
+Praca graczy przynosi firmie przychody, a firma odblokowuje kolejne etapy:
+
+| Etap | Co się odblokowuje |
+|------|--------------------|
+| Startup | IT, Biznes, Zarząd, HR — tylko piętro 1 |
+| Scale-up | Podział IT na backend / frontend / mobile, osobne działy marketingu i sprzedaży, DevOps |
+| Korporacja | Piętro 2, dział data science / AI, sala konferencyjna na eventy dla wszystkich |
+
+Docelowo role w Zarządzie i HR mogą stać się dostępne dla graczy (awanse).
+
+## 7. Mechaniki
+
+### Palenie
+- Palenie na zewnątrz w strefie palenia — bez konsekwencji.
+- Palenie w środku — zapach rozchodzi się po pomieszczeniach.
+- W niektórych miejscach czujniki włączają alarm przeciwpożarowy → ewakuacja budynku (naturalny event dla wszystkich graczy).
+
+### Sklep i ekonomia
+- Zakupy w sklepie na parterze.
+- Do ustalenia: pensja, ceny, wpływ zakupów na postać (np. energia, stres).
+
+### Pomysły do rozważenia (nieprzesądzone)
+- Punkty wydajności i ranking (np. „pracownik dnia”).
+- Biurowa polityka: przypisywanie sobie cudzych zadań, plotki, reputacja — z ryzykiem przyłapania.
+- Zadania wymagające współpracy kilku osób.
+- Czat głosowy / tekstowy zależny od zasięgu (słyszysz osoby w tym samym pokoju).
+- Wydarzenia dla całego budynku: zebranie firmowe, awaria prądu, kontrola, alarm pożarowy.
+- Kto płaci za fałszywy alarm pożarowy.
+- Personalizacja postaci i biurka.
+
+## 8. Otwarte kwestie
+- [ ] Obowiązki i zadania na poszczególnych stanowiskach (IT, Biznes)
+- [ ] Przebieg dnia pracy i czas gry vs czas rzeczywisty
+- [ ] Forma i treść rekrutacji dla każdego stanowiska
+- [ ] Ekonomia: pensja, sklep, statystyki postaci
+- [ ] Zasady awansów i progresji gracza
+- [ ] Warunki przejścia firmy do kolejnego etapu rozwoju
+- [ ] Mechanika zespołów po rozrośnięciu się firmy (zespoły działowe czy mieszane)
+- [ ] Nazwa gry i nazwa firmy
+
+## 9. Proponowany zakres MVP
+- Parter + piętro 1
+- Dwa działy (IT, Biznes) + NPC: portier, recepcja, Zarząd, HR
+- Uproszczona rekrutacja
+- Jedno–dwa zadania na dział
+- Multiplayer: ruch, pomieszczenia, synchronizacja do ~50 graczy
+- Palenie + alarm jako pierwsza mechanika systemowa
+
+---
+
+## 10. Implementacja — ustalenia i stan
+
+Sekcja techniczna prowadzona przez zespół; sekcje 1–9 to design.
+
+### 10.1 Rozbieżności między GDD a obecnym kodem (do decyzji)
+
+| Temat | GDD | Obecnie w kodzie |
+|-------|-----|------------------|
+| Snapshoty | tylko zmiany stanu (delta) | pełne snapshoty; w `Input` jest `ack_tick` przygotowany pod deltę — przy 50 graczach w pokoju to ~12 KB/s na klienta |
+| Transport | „np. renet” | własny protokół na UDP (decyzja z briefu etapu 1: klient w GDScript nie obsłuży renet) |
+| Platformy | desktop: Windows, macOS, Linux, Steam Deck | w rozmowie 2026-09-26 rozszerzone o Android/iOS z crossplayem („później”); konsole „może kiedyś”. Obecny priorytet: **macOS** |
+| Konta / tożsamość | Steam + backend kont (Rails) | nick + token sesji, bez kont i zapisu postępu |
+| Bramki / karty | bramki na kartę, portier wpuszcza osoby bez karty | bramki są na mapie (`access: card`), ale na razie przepuszczają każdego (decyzja 2026-09-26) |
+
+Rozwiązane 2026-09-26: układ parteru i piętra 1 zgodny z sekcją 3 (10.4).
+
+### 10.2 Stack (zaimplementowany)
+- Klient: Godot 4.7, GDScript.
+- Serwer: dedykowany, autorytatywny, Rust (`std::net::UdpSocket` + `socket2`, jeden wątek).
+- Transport: UDP, własny binarny protokół (`docs/PROTOCOL.md`), IPv4 + IPv6.
+
+### 10.3 Platformy i crossplay
 Decyzja (2026-09-26): zostajemy przy Godocie; Unity rozważone i odrzucone.
+Konsole (Switch, Xbox, PlayStation) — „może kiedyś”, przez firmę portującą
+(np. W4 Games); wtedy dojdą konta platform, certyfikacja i wymogi crossplay.
+Serwer i protokół nie zależą od platformy.
 
-- **Docelowo:** Windows, macOS, Linux, Android, iOS — wszystkie z pełnym
-  crossplayem (jeden serwer, jeden protokół, deterministyczny ruch na int).
-- **Konsole (Switch, Xbox, PlayStation): „może kiedyś”.** Jeśli gra chwyci —
-  port przez firmę zewnętrzną (np. W4 Games). Wtedy dojdą konta platform
-  (PSN / Xbox network / Nintendo Account) z uwierzytelnieniem na serwerze,
-  certyfikacja oraz wymogi crossplay (blokowanie/zgłaszanie, filtr nicków,
-  kontrola rodzicielska). Serwer i protokół nie zależą od platformy.
+Przygotowane już pod platformy mobilne (gdyby wróciły do planu):
+- ✅ IPv6 po obu stronach; ✅ sesja po tokenie (zmiana sieci); ✅ automatyczne ponowne łączenie.
+- ⬜ Sterowanie dotykowe, skalowanie UI, eksport Android/iOS, konta sklepów.
 
-Wymagania wynikające z platform mobilnych:
-- ✅ IPv6 po obu stronach (wymóg App Store: sieci tylko-IPv6).
-- ✅ Identyfikacja gracza po tokenie, a nie po adresie — przeżycie zmiany sieci
-  (Wi-Fi ↔ LTE).
-- ✅ Automatyczne ponowne łączenie (po zmianie sieci, powrocie z tła, restarcie
-  serwera).
-- ⬜ Pozostałe poniżej:
-- Sterowanie dotykowe (wirtualny joystick → te same bity inputu).
-- UI skalowane pod różne ekrany; renderer Compatibility dla słabszych Androidów.
-- Dystrybucja: konta Apple Developer / Google Play, podpis i notaryzacja macOS,
-  eksport iOS na Macu z Xcode.
-
-## Etap 1 — pionowy wycinek sieci
+### 10.4 Etap 1 — pionowy wycinek sieci
 
 Fundament multiplayera: wielu graczy chodzi po wspólnej mapie parteru.
 Bez rekrutacji, sklepu, palenia, NPC i zadań.
@@ -57,116 +193,179 @@ klient 60 FPS, serwer bez zgubionych ticków (logi czasu ticka i transferu);
 lag ~100 ms + 2% strat → nadal płynnie; zmiana pokoju zmienia widocznych
 graczy; testy jednostkowe serializacji i ruchu/kolizji.
 
-## Mapa parteru (floor0)
+### 10.5 Budynek (mapy)
 
-Siatka 64×40 kafli po 16 px (`client/maps/floor0.json`).
+Obie kondygnacje 60×48 kafli po 16 px; pliki `client/maps/building.json`,
+`floor0.json`, `floor1.json` generuje `tools/build_maps.py`. Piętro 2 jest w
+`building.json` jako zablokowane (bez pliku).
+
+**Parter + teren zewnętrzny** — gracz startuje na chodniku przed wejściem.
 
 ```
-################################################################
-#==================#..........................#,,,,,,,,#TTTTTTT#
-#==================#..........................#,,,,,,,,#:::::::#
-#==XXX========XXX==#...TTTTTT...TTTTTT..TTTT..#,,,,,,,,#:::::::#
-#==XXX========XXX==#....................TTTT..#,,,,,,,,#:::::::#
-#==================#....................TTTT..#,,TTTT,,#::::TT:#
-#==================#..........................#,,TTTT,,#::::TT:#
-#==================#...TTTTTT...TTTTTT........#,,TTTT,,#::::TT:#
-#==================#..........................#,,TTTT,,#::::TT:#
-#==XXX========XXX==#..........................#,,TTTT,,#:::::::#
-#==XXX========XXX==#..........................#,,TTTT,,#:::::::#
-#==================#...TTTTTT...TTTTTT........#,,TTTT,,#:::::::#
-#==================#..........................#,,TTTT,,#:::::::#
-#==================#..........................#,,TTTT,,#:::::::#
-#==================#..........................#,,,,,,,,#:::::::#
-#==XXX========XXX==#...TTTTTT...TTTTTT........#,,,,,,,,#:::::::#
-#==XXX========XXX==#..........................#,,,,,,,,#:::::::#
-#==================#..........................#,,,,,,,,#:::::::#
-#==================#..........................#,,,,,,,,#:::::::#
-#==================#############DD######DD########DD######DD####
-#==================#...........................................#
-#==================D...........................................#
-#==================D...........................................#
-#==================#...........................................#
-#==================#####################DDD#####################
-#==================#...........#___________________#...........#
-#==================#...........#___________________#...TTTTTTT.#
-#==XXX========XXX==#...........#___________________#...........#
-#==XXX========XXX==#...........D___________________#...........#
-#==================#...........D___________________#...TTTTTTT.#
-#==================#...........#___________________D...........#
-#==================#...........#___________________D...........#
-#==================#TTTTTTT....#___________________#...TTTTTTT.#
-#==XXX========XXX==#...........#___________________#...........#
-#==XXX========XXX==#...........#___________________#...........#
-#==================#...........#___________________#...........#
-#==================#...........#___________________#.TTT.......#
-#==================#...........#___________________#...........#
-#==================#...........#___________________#...........#
-########################################GGG#####################
+FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+FvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvF
+Fv###############################################vvvvvvvvvvF
+Fv#================#####################::::::::#vvvvvvvvvvF
+Fv#================#####################:TTTTTT:#vvvvvvvvvvF
+Fv#==XXX======XXX==#####################::::::::#vvvvvvvvvvF
+Fv#==XXX======XXX==############.SSSSSS.#::::::::#vvvvvvvvvvF
+Fv#================############.SSSSSS.#::::::::#vvvvvvvvvvF
+Fv#================#####eeeee##........#:TT:::::#vvvvvvvvvvF
+Fv#================#####eeeee##........#:TT:::::#vvvvvvvvvvF
+Fv#================#####eeeee##........#:TT:::::#vvvvvvvvvvF
+Fv#==XXX======XXX==#####eeeee##........#:TT:::::#vvvvvvvvvvF
+Fv#==XXX======XXX==#####eeeee##........#::::::::#vvvvvvvvvvF
+Fv#================######EEE######DD#######LL#############vF
+Fv#================#.....................................#vF
+Fv#================#.....................................#vF
+Fv#================D.....................................#vF
+Fv#==XXX======XXX==D.....................................#vF
+Fv#==XXX======XXX==#.....................................#vF
+Fv#================#.....................................#vF
+Fv#================#.....................................#vF
+Fv#================#########B#B#B#B#B#B###################vF
+Fv#================#......#______________#...............#vF
+Fv#==XXX======XXX==#......#______________#...............#vF
+Fv#==XXX======XXX==#......#______________#...TTTTTTTTTT..#vF
+Fv#================#......#______________#...............#vF
+Fv#================#......#______________#...............#vF
+Fv#================#.T....#______________#...TTTTTTTTTT..#vF
+Fv#================#.T....D______________#...............#vF
+Fv#==XXX======XXX==#.T....D______________D...............#vF
+Fv#==XXX======XXX==#.T....#______________D...............#vF
+Fv#================#......#______________#.........TTTTT.#vF
+Fv#================#......#______________#...............#vF
+Fv######ggggg##################GGGGG######################vF
+Fpppppp=======pppppppppppppppppppppppppppppppppppppppppppppF
+Fpppppp=======pppppppppppppppppppppppppppppppppppppppppppppF
+Fpppppp=======pppppppppppppppppppppppppppppppppppppppppppppF
+Fvvvvvv=======vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvF
+Fvv============================vvvvvvvvvvvvvvvvvvvvvvvvvvvvF
+Fvv=XXX==XXX==XXX==XXX==XXX====vvvvvvvvvvvzzzzzzzzzzzzzvvvvF
+Fvv=XXX==XXX==XXX==XXX==XXX====vvvvvvvvvvvzzzzzzzzzzzzzvvvvF
+Fvv============================vvvvvvvvvvvzzTTTzzzzzzzzvvvvF
+Fvv============================vvvvvvvvvvvzzzzzzzzzzzzzvvvvF
+Fvv=XXX==XXX==XXX==XXX==XXX====vvvvvvvvvvvzzzzzzzzTzzzzvvvvF
+Fvv=XXX==XXX==XXX==XXX==XXX====vvvvvvvvvvvzzzzzzzzzzzzzvvvvF
+Fvv============================vvvvvvvvvvvzzzzzzzzzzzzzvvvvF
+FvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvF
+FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
 ```
 
-Układ: lewo — Parking wewnętrzny; góra — Open space, Sala konferencyjna,
-Kuchnia; środek — Korytarz; dół — Portiernia, Wejście (hol), Sklep.
+**Piętro 1** (dolna część to pustka poza obrysem budynku)
 
-Legenda: `#` ściana, `.` podłoga, `,` wykładzina, `:` płytki, `_` posadzka
-holu, `=` parking, `D` drzwi, `G` szklane drzwi wejściowe (na razie zamknięte —
-świat zewnętrzny nie istnieje), `T` meble (biurka, lady, regały), `X` auta.
+```
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~###############################################~~~~~~~~~~~
+~~#,,,,,,,,,,,,,,,,#####################,,,,,,,,#~~~~~~~~~~~
+~~#,,,,,,,,,,,,,,,,#####################,,,,,,,,#~~~~~~~~~~~
+~~#,,TTTTT,,TTTTT,,#####################,,,,,,,,#~~~~~~~~~~~
+~~#,,,,,,,,,,,,,,,,############.SSSSSS.#,,TTTT,,#~~~~~~~~~~~
+~~#,,,,,,,,,,,,,,,,############.SSSSSS.#,,,,,,,,#~~~~~~~~~~~
+~~#,,,,,,,,,,,,,,,,#####eeeee##........#,,,,,,,,#~~~~~~~~~~~
+~~#,,TTTTT,,TTTTT,,#####eeeee##........#,,,,,,,,#~~~~~~~~~~~
+~~#,,,,,,,,,,,,,,,,#####eeeee##........#,,,,,,,,#~~~~~~~~~~~
+~~#,,,,,,,,,,,,,,,,#####eeeee##........#,,,,,,,,#~~~~~~~~~~~
+~~#,,,,,,,,,,,,,,,,#####eeeee##........#,,,,,,,,#~~~~~~~~~~~
+~~#,,TTTTT,,TTTTT,,######EEE######DD#######DD#############~~
+~~#,,,,,,,,,,,,,,,,#.........................#,,,,,,,,,,,#~~
+~~#,,,,,,,,,,,,,,,,#.........................#,,,,,,,,,,,#~~
+~~#,,,,,,,,,,,,,,,,#.........................#,,,TTTTT,,,#~~
+~~#,,TTTTT,,TTTTT,,#..........TTTTT..........#,,,TTTTT,,,#~~
+~~#,,,,,,,,,,,,,,,,#.........................#,,,,,,,,,,,#~~
+~~#,,,,,,,,,,,,,,,,#.........................#,,,,,,,,,,,#~~
+~~#,,,,,,,,,,,,,,,,#.........................#,,,,,,,,,,,#~~
+~~########DD##################DDDDD################DD#####~~
+~~#......................................................#~~
+~~#......................................................#~~
+~~#......................................................#~~
+~~##########DD##################DDD###########D######D####~~
+~~#,,,,,,,,,,,,,,,,,,,,#,,,,,,,,,,,,,,,,,,,#::::::#::::::#~~
+~~#,,,,,,,,,,,,,,,,,,,,#,,,,,,,,,,,,,,,,,,,#::::::#::::::#~~
+~~#,,TTTTT,,,TTTTT,,,,,#,,,TTT,,,,,,,,,,,,,#::::::#::::::#~~
+~~#,,,,,,,,,,,,,,,,,,,,#,,,TTT,,,,,,,,,,,,,#::::::#::::::#~~
+~~#,,,,,,,,,,,,,,,,,,,,#,,,,,,,,,,,,TTTT,,,#::::::#::::::#~~
+~~#,,TTTTT,,,TTTTT,,,,,#,,,,,,,,,,,,,,,,,,,#::::::#::::::#~~
+~~#,,,,,,,,,,,,,,,,,,,,#,,,,,,,,,,,,,,,,,,,#::::::#::::::#~~
+~~########################################################~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+```
 
-| id | pokój | uwagi |
-|----|-------|-------|
-| 1 | Wejście | hol z punktem spawnu, drzwi do korytarza, portierni i sklepu |
-| 2 | Portiernia | lada recepcji |
-| 3 | Korytarz | łączy wszystko; kafle drzwi należą do korytarza |
-| 4 | Sklep | regały, lada |
-| 5 | Parking wewnętrzny | auta; drzwi do korytarza |
-| 6 | Open space | rzędy biurek; największe pomieszczenie |
-| 7 | Sala konferencyjna | stół konferencyjny |
-| 8 | Kuchnia | blat, stolik |
+Legenda: `#` ściana, `.` podłoga, `,` wykładzina, `:` płytki, `_` posadzka holu,
+`=` parking, `v` trawa, `p` chodnik, `z` strefa palenia, `F` ogrodzenie,
+`~` pustka, `D` drzwi, `G` szklane drzwi wejściowe, `B` bramka na kartę
+(otwarta), `L` drzwi zamknięte (zaplecze), `g` brama garażowa, `E` drzwi windy,
+`e` kabina windy, `S` biegi schodów, `T` meble / regały / lady, `X` samochody.
 
-## Stan implementacji
+| Piętro | Pomieszczenia (id) |
+|--------|--------------------|
+| Parter | Na zewnątrz (1), Parking wewnętrzny (2), Hol (3), Portiernia (4), Wejście (5), Sklep (6), Parking zewnętrzny (7), Strefa palenia (8), Zaplecze techniczne (9, zamknięte), Winda (20), Klatka schodowa (21) |
+| Piętro 1 | Recepcja (1), Zarząd (2), IT / Produkt (3), HR (4), Korytarz (5), Biznes (6), Chill room (7), Łazienka damska (8), Łazienka męska (9), Winda (20), Klatka schodowa (21) |
 
-*Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie
-i automatyczne ponowne łączenie.*
+Ustalenia: sklep i portiernia są przed bramkami (dostępne bez karty); parking
+wewnętrzny duży, z bramą garażową na zewnątrz; wolne miejsce nad holem to
+zamknięte „Zaplecze techniczne”.
 
-### Zrobione
+**Poruszanie między piętrami:** schody — wejście na biegi schodów przenosi na
+drugie piętro (bez odbijania, gdy trzymasz klawisz); winda — w kabinie
+klawisz **E** jedzie na następne aktywne piętro (podpowiedź na ekranie).
+
+### 10.6 Stan implementacji
+
+*Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie,
+automatyczne ponowne łączenie oraz budynek wg GDD: parter z terenem
+zewnętrznym, piętro 1, schody i winda.*
+
+#### Zrobione
 - **Serwer Rust** (`server/`): tick 20 Hz bez dryfu z liczeniem zgubionych
   ticków; handshake z `nonce`/`token`, odrzucenia (pełny serwer, wersja,
   nick), timeout 5 s; kolejka inputów z limitem 6/tick; kolizje ze ścianami i
   meblami; snapshoty z interest management po `(piętro, pokój)`,
   fragmentowane ≤ 1200 B; nicki przez `PlayerInfo`/`InfoRequest`; ping;
   statystyki co 5 s; symulator `--lag-ms/--jitter-ms/--loss`.
-- **Mapa**: parter 64×40 z 8 pomieszczeniami i drzwiami w jednym pliku JSON
-  czytanym przez obie strony, weryfikowanym CRC32 przy połączeniu.
+- **Budynek**: parter (z parkingiem zewnętrznym i strefą palenia) + piętro 1
+  wg sekcji 3, piętro 2 zablokowane; schody i winda (E) jako część
+  deterministycznej symulacji, przewidywane przez klienta; JSON-y wspólne dla
+  serwera i klienta, weryfikowane jednym CRC32 budynku (protokół v2).
 - **Klient Godot** (`client/`): ekran startowy, mapa z kolorowych kafli i
   podpisów pomieszczeń, predykcja + rekoncyliacja z wygładzaniem korekt,
   interpolacja innych graczy (100 ms), nicki, kamera, overlay F3.
-- **Boty** (`cargo run --release --bin bots`): 50 domyślnie, chodzą po BFS,
-  część zbiera się w wybranym pokoju.
+- **Boty** (`cargo run --release --bin bots`): 50 domyślnie, chodzą po BFS po
+  całym budynku (schodami), część zbiera się w wybranym pokoju (domyślnie
+  Chill room na piętrze 1).
 - **Sieć mobilna**: serwer dual-stack IPv4/IPv6; gracz identyfikowany tokenem
   (zmiana adresu w trakcie gry przenosi sesję); klient przepina gniazdo po
   ciszy/powrocie z tła i sam łączy się ponownie po utracie sesji.
-- **Testy**: 19 jednostkowych w Rust (mapa, ruch/kolizje, protokół), 2 golden,
-  5 e2e serwera (handshake, widoczność, timeout, odrzucenia, IPv4+IPv6, migracja
-  adresu, nieznany token) — łącznie 26; 96 sprawdzeń w Godocie (parytet
-  protokołu i ruchu, parsowanie adresów).
+- **Testy**: 28 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność,
+  ruch/kolizje, schody, winda, nawigacja, protokół), 2 golden, 6 e2e serwera
+  (m.in. niewidoczność między piętrami i zgodność stanu serwera z predykcją
+  po schodach) — łącznie 36; 102 sprawdzenia w Godocie (parytet protokołu i
+  ruchu z przejściami między piętrami, parsowanie adresów).
 
-### Pomiary (MacBook, wszystko lokalnie)
+#### Pomiary (MacBook, wszystko lokalnie)
 | scenariusz | wynik |
 |------------|-------|
 | 50 botów w jednym pokoju | serwer: 0 zgubionych ticków, tick śr. ~1,2 ms (max ~2,6 ms), ~12 KB/s na klienta |
 | klient + 50 botów w tym samym pokoju | 60 FPS (vsync), 50 widocznych, 0 korekt predykcji |
 | RTT ~117 ms, jitter 10 ms, 2% strat | 60 FPS, 0 korekt, bufor interpolacji pusty w 0,40% klatek |
 | RTT ~226 ms, jitter 20 ms, 2% strat | 60 FPS, 0 korekt, bufor pusty w 0,25% klatek |
-| przejście z Wejścia do Korytarza | widoczni: 42 → 5 |
+| przejście z Wejścia do Korytarza (stara mapa) | widoczni: 42 → 5 |
+| 40 botów po całym budynku, połowa w Chill roomie (piętro 1) | serwer: 0 zgubionych ticków, tick śr. ~1,1 ms; boty: 0 błędnych predykcji mimo schodów |
+| klient w recepcji piętra 1, 26 widocznych | 60 FPS, 0 korekt, bufor interpolacji pusty w 0,00% klatek |
 | klient IPv6 + klient IPv4, serwer zamrożony na 3 s | obie sesje zachowane (nowe porty, te same id) |
 | restart serwera | obaj klienci połączeni ponownie automatycznie w < 1 s od startu serwera |
 
-### Znane ograniczenia
+#### Znane ograniczenia
 - Brak kolizji między graczami (celowo — to biuro, nie bijatyka).
 - Ping w F3 ma rozdzielczość klatki (~16 ms), bo `Pong` jest czytany w `_process`.
-- Szklane drzwi wejściowe są zamknięte, bo mapa nie ma świata zewnętrznego.
 - Eksport klienta: przy eksporcie trzeba dodać `*.json` do filtra zasobów
-  nie-Godotowych, inaczej `maps/floor0.json` nie trafi do paczki.
+  nie-Godotowych, inaczej `maps/*.json` nie trafią do paczki.
+- Kilka okien klienta naraz na jednym Macu: macOS spowalnia zasłonięte okna,
+  więc ich metryki płynności (F3) są wtedy zaniżone — to nie błąd gry.
+- Karty dostępu nie istnieją: bramki są otwarte, zaplecze na stałe zamknięte.
 
-### Następne kroki (propozycja)
-Piętra i winda, karty dostępu do drzwi, NPC, interakcje — punkty wpięcia
-opisane w `docs/ARCHITECTURE.md` („Gotowość na rozbudowę”).
+#### Następne kroki (propozycja)
+Zgodnie z MVP (sekcja 9): NPC (portier, recepcja, Zarząd, HR), karty dostępu
+i bramki, uproszczona rekrutacja, zadania działów, palenie + alarm. Punkty
+wpięcia opisane w `docs/ARCHITECTURE.md` („Gotowość na rozbudowę”).

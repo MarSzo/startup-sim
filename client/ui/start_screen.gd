@@ -49,7 +49,7 @@ func _ready() -> void:
 	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	box.add_child(status)
 	var hint := Label.new()
-	hint.text = "Sterowanie: WASD / strzałki   ·   F3: debug"
+	hint.text = "Sterowanie: WASD / strzałki   ·   E: winda   ·   F3: debug"
 	hint.modulate = Color(1, 1, 1, 0.45)
 	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(hint)

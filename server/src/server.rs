@@ -5,10 +5,10 @@ use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::net::SocketAddr;
 use std::time::{Duration, Instant};
 
-use crate::map::Map;
+use crate::building::Building;
 use crate::net::{canonical, LinkConditions, Net};
-use crate::protocol::{self as proto, EntityState, Packet, PlayerInfoEntry};
-use crate::sim::{self, Pos};
+use crate::protocol::{self as proto, EntityState, Packet, PlayerInfoEntry, SelfState};
+use crate::sim::{self, Body, Pos};
 
 pub const TICK_HZ: u32 = 20;
 pub const TICK: Duration = Duration::from_millis(1000 / TICK_HZ as u64);
@@ -35,8 +35,7 @@ struct Player {
     nonce: u32,
     addr: SocketAddr,
     nick: String,
-    pos: Pos,
-    floor: u8,
+    body: Body,
     room: u16,
     flags: u8,
     last_heard: Instant,
@@ -59,7 +58,7 @@ struct Stats {
 }
 
 pub struct Server {
-    map: Map,
+    building: Building,
     net: Net,
     cfg: Config,
     players: BTreeMap<u16, Player>,
@@ -77,10 +76,10 @@ pub struct Server {
 }
 
 impl Server {
-    pub fn new(map: Map, cfg: Config) -> std::io::Result<Server> {
+    pub fn new(building: Building, cfg: Config) -> std::io::Result<Server> {
         let net = Net::bind(cfg.bind, cfg.link)?;
         Ok(Server {
-            map,
+            building,
             net,
             cfg,
             players: BTreeMap::new(),
@@ -255,7 +254,8 @@ impl Server {
                 break t;
             }
         };
-        let spawn = self.map.spawns[self.next_spawn % self.map.spawns.len()];
+        let spawns = self.building.spawns();
+        let (spawn_floor, spawn) = spawns[self.next_spawn % spawns.len()];
         self.next_spawn += 1;
         let pos = Pos::tile_center(spawn.x, spawn.y);
         let player = Player {
@@ -264,9 +264,8 @@ impl Server {
             nonce,
             addr,
             nick,
-            pos,
-            floor: self.map.floor,
-            room: self.map.room_at(pos.x, pos.y),
+            body: Body::at(spawn_floor, pos),
+            room: self.room_of(spawn_floor, pos),
             flags: 0,
             last_heard: now,
             inputs: VecDeque::new(),
@@ -283,6 +282,10 @@ impl Server {
         self.send(addr, &welcome);
     }
 
+    fn room_of(&self, floor: u8, pos: Pos) -> u16 {
+        self.building.floor(floor).map_or(0, |m| m.room_at(pos.x, pos.y))
+    }
+
     fn welcome(&self, id: u16) -> Packet {
         let p = &self.players[&id];
         Packet::Welcome {
@@ -291,7 +294,7 @@ impl Server {
             token: p.token,
             tick_hz: TICK_HZ as u8,
             input_hz: sim::INPUT_HZ as u8,
-            map_crc: self.map.crc,
+            map_crc: self.building.crc,
             server_tick: self.tick,
         }
     }
@@ -351,10 +354,10 @@ impl Server {
             let mut moved = false;
             for _ in 0..MAX_INPUTS_PER_TICK {
                 let Some((seq, bits)) = p.inputs.pop_front() else { break };
-                let before = p.pos;
-                p.pos = sim::step(&self.map, p.pos, bits);
+                let before = p.body;
+                p.body = sim::step(&self.building, p.body, bits);
                 p.last_processed_seq = seq;
-                moved |= p.pos != before;
+                moved |= p.body.pos != before.pos || p.body.floor != before.floor;
                 let (dx, dy) = sim::input_dir(bits);
                 let facing = if dy > 0 { 0 } else if dy < 0 { 1 } else if dx < 0 { 2 } else if dx > 0 { 3 } else { p.flags & 3 };
                 p.flags = facing;
@@ -362,17 +365,17 @@ impl Server {
             if moved {
                 p.flags |= 0b100;
             }
-            p.room = self.map.room_at(p.pos.x, p.pos.y);
+            p.room = self.building.floor(p.body.floor).map_or(0, |m| m.room_at(p.body.pos.x, p.body.pos.y));
         }
 
         // 3. Interest management: group entities by (floor, room).
         let mut groups: HashMap<(u8, u16), Vec<EntityState>> = HashMap::new();
         for p in self.players.values() {
-            groups.entry((p.floor, p.room)).or_default().push(EntityState {
+            groups.entry((p.body.floor, p.room)).or_default().push(EntityState {
                 id: p.id,
                 kind: proto::kind::PLAYER,
-                x: p.pos.x,
-                y: p.pos.y,
+                x: p.body.pos.x,
+                y: p.body.pos.y,
                 flags: p.flags,
             });
         }
@@ -384,14 +387,22 @@ impl Server {
         for id in ids {
             let p = &self.players[&id];
             let visible: Vec<EntityState> =
-                groups[&(p.floor, p.room)].iter().filter(|e| e.id != id).copied().collect();
+                groups[&(p.body.floor, p.room)].iter().filter(|e| e.id != id).copied().collect();
             self.stats.max_visible = self.stats.max_visible.max(visible.len());
             let new_infos: Vec<PlayerInfoEntry> = visible
                 .iter()
                 .filter(|e| !p.known.contains(&e.id))
                 .map(|e| PlayerInfoEntry { id: e.id, nick: self.players[&e.id].nick.clone() })
                 .collect();
-            for f in proto::snapshot_fragments(tick, p.last_processed_seq, p.pos.x, p.pos.y, p.floor, p.room, &visible) {
+            let me = SelfState {
+                x: p.body.pos.x,
+                y: p.body.pos.y,
+                floor: p.body.floor,
+                room: p.room,
+                lock: p.body.lock,
+                prev_input: p.body.prev_input,
+            };
+            for f in proto::snapshot_fragments(tick, p.last_processed_seq, me, &visible) {
                 outgoing.push((p.addr, id, f));
             }
             for chunk in new_infos.chunks(INFO_PER_PACKET) {

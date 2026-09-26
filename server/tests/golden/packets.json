@@ -2,52 +2,52 @@
   "packets": [
     {
       "debug": "Connect { nonce: 3735928559, nick: \"Zażółć\" }",
-      "hex": "54530101efbeadde0a5a61c5bcc3b3c582c487",
+      "hex": "54530201efbeadde0a5a61c5bcc3b3c582c487",
       "name": "connect"
     },
     {
       "debug": "Welcome { nonce: 3735928559, player_id: 7, token: 16909060, tick_hz: 20, input_hz: 60, map_crc: 3405691582, server_tick: 1234 }",
-      "hex": "54530102efbeadde070004030201143cbebafecad2040000",
+      "hex": "54530202efbeadde070004030201143cbebafecad2040000",
       "name": "welcome"
     },
     {
       "debug": "Reject { reason: 1 }",
-      "hex": "5453010301",
+      "hex": "5453020301",
       "name": "reject"
     },
     {
       "debug": "Input { token: 16909060, ack_tick: 1200, last_seq: 99, inputs: [0, 1, 9, 6] }",
-      "hex": "5453010404030201b0040000630000000400010906",
+      "hex": "5453020404030201b0040000630000000400010906",
       "name": "input"
     },
     {
-      "debug": "Snapshot { tick: 1234, last_input_seq: 99, frag_idx: 0, frag_cnt: 1, self_x: 10000, self_y: -5, floor: 0, room: 6, entities: [EntityState { id: 3, kind: 0, x: 4096, y: 8192, flags: 5 }, EntityState { id: 65535, kind: 1, x: -1, y: 2000000, flags: 0 }] }",
-      "hex": "54530105d204000063000000000110270000fbffffff00060002030000001000000020000005ffff01ffffffff80841e0000",
+      "debug": "Snapshot { tick: 1234, last_input_seq: 99, frag_idx: 0, frag_cnt: 1, self_x: 10000, self_y: -5, floor: 1, room: 6, self_lock: 2, self_prev_input: 17, entities: [EntityState { id: 3, kind: 0, x: 4096, y: 8192, flags: 5 }, EntityState { id: 65535, kind: 1, x: -1, y: 2000000, flags: 0 }] }",
+      "hex": "54530205d204000063000000000110270000fbffffff010600021102030000001000000020000005ffff01ffffffff80841e0000",
       "name": "snapshot"
     },
     {
       "debug": "PlayerInfo { players: [PlayerInfoEntry { id: 3, nick: \"Ala\" }, PlayerInfoEntry { id: 4, nick: \"bot_07\" }] }",
-      "hex": "5453010602030003416c61040006626f745f3037",
+      "hex": "5453020602030003416c61040006626f745f3037",
       "name": "player_info"
     },
     {
       "debug": "InfoRequest { token: 16909060, ids: [3, 4, 500] }",
-      "hex": "54530107040302010303000400f401",
+      "hex": "54530207040302010303000400f401",
       "name": "info_request"
     },
     {
       "debug": "Ping { token: 16909060, client_time: 777000 }",
-      "hex": "545301080403020128db0b00",
+      "hex": "545302080403020128db0b00",
       "name": "ping"
     },
     {
       "debug": "Pong { client_time: 777000, server_tick: 1234 }",
-      "hex": "5453010928db0b00d2040000",
+      "hex": "5453020928db0b00d2040000",
       "name": "pong"
     },
     {
       "debug": "Disconnect { token: 16909060, reason: 1 }",
-      "hex": "5453010a0403020101",
+      "hex": "5453020a0403020101",
       "name": "disconnect"
     }
   ]

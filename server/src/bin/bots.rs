@@ -1,5 +1,6 @@
-//! Load-test bots: N virtual clients that connect, then walk around using BFS
-//! paths. A share of them heads to (and wanders inside) one chosen room.
+//! Load-test bots: N virtual clients that connect, then walk around the
+//! building (stairs included) using BFS paths. A share of them heads to (and
+//! wanders inside) one chosen room, on any floor.
 //!
 //! Each bot predicts its own movement exactly like the real client and
 //! reconciles with the server, so the log also reports misprediction counts.
@@ -10,9 +11,10 @@ use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use game::args::Args;
-use game::map::{default_map_path, Map, Tile};
+use game::building::{default_building_path, Building, Place};
+use game::nav::Walker;
 use game::protocol::{self as proto, Packet};
-use game::sim::{self, Pos, IN_DOWN, IN_LEFT, IN_RIGHT, IN_UP, SPEED};
+use game::sim::{self, Body, Pos};
 
 const HELP: &str = "\
 Startup sim - load-test bots
@@ -22,11 +24,11 @@ USAGE: cargo run --release --bin bots -- [OPTIONS]
 OPTIONS:
   --server <addr>       server address, IPv4 or [IPv6]  [default: 127.0.0.1:7777]
   --count <n>           number of bots                  [default: 50]
-  --room <name>         room some bots gather in        [default: Open space]
+  --room <name>         room some bots gather in        [default: Chill room]
   --room-share <0..1>   fraction of bots in that room   [default: 0.5]
   --all-in-room         same as --room-share 1
   --duration <secs>     stop after N seconds (0 = run forever) [default: 0]
-  --map <path>          map JSON (must match the server)
+  --map <path>          building JSON (must match the server)
 ";
 
 const INPUT_REDUNDANCY: usize = 4;
@@ -44,14 +46,14 @@ struct Bot {
     token: u32,
     seq: u32,
     pending: VecDeque<(u32, u8)>,
-    pred: Pos,
+    pred: Body,
     have_pos: bool,
     last_ack: u32,
     last_tick: u32,
+    floor: u8,
     room: u16,
-    target_room: Option<u16>,
-    path: Vec<Tile>,
-    path_i: usize,
+    gather: bool,
+    walker: Option<Walker>,
     idle_frames: u32,
     stuck_frames: u32,
     next_ping: Instant,
@@ -76,16 +78,24 @@ fn main() {
         .and_then(|mut a| a.next())
         .expect("valid --server address");
     let count: usize = args.get("count", 50);
-    let map_path = args.str("map").map(PathBuf::from).unwrap_or_else(default_map_path);
-    let map = Map::load(&map_path).expect("map loads");
-    let room_name = args.str("room").unwrap_or("Open space").to_string();
-    let target = map.room_by_name(&room_name).unwrap_or_else(|| panic!("no room named '{room_name}'")).id;
+    let map_path = args.str("map").map(PathBuf::from).unwrap_or_else(default_building_path);
+    let building = Building::load(&map_path).expect("building loads");
+    let room_name = args.str("room").unwrap_or("Chill room").to_string();
+    let (target_floor, target) = building
+        .find_room(&room_name)
+        .map(|(f, r)| (f, r.id))
+        .unwrap_or_else(|| panic!("no room named '{room_name}'"));
     let share: f64 = if args.flag("all-in-room") { 1.0 } else { args.get("room-share", 0.5) };
     let duration: u64 = args.get("duration", 0);
     let n_room = ((count as f64) * share).round() as usize;
 
-    let room_tiles = map.room_tiles(target);
-    let all_tiles = map.walkable_tiles();
+    // Goal pools; link tiles (stairs flights, elevator cabins) excluded.
+    let pool = |f: u8, tiles: Vec<game::map::Tile>| -> Vec<Place> {
+        let m = building.floor(f).unwrap();
+        tiles.into_iter().filter(|t| m.link_at(t.x, t.y).is_none()).map(|t| (f, t)).collect()
+    };
+    let room_tiles = pool(target_floor, building.floor(target_floor).unwrap().room_tiles(target));
+    let all_tiles: Vec<Place> = building.active_floors().flat_map(|(f, m)| pool(f, m.walkable_tiles())).collect();
     let start = Instant::now();
     let mut rng = fastrand::Rng::new();
 
@@ -103,14 +113,14 @@ fn main() {
                 token: 0,
                 seq: 0,
                 pending: VecDeque::new(),
-                pred: Pos { x: 0, y: 0 },
+                pred: Body::at(0, Pos { x: 0, y: 0 }),
                 have_pos: false,
                 last_ack: 0,
                 last_tick: 0,
+                floor: 0,
                 room: 0,
-                target_room: if i < n_room { Some(target) } else { None },
-                path: Vec::new(),
-                path_i: 0,
+                gather: i < n_room,
+                walker: None,
                 idle_frames: 0,
                 stuck_frames: 0,
                 next_ping: start,
@@ -122,7 +132,7 @@ fn main() {
         })
         .collect();
 
-    println!("{count} bots -> {server}; {n_room} of them gather in '{room_name}' (room {target})");
+    println!("{count} bots -> {server}; {n_room} of them gather in '{room_name}' (floor {target_floor}, room {target})");
     let frame = Duration::from_nanos(1_000_000_000 / sim::INPUT_HZ as u64);
     let mut next_frame = Instant::now();
     let mut next_stats = Instant::now() + Duration::from_secs(5);
@@ -144,7 +154,7 @@ fn main() {
             while let Ok(n) = b.sock.recv(&mut buf) {
                 b.bytes_in += n as u64;
                 let Ok(p) = Packet::decode(&buf[..n]) else { continue };
-                b.handle(p, &map, client_ms);
+                b.handle(p, &building, client_ms);
             }
             // --- send ---
             match b.state {
@@ -156,10 +166,10 @@ fn main() {
                 }
                 State::Playing => {
                     if b.have_pos {
-                        let bits = b.think(&map, &room_tiles, &all_tiles, &mut rng);
+                        let bits = b.think(&building, &room_tiles, &all_tiles, &mut rng);
                         b.seq += 1;
                         b.pending.push_back((b.seq, bits));
-                        b.pred = sim::step(&map, b.pred, bits);
+                        b.pred = sim::step(&building, b.pred, bits);
                         let k = b.pending.len().min(INPUT_REDUNDANCY);
                         let inputs: Vec<u8> = b.pending.iter().skip(b.pending.len() - k).map(|&(_, i)| i).collect();
                         let pkt = Packet::Input { token: b.token, ack_tick: b.last_tick, last_seq: b.seq, inputs };
@@ -176,7 +186,7 @@ fn main() {
         if now >= next_stats {
             let playing: Vec<&Bot> = bots.iter().filter(|b| matches!(b.state, State::Playing)).collect();
             let n = playing.len().max(1) as f64;
-            let in_room = playing.iter().filter(|b| b.room == target).count();
+            let in_room = playing.iter().filter(|b| (b.floor, b.room) == (target_floor, target)).count();
             println!(
                 "[{:>6.1}s] connected {}/{} | in '{}' {} | rtt avg {:.1} ms | recv avg {:.1} KB/s/bot | visible avg {:.1} max {} | mispredictions {}",
                 now.duration_since(start).as_secs_f64(),
@@ -207,12 +217,12 @@ fn main() {
 }
 
 impl Bot {
-    fn handle(&mut self, p: Packet, map: &Map, client_ms: u32) {
+    fn handle(&mut self, p: Packet, building: &Building, client_ms: u32) {
         match p {
             Packet::Welcome { nonce, player_id, token, map_crc, .. } => {
                 if let State::Connecting { nonce: n, .. } = self.state {
                     if n == nonce {
-                        assert_eq!(map_crc, map.crc, "server uses a different map");
+                        assert_eq!(map_crc, building.crc, "server uses a different building");
                         self.id = player_id;
                         self.token = token;
                         self.state = State::Playing;
@@ -220,7 +230,9 @@ impl Bot {
                 }
             }
             Packet::Reject { reason } => eprintln!("{} rejected: {reason}", self.nick),
-            Packet::Snapshot { tick, last_input_seq, frag_idx, self_x, self_y, room, entities, .. } => {
+            Packet::Snapshot {
+                tick, last_input_seq, frag_idx, self_x, self_y, floor, room, self_lock, self_prev_input, entities, ..
+            } => {
                 if tick < self.last_tick {
                     return; // out of order
                 }
@@ -229,6 +241,7 @@ impl Bot {
                 }
                 self.visible += entities.len();
                 self.last_tick = tick;
+                self.floor = floor;
                 self.room = room;
                 if last_input_seq < self.last_ack {
                     return;
@@ -238,14 +251,15 @@ impl Bot {
                 while self.pending.front().is_some_and(|&(s, _)| s <= last_input_seq) {
                     self.pending.pop_front();
                 }
-                let mut p = Pos { x: self_x, y: self_y };
+                let mut body =
+                    Body { floor, pos: Pos { x: self_x, y: self_y }, prev_input: self_prev_input, lock: self_lock };
                 for &(_, bits) in &self.pending {
-                    p = sim::step(map, p, bits);
+                    body = sim::step(building, body, bits);
                 }
-                if self.have_pos && p != self.pred {
+                if self.have_pos && body != self.pred {
                     self.corrections += 1;
                 }
-                self.pred = p;
+                self.pred = body;
                 self.have_pos = true;
             }
             Packet::Pong { client_time, .. } => {
@@ -254,10 +268,10 @@ impl Bot {
             }
             Packet::Disconnect { .. } => {
                 eprintln!("{} disconnected by server, reconnecting", self.nick);
-                let now = Instant::now();
-                self.state = State::Connecting { nonce: fastrand::u32(..), next_send: now };
+                self.state = State::Connecting { nonce: fastrand::u32(..), next_send: Instant::now() };
                 self.have_pos = false;
                 self.pending.clear();
+                self.walker = None;
                 self.seq = 0;
                 self.last_ack = 0;
                 self.last_tick = 0;
@@ -267,53 +281,30 @@ impl Bot {
     }
 
     /// Choose this frame's input bits.
-    fn think(&mut self, map: &Map, room_tiles: &[Tile], all_tiles: &[Tile], rng: &mut fastrand::Rng) -> u8 {
+    fn think(&mut self, building: &Building, room_tiles: &[Place], all_tiles: &[Place], rng: &mut fastrand::Rng) -> u8 {
         if self.idle_frames > 0 {
             self.idle_frames -= 1;
             return 0;
         }
-        let (tx, ty) = self.pred.tile();
-        if self.path_i >= self.path.len() {
-            let pool = if self.target_room.is_some() { room_tiles } else { all_tiles };
+        if self.walker.as_ref().is_none_or(|w| w.done()) {
+            let pool = if self.gather { room_tiles } else { all_tiles };
             let goal = pool[rng.usize(..pool.len())];
-            match map.find_path(Tile { x: tx, y: ty }, goal) {
-                Some(p) => {
-                    self.path = p;
-                    self.path_i = 0;
-                }
-                None => return 0,
-            }
-        }
-        let wp = self.path[self.path_i];
-        let c = Pos::tile_center(wp.x, wp.y);
-        let (dx, dy) = (c.x - self.pred.x, c.y - self.pred.y);
-        let mut bits = 0;
-        if dx > SPEED / 2 {
-            bits |= IN_RIGHT;
-        } else if dx < -SPEED / 2 {
-            bits |= IN_LEFT;
-        }
-        if dy > SPEED / 2 {
-            bits |= IN_DOWN;
-        } else if dy < -SPEED / 2 {
-            bits |= IN_UP;
-        }
-        if bits == 0 {
-            self.path_i += 1;
+            self.walker = Walker::to(building, &self.pred, goal);
             self.stuck_frames = 0;
-            if self.path_i >= self.path.len() {
-                self.idle_frames = rng.u32(0..120); // pause up to 2 s at the goal
+            if self.walker.is_none() {
+                return 0; // unreachable goal (e.g. locked room); try another next frame
             }
+        }
+        let bits = self.walker.as_mut().unwrap().next_input(&self.pred);
+        if bits == 0 {
+            self.idle_frames = rng.u32(0..120); // pause up to 2 s at the goal
             return 0;
         }
-        // Repath if we made no progress for a second.
-        let next = sim::step(map, self.pred, bits);
-        if next == self.pred {
+        // Replan if no progress for a second.
+        if sim::step(building, self.pred, bits).pos == self.pred.pos {
             self.stuck_frames += 1;
             if self.stuck_frames > 60 {
-                self.path.clear();
-                self.path_i = 0;
-                self.stuck_frames = 0;
+                self.walker = None;
             }
         }
         bits

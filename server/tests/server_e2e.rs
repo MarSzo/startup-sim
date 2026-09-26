@@ -3,15 +3,21 @@
 use std::net::{SocketAddr, UdpSocket};
 use std::time::{Duration, Instant};
 
-use game::map::{default_map_path, Map};
+use game::building::{default_building_path, Building, Place};
+use game::map::Tile;
+use game::nav::Walker;
 use game::net::LinkConditions;
 use game::protocol::{self as proto, Packet};
 use game::server::{Config, Server};
-use game::sim::{IN_RIGHT, IN_UP};
+use game::sim::{self, Body, Pos, IN_RIGHT};
 
-/// Server on a random port, dual-stack. Returns (IPv4 loopback addr, map crc).
+fn building() -> Building {
+    Building::load(&default_building_path()).unwrap()
+}
+
+/// Server on a random port, dual-stack. Returns (IPv4 loopback addr, building crc).
 fn start_server() -> (SocketAddr, u32) {
-    let map = Map::load(&default_map_path()).unwrap();
+    let map = building();
     let crc = map.crc;
     let cfg = Config {
         bind: "[::]:0".parse().unwrap(),
@@ -86,6 +92,30 @@ impl Client {
         last
     }
 
+    /// Walk to `goal` like a real client: predict locally with the shared
+    /// simulation, send 6 inputs every 50 ms (the server's per-tick budget).
+    /// Returns the predicted final body.
+    fn walk_to(&mut self, b: &Building, body: Body, goal: Place, others: &[&Client]) -> Body {
+        let mut body = body;
+        let mut w = Walker::to(b, &body, goal).expect("reachable");
+        while !w.done() {
+            let mut batch = Vec::new();
+            for _ in 0..6 {
+                let i = w.next_input(&body);
+                body = sim::step(b, body, i);
+                batch.push(i);
+            }
+            self.seq += batch.len() as u32;
+            let p = Packet::Input { token: self.token, ack_tick: 0, last_seq: self.seq, inputs: batch };
+            self.sock.send(&p.encode()).unwrap();
+            for o in others {
+                o.ping();
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        body
+    }
+
     fn ping(&self) {
         self.sock.send(&Packet::Ping { token: self.token, client_time: 1 }.encode()).unwrap();
     }
@@ -94,15 +124,16 @@ impl Client {
 #[test]
 fn handshake_interest_and_timeout() {
     let (addr, crc) = start_server();
-    let map = Map::load(&default_map_path()).unwrap();
-    let lobby = map.room_by_name("Wejście").unwrap().id;
+    let b0 = building();
+    let outside = b0.floor(0).unwrap().room_by_name("Na zewnątrz").unwrap().id;
+    let lobby = b0.floor(0).unwrap().room_by_name("Wejście").unwrap().id;
 
     let (a, a_crc) = Client::connect(addr, "Ala");
     let (mut b, _) = Client::connect(addr, "Bob");
     assert_eq!(a_crc, crc);
     assert_ne!(a.id, b.id);
 
-    // Both spawn in the lobby and see each other; A learns B's nick.
+    // Both spawn outside and see each other; A learns B's nick.
     let mut got_info = false;
     let mut saw_b = false;
     let deadline = Instant::now() + Duration::from_millis(500);
@@ -112,7 +143,7 @@ fn handshake_interest_and_timeout() {
         match a.recv() {
             Some(Packet::PlayerInfo { players }) => got_info |= players.iter().any(|p| p.id == b.id && p.nick == "Bob"),
             Some(Packet::Snapshot { room, entities, .. }) => {
-                assert_eq!(room, lobby);
+                assert_eq!(room, outside);
                 saw_b |= entities.iter().any(|e| e.id == b.id);
             }
             _ => {}
@@ -120,24 +151,17 @@ fn handshake_interest_and_timeout() {
     }
     assert!(saw_b && got_info, "A should see B and get its nick");
 
-    // B walks right one tile, then up through the corridor door and out of the lobby.
-    for _ in 0..2 {
-        b.send_inputs(IN_RIGHT, 6);
-        a.ping();
-        std::thread::sleep(Duration::from_millis(50));
-    }
-    for _ in 0..40 {
-        b.send_inputs(IN_UP, 6);
-        a.ping();
-        std::thread::sleep(Duration::from_millis(50));
-    }
+    // B walks in through the glass doors into the lobby.
+    let spawn = b0.spawns()[1];
+    let b_body = Body::at(spawn.0, Pos::tile_center(spawn.1.x, spawn.1.y));
+    b.walk_to(&b0, b_body, (0, Tile { x: 33, y: 28 }), &[&a]);
     a.ping();
     let (_, b_room, _, _, b_ack) = b.latest_snapshot(Duration::from_millis(300)).unwrap();
     a.ping();
     assert_eq!(b_ack, b.seq, "server processed all inputs");
-    assert_ne!(b_room, lobby, "B left the lobby");
+    assert_eq!(b_room, lobby, "B entered the lobby");
     let (_, a_room, _, a_visible, _) = a.latest_snapshot(Duration::from_millis(200)).unwrap();
-    assert_eq!(a_room, lobby);
+    assert_eq!(a_room, outside);
     assert!(!a_visible.contains(&b.id), "B no longer visible to A after changing rooms");
 
     // A goes silent -> gets a timeout Disconnect.
@@ -233,4 +257,34 @@ fn unknown_token_is_told_to_reconnect() {
         Packet::decode(&buf[..n]).unwrap(),
         Packet::Disconnect { token: 12345, reason: proto::disconnect::SESSION_UNKNOWN }
     );
+}
+
+#[test]
+fn other_floors_are_invisible_and_state_matches_prediction() {
+    let (addr, _) = start_server();
+    let b0 = building();
+    let (a, _) = Client::connect(addr, "downstairs");
+    let (mut b, _) = Client::connect(addr, "upstairs");
+    let spawn = b0.spawns()[1];
+    let start = Body::at(spawn.0, Pos::tile_center(spawn.1.x, spawn.1.y));
+    // Up the stairs to the reception on floor 1: A stays outside.
+    let predicted = b.walk_to(&b0, start, (1, Tile { x: 25, y: 18 }), &[&a]);
+    assert_eq!(predicted.floor, 1);
+
+    let deadline = Instant::now() + Duration::from_millis(400);
+    let mut last = None;
+    while Instant::now() < deadline {
+        a.ping();
+        if let Some(Packet::Snapshot { floor, room, self_x, self_y, self_lock, self_prev_input, last_input_seq, .. }) = b.recv() {
+            last = Some((floor, room, self_x, self_y, self_lock, self_prev_input, last_input_seq));
+        }
+    }
+    let (floor, room, x, y, lock, prev, ack) = last.expect("B gets snapshots");
+    assert_eq!(ack, b.seq);
+    let server = Body { floor, pos: Pos { x, y }, prev_input: prev, lock };
+    assert_eq!(server, predicted, "server state == client prediction, bit for bit");
+    assert_eq!(b0.floor(1).unwrap().room_name(room), "Recepcja");
+
+    assert!(!visible_ids(&a, &[&b], Duration::from_millis(200)).contains(&b.id), "A (floor 0) can't see B");
+    assert!(!visible_ids(&b, &[&a], Duration::from_millis(200)).contains(&a.id), "B (floor 1) can't see A");
 }

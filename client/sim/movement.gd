@@ -1,4 +1,4 @@
-## Deterministic movement and wall collision.
+## Deterministic movement, wall collision and floor transitions.
 ## Mirror of server/src/sim.rs - keep both in sync (golden test checks parity).
 extends RefCounted
 
@@ -14,6 +14,12 @@ const IN_UP := 1
 const IN_DOWN := 2
 const IN_LEFT := 4
 const IN_RIGHT := 8
+const IN_INTERACT := 16
+const IN_MOVE_MASK := 0x0f
+
+const LOCK_NONE := 0
+const LOCK_HELD := 1
+const LOCK_RELEASED := 2
 
 
 static func floor_div(a: int, b: int) -> int:
@@ -36,8 +42,49 @@ static func input_dir(input: int) -> Vector2i:
 	return Vector2i(dx, dy)
 
 
-## One input step (1/60 s). Resolves X then Y so the player slides along walls.
-static func step(map, pos: Vector2i, input: int) -> Vector2i:
+## A character's full simulated state (see Body in sim.rs).
+static func body(floor_i: int, pos: Vector2i, prev_input := 0, lock := LOCK_NONE) -> Dictionary:
+	return {"floor": floor_i, "pos": pos, "prev": prev_input, "lock": lock}
+
+
+static func tile_of_pos(p: Vector2i) -> Vector2i:
+	return Vector2i(tile_of(p.x), tile_of(p.y))
+
+
+## One input step (1/60 s) in the building: movement, then floor links.
+## Stairs move you when you step onto them (unless locked right after
+## arriving); the elevator needs an interact press inside the cabin.
+static func step(building, b: Dictionary, input: int) -> Dictionary:
+	var map = building.get_floor(b.floor)
+	if map == null:
+		return b
+	var n := b.duplicate()
+	n.pos = move_on(map, b.pos, input)
+	if n.lock == LOCK_HELD and (input & IN_MOVE_MASK) != (b.prev & IN_MOVE_MASK):
+		n.lock = LOCK_RELEASED
+	var t := tile_of_pos(n.pos)
+	var link: Dictionary = map.link_at(t.x, t.y)
+	if n.lock == LOCK_RELEASED and link.is_empty():
+		n.lock = LOCK_NONE
+	if not link.is_empty():
+		if link.kind == "stairs":
+			if n.lock == LOCK_NONE and building.get_floor(link.to_floor) != null:
+				n.floor = link.to_floor
+				n.pos = tile_center(link.to.x, link.to.y)
+				n.lock = LOCK_HELD
+		elif link.kind == "elevator":
+			if (input & IN_INTERACT) != 0 and (b.prev & IN_INTERACT) == 0:
+				var f: int = building.next_elevator_floor(n.floor, link.id)
+				if f >= 0:
+					n.floor = f
+					n.lock = LOCK_HELD
+	n.prev = input
+	return n
+
+
+## Move by one input step on a single floor. Resolves X then Y so the player
+## slides along walls.
+static func move_on(map, pos: Vector2i, input: int) -> Vector2i:
 	var d := input_dir(input)
 	if d == Vector2i.ZERO:
 		return pos

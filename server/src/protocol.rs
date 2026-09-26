@@ -5,7 +5,7 @@
 //! `tests/golden/packets.json`.
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 1;
+pub const VERSION: u8 = 2;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
 pub const MAX_PACKET: usize = 1200;
@@ -14,7 +14,7 @@ pub const MAX_NICK_BYTES: usize = 16;
 pub const MAX_INPUTS_PER_PACKET: usize = 8;
 
 /// Fixed part of a Snapshot packet (header + fields before the entity list).
-pub const SNAPSHOT_FIXED_LEN: usize = HEADER_LEN + 4 + 4 + 1 + 1 + (4 + 4 + 1 + 2) + 1;
+pub const SNAPSHOT_FIXED_LEN: usize = HEADER_LEN + 4 + 4 + 1 + 1 + (4 + 4 + 1 + 2 + 1 + 1) + 1;
 pub const ENTITY_LEN: usize = 12;
 /// Entities per snapshot fragment so a fragment never exceeds `MAX_PACKET`.
 pub const MAX_ENTITIES_PER_SNAPSHOT: usize = (MAX_PACKET - SNAPSHOT_FIXED_LEN) / ENTITY_LEN;
@@ -86,6 +86,10 @@ pub enum Packet {
         self_y: i32,
         floor: u8,
         room: u16,
+        /// Receiver's `sim::Body::lock` and `prev_input`: with position and
+        /// floor this is the full simulation state the client replays from.
+        self_lock: u8,
+        self_prev_input: u8,
         entities: Vec<EntityState>,
     },
     PlayerInfo { players: Vec<PlayerInfoEntry> },
@@ -219,7 +223,7 @@ impl Packet {
                     w.u8(i);
                 }
             }
-            Packet::Snapshot { tick, last_input_seq, frag_idx, frag_cnt, self_x, self_y, floor, room, entities } => {
+            Packet::Snapshot { tick, last_input_seq, frag_idx, frag_cnt, self_x, self_y, floor, room, self_lock, self_prev_input, entities } => {
                 w.u32(*tick);
                 w.u32(*last_input_seq);
                 w.u8(*frag_idx);
@@ -228,6 +232,8 @@ impl Packet {
                 w.i32(*self_y);
                 w.u8(*floor);
                 w.u16(*room);
+                w.u8(*self_lock);
+                w.u8(*self_prev_input);
                 let n = entities.len().min(MAX_ENTITIES_PER_SNAPSHOT);
                 w.u8(n as u8);
                 for e in &entities[..n] {
@@ -309,12 +315,14 @@ impl Packet {
                 let self_y = r.i32()?;
                 let floor = r.u8()?;
                 let room = r.u16()?;
+                let self_lock = r.u8()?;
+                let self_prev_input = r.u8()?;
                 let n = r.u8()? as usize;
                 let mut entities = Vec::with_capacity(n);
                 for _ in 0..n {
                     entities.push(EntityState { id: r.u16()?, kind: r.u8()?, x: r.i32()?, y: r.i32()?, flags: r.u8()? });
                 }
-                Packet::Snapshot { tick, last_input_seq, frag_idx, frag_cnt, self_x, self_y, floor, room, entities }
+                Packet::Snapshot { tick, last_input_seq, frag_idx, frag_cnt, self_x, self_y, floor, room, self_lock, self_prev_input, entities }
             }
             ty::PLAYER_INFO => {
                 let n = r.u8()? as usize;
@@ -345,16 +353,19 @@ impl Packet {
     }
 }
 
+/// Receiver's own state carried in every snapshot fragment.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SelfState {
+    pub x: i32,
+    pub y: i32,
+    pub floor: u8,
+    pub room: u16,
+    pub lock: u8,
+    pub prev_input: u8,
+}
+
 /// Split a room's entity list into snapshot fragments that each fit in `MAX_PACKET`.
-pub fn snapshot_fragments(
-    tick: u32,
-    last_input_seq: u32,
-    self_x: i32,
-    self_y: i32,
-    floor: u8,
-    room: u16,
-    entities: &[EntityState],
-) -> Vec<Packet> {
+pub fn snapshot_fragments(tick: u32, last_input_seq: u32, me: SelfState, entities: &[EntityState]) -> Vec<Packet> {
     let chunks: Vec<&[EntityState]> = if entities.is_empty() {
         vec![&[]]
     } else {
@@ -370,10 +381,12 @@ pub fn snapshot_fragments(
             last_input_seq,
             frag_idx: i as u8,
             frag_cnt: cnt,
-            self_x,
-            self_y,
-            floor,
-            room,
+            self_x: me.x,
+            self_y: me.y,
+            floor: me.floor,
+            room: me.room,
+            self_lock: me.lock,
+            self_prev_input: me.prev_input,
             entities: c.to_vec(),
         })
         .collect()
@@ -398,8 +411,10 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
                 frag_cnt: 1,
                 self_x: 10_000,
                 self_y: -5,
-                floor: 0,
+                floor: 1,
                 room: 6,
+                self_lock: 2,
+                self_prev_input: 17,
                 entities: vec![
                     EntityState { id: 3, kind: kind::PLAYER, x: 4096, y: 8192, flags: 0b101 },
                     EntityState { id: 65535, kind: kind::NPC, x: -1, y: 2_000_000, flags: 0 },
@@ -491,7 +506,7 @@ mod tests {
         let ents: Vec<EntityState> = (0..250)
             .map(|i| EntityState { id: i, kind: kind::PLAYER, x: i as i32 * 100, y: -(i as i32), flags: 0 })
             .collect();
-        let frags = snapshot_fragments(5, 6, 1, 2, 0, 3, &ents);
+        let frags = snapshot_fragments(5, 6, SelfState { x: 1, y: 2, room: 3, ..Default::default() }, &ents);
         assert_eq!(frags.len(), 3);
         let mut seen = 0;
         for (i, f) in frags.iter().enumerate() {
@@ -512,7 +527,7 @@ mod tests {
 
     #[test]
     fn empty_room_still_sends_one_fragment() {
-        let frags = snapshot_fragments(1, 0, 0, 0, 0, 1, &[]);
+        let frags = snapshot_fragments(1, 0, SelfState::default(), &[]);
         assert_eq!(frags.len(), 1);
     }
 }

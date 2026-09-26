@@ -1,0 +1,224 @@
+//! The whole building: all floors listed in `client/maps/building.json`.
+
+use std::collections::{HashMap, VecDeque};
+use std::path::{Path, PathBuf};
+
+use serde::Deserialize;
+
+use crate::map::{LinkKind, Map, RoomDef, Tile};
+
+#[derive(Debug, Deserialize)]
+struct FloorEntry {
+    floor: u8,
+    file: Option<String>,
+    name: String,
+    #[serde(default)]
+    locked: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct BuildingFile {
+    version: u32,
+    floors: Vec<FloorEntry>,
+}
+
+#[derive(Debug)]
+pub struct Floor {
+    pub name: String,
+    /// Locked floors exist in the design but can't be entered yet (floor 2).
+    pub locked: bool,
+    pub map: Option<Map>,
+}
+
+#[derive(Debug)]
+pub struct Building {
+    /// Indexed by floor number.
+    pub floors: Vec<Floor>,
+    /// CRC32 over building.json followed by every floor file, in floor order.
+    /// Sent in `Welcome`; the client computes the same over its copies.
+    pub crc: u32,
+}
+
+/// A position in the building: (floor, tile).
+pub type Place = (u8, Tile);
+
+pub fn default_building_path() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../client/maps/building.json")
+}
+
+impl Building {
+    pub fn load(path: &Path) -> Result<Building, String> {
+        let dir = path.parent().unwrap_or(Path::new("."));
+        let bytes = std::fs::read(path).map_err(|e| format!("{}: {e}", path.display()))?;
+        let file: BuildingFile = serde_json::from_slice(&bytes).map_err(|e| format!("building json: {e}"))?;
+        if file.version != 1 {
+            return Err(format!("unsupported building version {}", file.version));
+        }
+        let mut hasher = crc32fast::Hasher::new();
+        hasher.update(&bytes);
+        let mut floors = Vec::new();
+        for (i, f) in file.floors.iter().enumerate() {
+            if f.floor as usize != i {
+                return Err("floors must be listed in order 0, 1, 2, ...".into());
+            }
+            let map = match &f.file {
+                Some(name) => {
+                    let p = dir.join(name);
+                    let mb = std::fs::read(&p).map_err(|e| format!("{}: {e}", p.display()))?;
+                    hasher.update(&mb);
+                    let m = Map::from_bytes(&mb).map_err(|e| format!("{name}: {e}"))?;
+                    if m.floor != f.floor {
+                        return Err(format!("{name}: floor {} != {}", m.floor, f.floor));
+                    }
+                    Some(m)
+                }
+                None => None,
+            };
+            floors.push(Floor { name: f.name.clone(), locked: f.locked, map });
+        }
+        let b = Building { floors, crc: hasher.finalize() };
+        if b.spawns().is_empty() {
+            return Err("building has no spawns".into());
+        }
+        for (f, m) in b.active_floors() {
+            for l in &m.links {
+                if let LinkKind::Stairs { to_floor, to } = &l.kind {
+                    let Some(dest) = b.floor(*to_floor) else {
+                        return Err(format!("floor {f}: stairs lead to inactive floor {to_floor}"));
+                    };
+                    if dest.is_blocked(to.x, to.y) || dest.link_at(to.x, to.y).is_some() {
+                        return Err(format!("floor {f}: stairs arrival {to:?} must be free and outside links"));
+                    }
+                }
+            }
+        }
+        Ok(b)
+    }
+
+    /// Map of an active (existing, unlocked) floor.
+    pub fn floor(&self, f: u8) -> Option<&Map> {
+        self.floors.get(f as usize).filter(|fl| !fl.locked).and_then(|fl| fl.map.as_ref())
+    }
+
+    pub fn floor_name(&self, f: u8) -> &str {
+        self.floors.get(f as usize).map_or("?", |fl| fl.name.as_str())
+    }
+
+    pub fn active_floors(&self) -> impl Iterator<Item = (u8, &Map)> {
+        (0..self.floors.len() as u8).filter_map(|f| self.floor(f).map(|m| (f, m)))
+    }
+
+    pub fn spawns(&self) -> Vec<Place> {
+        self.active_floors().flat_map(|(f, m)| m.spawns.iter().map(move |t| (f, *t))).collect()
+    }
+
+    /// Next active floor (cyclically, going up) with an elevator cabin `id`.
+    pub fn next_elevator_floor(&self, from: u8, id: &str) -> Option<u8> {
+        let n = self.floors.len() as u8;
+        (1..n).map(|k| (from + k) % n).find(|&f| {
+            self.floor(f)
+                .is_some_and(|m| m.links.iter().any(|l| matches!(&l.kind, LinkKind::Elevator { id: i } if i == id)))
+        })
+    }
+
+    pub fn find_room(&self, name: &str) -> Option<(u8, &RoomDef)> {
+        self.active_floors().find_map(|(f, m)| m.room_by_name(name).map(|r| (f, r)))
+    }
+
+    /// BFS across floors. Stepping onto a stairs tile continues at its arrival
+    /// tile on the other floor; the path contains the stairs tile followed by
+    /// the arrival. (Elevators need an interact press and are not used.)
+    pub fn find_path(&self, from: Place, to: Place) -> Option<Vec<Place>> {
+        let valid = |p: &Place| self.floor(p.0).is_some_and(|m| !m.is_blocked(p.1.x, p.1.y));
+        if !valid(&from) || !valid(&to) {
+            return None;
+        }
+        // node -> (previous node, stairs tile passed on the way, if any)
+        let mut prev: HashMap<Place, (Place, Option<Place>)> = HashMap::new();
+        prev.insert(from, (from, None));
+        let mut queue = VecDeque::from([from]);
+        while let Some(cur) = queue.pop_front() {
+            if cur == to {
+                let mut path = vec![to];
+                let mut n = to;
+                while n != from {
+                    let (p, via) = prev[&n];
+                    if let Some(v) = via {
+                        path.push(v);
+                    }
+                    path.push(p);
+                    n = p;
+                }
+                path.reverse();
+                path.dedup();
+                return Some(path);
+            }
+            let (f, t) = cur;
+            let m = self.floor(f).unwrap();
+            for (dx, dy) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+                let nt = Tile { x: t.x + dx, y: t.y + dy };
+                if m.is_blocked(nt.x, nt.y) {
+                    continue;
+                }
+                let (next, via) = match m.link_at(nt.x, nt.y).map(|l| &l.kind) {
+                    Some(LinkKind::Stairs { to_floor, to }) if self.floor(*to_floor).is_some() => {
+                        ((*to_floor, *to), Some((f, nt)))
+                    }
+                    _ => ((f, nt), None),
+                };
+                if let std::collections::hash_map::Entry::Vacant(e) = prev.entry(next) {
+                    e.insert((cur, via));
+                    queue.push_back(next);
+                }
+            }
+        }
+        None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn b() -> Building {
+        Building::load(&default_building_path()).unwrap()
+    }
+
+    #[test]
+    fn loads_two_active_floors_and_locked_third() {
+        let b = b();
+        assert_eq!(b.floors.len(), 3);
+        assert!(b.floor(0).is_some() && b.floor(1).is_some());
+        assert!(b.floor(2).is_none() && b.floors[2].locked);
+        assert_eq!(b.floor_name(1), "Piętro 1");
+    }
+
+    #[test]
+    fn elevator_cycles_between_active_floors() {
+        let b = b();
+        assert_eq!(b.next_elevator_floor(0, "main"), Some(1));
+        assert_eq!(b.next_elevator_floor(1, "main"), Some(0), "locked floor 2 is skipped");
+        assert_eq!(b.next_elevator_floor(0, "nope"), None);
+    }
+
+    #[test]
+    fn path_goes_upstairs() {
+        let b = b();
+        let spawn = b.spawns()[0];
+        let (f, room) = b.find_room("Chill room").unwrap();
+        let goal = b.floor(f).unwrap().room_tiles(room.id)[0];
+        let path = b.find_path(spawn, (f, goal)).expect("reachable");
+        assert_eq!(path.first(), Some(&spawn));
+        assert_eq!(path.last(), Some(&(1, goal)));
+        let i = path.iter().position(|p| p.0 == 1).unwrap();
+        let stairs = path[i - 1];
+        assert_eq!(b.floor(0).unwrap().tile_char(stairs.1.x, stairs.1.y), Some('S'));
+        assert_eq!(path[i].1, Tile { x: 34, y: 10 }, "arrival tile");
+        for w in path.windows(2) {
+            if w[0].0 == w[1].0 {
+                let d = (w[0].1.x - w[1].1.x).abs() + (w[0].1.y - w[1].1.y).abs();
+                assert_eq!(d, 1, "4-connected steps: {:?}", w);
+            }
+        }
+    }
+}

@@ -3,7 +3,7 @@
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 1
+const VERSION := 2
 const MAX_PACKET := 1200
 const MAX_NICK_BYTES := 16
 const MAX_INPUTS_PER_PACKET := 8
@@ -160,6 +160,8 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			p.self_y = r.i32()
 			p.floor = r.u8()
 			p.room = r.u16()
+			p.self_lock = r.u8()
+			p.self_prev_input = r.u8()
 			var n := r.u8()
 			var ents := []
 			for i in n:

@@ -9,11 +9,12 @@ z własnym binarnym protokołem (`docs/PROTOCOL.md`).
 │ net_client.gd  handshake, ping, timeout  │ ── Input 60 Hz ─▶ │ server.rs   pętla 20 Hz, gracze,      │
 │ game.gd        predykcja + rekoncyliacja │                   │             interest mgmt, snapshoty  │
 │                interpolacja innych       │ ◀─ Snapshot 20 Hz │ net.rs      socket + symulator laga    │
-│ movement.gd ═══════ identyczny algorytm ══════════════════════ sim.rs      ruch i kolizje (int)      │
+│ movement.gd ═══════ identyczny algorytm ══════════════════════ sim.rs      ruch, kolizje, piętra     │
 │ protocol.gd ═══════ identyczny format ════════════════════════ protocol.rs kodowanie pakietów        │
-│ map_data.gd ═══╗                         │                   │ map.rs ═══╗ mapa, pokoje, BFS         │
-└────────────────║─────────────────────────┘                   └───────────║───────────────────────────┘
-                 ╚═════════════ client/maps/floor0.json (JEDEN plik) ══════╝
+│ building.gd ═══╗                         │                   │ building.rs ═╗ piętra, BFS po budynku │
+│ map_data.gd    ║                         │                   │ map.rs       ║ piętro, pokoje, linki   │
+└────────────────║─────────────────────────┘                   └──────────────║────────────────────────┘
+                 ╚══════ client/maps/building.json + floorN.json (JEDNO źródło) ╝
 ```
 
 ## Repozytorium
@@ -21,8 +22,10 @@ z własnym binarnym protokołem (`docs/PROTOCOL.md`).
 ```
 server/                 crate Rusta (lib `game` + binarki)
   src/lib.rs            moduły współdzielone przez serwer i boty
-  src/map.rs            wczytywanie mapy, kolizje kafli, pokoje, BFS
-  src/sim.rs            deterministyczny krok ruchu (liczby całkowite)
+  src/building.rs       budynek: lista pięter, CRC, winda, BFS między piętrami
+  src/map.rs            jedno piętro: kafle, kolizje, pokoje, linki (schody/winda)
+  src/sim.rs            deterministyczny krok: ruch, kolizje, schody, winda
+  src/nav.rs            podążanie ścieżką (boty; później NPC)
   src/protocol.rs       pakiety: encode/decode, fragmentacja snapshotów
   src/net.rs            UdpSocket + symulator opóźnienia/jittera/strat
   src/server.rs         pętla ticka, handshake, inputy, interest mgmt, statystyki
@@ -33,11 +36,14 @@ server/                 crate Rusta (lib `game` + binarki)
   tests/server_e2e.rs   prawdziwy serwer na losowym porcie + surowe klienty UDP
   tests/golden/         packets.json, movement_vectors.json
 client/                 projekt Godota 4.7
-  maps/floor0.json      mapa parteru (czytana też przez serwer)
+  maps/building.json    lista pięter (piętro 2 zablokowane)
+  maps/floor0.json      parter + teren zewnętrzny
+  maps/floor1.json      piętro 1
   main.gd / main.tscn   wejście: start screen <-> gra, argumenty dev
   net/protocol.gd       lustro protocol.rs
   net/net_client.gd     połączenie UDP (PacketPeerUDP)
   sim/movement.gd       lustro sim.rs
+  map/building.gd       lustro building.rs (bez BFS)
   map/map_data.gd       lustro map.rs (bez BFS)
   map/map_view.gd       render mapy do jednej tekstury
   game/game.gd          logika sieciowa gry po stronie klienta
@@ -46,6 +52,7 @@ client/                 projekt Godota 4.7
   ui/start_screen.gd    ekran startowy
   ui/debug_overlay.gd   F3
   tests/run_tests.gd    testy headless (parytet z Rustem)
+tools/build_maps.py     generator map z czytelnego opisu (wynik = JSON-y wyżej)
 docs/                   GDD, PROTOCOL, ARCHITECTURE
 ```
 
@@ -71,7 +78,8 @@ Pakiety są obsługiwane od razu po odebraniu: `Input` trafia do kolejki gracza,
 **Tick** (`Server::tick`):
 1. Timeout: gracze bez pakietów > 5 s → `Disconnect(timeout)` i usunięcie.
 2. Symulacja: z kolejki inputów każdego gracza max 6 kroków `sim::step`
-   (średnio 3 = 60 Hz / 20 Hz); aktualizacja pokoju i flag.
+   (średnio 3 = 60 Hz / 20 Hz) na jego `Body` (piętro, pozycja, poprzedni
+   input, blokada schodów); aktualizacja pokoju i flag.
 3. Grupowanie encji po `(floor, room)`.
 4. Dla każdego gracza snapshot z encji jego grupy (fragmentowany ≤ 1200 B)
    + `PlayerInfo` dla encji, których nicku jeszcze nie dostał.
@@ -99,10 +107,26 @@ siatka kafli, najpierw oś X, potem Y (ślizganie po ścianach), docinanie do
 krawędzi kafla. Kafle poza mapą są blokujące. Krok (24) < kafel (256), więc
 nie ma tunelowania.
 
+**Stan postaci** (`sim::Body`, w GDScript słownik z `Movement.body()`):
+piętro, pozycja, poprzedni input i blokada schodów. Wszystko, od czego zależy
+krok, jest w tym stanie i idzie w snapshocie do właściciela — dzięki temu
+rekoncyliacja odtwarza inputy od dokładnie tego samego stanu.
+
+**Przejścia między piętrami** (część kroku, więc przewidywane przez klienta):
+- **Schody**: wejście środkiem postaci na kafel schodów (`links` typu `stairs`)
+  przenosi na kafel przyjścia na drugim piętrze. Zaraz potem działa blokada:
+  schody nie zadziałają, dopóki nie zmienisz klawiszy ruchu *i* nie zejdziesz
+  z obszaru schodów — przytrzymanie „w górę” po przyjściu nie cofa na dół.
+- **Winda**: w kabinie (`links` typu `elevator`, ta sama pozycja na każdym
+  piętrze) wciśnięcie E (zbocze: nie wciśnięte w poprzednim kroku) przenosi
+  na następne aktywne piętro z kabiną o tym samym `id`. Zablokowane piętro 2
+  jest pomijane.
+
 Ten sam algorytm jest w `sim.rs` i `movement.gd`; GDScript liczy na 64-bit
 int, więc wyniki są bit w bit równe. `tests/golden/movement_vectors.json`
-(8 przypadków × 400 kroków przy ścianach, meblach, drzwiach) jest generowany
-przez Rust i odtwarzany w Godocie.
+(10 losowych przejść × 400 kroków przy ścianach, meblach, drzwiach, bramkach,
+schodach i w windzie + scenariusz: spawn → schody → Chill room → winda w dół
+i w górę) jest generowany przez Rust i odtwarzany w Godocie.
 
 ## Klient
 
@@ -119,8 +143,10 @@ Render interpoluje między dwoma ostatnimi krokami fizyki
 (`Engine.get_physics_interpolation_fraction()`), więc ruch jest płynny przy
 dowolnym odświeżaniu monitora.
 
-**Rekoncyliacja**: z każdym nowym tickiem klient bierze pozycję serwera,
-usuwa inputy `≤ last_input_seq` i odtwarza pozostałe. Jeśli wynik różni się
+**Rekoncyliacja**: z każdym nowym tickiem klient bierze stan serwera
+(`floor`, pozycja, `self_lock`, `self_prev_input`), usuwa inputy
+`≤ last_input_seq` i odtwarza pozostałe. Zmiana piętra w wyniku korekty
+przełącza widok bez wygładzania. Jeśli wynik różni się
 od predykcji (np. zgubione 4+ pakiety inputu z rzędu), różnica trafia do
 `error_offset`, który wygasa wykładniczo (~70 ms) — bez teleportów. Przy
 jednakowej symulacji po obu stronach korekt praktycznie nie ma (0 w testach).
@@ -135,53 +161,62 @@ Gdy brakuje danych, krótka ekstrapolacja (max 2 ticki), potem stop.
 zdalnych graczy — nowy zestaw przychodzi w tym samym snapshocie. Gracz
 nieobecny w snapshotach przez 5 ticków znika.
 
-**Render**: mapa rysowana raz do `ImageTexture` (jeden sprite), postacie to
+**Render**: każde piętro rysowane raz do `ImageTexture` (jeden sprite na
+piętro, widoczne tylko bieżące), postacie to
 `Node2D._draw()` z `Label`em (y-sort). Kamera `Camera2D` z zoomem 3×, bez
 wygładzania, z limitami mapy. Etykiety mają skalę `1/zoom` i rozmiar czcionki
 ekranowej, więc są ostre mimo zoomu.
 
-**F3** (`debug_overlay.gd`): FPS, ping, tick serwera i czas renderu, pokój,
+**Podpowiedź** „[E] Winda: jedź na …” pojawia się w kabinie windy.
+
+**F3** (`debug_overlay.gd`): FPS, ping, tick serwera i czas renderu, piętro i pokój,
 widoczni gracze, id/kafel, inputy w locie, liczba korekt, procent klatek z
 pustym buforem interpolacji, transfer.
 
 ## Mapa
 
-`client/maps/floor0.json` — jedyne źródło. Serwer czyta go ścieżką
-`../client/maps/floor0.json` względem crate'a (lub `--map`), klient przez
-`res://maps/floor0.json`. `Welcome` niesie CRC32 pliku; klient odrzuca
-niezgodną wersję.
+`client/maps/building.json` wymienia piętra (`floor`, `file`, `name`,
+`locked`); każde piętro ma swój `floorN.json`. To jedyne źródło: serwer czyta
+je ścieżką `../client/maps/building.json` względem crate'a (lub `--map`),
+klient przez `res://maps/`. `Welcome` niesie CRC32 całego budynku; klient
+odrzuca niezgodną wersję. Pliki generuje `tools/build_maps.py` (edytuj
+generator, nie JSON-y ręcznie), który też sprawdza, czy drzwi gdzieś prowadzą.
 
-Format:
-- `tiles`: wiersze znaków; `legend` mapuje znak → `{type, solid, color}`.
+Format piętra:
+- `tiles`: wiersze znaków; `legend` mapuje znak → `{type, solid, color, access?}`.
+  `access` („card” dla bramek, „service” dla zaplecza) jest na razie tylko
+  informacją — o kolizji decyduje `solid` (bramki otwarte, zaplecze zamknięte).
 - `rooms`: druga warstwa znaków tej samej wielkości; `room_defs` mapuje znak →
-  `{id, name, type}`, `-` = brak pokoju (ściany).
-- `doors`: lista kafli drzwi z polem `access` (na przyszłe karty dostępu).
-- `spawns`: kafle startowe.
+  `{id, name, type}`, `-` = brak pokoju (ściany). Id są unikalne w obrębie piętra.
+- `links`: `{kind: "stairs", area: [x,y,w,h], to_floor, to: [x,y]}` albo
+  `{kind: "elevator", id, area}`.
+- `spawns`: kafle startowe (tylko parter: chodnik przed wejściem).
 
-Kafle drzwi należą do pokoju po stronie „publicznej” (korytarz / wejście), więc
+Kafle drzwi należą do pokoju po stronie „publicznej” (korytarz / hol), więc
 stojąc w drzwiach widzisz korytarz.
 
 ## Gotowość na rozbudowę (nie zaimplementowane)
 
 | funkcja | gdzie się wepnie |
 |---------|------------------|
-| **Piętra / winda** | `floor` jest w `Map`, stanie gracza i snapshocie; interest mgmt grupuje po `(floor, room)`. Kolejne piętra = kolejne pliki map + `MapSet` indeksowany piętrem; winda = strefa, która zmienia `floor` i pozycję. |
-| **Karty dostępu** | `Map::is_blocked` to jedyne miejsce decyzji o kolizji; drzwi mają pole `access`. Dojdzie kontekst gracza (posiadane karty) i ta sama logika w `movement.gd`. |
-| **NPC** | `kind` w encji snapshotu, BFS `Map::find_path` (używany już przez boty). NPC to encje serwera bez adresu sieciowego, symulowane w tym samym ticku. |
-| **Akcje / interakcje** | bity 4–7 inputu (zarezerwowane) lub nowe typy pakietów; kolejność zapewnia `seq`. |
+| **Piętro 2** | wpis w `building.json` z `locked: true`; odblokowanie = plik mapy + `locked: false` (winda i schody same go obsłużą; do ustalenia: odblokowanie w trakcie gry wymaga zmiany CRC albo osobnego komunikatu). |
+| **Karty dostępu** | `Map::is_blocked` to jedyne miejsce decyzji o kolizji, a kafle mają już `access`. Dojdzie kontekst gracza (posiadane karty) w `Body`, ta sama logika w `movement.gd`. |
+| **NPC** | `kind` w encji snapshotu, `nav::Walker` + `Building::find_path` (używane już przez boty, także między piętrami). NPC to encje serwera bez adresu sieciowego, symulowane w tym samym ticku. |
+| **Akcje / interakcje** | bit 16 (E) działa jak w windzie: kontekst = link/kafel, na którym stoisz; bity 5–7 wolne. |
 | **Więcej graczy w pokoju** | fragmentacja snapshotów już działa; następny krok to delta względem `ack_tick` i/lub priorytet po odległości. |
 
 ## Boty (`cargo run --release --bin bots`)
 
 Jeden wątek, N gniazd nieblokujących, pętla 60 Hz. Każdy bot przechodzi pełny
 handshake, predykuje ruch tym samym `sim::step` i robi rekoncyliację (log
-pokazuje liczbę błędnych predykcji), chodzi po ścieżkach BFS do losowych
-kafli — `--room-share` z nich wybiera cele tylko w `--room`. Log co 5 s:
+pokazuje liczbę błędnych predykcji), chodzi (`nav::Walker`) po ścieżkach BFS
+przez cały budynek, schodami między piętrami — `--room-share` z nich wybiera
+cele tylko w `--room` (domyślnie „Chill room” na piętrze 1). Log co 5 s:
 połączeni, liczba w docelowym pokoju, RTT, odbierany transfer, widoczni.
 
 ## Testy
 
 | polecenie | co sprawdza |
 |-----------|-------------|
-| `cd server && cargo test` | 19 testów jednostkowych (mapa, ruch/kolizje, protokół: round-trip, nagłówek, śmieciowe i ucięte pakiety, fragmentacja ≤ 1200 B), golden, e2e (handshake, widoczność po pokojach, timeout, odrzucenia) |
-| `godot --headless --path client -s tests/run_tests.gd` | parytet protokołu (bajt w bajt) i ruchu (3200 kroków) z Rustem, zgodność CRC mapy |
+| `cd server && cargo test` | 28 testów jednostkowych (budynek i mapy wg GDD, osiągalność pokoi, ruch/kolizje, schody bez odbijania, winda na wciśnięcie, nawigacja, protokół), 2 golden, 6 e2e (handshake, widoczność po pokojach i piętrach, stan serwera = predykcja po schodach, timeout, odrzucenia, IPv4+IPv6, migracja adresu, nieznany token) |
+| `godot --headless --path client -s tests/run_tests.gd` | parytet protokołu (bajt w bajt) i ruchu z przejściami między piętrami z Rustem, zgodność CRC budynku, parsowanie adresów |

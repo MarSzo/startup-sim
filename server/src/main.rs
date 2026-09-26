@@ -2,7 +2,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use game::args::Args;
-use game::map::{default_map_path, Map};
+use game::building::{default_building_path, Building};
 use game::net::LinkConditions;
 use game::server::{Config, Server, DEFAULT_CLIENT_TIMEOUT, TICK_HZ};
 
@@ -14,7 +14,7 @@ USAGE: cargo run [--release] -- [OPTIONS]
 OPTIONS:
   --bind <addr>         listen address        [default: [::]:7777, dual-stack IPv6+IPv4;
                                                falls back to 0.0.0.0:7777 without IPv6]
-  --map <path>          map JSON              [default: ../client/maps/floor0.json]
+  --map <path>          building JSON         [default: ../client/maps/building.json]
   --max-players <n>                           [default: 256]
   --stats-secs <n>      stats log interval    [default: 5]
   --lag-ms <ms>         simulated one-way delay, each direction (RTT += 2x)
@@ -28,8 +28,8 @@ fn main() {
         print!("{HELP}");
         return;
     }
-    let map_path = args.str("map").map(PathBuf::from).unwrap_or_else(default_map_path);
-    let map = Map::load(&map_path).unwrap_or_else(|e| {
+    let map_path = args.str("map").map(PathBuf::from).unwrap_or_else(default_building_path);
+    let building = Building::load(&map_path).unwrap_or_else(|e| {
         eprintln!("failed to load map: {e}");
         std::process::exit(1);
     });
@@ -50,7 +50,9 @@ fn main() {
         // No IPv6 on this host: plain IPv4.
         cfg.bind = "0.0.0.0:7777".parse().unwrap();
     }
-    let mut server = match Server::new(map, cfg) {
+    let crc = building.crc;
+    let floors = building.active_floors().count();
+    let mut server = match Server::new(building, cfg) {
         Ok(s) => s,
         Err(e) => {
             eprintln!("failed to bind: {e}");
@@ -58,19 +60,15 @@ fn main() {
         }
     };
     println!(
-        "server listening on {} | tick {} Hz | map '{}' crc {:08x} ({}) | link: lag {:?} jitter {:?} loss {:.1}%",
+        "server listening on {} | tick {} Hz | building crc {:08x}, {} active floors ({}) | link: lag {:?} jitter {:?} loss {:.1}%",
         server.local_addr(),
         TICK_HZ,
-        map_path.file_name().unwrap().to_string_lossy(),
-        crc(&map_path),
+        crc,
+        floors,
         map_path.display(),
         link.lag,
         link.jitter,
         link.loss * 100.0
     );
     server.run();
-}
-
-fn crc(path: &std::path::Path) -> u32 {
-    crc32fast::hash(&std::fs::read(path).unwrap_or_default())
 }

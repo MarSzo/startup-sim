@@ -1,0 +1,21 @@
+{
+ "version": 1,
+ "floors": [
+  {
+   "floor": 0,
+   "file": "floor0.json",
+   "name": "Parter"
+  },
+  {
+   "floor": 1,
+   "file": "floor1.json",
+   "name": "Piętro 1"
+  },
+  {
+   "floor": 2,
+   "file": null,
+   "name": "Piętro 2",
+   "locked": true
+  }
+ ]
+}

@@ -1,5 +1,6 @@
-## Tile map loaded from the JSON file shared with the server
-## (see server/src/map.rs). Collision and room zones must match exactly.
+## One floor of the building, loaded from the JSON file shared with the
+## server (see server/src/map.rs). Collision, room zones and floor links must
+## match exactly.
 extends RefCounted
 
 const NO_ROOM := 0
@@ -9,29 +10,20 @@ var floor_index: int
 var width: int
 var height: int
 var tile_px: int
-## CRC32 of the raw file; compared with the server's value from Welcome.
-var crc: int
 var solid := PackedByteArray()
 var tile_chars := PackedStringArray()
 var room := PackedInt32Array()
 var room_names := {}  # id -> name
 var room_types := {}  # id -> type
-var legend := {}      # char -> {type, solid, color}
-var doors: Array = []
+var legend := {}      # char -> {type, solid, color, access?}
+## [{kind: "stairs"|"elevator", rect: Rect2i, id, to_floor, to: Vector2i}]
+var links: Array = []
+var spawns: Array[Vector2i] = []
 var error := ""
 
 
-## Load and parse a map file; on failure `error` is non-empty.
-func load_path(path: String) -> void:
-	var bytes := FileAccess.get_file_as_bytes(path)
-	if bytes.is_empty():
-		error = "cannot read %s" % path
-		return
-	_parse(bytes)
-
-
-func _parse(bytes: PackedByteArray) -> void:
-	crc = crc32(bytes)
+## Parse a floor file; on failure `error` is non-empty.
+func parse(bytes: PackedByteArray) -> void:
 	var data = JSON.parse_string(bytes.get_string_from_utf8())
 	if typeof(data) != TYPE_DICTIONARY:
 		error = "invalid map json"
@@ -42,7 +34,17 @@ func _parse(bytes: PackedByteArray) -> void:
 	height = int(data["height"])
 	tile_px = int(data["tile_px"])
 	legend = data["legend"]
-	doors = data.get("doors", [])
+	for l in data.get("links", []):
+		var a: Array = l["area"]
+		var link := {"kind": l["kind"], "rect": Rect2i(int(a[0]), int(a[1]), int(a[2]), int(a[3]))}
+		if l["kind"] == "stairs":
+			link.to_floor = int(l["to_floor"])
+			link.to = Vector2i(int(l["to"][0]), int(l["to"][1]))
+		else:
+			link.id = l["id"]
+		links.append(link)
+	for sp in data.get("spawns", []):
+		spawns.append(Vector2i(int(sp[0]), int(sp[1])))
 	var defs: Dictionary = data["room_defs"]
 	var room_ids := {}
 	for key in defs:
@@ -89,6 +91,14 @@ func room_at_tile(tx: int, ty: int) -> int:
 
 func room_name(rid: int) -> String:
 	return room_names.get(rid, "-")
+
+
+## Link covering a tile, or {} if none.
+func link_at(tx: int, ty: int) -> Dictionary:
+	for l in links:
+		if (l.rect as Rect2i).has_point(Vector2i(tx, ty)):
+			return l
+	return {}
 
 
 static func crc32(data: PackedByteArray) -> int:

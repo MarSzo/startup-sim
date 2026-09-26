@@ -4,15 +4,15 @@
 extends Node
 
 const NetClient = preload("res://net/net_client.gd")
-const MapData = preload("res://map/map_data.gd")
+const Building = preload("res://map/building.gd")
 const Game = preload("res://game/game.gd")
 const StartScreen = preload("res://ui/start_screen.gd")
 
-const MAP_PATH := "res://maps/floor0.json"
+const BUILDING_PATH := "res://maps/building.json"
 
 var args := {}
 var net := NetClient.new()
-var map
+var building
 var start := StartScreen.new()
 var game: Node = null
 
@@ -22,8 +22,8 @@ func _ready() -> void:
 		var kv: PackedStringArray = a.trim_prefix("--").split("=", true, 1)
 		args[kv[0]] = kv[1] if kv.size() > 1 else ""
 	get_tree().auto_accept_quit = false
-	map = MapData.new()
-	map.load_path(MAP_PATH)
+	building = Building.new()
+	building.load_path(BUILDING_PATH)
 	add_child(net)
 	net.connected.connect(_on_connected)
 	net.disconnected.connect(_on_disconnected)
@@ -33,8 +33,8 @@ func _ready() -> void:
 	ui.add_child(start)
 	start.connect_pressed.connect(_on_connect_pressed)
 	start.set_defaults(args.get("nick", "Gracz%d" % randi_range(100, 999)), args.get("server", "127.0.0.1:7777"))
-	if map.error != "":
-		start.set_status("Błąd mapy: " + map.error, true)
+	if building.error != "":
+		start.set_status("Błąd mapy: " + building.error, true)
 		start.set_busy(true)
 	elif args.has("autoconnect"):
 		_on_connect_pressed(start.nick_edit.text, start.addr_edit.text)
@@ -63,10 +63,10 @@ func _on_connect_pressed(nick: String, address: String) -> void:
 
 
 func _on_connected(welcome: Dictionary) -> void:
-	if welcome.map_crc != map.crc:
+	if welcome.map_crc != building.crc:
 		net.close()
 		start.set_busy(false)
-		start.set_status("Niezgodna wersja mapy (serwer %08x, klient %08x)" % [welcome.map_crc, map.crc], true)
+		start.set_status("Niezgodna wersja mapy (serwer %08x, klient %08x)" % [welcome.map_crc, building.crc], true)
 		return
 	if game:
 		game.reset_session(welcome)  # auto-reconnect: keep the world, new session
@@ -75,7 +75,7 @@ func _on_connected(welcome: Dictionary) -> void:
 	get_window().title = "Startup Sim — %s" % net.nick
 	game = Game.new()
 	add_child(game)
-	game.setup(net, map, welcome, net.nick, args)
+	game.setup(net, building, welcome, net.nick, args)
 
 
 func _on_reconnecting(reason: String) -> void:

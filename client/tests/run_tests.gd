@@ -5,6 +5,7 @@ extends SceneTree
 const Protocol = preload("res://net/protocol.gd")
 const Movement = preload("res://sim/movement.gd")
 const MapData = preload("res://map/map_data.gd")
+const Building = preload("res://map/building.gd")
 const NetClient = preload("res://net/net_client.gd")
 
 var failures := 0
@@ -55,7 +56,8 @@ func test_protocol(path: String) -> void:
 	expect(rj.get("reason") == 1, "decode reject")
 	var s := Protocol.decode(golden["snapshot"].hex_decode())
 	expect(s.get("tick") == 1234 and s.last_input_seq == 99 and s.frag_cnt == 1 and s.self_x == 10000 and s.self_y == -5
-		and s.room == 6 and s.entities.size() == 2, "decode snapshot %s" % s)
+		and s.floor == 1 and s.room == 6 and s.self_lock == 2 and s.self_prev_input == 17 and s.entities.size() == 2,
+		"decode snapshot %s" % s)
 	if s.has("entities") and s.entities.size() == 2:
 		var e0: Dictionary = s.entities[0]
 		var e1: Dictionary = s.entities[1]
@@ -76,27 +78,36 @@ func test_protocol(path: String) -> void:
 	expect(c[8] == 16 and c.size() == 9 + 16, "nick truncation")
 
 
+func _body_from(a: Array) -> Dictionary:
+	return Movement.body(int(a[0]), Vector2i(int(a[1]), int(a[2])), int(a[3]), int(a[4]))
+
+
 func test_movement(path: String) -> void:
-	var map = MapData.new()
-	map.load_path("res://maps/floor0.json")
-	expect(map.error == "", "map loads: " + map.error)
+	var building = Building.new()
+	building.load_path("res://maps/building.json")
+	expect(building.error == "", "building loads: " + building.error)
 	var data = load_json(path)
-	expect(int(data["map_crc"]) == map.crc, "map crc parity %d vs %d" % [int(data["map_crc"]), map.crc])
+	expect(int(data["building_crc"]) == building.crc, "building crc parity %d vs %d" % [int(data["building_crc"]), building.crc])
 	var case_i := 0
+	var floor_changes := 0
 	for c in data["cases"]:
-		var p := Vector2i(int(c["start"][0]), int(c["start"][1]))
+		var b := _body_from(c["start"])
 		var inputs: Array = c["inputs"]
-		var positions: Array = c["positions"]
+		var states: Array = c["states"]
 		var ok := true
 		for i in inputs.size():
-			p = Movement.step(map, p, int(inputs[i]))
-			var want := Vector2i(int(positions[i][0]), int(positions[i][1]))
-			if p != want:
-				expect(false, "case %d step %d: got %s want %s" % [case_i, i, p, want])
+			var before: int = b.floor
+			b = Movement.step(building, b, int(inputs[i]))
+			if b.floor != before:
+				floor_changes += 1
+			var want := _body_from(states[i])
+			if b != want:
+				expect(false, "case %d step %d: got %s want %s" % [case_i, i, b, want])
 				ok = false
 				break
 		expect(ok, "movement case %d" % case_i)
 		case_i += 1
+	expect(floor_changes >= 3, "vectors exercise stairs/elevator (%d floor changes)" % floor_changes)
 
 
 func test_rejects_garbage() -> void:

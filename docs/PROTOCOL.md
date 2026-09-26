@@ -1,4 +1,4 @@
-# Protokół sieciowy (wersja 1)
+# Protokół sieciowy (wersja 2)
 
 Własny binarny protokół na UDP. Implementacje:
 - serwer: `server/src/protocol.rs` (źródło prawdy),
@@ -23,7 +23,7 @@ przez `cargo test` i czytane przez `client/tests/run_tests.gd`.
 | pole    | typ | wartość |
 |---------|-----|---------|
 | magic   | u16 | `0x5354` (bajty `54 53`, „TS”) |
-| version | u8  | `1` |
+| version | u8  | `2` |
 | type    | u8  | typ pakietu (niżej) |
 
 ## Jednostki
@@ -54,10 +54,10 @@ adresu = ponowne połączenie (stary gracz jest usuwany).
 | token       | u32 — sekret sesji, wymagany w każdym dalszym pakiecie C→S |
 | tick_hz     | u8 — 20 |
 | input_hz    | u8 — 60 |
-| map_crc     | u32 — CRC32 (IEEE) surowego pliku mapy |
+| map_crc     | u32 — CRC32 (IEEE) budynku: bajty `building.json`, a po nich kolejno plików wszystkich pięter |
 | server_tick | u32 |
 
-Klient porównuje `map_crc` z CRC swojego `maps/floor0.json`; przy różnicy się rozłącza.
+Klient liczy to samo CRC ze swoich plików `maps/` i przy różnicy się rozłącza.
 Pozycja startowa przychodzi w pierwszym `Snapshot`.
 
 ### 3 `Reject` (S→C)
@@ -74,8 +74,8 @@ Pozycja startowa przychodzi w pierwszym `Snapshot`.
 | count    | u8 — 1..8 |
 | inputs   | count × u8, najstarszy pierwszy; input `i` ma seq `last_seq - (count-1-i)` |
 
-Bity inputu: `1` góra, `2` dół, `4` lewo, `8` prawo; bity 4–7 zarezerwowane
-(akcje: interakcja, bieg…). Klient powtarza w każdym pakiecie 4 ostatnie inputy,
+Bity inputu: `1` góra, `2` dół, `4` lewo, `8` prawo, `16` interakcja (klawisz E —
+na razie winda); bity 5–7 zarezerwowane (bieg…). Klient powtarza w każdym pakiecie 4 ostatnie inputy,
 więc zgubienie do 3 kolejnych pakietów nie traci ruchu.
 
 Serwer przyjmuje inputy o `seq > ostatnio odebrany`, kolejkuje je i w każdym ticku
@@ -89,8 +89,10 @@ aplikuje max 6 (średnio 3 = 60/20). Kolejka ponad 30 jest przycinana od najstar
 | frag_idx       | u8 |
 | frag_cnt       | u8 |
 | self_x, self_y | i32, i32 — autorytatywna pozycja odbiorcy |
-| floor          | u8 — piętro (na razie zawsze 0) |
-| room           | u16 — id pokoju odbiorcy (0 = brak) |
+| floor          | u8 — piętro odbiorcy |
+| room           | u16 — id pokoju odbiorcy na jego piętrze (0 = brak) |
+| self_lock      | u8 — blokada schodów odbiorcy (`sim::Body::lock`: 0 brak, 1 trzymane, 2 zwolnione) |
+| self_prev_input| u8 — poprzedni input odbiorcy (`sim::Body::prev_input`, do akcji „na wciśnięcie”) |
 | n              | u8 |
 | entities       | n × 12 B |
 
@@ -102,8 +104,11 @@ Encja (12 B): `id u16 | kind u8 | x i32 | y i32 | flags u8`.
 odbiorca (bez niego samego). Snapshot jest pełny (nie delta) — zgubienie
 któregokolwiek nie wymaga retransmisji.
 
-**Fragmentacja**: stała część snapshotu ma 26 B, więc mieści się 97 encji
-(26 + 97·12 = 1190 B). Więcej encji → kilka fragmentów z tym samym `tick`,
+`self_*` + `floor` to **pełny stan symulacji** odbiorcy, więc klient odtwarza
+niepotwierdzone inputy dokładnie od tego stanu, także przez schody i windę.
+
+**Fragmentacja**: stała część snapshotu ma 28 B, więc mieści się 97 encji
+(28 + 97·12 = 1192 B). Więcej encji → kilka fragmentów z tym samym `tick`,
 każdy z pełnymi polami `self_*`. Pusty pokój → 1 fragment z `n = 0`.
 
 ### 6 `PlayerInfo` (S→C)
@@ -192,10 +197,16 @@ szyfrowaniem.
 | 49 innych graczy w pokoju | ~12 KB/s (snapshot 614 B × 20/s) |
 | C→S (input 60 Hz + ping) | ~1,2 KB/s |
 
+## Historia wersji
+
+- **2** — snapshot: pola `self_lock`, `self_prev_input`; bit inputu 16 (interakcja);
+  `map_crc` liczone z całego budynku (wiele pięter).
+- **1** — wersja początkowa.
+
 ## Rozszerzenia (zaplanowane, nie zaimplementowane)
 
-- Piętra: pole `floor` już jest w snapshotach; interest management grupuje po `(floor, room)`.
 - NPC: `kind = 1` w tym samym formacie encji.
-- Akcje (drzwi z kartą dostępu, interakcje): bity 4–7 inputu lub nowe typy pakietów.
+- Akcje (drzwi z kartą dostępu, sklep, rozmowy): bit interakcji 16 + kontekst
+  miejsca (jak winda) lub nowe typy pakietów; bity 5–7 wolne.
 - Kompresja delta: `ack_tick` już jest w `Input`.
 - Zmiana formatu = podbicie `VERSION`; stary klient dostaje `Reject(2)`.
