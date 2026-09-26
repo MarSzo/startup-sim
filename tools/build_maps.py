@@ -24,9 +24,11 @@ LEGEND = {
     "=": {"type": "parking", "solid": False, "color": "#6f6f6f"},
     "D": {"type": "door", "solid": False, "color": "#a0522d"},
     "G": {"type": "glass_door", "solid": False, "color": "#8fd3e8"},
-    "B": {"type": "card_gate", "solid": False, "color": "#e0b040", "access": "card"},
-    "L": {"type": "locked_door", "solid": True, "color": "#6a3a2a", "access": "service"},
-    "g": {"type": "garage_gate", "solid": False, "color": "#9a9a9a"},
+    # access: needs a pass/card ("card") or service access ("service");
+    # free_dir: direction you may always pass in (exit through the gates).
+    "B": {"type": "card_gate", "solid": False, "color": "#e0b040", "access": "card", "free_dir": "down"},
+    "L": {"type": "service_door", "solid": False, "color": "#6a3a2a", "access": "service"},
+    "g": {"type": "garage_gate", "solid": False, "color": "#9a9a9a", "access": "card", "free_dir": "down"},
     "E": {"type": "elevator_door", "solid": False, "color": "#b8c4cc"},
     "e": {"type": "elevator", "solid": False, "color": "#9aa8b0"},
     "S": {"type": "stairs", "solid": False, "color": "#b09070"},
@@ -48,6 +50,7 @@ class Floor:
         self.rooms = {}
         self.links = []
         self.spawns = []
+        self.npcs = []
 
     def room(self, key, rid, name, kind):
         self.rooms[key] = {"id": rid, "name": name, "type": kind}
@@ -157,6 +160,8 @@ def floor0():
     f.put(50, 43, 50, 43, "T")                           # ashtray
 
     f.spawns = [[x, y] for y in (35, 36) for x in range(28, 39)]
+    # Porter: sits in the lodge; escorts newcomers to the 1st floor reception.
+    f.npcs = [{"kind": "porter", "name": "Portier", "home": [24, 29], "escort_to": [1, 32, 19]}]
     return f
 
 
@@ -238,6 +243,7 @@ def to_json(f, floor_links):
         "room_defs": f.rooms,
         "links": floor_links,
         "spawns": f.spawns,
+        "npcs": f.npcs,
     }
 
 

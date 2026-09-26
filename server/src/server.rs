@@ -7,6 +7,7 @@ use std::time::{Duration, Instant};
 
 use crate::building::Building;
 use crate::net::{canonical, LinkConditions, Net};
+use crate::npc::{self, Npc};
 use crate::protocol::{self as proto, EntityState, Packet, PlayerInfoEntry, SelfState};
 use crate::sim::{self, Body, Pos};
 
@@ -27,6 +28,9 @@ pub struct Config {
     pub max_players: usize,
     pub stats_every: Duration,
     pub client_timeout: Duration,
+    /// Rights every new player starts with (`map::access::*`); 0 in normal
+    /// play, CARD for load tests (`--start-with-card`) so bots pass the gates.
+    pub start_access: u8,
 }
 
 struct Player {
@@ -59,6 +63,7 @@ struct Stats {
 
 pub struct Server {
     building: Building,
+    npcs: Vec<Npc>,
     net: Net,
     cfg: Config,
     players: BTreeMap<u16, Player>,
@@ -79,6 +84,7 @@ impl Server {
     pub fn new(building: Building, cfg: Config) -> std::io::Result<Server> {
         let net = Net::bind(cfg.bind, cfg.link)?;
         Ok(Server {
+            npcs: Npc::spawn_all(&building),
             building,
             net,
             cfg,
@@ -206,11 +212,8 @@ impl Server {
                 }
             }
             Packet::InfoRequest { ids, .. } => {
-                let entries: Vec<PlayerInfoEntry> = ids
-                    .iter()
-                    .filter_map(|i| self.players.get(i))
-                    .map(|p| PlayerInfoEntry { id: p.id, nick: p.nick.clone() })
-                    .collect();
+                let entries: Vec<PlayerInfoEntry> =
+                    ids.iter().filter_map(|&i| self.name_of(i).map(|nick| PlayerInfoEntry { id: i, nick })).collect();
                 let p = self.players.get_mut(&id).unwrap();
                 p.known.extend(entries.iter().map(|e| e.id));
                 for chunk in entries.chunks(INFO_PER_PACKET) {
@@ -264,7 +267,7 @@ impl Server {
             nonce,
             addr,
             nick,
-            body: Body::at(spawn_floor, pos),
+            body: Body { access: self.cfg.start_access, ..Body::at(spawn_floor, pos) },
             room: self.room_of(spawn_floor, pos),
             flags: 0,
             last_heard: now,
@@ -280,6 +283,14 @@ impl Server {
         self.by_token.insert(token, id);
         let welcome = self.welcome(id);
         self.send(addr, &welcome);
+    }
+
+    /// Display name of a player or NPC.
+    fn name_of(&self, id: u16) -> Option<String> {
+        match self.players.get(&id) {
+            Some(p) => Some(p.nick.clone()),
+            None => self.npcs.iter().find(|n| n.id == id).map(|n| n.name.clone()),
+        }
     }
 
     fn room_of(&self, floor: u8, pos: Pos) -> u16 {
@@ -302,7 +313,8 @@ impl Server {
     fn alloc_id(&mut self) -> u16 {
         loop {
             let id = self.next_id;
-            self.next_id = self.next_id.wrapping_add(1).max(1);
+            // Player ids: 1 .. NPC_ID_BASE-1 (NPCs use the ids above).
+            self.next_id = if self.next_id + 1 >= npc::NPC_ID_BASE { 1 } else { self.next_id + 1 };
             if !self.players.contains_key(&id) {
                 return id;
             }
@@ -350,6 +362,7 @@ impl Server {
         }
 
         // 2. Simulation: apply queued inputs in sequence order.
+        let mut talks: Vec<(u16, Body)> = Vec::new();
         for p in self.players.values_mut() {
             let mut moved = false;
             for _ in 0..MAX_INPUTS_PER_TICK {
@@ -357,6 +370,11 @@ impl Server {
                 let before = p.body;
                 p.body = sim::step(&self.building, p.body, bits);
                 p.last_processed_seq = seq;
+                // E pressed (edge) without riding the elevator: talk to an NPC nearby.
+                let pressed = bits & sim::IN_INTERACT != 0 && before.prev_input & sim::IN_INTERACT == 0;
+                if pressed && p.body.floor == before.floor {
+                    talks.push((p.id, p.body));
+                }
                 moved |= p.body.pos != before.pos || p.body.floor != before.floor;
                 let (dx, dy) = sim::input_dir(bits);
                 let facing = if dy > 0 { 0 } else if dy < 0 { 1 } else if dx < 0 { 2 } else if dx > 0 { 3 } else { p.flags & 3 };
@@ -368,7 +386,40 @@ impl Server {
             p.room = self.building.floor(p.body.floor).map_or(0, |m| m.room_at(p.body.pos.x, p.body.pos.y));
         }
 
-        // 3. Interest management: group entities by (floor, room).
+        // 3. NPCs: conversations, then their own behaviour.
+        let mut events = Vec::new();
+        for (pid, body) in talks {
+            let nearest = self
+                .npcs
+                .iter_mut()
+                .filter(|n| n.in_talk_range(&body))
+                .min_by_key(|n| (n.body.pos.x - body.pos.x).abs() + (n.body.pos.y - body.pos.y).abs());
+            if let Some(n) = nearest {
+                events.extend(n.interact(&self.building, pid, body.access));
+            }
+        }
+        let bodies: HashMap<u16, Body> = self.players.values().map(|p| (p.id, p.body)).collect();
+        for n in &mut self.npcs {
+            events.extend(n.tick(&self.building, &bodies));
+        }
+        let mut says: Vec<(u16, &'static str, Option<u16>)> = Vec::new();
+        for e in events {
+            match e {
+                npc::Event::Grant { player, access } => {
+                    if let Some(p) = self.players.get_mut(&player) {
+                        p.body.access |= access;
+                    }
+                }
+                npc::Event::Revoke { player, access } => {
+                    if let Some(p) = self.players.get_mut(&player) {
+                        p.body.access &= !access;
+                    }
+                }
+                npc::Event::Say { npc, text, to } => says.push((npc, text, to)),
+            }
+        }
+
+        // 4. Interest management: group entities by (floor, room).
         let mut groups: HashMap<(u8, u16), Vec<EntityState>> = HashMap::new();
         for p in self.players.values() {
             groups.entry((p.body.floor, p.room)).or_default().push(EntityState {
@@ -379,8 +430,17 @@ impl Server {
                 flags: p.flags,
             });
         }
+        for n in &self.npcs {
+            groups.entry((n.body.floor, n.room)).or_default().push(EntityState {
+                id: n.id,
+                kind: proto::kind::NPC,
+                x: n.body.pos.x,
+                y: n.body.pos.y,
+                flags: n.flags,
+            });
+        }
 
-        // 4. Snapshots + PlayerInfo for newly visible entities.
+        // 5. Snapshots + PlayerInfo for newly visible entities.
         let tick = self.tick;
         let ids: Vec<u16> = self.players.keys().copied().collect();
         let mut outgoing: Vec<(SocketAddr, u16, Packet)> = Vec::new();
@@ -392,7 +452,7 @@ impl Server {
             let new_infos: Vec<PlayerInfoEntry> = visible
                 .iter()
                 .filter(|e| !p.known.contains(&e.id))
-                .map(|e| PlayerInfoEntry { id: e.id, nick: self.players[&e.id].nick.clone() })
+                .filter_map(|e| self.name_of(e.id).map(|nick| PlayerInfoEntry { id: e.id, nick }))
                 .collect();
             let me = SelfState {
                 x: p.body.pos.x,
@@ -401,6 +461,7 @@ impl Server {
                 room: p.room,
                 lock: p.body.lock,
                 prev_input: p.body.prev_input,
+                access: p.body.access,
             };
             for f in proto::snapshot_fragments(tick, p.last_processed_seq, me, &visible) {
                 outgoing.push((p.addr, id, f));
@@ -410,6 +471,21 @@ impl Server {
             }
             let p = self.players.get_mut(&id).unwrap();
             p.known.extend(new_infos.iter().map(|e| e.id));
+        }
+        // 6. Speech: to everyone in the speaker's room, plus the addressee.
+        for (npc_id, text, to) in says {
+            let Some(n) = self.npcs.iter().find(|n| n.id == npc_id) else { continue };
+            let (place, name) = ((n.body.floor, n.room), n.name.clone());
+            for p in self.players.values_mut() {
+                if (p.body.floor, p.room) == place || Some(p.id) == to {
+                    // Name first, so the line isn't shown as "?".
+                    if p.known.insert(npc_id) {
+                        let info = vec![PlayerInfoEntry { id: npc_id, nick: name.clone() }];
+                        outgoing.push((p.addr, p.id, Packet::PlayerInfo { players: info }));
+                    }
+                    outgoing.push((p.addr, p.id, Packet::Say { id: npc_id, text: text.to_string() }));
+                }
+            }
         }
         for (addr, id, packet) in outgoing {
             let n = self.send(addr, &packet);

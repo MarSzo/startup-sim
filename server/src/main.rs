@@ -20,6 +20,7 @@ OPTIONS:
   --lag-ms <ms>         simulated one-way delay, each direction (RTT += 2x)
   --jitter-ms <ms>      simulated extra random delay 0..=ms
   --loss <p>            simulated packet loss per direction, e.g. 0.02
+  --start-with-card     every player starts with an employee card (load tests / bots)
 ";
 
 fn main() {
@@ -44,6 +45,7 @@ fn main() {
         max_players: args.get("max-players", 256),
         stats_every: Duration::from_secs(args.get("stats-secs", 5)),
         client_timeout: DEFAULT_CLIENT_TIMEOUT,
+        start_access: if args.flag("start-with-card") { game::map::access::CARD } else { 0 },
     };
     let mut cfg = cfg;
     if args.str("bind").is_none() && game::net::bind_udp(cfg.bind).is_err() {

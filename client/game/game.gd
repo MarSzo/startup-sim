@@ -8,6 +8,7 @@ const MapView = preload("res://map/map_view.gd")
 const PlayerView = preload("res://game/player_view.gd")
 const RemotePlayer = preload("res://game/remote_player.gd")
 const DebugOverlay = preload("res://ui/debug_overlay.gd")
+const MapData = preload("res://map/map_data.gd")
 
 const ZOOM := 3.0
 ## Remote players are rendered this far in the past (2 snapshots at 20 Hz).
@@ -19,6 +20,11 @@ const REMOTE_TIMEOUT_TICKS := 5
 ## Visual correction error decays with this rate (1/s).
 const ERROR_DECAY := 15.0
 const MAX_PENDING := 240
+## Talk range to NPCs (same as npc::TALK_RADIUS on the server): 3.5 tiles.
+const TALK_RADIUS_PX := 56.0
+const NPC_COLOR := Color(0.22, 0.32, 0.62)
+const LOG_LINES := 4
+const LOG_TTL_SEC := 12.0
 
 var net
 var building
@@ -32,6 +38,10 @@ var overlay := DebugOverlay.new()
 var status_layer := CanvasLayer.new()
 var status_label := Label.new()
 var hint_label := Label.new()
+var log_label := Label.new()
+var _log: Array = []  # [msec, text]
+var kinds := {}          # id -> entity kind (player / NPC)
+var _pending_say := {}   # id -> [msec, text]: said before the speaker was visible
 var remotes := {}        # id -> RemotePlayer
 var nicks := {}          # id -> String
 var info_requested := {} # id -> msec of last request
@@ -57,8 +67,8 @@ var interp_frames := 0
 var interp_underruns := 0
 
 # Dev helpers: --autowalk (random walk), --goto=<leg>;<leg>;... where a leg is
-# a room name or "x,y" tile on the current floor (e.g. "34,6;Recepcja" takes
-# the stairs up, then walks to the reception), --goto-press=E at the end.
+# a room name or "x,y" tile on the current floor, "E" (press interact once) or
+# "wait:N" (stand still N seconds). E.g. "27,29;E;wait:2;34,6;Recepcja".
 var autowalk := false
 var _autowalk_bits := 0
 var _autowalk_timer := 0.0
@@ -127,6 +137,15 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 	hint_label.add_theme_color_override("font_outline_color", Color.BLACK)
 	hint_label.visible = false
 	status_layer.add_child(hint_label)
+	log_label.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+	log_label.position = Vector2(16, -140)
+	log_label.size = Vector2(700, 124)
+	log_label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
+	log_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	log_label.add_theme_font_size_override("font_size", 16)
+	log_label.add_theme_constant_override("outline_size", 5)
+	log_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	status_layer.add_child(log_label)
 	_show_floor(0)
 
 
@@ -149,6 +168,7 @@ func reset_session(welcome: Dictionary) -> void:
 		r.queue_free()
 	remotes.clear()
 	nicks.clear()
+	kinds.clear()
 	info_requested.clear()
 	pending.clear()
 	seq = 0
@@ -200,6 +220,12 @@ func _goto_input(delta: float) -> int:
 	if _goto_path.is_empty() and not goto_legs.is_empty():
 		var leg := goto_legs[0]
 		goto_legs.remove_at(0)
+		if leg == "E":
+			goto_delay = 0.3
+			return Movement.IN_INTERACT
+		if leg.begins_with("wait:"):
+			goto_delay = float(leg.substr(5))
+			return 0
 		_goto_path = _plan_path(leg)
 		goto_delay = 0.3
 	while not _goto_path.is_empty():
@@ -226,7 +252,8 @@ func _plan_path(leg: String) -> Array[Vector2i]:
 	var goal := Vector2i(-1, -1)
 	for y in map.height:
 		for x in map.width:
-			if map.is_blocked(x, y):
+			# Tiles we can't enter (walls, gates without a pass) are solid.
+			if map.is_blocked(x, y) or map.blocks(x, y, pred.access, MapData.DIR_UP):
 				astar.set_point_solid(Vector2i(x, y))
 			elif goal.x < 0 and map.room_name(map.room_at_tile(x, y)) == leg:
 				goal = Vector2i(x + 2, y + 2)  # a bit inside the room
@@ -272,6 +299,8 @@ func _process(delta: float) -> void:
 		var frac := Engine.get_physics_interpolation_fraction()
 		me.position = Movement.to_px(prev_pos).lerp(Movement.to_px(pred.pos), frac) + error_offset
 		_update_hint()
+		if not _log.is_empty():
+			_refresh_log()
 	if have_time:
 		est_tick += delta * tick_hz
 		var render_tick := est_tick - INTERP_DELAY_SEC * tick_hz
@@ -294,6 +323,16 @@ func _on_packet(p: Dictionary) -> void:
 	match p.type:
 		Protocol.T_SNAPSHOT:
 			_on_snapshot(p)
+		Protocol.T_SAY:
+			var who: String = nicks.get(p.id, "?")
+			if remotes.has(p.id):
+				remotes[p.id].say(p.text)
+			else:
+				_pending_say[p.id] = [Time.get_ticks_msec(), p.text]
+			_log.append([Time.get_ticks_msec(), "%s: %s" % [who, p.text]])
+			if _log.size() > LOG_LINES:
+				_log.pop_front()
+			_refresh_log()
 		Protocol.T_PLAYER_INFO:
 			for e in p.players:
 				nicks[e.id] = e.nick
@@ -321,7 +360,7 @@ func _on_snapshot(p: Dictionary) -> void:
 			have_time = true
 		else:
 			est_tick += (tick - est_tick) * 0.1
-		_reconcile(Movement.body(p.floor, Vector2i(p.self_x, p.self_y), p.self_prev_input, p.self_lock), p.last_input_seq)
+		_reconcile(Movement.body(p.floor, Vector2i(p.self_x, p.self_y), p.self_prev_input, p.self_lock, p.self_access), p.last_input_seq)
 	visible_count += p.entities.size()
 	var unknown := []
 	var now := Time.get_ticks_msec()
@@ -329,10 +368,17 @@ func _on_snapshot(p: Dictionary) -> void:
 		var r = remotes.get(e.id)
 		if r == null:
 			r = RemotePlayer.new()
-			r.setup(_color_for(e.id), nicks.get(e.id, "..."), ZOOM)
+			var npc: bool = e.kind == Protocol.KIND_NPC
+			r.uniform = npc
+			r.setup(NPC_COLOR if npc else _color_for(e.id), nicks.get(e.id, "..."), ZOOM)
 			world.add_child(r)
 			remotes[e.id] = r
+			if _pending_say.has(e.id):
+				if now - _pending_say[e.id][0] < 4000:
+					r.say(_pending_say[e.id][1])
+				_pending_say.erase(e.id)
 		r.push_sample(tick, Vector2(e.x, e.y) / float(Movement.SUBPIXELS), e.flags)
+		kinds[e.id] = e.kind
 		if not nicks.has(e.id) and now - info_requested.get(e.id, -100000) > 500:
 			info_requested[e.id] = now
 			unknown.append(e.id)
@@ -358,7 +404,7 @@ func _reconcile(server_body: Dictionary, ack: int) -> void:
 		me.visible = true
 		_show_floor(nb.floor)
 		return
-	if nb != pred:
+	if nb.pos != pred.pos or nb.floor != pred.floor:
 		corrections += 1
 		if nb.floor != pred.floor:
 			error_offset = Vector2.ZERO  # different floor: snap
@@ -369,21 +415,44 @@ func _reconcile(server_body: Dictionary, ack: int) -> void:
 			if error_offset.length() > 48.0:
 				error_offset = Vector2.ZERO  # large jump: snap
 			prev_pos += nb.pos - pred.pos
-		pred = nb
+	pred = nb  # also picks up server-side changes (e.g. a new pass)
 
 
-## "Press E" hint while standing in the elevator cabin.
+## Context hint at the bottom of the screen: elevator, NPC to talk to, or a
+## gate that needs a pass.
 func _update_hint() -> void:
+	var text := ""
 	var map = building.get_floor(pred.floor)
 	var t := Movement.tile_of_pos(pred.pos)
 	var link: Dictionary = map.link_at(t.x, t.y) if map else {}
 	if not link.is_empty() and link.kind == "elevator":
 		var target: int = building.next_elevator_floor(pred.floor, link.id)
 		if target >= 0:
-			hint_label.text = "[E] Winda: jedź na %s" % building.floor_name(target)
-			hint_label.visible = true
-			return
-	hint_label.visible = false
+			text = "[E] Winda: jedź na %s" % building.floor_name(target)
+	if text == "":
+		var me_px := Movement.to_px(pred.pos)
+		for id in remotes:
+			if kinds.get(id) == Protocol.KIND_NPC and remotes[id].position.distance_to(me_px) <= TALK_RADIUS_PX:
+				text = "[E] Porozmawiaj: %s" % nicks.get(id, "?")
+				break
+	if text == "" and map:
+		for dy in [-1, -2]:
+			for dx in [-1, 0, 1]:
+				var need: int = map.need_at(t.x + dx, t.y + dy)
+				if need != 0 and (pred.access & need) == 0:
+					text = "Bramka wymaga przepustki — porozmawiaj z portierem (portiernia)" if (need & MapData.ACCESS_GUEST) else "Wstęp tylko dla obsługi"
+	hint_label.text = text
+	hint_label.visible = text != ""
+
+
+func _refresh_log() -> void:
+	var now := Time.get_ticks_msec()
+	while not _log.is_empty() and now - _log[0][0] > LOG_TTL_SEC * 1000:
+		_log.pop_front()
+	var lines := PackedStringArray()
+	for l in _log:
+		lines.append(l[1])
+	log_label.text = "\n".join(lines)
 
 
 func debug_text() -> String:
@@ -395,8 +464,22 @@ func debug_text() -> String:
 		"Piętro: %s  Pokój: %s (id %d)" % [building.floor_name(floor_index), building.room_name(floor_index, room_id), room_id],
 		"Widoczni gracze: %d" % visible_count,
 		"Gracz #%d %s  kafel (%d, %d)" % [net.player_id, nick, t.x, t.y],
+		"Uprawnienia: %s" % _access_text(),
 		"Inputy w locie: %d  korekty: %d" % [pending.size(), corrections],
 		"Bufor interpolacji pusty: %.2f%% klatek" % (100.0 * interp_underruns / maxi(interp_frames, 1)),
 		"Ruch: %.1f KB/s in / %.1f KB/s out" % [net.bytes_in_per_sec / 1024.0, net.bytes_out_per_sec / 1024.0],
 		"Serwer: %s  zmiany gniazda: %d  ponowne połączenia: %d" % [net.server_ip, net.rebinds, net.reconnects],
 	])
+
+
+func _access_text() -> String:
+	if not have_state:
+		return "-"
+	var parts := PackedStringArray()
+	if pred.access & MapData.ACCESS_GUEST:
+		parts.append("przepustka gościa")
+	if pred.access & MapData.ACCESS_CARD:
+		parts.append("karta pracownika")
+	if pred.access & MapData.ACCESS_SERVICE:
+		parts.append("obsługa")
+	return ", ".join(parts) if not parts.is_empty() else "brak"

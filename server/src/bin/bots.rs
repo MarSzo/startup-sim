@@ -29,6 +29,9 @@ OPTIONS:
   --all-in-room         same as --room-share 1
   --duration <secs>     stop after N seconds (0 = run forever) [default: 0]
   --map <path>          building JSON (must match the server)
+
+Bots can only get past the card gates if the server runs with
+--start-with-card; otherwise they stay in the public area.
 ";
 
 const INPUT_REDUNDANCY: usize = 4;
@@ -231,7 +234,18 @@ impl Bot {
             }
             Packet::Reject { reason } => eprintln!("{} rejected: {reason}", self.nick),
             Packet::Snapshot {
-                tick, last_input_seq, frag_idx, self_x, self_y, floor, room, self_lock, self_prev_input, entities, ..
+                tick,
+                last_input_seq,
+                frag_idx,
+                self_x,
+                self_y,
+                floor,
+                room,
+                self_lock,
+                self_prev_input,
+                self_access,
+                entities,
+                ..
             } => {
                 if tick < self.last_tick {
                     return; // out of order
@@ -251,8 +265,13 @@ impl Bot {
                 while self.pending.front().is_some_and(|&(s, _)| s <= last_input_seq) {
                     self.pending.pop_front();
                 }
-                let mut body =
-                    Body { floor, pos: Pos { x: self_x, y: self_y }, prev_input: self_prev_input, lock: self_lock };
+                let mut body = Body {
+                    floor,
+                    pos: Pos { x: self_x, y: self_y },
+                    prev_input: self_prev_input,
+                    lock: self_lock,
+                    access: self_access,
+                };
                 for &(_, bits) in &self.pending {
                     body = sim::step(building, body, bits);
                 }

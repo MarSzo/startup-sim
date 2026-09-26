@@ -25,7 +25,8 @@ server/                 crate Rusta (lib `game` + binarki)
   src/building.rs       budynek: lista pięter, CRC, winda, BFS między piętrami
   src/map.rs            jedno piętro: kafle, kolizje, pokoje, linki (schody/winda)
   src/sim.rs            deterministyczny krok: ruch, kolizje, schody, winda
-  src/nav.rs            podążanie ścieżką (boty; później NPC)
+  src/nav.rs            podążanie ścieżką (boty, NPC)
+  src/npc.rs            NPC po stronie serwera (portier)
   src/protocol.rs       pakiety: encode/decode, fragmentacja snapshotów
   src/net.rs            UdpSocket + symulator opóźnienia/jittera/strat
   src/server.rs         pętla ticka, handshake, inputy, interest mgmt, statystyki
@@ -88,6 +89,20 @@ Pakiety są obsługiwane od razu po odebraniu: `Input` trafia do kolejki gracza,
 maksymalny czas ticka, gracze, max widocznych, transfer na klienta
 (średnia/min/max), pakiety/s wejście/wyjście, pakiety wycięte przez symulator.
 
+**NPC** (`npc.rs`) to encje serwera bez adresu sieciowego: w każdym ticku
+robią 3 kroki tym samym `sim::step` (sterowane `nav::Walker`), są w
+snapshotach jako `kind` NPC i mówią pakietem `Say`. Wciśnięcie E (zbocze) przez
+gracza, który nie jedzie windą, trafia do najbliższego NPC w promieniu 3,5
+kafla (`Npc::interact`). NPC zwracają zdarzenia (`Say`, `Grant`, `Revoke`),
+które serwer wykonuje.
+
+**Portier** (definicja w `floor0.json` → `npcs`): w spoczynku stoi w portierni.
+Gość bez przepustki rozmawia z nim (E) → dostaje przepustkę gościa, a portier
+prowadzi go na recepcję piętra 1 (bramki, schody). Czeka, jeśli gościa nie ma
+ani obok niego (4 kafle), ani dalej na trasie, ani w recepcji; przypomina co
+6 s, po 30 s rezygnuje i odbiera przepustkę. Po dojściu mówi, że przepustka jest
+ważna do końca dnia, i wraca. Prowadzi jedną osobę naraz.
+
 **Sesje** są indeksowane tokenem (`by_token`), nie adresem: pakiet z ważnym
 tokenem z nowego adresu przenosi sesję (`migrate`), jeśli dowodzi „świeżości”
 (`Ping` albo nowe inputy). Nieznany token dostaje `Disconnect(4)`. `by_addr`
@@ -108,9 +123,16 @@ krawędzi kafla. Kafle poza mapą są blokujące. Krok (24) < kafel (256), więc
 nie ma tunelowania.
 
 **Stan postaci** (`sim::Body`, w GDScript słownik z `Movement.body()`):
-piętro, pozycja, poprzedni input i blokada schodów. Wszystko, od czego zależy
+piętro, pozycja, poprzedni input, blokada schodów i uprawnienia (`access`). Wszystko, od czego zależy
 krok, jest w tym stanie i idzie w snapshocie do właściciela — dzięki temu
 rekoncyliacja odtwarza inputy od dokładnie tego samego stanu.
+
+**Uprawnienia i bramki**: jedyna reguła kolizji to `Map::blocks(kafel,
+uprawnienia, kierunek)`: kafel blokuje, jeśli jest pełny albo wymaga
+uprawnień, których postać nie ma — chyba że porusza się w jego „wolnym
+kierunku” (`free_dir`: wyjście przez bramki i bramę garażową w dół jest wolne).
+Bramki i brama garażowa wymagają przepustki lub karty, drzwi zaplecza —
+uprawnień obsługi. BFS (`Building::find_path`) stosuje te same reguły.
 
 **Przejścia między piętrami** (część kroku, więc przewidywane przez klienta):
 - **Schody**: wejście środkiem postaci na kafel schodów (`links` typu `stairs`)
@@ -167,7 +189,11 @@ piętro, widoczne tylko bieżące), postacie to
 wygładzania, z limitami mapy. Etykiety mają skalę `1/zoom` i rozmiar czcionki
 ekranowej, więc są ostre mimo zoomu.
 
-**Podpowiedź** „[E] Winda: jedź na …” pojawia się w kabinie windy.
+**Podpowiedzi** na dole ekranu: „[E] Winda: jedź na …” w kabinie windy,
+„[E] Porozmawiaj: Portier” przy NPC, informacja o wymaganej przepustce przed
+bramką. **NPC** rysowane są w mundurze z czapką; wypowiedzi (`Say`) pokazują się
+w dymku nad postacią (także gdy mówiący dopiero wejdzie w pole widzenia) i w
+logu w lewym dolnym rogu.
 
 **F3** (`debug_overlay.gd`): FPS, ping, tick serwera i czas renderu, piętro i pokój,
 widoczni gracze, id/kafel, inputy w locie, liczba korekt, procent klatek z
@@ -183,14 +209,16 @@ odrzuca niezgodną wersję. Pliki generuje `tools/build_maps.py` (edytuj
 generator, nie JSON-y ręcznie), który też sprawdza, czy drzwi gdzieś prowadzą.
 
 Format piętra:
-- `tiles`: wiersze znaków; `legend` mapuje znak → `{type, solid, color, access?}`.
-  `access` („card” dla bramek, „service” dla zaplecza) jest na razie tylko
-  informacją — o kolizji decyduje `solid` (bramki otwarte, zaplecze zamknięte).
+- `tiles`: wiersze znaków; `legend` mapuje znak →
+  `{type, solid, color, access?, free_dir?}`. `access`: „card” (przepustka gościa
+  lub karta) dla bramek i bramy garażowej, „service” dla zaplecza;
+  `free_dir`: kierunek, w którym kafel zawsze przepuszcza.
 - `rooms`: druga warstwa znaków tej samej wielkości; `room_defs` mapuje znak →
   `{id, name, type}`, `-` = brak pokoju (ściany). Id są unikalne w obrębie piętra.
 - `links`: `{kind: "stairs", area: [x,y,w,h], to_floor, to: [x,y]}` albo
   `{kind: "elevator", id, area}`.
 - `spawns`: kafle startowe (tylko parter: chodnik przed wejściem).
+- `npcs`: `{kind, name, home: [x,y], escort_to?: [piętro,x,y]}` — na razie portier.
 
 Kafle drzwi należą do pokoju po stronie „publicznej” (korytarz / hol), więc
 stojąc w drzwiach widzisz korytarz.
@@ -200,8 +228,8 @@ stojąc w drzwiach widzisz korytarz.
 | funkcja | gdzie się wepnie |
 |---------|------------------|
 | **Piętro 2** | wpis w `building.json` z `locked: true`; odblokowanie = plik mapy + `locked: false` (winda i schody same go obsłużą; do ustalenia: odblokowanie w trakcie gry wymaga zmiany CRC albo osobnego komunikatu). |
-| **Karty dostępu** | `Map::is_blocked` to jedyne miejsce decyzji o kolizji, a kafle mają już `access`. Dojdzie kontekst gracza (posiadane karty) w `Body`, ta sama logika w `movement.gd`. |
-| **NPC** | `kind` w encji snapshotu, `nav::Walker` + `Building::find_path` (używane już przez boty, także między piętrami). NPC to encje serwera bez adresu sieciowego, symulowane w tym samym ticku. |
+| **Karta z HR** | uprawnienie `CARD` już istnieje i otwiera bramki; wyda je NPC HR (`Event::Grant`). Trwałość wymaga kont (backend). |
+| **Kolejne NPC** | recepcja, Zarząd, HR: nowy `kind` w `npcs` mapy + gałąź w `npc.rs`; rozmowa, ruch, dymki i widoczność działają tak samo jak u portiera. |
 | **Akcje / interakcje** | bit 16 (E) działa jak w windzie: kontekst = link/kafel, na którym stoisz; bity 5–7 wolne. |
 | **Więcej graczy w pokoju** | fragmentacja snapshotów już działa; następny krok to delta względem `ack_tick` i/lub priorytet po odległości. |
 
@@ -211,12 +239,13 @@ Jeden wątek, N gniazd nieblokujących, pętla 60 Hz. Każdy bot przechodzi peł
 handshake, predykuje ruch tym samym `sim::step` i robi rekoncyliację (log
 pokazuje liczbę błędnych predykcji), chodzi (`nav::Walker`) po ścieżkach BFS
 przez cały budynek, schodami między piętrami — `--room-share` z nich wybiera
-cele tylko w `--room` (domyślnie „Chill room” na piętrze 1). Log co 5 s:
+cele tylko w `--room` (domyślnie „Chill room” na piętrze 1). Za bramki boty
+przejdą tylko, gdy serwer działa z `--start-with-card`. Log co 5 s:
 połączeni, liczba w docelowym pokoju, RTT, odbierany transfer, widoczni.
 
 ## Testy
 
 | polecenie | co sprawdza |
 |-----------|-------------|
-| `cd server && cargo test` | 28 testów jednostkowych (budynek i mapy wg GDD, osiągalność pokoi, ruch/kolizje, schody bez odbijania, winda na wciśnięcie, nawigacja, protokół), 2 golden, 6 e2e (handshake, widoczność po pokojach i piętrach, stan serwera = predykcja po schodach, timeout, odrzucenia, IPv4+IPv6, migracja adresu, nieznany token) |
-| `godot --headless --path client -s tests/run_tests.gd` | parytet protokołu (bajt w bajt) i ruchu z przejściami między piętrami z Rustem, zgodność CRC budynku, parsowanie adresów |
+| `cd server && cargo test` | 36 testów jednostkowych (budynek i mapy wg GDD, osiągalność zależna od uprawnień, bramki z wolnym wyjściem, ruch/kolizje, schody, winda, nawigacja, portier: odprowadzenie, czekanie, rezygnacja, zajętość, zasięg rozmowy; protokół), 2 golden, 7 e2e (m.in. cała ścieżka z portierem przez sieć, widoczność między piętrami, stan serwera = predykcja) |
+| `godot --headless --path client -s tests/run_tests.gd` | parytet protokołu (bajt w bajt) i ruchu — z bramkami, uprawnieniami i przejściami między piętrami — z Rustem, zgodność CRC budynku, parsowanie adresów |

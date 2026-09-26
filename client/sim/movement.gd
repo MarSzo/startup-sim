@@ -21,6 +21,12 @@ const LOCK_NONE := 0
 const LOCK_HELD := 1
 const LOCK_RELEASED := 2
 
+# Movement directions (map::dir in Rust).
+const DIR_UP := 1
+const DIR_DOWN := 2
+const DIR_LEFT := 3
+const DIR_RIGHT := 4
+
 
 static func floor_div(a: int, b: int) -> int:
 	if a >= 0:
@@ -42,9 +48,10 @@ static func input_dir(input: int) -> Vector2i:
 	return Vector2i(dx, dy)
 
 
-## A character's full simulated state (see Body in sim.rs).
-static func body(floor_i: int, pos: Vector2i, prev_input := 0, lock := LOCK_NONE) -> Dictionary:
-	return {"floor": floor_i, "pos": pos, "prev": prev_input, "lock": lock}
+## A character's full simulated state (see Body in sim.rs). `access` is the
+## rights bitmask (MapData.ACCESS_*); only the server changes it.
+static func body(floor_i: int, pos: Vector2i, prev_input := 0, lock := LOCK_NONE, access := 0) -> Dictionary:
+	return {"floor": floor_i, "pos": pos, "prev": prev_input, "lock": lock, "access": access}
 
 
 static func tile_of_pos(p: Vector2i) -> Vector2i:
@@ -59,7 +66,7 @@ static func step(building, b: Dictionary, input: int) -> Dictionary:
 	if map == null:
 		return b
 	var n := b.duplicate()
-	n.pos = move_on(map, b.pos, input)
+	n.pos = move_on(map, b.pos, input, b.access)
 	if n.lock == LOCK_HELD and (input & IN_MOVE_MASK) != (b.prev & IN_MOVE_MASK):
 		n.lock = LOCK_RELEASED
 	var t := tile_of_pos(n.pos)
@@ -82,51 +89,51 @@ static func step(building, b: Dictionary, input: int) -> Dictionary:
 	return n
 
 
-## Move by one input step on a single floor. Resolves X then Y so the player
-## slides along walls.
-static func move_on(map, pos: Vector2i, input: int) -> Vector2i:
+## Move by one input step on a single floor for a character with rights
+## `access`. Resolves X then Y so the player slides along walls.
+static func move_on(map, pos: Vector2i, input: int, access := 0) -> Vector2i:
 	var d := input_dir(input)
 	if d == Vector2i.ZERO:
 		return pos
 	var speed := SPEED_DIAG if (d.x != 0 and d.y != 0) else SPEED
 	var p := pos
 	if d.x != 0:
-		p.x = _move_x(map, p, d.x * speed)
+		p.x = _move_x(map, p, d.x * speed, access)
 	if d.y != 0:
-		p.y = _move_y(map, p, d.y * speed)
+		p.y = _move_y(map, p, d.y * speed, access)
 	return p
 
 
-static func _move_x(map, p: Vector2i, mx: int) -> int:
+static func _move_x(map, p: Vector2i, mx: int, access: int) -> int:
 	var nx := p.x + mx
 	var ty0 := tile_of(p.y - HALF_H)
 	var ty1 := tile_of(p.y + HALF_H - 1)
 	if mx > 0:
 		var tx := tile_of(nx + HALF_W - 1)
 		for ty in range(ty0, ty1 + 1):
-			if map.is_blocked(tx, ty):
+			if map.blocks(tx, ty, access, DIR_RIGHT):
 				return tx * TILE_UNITS - HALF_W
 	else:
 		var tx := tile_of(nx - HALF_W)
 		for ty in range(ty0, ty1 + 1):
-			if map.is_blocked(tx, ty):
+			if map.blocks(tx, ty, access, DIR_LEFT):
 				return (tx + 1) * TILE_UNITS + HALF_W
 	return nx
 
 
-static func _move_y(map, p: Vector2i, my: int) -> int:
+static func _move_y(map, p: Vector2i, my: int, access: int) -> int:
 	var ny := p.y + my
 	var tx0 := tile_of(p.x - HALF_W)
 	var tx1 := tile_of(p.x + HALF_W - 1)
 	if my > 0:
 		var ty := tile_of(ny + HALF_H - 1)
 		for tx in range(tx0, tx1 + 1):
-			if map.is_blocked(tx, ty):
+			if map.blocks(tx, ty, access, DIR_DOWN):
 				return ty * TILE_UNITS - HALF_H
 	else:
 		var ty := tile_of(ny - HALF_H)
 		for tx in range(tx0, tx1 + 1):
-			if map.is_blocked(tx, ty):
+			if map.blocks(tx, ty, access, DIR_UP):
 				return (ty + 1) * TILE_UNITS + HALF_H
 	return ny
 

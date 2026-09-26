@@ -45,18 +45,21 @@
    "type": "card_gate",
    "solid": false,
    "color": "#e0b040",
-   "access": "card"
+   "access": "card",
+   "free_dir": "down"
   },
   "L": {
-   "type": "locked_door",
-   "solid": true,
+   "type": "service_door",
+   "solid": false,
    "color": "#6a3a2a",
    "access": "service"
   },
   "g": {
    "type": "garage_gate",
    "solid": false,
-   "color": "#9a9a9a"
+   "color": "#9a9a9a",
+   "access": "card",
+   "free_dir": "down"
   },
   "E": {
    "type": "elevator_door",
@@ -376,5 +379,20 @@
    38,
    36
   ]
+ ],
+ "npcs": [
+  {
+   "kind": "porter",
+   "name": "Portier",
+   "home": [
+    24,
+    29
+   ],
+   "escort_to": [
+    1,
+    32,
+    19
+   ]
+  }
  ]
 }

@@ -1,4 +1,4 @@
-# Protokół sieciowy (wersja 2)
+# Protokół sieciowy (wersja 3)
 
 Własny binarny protokół na UDP. Implementacje:
 - serwer: `server/src/protocol.rs` (źródło prawdy),
@@ -23,7 +23,7 @@ przez `cargo test` i czytane przez `client/tests/run_tests.gd`.
 | pole    | typ | wartość |
 |---------|-----|---------|
 | magic   | u16 | `0x5354` (bajty `54 53`, „TS”) |
-| version | u8  | `2` |
+| version | u8  | `3` |
 | type    | u8  | typ pakietu (niżej) |
 
 ## Jednostki
@@ -93,11 +93,12 @@ aplikuje max 6 (średnio 3 = 60/20). Kolejka ponad 30 jest przycinana od najstar
 | room           | u16 — id pokoju odbiorcy na jego piętrze (0 = brak) |
 | self_lock      | u8 — blokada schodów odbiorcy (`sim::Body::lock`: 0 brak, 1 trzymane, 2 zwolnione) |
 | self_prev_input| u8 — poprzedni input odbiorcy (`sim::Body::prev_input`, do akcji „na wciśnięcie”) |
+| self_access    | u8 — uprawnienia odbiorcy (`map::access`: 1 przepustka gościa, 2 karta pracownika, 4 obsługa) |
 | n              | u8 |
 | entities       | n × 12 B |
 
 Encja (12 B): `id u16 | kind u8 | x i32 | y i32 | flags u8`.
-- `kind`: 0 gracz, 1 NPC (zarezerwowane).
+- `kind`: 0 gracz, 1 NPC. Id NPC zaczynają się od `0xF000` (61440); gracze mają 1..61439.
 - `flags`: bity 0–1 kierunek (0 dół, 1 góra, 2 lewo, 3 prawo), bit 2 „w ruchu”, reszta zarezerwowana.
 
 **Interest management**: lista zawiera tylko encje z tym samym `(floor, room)` co
@@ -107,8 +108,11 @@ któregokolwiek nie wymaga retransmisji.
 `self_*` + `floor` to **pełny stan symulacji** odbiorcy, więc klient odtwarza
 niepotwierdzone inputy dokładnie od tego stanu, także przez schody i windę.
 
-**Fragmentacja**: stała część snapshotu ma 28 B, więc mieści się 97 encji
-(28 + 97·12 = 1192 B). Więcej encji → kilka fragmentów z tym samym `tick`,
+Uprawnienia zmienia tylko serwer (np. portier daje przepustkę); klient poznaje
+je ze snapshotu i od razu uwzględnia w predykcji kolizji z bramkami.
+
+**Fragmentacja**: stała część snapshotu ma 29 B, więc mieści się 97 encji
+(29 + 97·12 = 1193 B). Więcej encji → kilka fragmentów z tym samym `tick`,
 każdy z pełnymi polami `self_*`. Pusty pokój → 1 fragment z `n = 0`.
 
 ### 6 `PlayerInfo` (S→C)
@@ -117,8 +121,9 @@ każdy z pełnymi polami `self_*`. Pusty pokój → 1 fragment z `n = 0`.
 | n       | u8 |
 | players | n × (`id u16`, nick `u8 len + UTF-8`) |
 
-Wysyłany, gdy encja pierwszy raz staje się widoczna dla odbiorcy, oraz w
-odpowiedzi na `InfoRequest`. Max 55 wpisów na pakiet.
+Wysyłany, gdy encja (gracz lub NPC — wtedy `nick` to jego imię, np. „Portier”)
+pierwszy raz staje się widoczna dla odbiorcy, przed pierwszą skierowaną do niego
+wypowiedzią NPC oraz w odpowiedzi na `InfoRequest`. Max 55 wpisów na pakiet.
 
 ### 7 `InfoRequest` (C→S)
 | pole  | typ |
@@ -140,6 +145,16 @@ Klient pinguje co 1 s; RTT = teraz − `client_time`. Serwer odpowiada natychmia
 `token u32 | reason u8` — 0 wyjście klienta, 1 timeout, 2 wyrzucenie, 3 wyłączenie serwera,
 4 nieznana sesja (odpowiedź serwera na `Input`/`Ping` z tokenem, którego nie zna —
 sesja wygasła albo serwer był restartowany).
+
+### 11 `Say` (S→C)
+| pole | typ |
+|------|-----|
+| id   | u16 — kto mówi (NPC) |
+| text | u16 len + UTF-8 (max 240 B, ucinane na granicy znaku) |
+
+Wypowiedź pokazywana w dymku nad postacią i w logu na dole ekranu. Trafia do
+wszystkich w tym samym `(piętro, pokój)` co mówiący oraz do gracza, do którego
+jest skierowana. Bez retransmisji (zgubiona linia przepada — to tylko dialog).
 
 ## Połączenie i timeouty
 
@@ -199,13 +214,13 @@ szyfrowaniem.
 
 ## Historia wersji
 
+- **3** — snapshot: `self_access`; pakiet `Say`; encje NPC (`kind` 1) z imionami w `PlayerInfo`.
 - **2** — snapshot: pola `self_lock`, `self_prev_input`; bit inputu 16 (interakcja);
   `map_crc` liczone z całego budynku (wiele pięter).
 - **1** — wersja początkowa.
 
 ## Rozszerzenia (zaplanowane, nie zaimplementowane)
 
-- NPC: `kind = 1` w tym samym formacie encji.
 - Akcje (drzwi z kartą dostępu, sklep, rozmowy): bit interakcji 16 + kontekst
   miejsca (jak winda) lub nowe typy pakietów; bity 5–7 wolne.
 - Kompresja delta: `ack_tick` już jest w `Input`.

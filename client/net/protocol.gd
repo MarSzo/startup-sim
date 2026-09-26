@@ -3,9 +3,10 @@
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 2
+const VERSION := 3
 const MAX_PACKET := 1200
 const MAX_NICK_BYTES := 16
+const MAX_SAY_BYTES := 240
 const MAX_INPUTS_PER_PACKET := 8
 
 const T_CONNECT := 1
@@ -18,6 +19,10 @@ const T_INFO_REQUEST := 7
 const T_PING := 8
 const T_PONG := 9
 const T_DISCONNECT := 10
+const T_SAY := 11
+
+const KIND_PLAYER := 0
+const KIND_NPC := 1
 
 const DISCONNECT_QUIT := 0
 const DISCONNECT_TIMEOUT := 1
@@ -129,6 +134,14 @@ class Reader:
 		var res: Array = b.get_data(n)
 		return (res[1] as PackedByteArray).get_string_from_utf8()
 
+	func str16(max_bytes: int) -> String:
+		var n := u16()
+		if n > max_bytes or not _has(n):
+			ok = false
+			return ""
+		var res: Array = b.get_data(n)
+		return (res[1] as PackedByteArray).get_string_from_utf8()
+
 	func at_end() -> bool:
 		return b.get_available_bytes() == 0
 
@@ -162,6 +175,7 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			p.room = r.u16()
 			p.self_lock = r.u8()
 			p.self_prev_input = r.u8()
+			p.self_access = r.u8()
 			var n := r.u8()
 			var ents := []
 			for i in n:
@@ -179,6 +193,9 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 		T_DISCONNECT:
 			p.token = r.u32()
 			p.reason = r.u8()
+		T_SAY:
+			p.id = r.u16()
+			p.text = r.str16(MAX_SAY_BYTES)
 		_:
 			return {}
 	if not r.ok or not r.at_end():

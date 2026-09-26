@@ -5,16 +5,18 @@
 //! `tests/golden/packets.json`.
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 2;
+pub const VERSION: u8 = 3;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
 pub const MAX_PACKET: usize = 1200;
 pub const MAX_NICK_BYTES: usize = 16;
+/// Max UTF-8 bytes of a speech line (`Say`).
+pub const MAX_SAY_BYTES: usize = 240;
 /// Max inputs carried in one Input packet.
 pub const MAX_INPUTS_PER_PACKET: usize = 8;
 
 /// Fixed part of a Snapshot packet (header + fields before the entity list).
-pub const SNAPSHOT_FIXED_LEN: usize = HEADER_LEN + 4 + 4 + 1 + 1 + (4 + 4 + 1 + 2 + 1 + 1) + 1;
+pub const SNAPSHOT_FIXED_LEN: usize = HEADER_LEN + 4 + 4 + 1 + 1 + (4 + 4 + 1 + 2 + 1 + 1 + 1) + 1;
 pub const ENTITY_LEN: usize = 12;
 /// Entities per snapshot fragment so a fragment never exceeds `MAX_PACKET`.
 pub const MAX_ENTITIES_PER_SNAPSHOT: usize = (MAX_PACKET - SNAPSHOT_FIXED_LEN) / ENTITY_LEN;
@@ -30,6 +32,7 @@ pub mod ty {
     pub const PING: u8 = 8;
     pub const PONG: u8 = 9;
     pub const DISCONNECT: u8 = 10;
+    pub const SAY: u8 = 11;
 }
 
 pub mod reject {
@@ -90,6 +93,8 @@ pub enum Packet {
         /// floor this is the full simulation state the client replays from.
         self_lock: u8,
         self_prev_input: u8,
+        /// Receiver's rights (`map::access::*`): part of the simulated state.
+        self_access: u8,
         entities: Vec<EntityState>,
     },
     PlayerInfo { players: Vec<PlayerInfoEntry> },
@@ -97,6 +102,8 @@ pub enum Packet {
     Ping { token: u32, client_time: u32 },
     Pong { client_time: u32, server_tick: u32 },
     Disconnect { token: u32, reason: u8 },
+    /// Something an entity (NPC) says; shown as a speech bubble.
+    Say { id: u16, text: String },
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -126,6 +133,11 @@ impl Writer {
     fn str8(&mut self, s: &str) {
         let b = truncate_utf8(s, MAX_NICK_BYTES).as_bytes();
         self.u8(b.len() as u8);
+        self.0.extend_from_slice(b);
+    }
+    fn str16(&mut self, s: &str, max: usize) {
+        let b = truncate_utf8(s, max).as_bytes();
+        self.u16(b.len() as u16);
         self.0.extend_from_slice(b);
     }
 }
@@ -163,6 +175,13 @@ impl<'a> Reader<'a> {
         }
         String::from_utf8(self.take(n)?.to_vec()).map_err(|_| DecodeError::Invalid("bad utf8"))
     }
+    fn str16(&mut self, max: usize) -> Result<String, DecodeError> {
+        let n = self.u16()? as usize;
+        if n > max {
+            return Err(DecodeError::Invalid("string too long"));
+        }
+        String::from_utf8(self.take(n)?.to_vec()).map_err(|_| DecodeError::Invalid("bad utf8"))
+    }
 }
 
 /// Cut a string to at most `max` bytes on a char boundary.
@@ -190,6 +209,7 @@ impl Packet {
             Packet::Ping { .. } => ty::PING,
             Packet::Pong { .. } => ty::PONG,
             Packet::Disconnect { .. } => ty::DISCONNECT,
+            Packet::Say { .. } => ty::SAY,
         }
     }
 
@@ -223,7 +243,20 @@ impl Packet {
                     w.u8(i);
                 }
             }
-            Packet::Snapshot { tick, last_input_seq, frag_idx, frag_cnt, self_x, self_y, floor, room, self_lock, self_prev_input, entities } => {
+            Packet::Snapshot {
+                tick,
+                last_input_seq,
+                frag_idx,
+                frag_cnt,
+                self_x,
+                self_y,
+                floor,
+                room,
+                self_lock,
+                self_prev_input,
+                self_access,
+                entities,
+            } => {
                 w.u32(*tick);
                 w.u32(*last_input_seq);
                 w.u8(*frag_idx);
@@ -234,6 +267,7 @@ impl Packet {
                 w.u16(*room);
                 w.u8(*self_lock);
                 w.u8(*self_prev_input);
+                w.u8(*self_access);
                 let n = entities.len().min(MAX_ENTITIES_PER_SNAPSHOT);
                 w.u8(n as u8);
                 for e in &entities[..n] {
@@ -269,6 +303,10 @@ impl Packet {
             Packet::Disconnect { token, reason } => {
                 w.u32(*token);
                 w.u8(*reason);
+            }
+            Packet::Say { id, text } => {
+                w.u16(*id);
+                w.str16(text, MAX_SAY_BYTES);
             }
         }
         w.0
@@ -317,12 +355,26 @@ impl Packet {
                 let room = r.u16()?;
                 let self_lock = r.u8()?;
                 let self_prev_input = r.u8()?;
+                let self_access = r.u8()?;
                 let n = r.u8()? as usize;
                 let mut entities = Vec::with_capacity(n);
                 for _ in 0..n {
                     entities.push(EntityState { id: r.u16()?, kind: r.u8()?, x: r.i32()?, y: r.i32()?, flags: r.u8()? });
                 }
-                Packet::Snapshot { tick, last_input_seq, frag_idx, frag_cnt, self_x, self_y, floor, room, self_lock, self_prev_input, entities }
+                Packet::Snapshot {
+                    tick,
+                    last_input_seq,
+                    frag_idx,
+                    frag_cnt,
+                    self_x,
+                    self_y,
+                    floor,
+                    room,
+                    self_lock,
+                    self_prev_input,
+                    self_access,
+                    entities,
+                }
             }
             ty::PLAYER_INFO => {
                 let n = r.u8()? as usize;
@@ -344,6 +396,7 @@ impl Packet {
             ty::PING => Packet::Ping { token: r.u32()?, client_time: r.u32()? },
             ty::PONG => Packet::Pong { client_time: r.u32()?, server_tick: r.u32()? },
             ty::DISCONNECT => Packet::Disconnect { token: r.u32()?, reason: r.u8()? },
+            ty::SAY => Packet::Say { id: r.u16()?, text: r.str16(MAX_SAY_BYTES)? },
             other => return Err(DecodeError::UnknownType(other)),
         };
         if r.pos != b.len() {
@@ -362,6 +415,7 @@ pub struct SelfState {
     pub room: u16,
     pub lock: u8,
     pub prev_input: u8,
+    pub access: u8,
 }
 
 /// Split a room's entity list into snapshot fragments that each fit in `MAX_PACKET`.
@@ -387,6 +441,7 @@ pub fn snapshot_fragments(tick: u32, last_input_seq: u32, me: SelfState, entitie
             room: me.room,
             self_lock: me.lock,
             self_prev_input: me.prev_input,
+            self_access: me.access,
             entities: c.to_vec(),
         })
         .collect()
@@ -415,6 +470,7 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
                 room: 6,
                 self_lock: 2,
                 self_prev_input: 17,
+                self_access: 5,
                 entities: vec![
                     EntityState { id: 3, kind: kind::PLAYER, x: 4096, y: 8192, flags: 0b101 },
                     EntityState { id: 65535, kind: kind::NPC, x: -1, y: 2_000_000, flags: 0 },
@@ -429,6 +485,7 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
         ("ping", Packet::Ping { token: 0x01020304, client_time: 777_000 }),
         ("pong", Packet::Pong { client_time: 777_000, server_tick: 1234 }),
         ("disconnect", Packet::Disconnect { token: 0x01020304, reason: disconnect::TIMEOUT }),
+        ("say", Packet::Say { id: 61440, text: "Dzień dobry! Proszę za mną.".into() }),
     ]
 }
 
@@ -486,9 +543,20 @@ mod tests {
                 b[0] = 0x54;
                 b[1] = 0x53;
                 b[2] = VERSION;
-                b[3] = rng.u8(1..=10);
+                b[3] = rng.u8(1..=11);
             }
             let _ = Packet::decode(&b);
+        }
+    }
+
+    #[test]
+    fn long_speech_is_truncated_on_char_boundary() {
+        let p = Packet::Say { id: 1, text: "ż".repeat(200) }; // 400 bytes
+        let b = p.encode();
+        assert!(b.len() <= MAX_PACKET);
+        match Packet::decode(&b).unwrap() {
+            Packet::Say { text, .. } => assert_eq!(text, "ż".repeat(MAX_SAY_BYTES / 2)),
+            _ => unreachable!(),
         }
     }
 

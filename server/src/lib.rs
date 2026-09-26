@@ -4,6 +4,7 @@ pub mod args;
 pub mod building;
 pub mod map;
 pub mod nav;
+pub mod npc;
 pub mod net;
 pub mod protocol;
 pub mod server;

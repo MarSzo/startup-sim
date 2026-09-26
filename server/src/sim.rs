@@ -5,7 +5,7 @@
 //! checked by the golden vectors in `tests/golden/movement_vectors.json`.
 
 use crate::building::Building;
-use crate::map::{LinkKind, Map};
+use crate::map::{dir, LinkKind, Map};
 
 pub const SUBPIXELS: i32 = 16;
 pub const TILE_UNITS: i32 = 16 * SUBPIXELS;
@@ -65,9 +65,10 @@ pub fn input_dir(input: u8) -> (i32, i32) {
     (dx, dy)
 }
 
-/// Move by one input step on a single floor. Movement is resolved per axis
-/// (X, then Y) so the player slides along walls.
-pub fn move_on(map: &Map, pos: Pos, input: u8) -> Pos {
+/// Move by one input step on a single floor, for a character with rights
+/// `access`. Movement is resolved per axis (X, then Y) so the player slides
+/// along walls.
+pub fn move_on(map: &Map, pos: Pos, input: u8, access: u8) -> Pos {
     let (dx, dy) = input_dir(input);
     if dx == 0 && dy == 0 {
         return pos;
@@ -75,44 +76,44 @@ pub fn move_on(map: &Map, pos: Pos, input: u8) -> Pos {
     let speed = if dx != 0 && dy != 0 { SPEED_DIAG } else { SPEED };
     let mut p = pos;
     if dx != 0 {
-        p.x = move_x(map, p, dx * speed);
+        p.x = move_x(map, p, dx * speed, access);
     }
     if dy != 0 {
-        p.y = move_y(map, p, dy * speed);
+        p.y = move_y(map, p, dy * speed, access);
     }
     p
 }
 
-fn move_x(map: &Map, p: Pos, mx: i32) -> i32 {
+fn move_x(map: &Map, p: Pos, mx: i32, access: u8) -> i32 {
     let nx = p.x + mx;
     let ty0 = tile_of(p.y - HALF_H);
     let ty1 = tile_of(p.y + HALF_H - 1);
     if mx > 0 {
         let tx = tile_of(nx + HALF_W - 1);
-        if (ty0..=ty1).any(|ty| map.is_blocked(tx, ty)) {
+        if (ty0..=ty1).any(|ty| map.blocks(tx, ty, access, dir::RIGHT)) {
             return tx * TILE_UNITS - HALF_W;
         }
     } else {
         let tx = tile_of(nx - HALF_W);
-        if (ty0..=ty1).any(|ty| map.is_blocked(tx, ty)) {
+        if (ty0..=ty1).any(|ty| map.blocks(tx, ty, access, dir::LEFT)) {
             return (tx + 1) * TILE_UNITS + HALF_W;
         }
     }
     nx
 }
 
-fn move_y(map: &Map, p: Pos, my: i32) -> i32 {
+fn move_y(map: &Map, p: Pos, my: i32, access: u8) -> i32 {
     let ny = p.y + my;
     let tx0 = tile_of(p.x - HALF_W);
     let tx1 = tile_of(p.x + HALF_W - 1);
     if my > 0 {
         let ty = tile_of(ny + HALF_H - 1);
-        if (tx0..=tx1).any(|tx| map.is_blocked(tx, ty)) {
+        if (tx0..=tx1).any(|tx| map.blocks(tx, ty, access, dir::DOWN)) {
             return ty * TILE_UNITS - HALF_H;
         }
     } else {
         let ty = tile_of(ny - HALF_H);
-        if (tx0..=tx1).any(|tx| map.is_blocked(tx, ty)) {
+        if (tx0..=tx1).any(|tx| map.blocks(tx, ty, access, dir::UP)) {
             return (ty + 1) * TILE_UNITS + HALF_H;
         }
     }
@@ -144,11 +145,14 @@ pub struct Body {
     /// `LOCK_*`: prevents bouncing straight back after taking the stairs
     /// while the movement key is still held.
     pub lock: u8,
+    /// Rights (`map::access::*`): which gates/doors open. Changed only by the
+    /// server (porter, HR...); the client learns it from snapshots.
+    pub access: u8,
 }
 
 impl Body {
     pub fn at(floor: u8, pos: Pos) -> Body {
-        Body { floor, pos, prev_input: 0, lock: LOCK_NONE }
+        Body { floor, pos, prev_input: 0, lock: LOCK_NONE, access: 0 }
     }
 }
 
@@ -163,7 +167,7 @@ impl Body {
 pub fn step(b: &Building, body: Body, input: u8) -> Body {
     let Some(map) = b.floor(body.floor) else { return body };
     let mut n = body;
-    n.pos = move_on(map, body.pos, input);
+    n.pos = move_on(map, body.pos, input, body.access);
     if n.lock == LOCK_HELD && (input & IN_MOVE_MASK) != (body.prev_input & IN_MOVE_MASK) {
         n.lock = LOCK_RELEASED;
     }
@@ -201,7 +205,7 @@ mod tests {
 
     fn run(map: &Map, mut p: Pos, input: u8, n: usize) -> Pos {
         for _ in 0..n {
-            p = move_on(map, p, input);
+            p = move_on(map, p, input, 0);
         }
         p
     }
@@ -230,11 +234,11 @@ mod tests {
         let b = building();
         let m = b.floor(0).unwrap();
         let p = Pos::tile_center(33, 27); // lobby
-        assert_eq!(move_on(m, p, IN_RIGHT), Pos { x: p.x + SPEED, y: p.y });
-        assert_eq!(move_on(m, p, IN_UP), Pos { x: p.x, y: p.y - SPEED });
-        assert_eq!(move_on(m, p, IN_UP | IN_LEFT), Pos { x: p.x - SPEED_DIAG, y: p.y - SPEED_DIAG });
-        assert_eq!(move_on(m, p, IN_LEFT | IN_RIGHT), p, "opposite keys cancel");
-        assert_eq!(move_on(m, p, IN_INTERACT), p, "interact alone doesn't move");
+        assert_eq!(move_on(m, p, IN_RIGHT, 0), Pos { x: p.x + SPEED, y: p.y });
+        assert_eq!(move_on(m, p, IN_UP, 0), Pos { x: p.x, y: p.y - SPEED });
+        assert_eq!(move_on(m, p, IN_UP | IN_LEFT, 0), Pos { x: p.x - SPEED_DIAG, y: p.y - SPEED_DIAG });
+        assert_eq!(move_on(m, p, IN_LEFT | IN_RIGHT, 0), p, "opposite keys cancel");
+        assert_eq!(move_on(m, p, IN_INTERACT, 0), p, "interact alone doesn't move");
     }
 
     #[test]
@@ -251,11 +255,28 @@ mod tests {
     }
 
     #[test]
-    fn walks_through_open_card_gate() {
+    fn gates_need_a_pass_to_enter_but_not_to_leave() {
+        use crate::map::access;
         let b = building();
-        let m = b.floor(0).unwrap();
-        let p = run(m, Pos::tile_center(34, 24), IN_UP, 100);
-        assert_eq!(m.room_name(m.room_at(p.x, p.y)), "Hol");
+        let room = |body: &Body| {
+            let m = b.floor(body.floor).unwrap();
+            m.room_name(m.room_at(body.pos.x, body.pos.y)).to_string()
+        };
+        let lobby = Body::at(0, Pos::tile_center(34, 24)); // below gate x=34
+        let stuck = walk(&b, lobby, IN_UP, 100);
+        assert_eq!(stuck.pos.y, 22 * TILE_UNITS + HALF_H, "no pass: stopped at the gate");
+        let guest = walk(&b, Body { access: access::GUEST, ..lobby }, IN_UP, 100);
+        assert_eq!(room(&guest), "Hol", "guest pass opens the gate");
+        let employee = walk(&b, Body { access: access::CARD, ..lobby }, IN_UP, 100);
+        assert_eq!(room(&employee), "Hol", "employee card opens the gate");
+        // Leaving: from the hall, without any pass, down through the gate.
+        let out = walk(&b, Body::at(0, Pos::tile_center(34, 18)), IN_DOWN, 100);
+        assert_eq!(room(&out), "Wejście", "exit is free");
+        // Garage gate: same rules.
+        let garage = walk(&b, Body::at(0, Pos::tile_center(10, 36)), IN_UP, 100);
+        assert_eq!(room(&garage), "Na zewnątrz", "no pass: can't drive in");
+        let car = walk(&b, Body { access: access::CARD, ..Body::at(0, Pos::tile_center(10, 36)) }, IN_UP, 100);
+        assert_eq!(room(&car), "Parking wewnętrzny");
     }
 
     #[test]

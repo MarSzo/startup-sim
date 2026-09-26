@@ -56,7 +56,8 @@ func test_protocol(path: String) -> void:
 	expect(rj.get("reason") == 1, "decode reject")
 	var s := Protocol.decode(golden["snapshot"].hex_decode())
 	expect(s.get("tick") == 1234 and s.last_input_seq == 99 and s.frag_cnt == 1 and s.self_x == 10000 and s.self_y == -5
-		and s.floor == 1 and s.room == 6 and s.self_lock == 2 and s.self_prev_input == 17 and s.entities.size() == 2,
+		and s.floor == 1 and s.room == 6 and s.self_lock == 2 and s.self_prev_input == 17 and s.self_access == 5
+		and s.entities.size() == 2,
 		"decode snapshot %s" % s)
 	if s.has("entities") and s.entities.size() == 2:
 		var e0: Dictionary = s.entities[0]
@@ -69,6 +70,8 @@ func test_protocol(path: String) -> void:
 	expect(po.get("client_time") == 777000 and po.server_tick == 1234, "decode pong")
 	var d := Protocol.decode(golden["disconnect"].hex_decode())
 	expect(d.get("reason") == 1 and d.token == 0x01020304, "decode disconnect")
+	var say := Protocol.decode(golden["say"].hex_decode())
+	expect(say.get("type") == Protocol.T_SAY and say.id == 61440 and say.text == "Dzień dobry! Proszę za mną.", "decode say %s" % say)
 	# Truncation must never decode.
 	var snap: PackedByteArray = golden["snapshot"].hex_decode()
 	for n in snap.size():
@@ -79,7 +82,7 @@ func test_protocol(path: String) -> void:
 
 
 func _body_from(a: Array) -> Dictionary:
-	return Movement.body(int(a[0]), Vector2i(int(a[1]), int(a[2])), int(a[3]), int(a[4]))
+	return Movement.body(int(a[0]), Vector2i(int(a[1]), int(a[2])), int(a[3]), int(a[4]), int(a[5]))
 
 
 func test_movement(path: String) -> void:

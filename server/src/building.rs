@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
-use crate::map::{LinkKind, Map, RoomDef, Tile};
+use crate::map::{dir, LinkKind, Map, NpcDef, RoomDef, Tile};
 
 #[derive(Debug, Deserialize)]
 struct FloorEntry {
@@ -125,10 +125,16 @@ impl Building {
         self.active_floors().find_map(|(f, m)| m.room_by_name(name).map(|r| (f, r)))
     }
 
-    /// BFS across floors. Stepping onto a stairs tile continues at its arrival
-    /// tile on the other floor; the path contains the stairs tile followed by
-    /// the arrival. (Elevators need an interact press and are not used.)
-    pub fn find_path(&self, from: Place, to: Place) -> Option<Vec<Place>> {
+    /// All NPC definitions with their floor.
+    pub fn npcs(&self) -> Vec<(u8, NpcDef)> {
+        self.active_floors().flat_map(|(f, m)| m.npcs.iter().map(move |n| (f, n.clone()))).collect()
+    }
+
+    /// BFS across floors for a character with rights `access`. Stepping onto a
+    /// stairs tile continues at its arrival tile on the other floor; the path
+    /// contains the stairs tile followed by the arrival. One-way tiles (gates)
+    /// are respected. (Elevators need an interact press and are not used.)
+    pub fn find_path(&self, from: Place, to: Place, access: u8) -> Option<Vec<Place>> {
         let valid = |p: &Place| self.floor(p.0).is_some_and(|m| !m.is_blocked(p.1.x, p.1.y));
         if !valid(&from) || !valid(&to) {
             return None;
@@ -155,9 +161,9 @@ impl Building {
             }
             let (f, t) = cur;
             let m = self.floor(f).unwrap();
-            for (dx, dy) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+            for (dx, dy, d) in [(1, 0, dir::RIGHT), (-1, 0, dir::LEFT), (0, 1, dir::DOWN), (0, -1, dir::UP)] {
                 let nt = Tile { x: t.x + dx, y: t.y + dy };
-                if m.is_blocked(nt.x, nt.y) {
+                if m.blocks(nt.x, nt.y, access, d) {
                     continue;
                 }
                 let (next, via) = match m.link_at(nt.x, nt.y).map(|l| &l.kind) {
@@ -207,7 +213,8 @@ mod tests {
         let spawn = b.spawns()[0];
         let (f, room) = b.find_room("Chill room").unwrap();
         let goal = b.floor(f).unwrap().room_tiles(room.id)[0];
-        let path = b.find_path(spawn, (f, goal)).expect("reachable");
+        let path = b.find_path(spawn, (f, goal), crate::map::access::GUEST).expect("reachable");
+        assert!(b.find_path(spawn, (f, goal), 0).is_none(), "gates stop visitors without a pass");
         assert_eq!(path.first(), Some(&spawn));
         assert_eq!(path.last(), Some(&(1, goal)));
         let i = path.iter().position(|p| p.0 == 1).unwrap();

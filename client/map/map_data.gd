@@ -5,17 +5,32 @@ extends RefCounted
 
 const NO_ROOM := 0
 
+# Access rights (bitmask, same as map::access in Rust).
+const ACCESS_GUEST := 1
+const ACCESS_CARD := 2
+const ACCESS_SERVICE := 4
+const ACCESS_REQUIRED := {"card": ACCESS_GUEST | ACCESS_CARD, "service": ACCESS_SERVICE}
+
+# Movement directions (map::dir in Rust).
+const DIR_UP := 1
+const DIR_DOWN := 2
+const DIR_LEFT := 3
+const DIR_RIGHT := 4
+const DIR_NAMES := {"up": DIR_UP, "down": DIR_DOWN, "left": DIR_LEFT, "right": DIR_RIGHT}
+
 var id: String
 var floor_index: int
 var width: int
 var height: int
 var tile_px: int
 var solid := PackedByteArray()
+var need := PackedByteArray()       # rights that open the tile (0 = none)
+var free_dir := PackedByteArray()   # direction always passable (exit), 0 = none
 var tile_chars := PackedStringArray()
 var room := PackedInt32Array()
 var room_names := {}  # id -> name
 var room_types := {}  # id -> type
-var legend := {}      # char -> {type, solid, color, access?}
+var legend := {}      # char -> {type, solid, color, access?, free_dir?}
 ## [{kind: "stairs"|"elevator", rect: Rect2i, id, to_floor, to: Vector2i}]
 var links: Array = []
 var spawns: Array[Vector2i] = []
@@ -58,6 +73,8 @@ func parse(bytes: PackedByteArray) -> void:
 		error = "row count mismatch"
 		return
 	solid.resize(width * height)
+	need.resize(width * height)
+	free_dir.resize(width * height)
 	room.resize(width * height)
 	tile_chars.resize(width * height)
 	for y in height:
@@ -74,13 +91,34 @@ func parse(bytes: PackedByteArray) -> void:
 				return
 			tile_chars[i] = c
 			solid[i] = 1 if legend[c]["solid"] else 0
+			need[i] = ACCESS_REQUIRED.get(legend[c].get("access", ""), 0)
+			free_dir[i] = DIR_NAMES.get(legend[c].get("free_dir", ""), 0)
 			room[i] = room_ids.get(rrow[x], NO_ROOM)
 
 
+## Solid tile (walls, furniture); ignores access rules.
 func is_blocked(tx: int, ty: int) -> bool:
 	if tx < 0 or ty < 0 or tx >= width or ty >= height:
 		return true
 	return solid[ty * width + tx] != 0
+
+
+## Collision rule used by the simulation (mirror of Map::blocks in Rust):
+## solid, or needs rights the character lacks - unless moving in the tile's
+## free direction (leaving through the gates).
+func blocks(tx: int, ty: int, access: int, dir: int) -> bool:
+	if tx < 0 or ty < 0 or tx >= width or ty >= height:
+		return true
+	var i := ty * width + tx
+	if solid[i] != 0:
+		return true
+	return need[i] != 0 and (access & need[i]) == 0 and free_dir[i] != dir
+
+
+func need_at(tx: int, ty: int) -> int:
+	if tx < 0 or ty < 0 or tx >= width or ty >= height:
+		return 0
+	return need[ty * width + tx]
 
 
 func room_at_tile(tx: int, ty: int) -> int:

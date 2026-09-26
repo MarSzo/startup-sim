@@ -4,7 +4,7 @@
 //! room zones and floor links are identical on both sides. See
 //! `building.rs` for the multi-floor container.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 
 use serde::Deserialize;
 
@@ -13,16 +13,75 @@ use crate::sim::TILE_UNITS;
 /// Room id used for tiles that belong to no room (walls).
 pub const NO_ROOM: u16 = 0;
 
+/// Access rights a character can hold (bitmask in `sim::Body::access`).
+pub mod access {
+    /// Visitor pass from the porter (trial day), valid for the session.
+    pub const GUEST: u8 = 1;
+    /// Employee card (after the HR contract - not obtainable yet).
+    pub const CARD: u8 = 2;
+    /// Staff/service areas (technical room).
+    pub const SERVICE: u8 = 4;
+
+    /// Rights that satisfy a tile's `access` requirement from the legend.
+    pub fn required(name: &str) -> Option<u8> {
+        match name {
+            "card" => Some(GUEST | CARD),
+            "service" => Some(SERVICE),
+            _ => None,
+        }
+    }
+}
+
+/// Movement directions (for one-way passages such as exiting the gates).
+pub mod dir {
+    pub const UP: u8 = 1;
+    pub const DOWN: u8 = 2;
+    pub const LEFT: u8 = 3;
+    pub const RIGHT: u8 = 4;
+
+    pub fn parse(name: &str) -> Option<u8> {
+        match name {
+            "up" => Some(UP),
+            "down" => Some(DOWN),
+            "left" => Some(LEFT),
+            "right" => Some(RIGHT),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Deserialize)]
 struct LegendEntry {
     #[allow(dead_code)]
     #[serde(rename = "type")]
     kind: String,
     solid: bool,
-    /// Access requirement (e.g. "card", "service"). Not enforced yet: the
-    /// tile's `solid` flag decides collision for now.
+    /// Access requirement ("card", "service"): blocks characters without it.
     #[serde(default)]
     access: Option<String>,
+    /// Direction in which the tile can always be passed (e.g. leaving
+    /// through the gates without a card).
+    #[serde(default)]
+    free_dir: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct NpcFile {
+    kind: String,
+    name: String,
+    home: [i32; 2],
+    #[serde(default)]
+    escort_to: Option<[i32; 3]>,
+}
+
+/// NPC placed on this floor (server-side characters).
+#[derive(Debug, Clone)]
+pub struct NpcDef {
+    pub kind: String,
+    pub name: String,
+    pub home: Tile,
+    /// Where the porter escorts newcomers: (floor, tile).
+    pub escort_to: Option<(u8, Tile)>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -91,6 +150,8 @@ struct MapFile {
     links: Vec<LinkFile>,
     #[serde(default)]
     spawns: Vec<[i32; 2]>,
+    #[serde(default)]
+    npcs: Vec<NpcFile>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -107,11 +168,14 @@ pub struct Map {
     pub height: i32,
     solid: Vec<bool>,
     tile_kind: Vec<u8>,
-    access: Vec<Option<String>>,
+    /// Rights that open the tile (0 = no requirement).
+    need: Vec<u8>,
+    free_dir: Vec<u8>,
     room: Vec<u16>,
     pub rooms: Vec<RoomDef>,
     pub links: Vec<Link>,
     pub spawns: Vec<Tile>,
+    pub npcs: Vec<NpcDef>,
 }
 
 impl Map {
@@ -129,7 +193,8 @@ impl Map {
         }
         let mut solid = Vec::with_capacity(w * h);
         let mut tile_kind = Vec::with_capacity(w * h);
-        let mut access = Vec::with_capacity(w * h);
+        let mut need = Vec::with_capacity(w * h);
+        let mut free_dir = Vec::with_capacity(w * h);
         let mut room = Vec::with_capacity(w * h);
         for (y, (trow, rrow)) in file.tiles.iter().zip(&file.rooms).enumerate() {
             if trow.len() != w || rrow.len() != w || !trow.is_ascii() || !rrow.is_ascii() {
@@ -140,7 +205,14 @@ impl Map {
                 let entry = file.legend.get(&key).ok_or_else(|| format!("row {y}: tile '{key}' not in legend"))?;
                 solid.push(entry.solid);
                 tile_kind.push(tc);
-                access.push(entry.access.clone());
+                need.push(match &entry.access {
+                    Some(a) => access::required(a).ok_or_else(|| format!("tile '{key}': unknown access '{a}'"))?,
+                    None => 0,
+                });
+                free_dir.push(match &entry.free_dir {
+                    Some(d) => dir::parse(d).ok_or_else(|| format!("tile '{key}': unknown free_dir '{d}'"))?,
+                    None => 0,
+                });
                 let rkey = (rc as char).to_string();
                 room.push(match file.room_defs.get(&rkey) {
                     Some(def) => def.id,
@@ -173,11 +245,22 @@ impl Map {
             height: h as i32,
             solid,
             tile_kind,
-            access,
+            need,
+            free_dir,
             room,
             rooms,
             links,
             spawns: file.spawns.iter().map(|s| Tile { x: s[0], y: s[1] }).collect(),
+            npcs: file
+                .npcs
+                .iter()
+                .map(|n| NpcDef {
+                    kind: n.kind.clone(),
+                    name: n.name.clone(),
+                    home: Tile { x: n.home[0], y: n.home[1] },
+                    escort_to: n.escort_to.map(|e| (e[0] as u8, Tile { x: e[1], y: e[2] })),
+                })
+                .collect(),
         };
         for s in &map.spawns {
             if map.is_blocked(s.x, s.y) {
@@ -204,19 +287,31 @@ impl Map {
         }
     }
 
-    /// Whether a tile blocks movement. Out-of-map tiles are blocked.
-    /// Future: access cards will add a player context here (and in movement.gd).
+    /// Whether a tile is solid (walls, furniture). Out-of-map tiles are solid.
+    /// Ignores access rules - see `blocks` for movement.
     pub fn is_blocked(&self, tx: i32, ty: i32) -> bool {
         self.idx(tx, ty).map_or(true, |i| self.solid[i])
+    }
+
+    /// Whether a character with rights `access`, moving in direction `d`
+    /// (`dir::*`), is stopped by this tile. The only collision rule used by
+    /// the simulation (mirrored in movement.gd).
+    pub fn blocks(&self, tx: i32, ty: i32, access: u8, d: u8) -> bool {
+        match self.idx(tx, ty) {
+            None => true,
+            Some(i) => {
+                self.solid[i] || (self.need[i] != 0 && access & self.need[i] == 0 && self.free_dir[i] != d)
+            }
+        }
     }
 
     pub fn tile_char(&self, tx: i32, ty: i32) -> Option<char> {
         self.idx(tx, ty).map(|i| self.tile_kind[i] as char)
     }
 
-    /// Access requirement of a tile ("card", "service"), if any.
-    pub fn access(&self, tx: i32, ty: i32) -> Option<&str> {
-        self.idx(tx, ty).and_then(|i| self.access[i].as_deref())
+    /// Rights that open a tile (0 = none needed).
+    pub fn need(&self, tx: i32, ty: i32) -> u8 {
+        self.idx(tx, ty).map_or(0, |i| self.need[i])
     }
 
     pub fn room_at_tile(&self, tx: i32, ty: i32) -> u16 {
@@ -255,43 +350,6 @@ impl Map {
             }
         }
         out
-    }
-
-    /// 4-connected BFS path on this floor from `from` to `to` (both inclusive).
-    pub fn find_path(&self, from: Tile, to: Tile) -> Option<Vec<Tile>> {
-        if self.is_blocked(to.x, to.y) || self.is_blocked(from.x, from.y) {
-            return None;
-        }
-        let n = (self.width * self.height) as usize;
-        let mut prev = vec![usize::MAX; n];
-        let start = self.idx(from.x, from.y)?;
-        let goal = self.idx(to.x, to.y)?;
-        prev[start] = start;
-        let mut queue = VecDeque::from([from]);
-        while let Some(t) = queue.pop_front() {
-            let ti = self.idx(t.x, t.y).unwrap();
-            if ti == goal {
-                let w = self.width as usize;
-                let mut path = vec![to];
-                let mut cur = goal;
-                while cur != start {
-                    cur = prev[cur];
-                    path.push(Tile { x: (cur % w) as i32, y: (cur / w) as i32 });
-                }
-                path.reverse();
-                return Some(path);
-            }
-            for (dx, dy) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
-                let (nx, ny) = (t.x + dx, t.y + dy);
-                if let Some(ni) = self.idx(nx, ny) {
-                    if prev[ni] == usize::MAX && !self.solid[ni] {
-                        prev[ni] = ti;
-                        queue.push_back(Tile { x: nx, y: ny });
-                    }
-                }
-            }
-        }
-        None
     }
 }
 
@@ -364,29 +422,54 @@ mod tests {
     }
 
     #[test]
-    fn gates_open_but_marked_and_service_door_locked() {
+    fn gates_need_a_pass_except_on_the_way_out() {
+        use super::{access, dir};
         let b = b();
         let m = b.floor(0).unwrap();
         assert_eq!(m.tile_char(28, 21), Some('B'));
-        assert!(!m.is_blocked(28, 21), "card gates are open for now");
-        assert_eq!(m.access(28, 21), Some("card"));
+        assert!(m.blocks(28, 21, 0, dir::UP), "no pass: can't enter");
+        assert!(!m.blocks(28, 21, 0, dir::DOWN), "no pass: can always leave");
+        assert!(!m.blocks(28, 21, access::GUEST, dir::UP), "guest pass opens");
+        assert!(!m.blocks(28, 21, access::CARD, dir::UP), "employee card opens");
         assert_eq!(m.tile_char(43, 13), Some('L'));
-        assert!(m.is_blocked(43, 13), "service room is locked");
-        assert_eq!(m.access(43, 13), Some("service"));
+        assert!(m.blocks(43, 13, access::GUEST | access::CARD, dir::UP), "service room stays closed");
+        assert!(!m.blocks(43, 13, access::SERVICE, dir::UP));
+        assert!(m.blocks(0, 0, 0xff, dir::UP), "walls block everyone");
     }
 
     #[test]
-    fn every_room_reachable_from_spawn_except_locked() {
+    fn reachability_depends_on_access() {
+        use super::access;
         let b = b();
         let spawn = (0, b.floor(0).unwrap().spawns[0]);
+        let public = ["outside", "parking", "entrance", "reception", "shop", "smoking"];
         for f in [0u8, 1] {
             let m = b.floor(f).unwrap();
             for r in &m.rooms {
-                let target = m.room_tiles(r.id)[0];
-                let reachable = b.find_path(spawn, (f, target)).is_some();
-                assert_eq!(reachable, r.kind != "service", "floor {f} room {}", r.name);
+                let tile = m.room_tiles(r.id).into_iter().find(|t| m.need(t.x, t.y) == 0).unwrap();
+                let target = (f, tile);
+                let guest = b.find_path(spawn, target, access::GUEST).is_some();
+                let nobody = b.find_path(spawn, target, 0).is_some();
+                let staff = b.find_path(spawn, target, access::CARD | access::SERVICE).is_some();
+                assert!(staff, "floor {f} {} unreachable even for staff", r.name);
+                assert_eq!(guest, r.kind != "service", "floor {f} {} with a guest pass", r.name);
+                let is_public = f == 0 && public.contains(&r.kind.as_str()) && r.name != "Parking wewnętrzny";
+                assert_eq!(nobody, is_public, "floor {f} {} without any pass", r.name);
             }
         }
+    }
+
+    #[test]
+    fn porter_is_placed_in_the_lodge() {
+        let b = b();
+        let m = b.floor(0).unwrap();
+        assert_eq!(m.npcs.len(), 1);
+        let p = &m.npcs[0];
+        assert_eq!((p.kind.as_str(), p.name.as_str()), ("porter", "Portier"));
+        assert_eq!(m.room_name(m.room_at_tile(p.home.x, p.home.y)), "Portiernia");
+        let (f, t) = p.escort_to.unwrap();
+        let m1 = b.floor(f).unwrap();
+        assert_eq!(m1.room_name(m1.room_at_tile(t.x, t.y)), "Recepcja");
     }
 
     #[test]

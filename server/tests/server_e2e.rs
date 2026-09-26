@@ -4,7 +4,8 @@ use std::net::{SocketAddr, UdpSocket};
 use std::time::{Duration, Instant};
 
 use game::building::{default_building_path, Building, Place};
-use game::map::Tile;
+use game::map::{access, Tile};
+use game::npc::{lines, NPC_ID_BASE};
 use game::nav::Walker;
 use game::net::LinkConditions;
 use game::protocol::{self as proto, Packet};
@@ -17,6 +18,11 @@ fn building() -> Building {
 
 /// Server on a random port, dual-stack. Returns (IPv4 loopback addr, building crc).
 fn start_server() -> (SocketAddr, u32) {
+    start_server_with(0)
+}
+
+/// Same, with every player starting with rights `start_access`.
+fn start_server_with(start_access: u8) -> (SocketAddr, u32) {
     let map = building();
     let crc = map.crc;
     let cfg = Config {
@@ -25,6 +31,7 @@ fn start_server() -> (SocketAddr, u32) {
         max_players: 16,
         stats_every: Duration::from_secs(3600),
         client_timeout: Duration::from_millis(600),
+        start_access,
     };
     let mut server = Server::new(map, cfg).unwrap();
     let port = server.local_addr().port();
@@ -261,12 +268,12 @@ fn unknown_token_is_told_to_reconnect() {
 
 #[test]
 fn other_floors_are_invisible_and_state_matches_prediction() {
-    let (addr, _) = start_server();
+    let (addr, _) = start_server_with(access::CARD);
     let b0 = building();
     let (a, _) = Client::connect(addr, "downstairs");
     let (mut b, _) = Client::connect(addr, "upstairs");
     let spawn = b0.spawns()[1];
-    let start = Body::at(spawn.0, Pos::tile_center(spawn.1.x, spawn.1.y));
+    let start = Body { access: access::CARD, ..Body::at(spawn.0, Pos::tile_center(spawn.1.x, spawn.1.y)) };
     // Up the stairs to the reception on floor 1: A stays outside.
     let predicted = b.walk_to(&b0, start, (1, Tile { x: 25, y: 18 }), &[&a]);
     assert_eq!(predicted.floor, 1);
@@ -281,10 +288,61 @@ fn other_floors_are_invisible_and_state_matches_prediction() {
     }
     let (floor, room, x, y, lock, prev, ack) = last.expect("B gets snapshots");
     assert_eq!(ack, b.seq);
-    let server = Body { floor, pos: Pos { x, y }, prev_input: prev, lock };
+    let server = Body { floor, pos: Pos { x, y }, prev_input: prev, lock, access: access::CARD };
     assert_eq!(server, predicted, "server state == client prediction, bit for bit");
     assert_eq!(b0.floor(1).unwrap().room_name(room), "Recepcja");
 
     assert!(!visible_ids(&a, &[&b], Duration::from_millis(200)).contains(&b.id), "A (floor 0) can't see B");
     assert!(!visible_ids(&b, &[&a], Duration::from_millis(200)).contains(&a.id), "B (floor 1) can't see A");
+}
+
+#[test]
+fn porter_escorts_a_newcomer_with_a_guest_pass() {
+    let (addr, _) = start_server();
+    let b0 = building();
+    let (mut g, _) = Client::connect(addr, "Nowy");
+    let spawn = b0.spawns()[0];
+    let start = Body::at(spawn.0, Pos::tile_center(spawn.1.x, spawn.1.y));
+
+    // Without a pass the gates stop you: walking to the hall ends in the lobby.
+    assert!(Walker::to(&b0, &start, (0, Tile { x: 34, y: 17 })).is_none(), "no path without a pass");
+
+    // Walk to the lodge door and press E next to the porter.
+    let body = g.walk_to(&b0, start, (0, Tile { x: 27, y: 29 }), &[]);
+    g.seq += 2;
+    let press = Packet::Input { token: g.token, ack_tick: 0, last_seq: g.seq, inputs: vec![0, sim::IN_INTERACT] };
+    g.sock.send(&press.encode()).unwrap();
+    let body = sim::step(&b0, sim::step(&b0, body, 0), sim::IN_INTERACT);
+
+    let (mut welcomed, mut got_pass, mut porter_named) = (false, false, false);
+    let deadline = Instant::now() + Duration::from_millis(800);
+    while Instant::now() < deadline {
+        g.ping();
+        match g.recv() {
+            Some(Packet::Say { id, text }) => {
+                assert!(id >= NPC_ID_BASE);
+                welcomed |= text == lines::WELCOME_ESCORT;
+            }
+            Some(Packet::Snapshot { self_access, .. }) => got_pass |= self_access == access::GUEST,
+            Some(Packet::PlayerInfo { players }) => porter_named |= players.iter().any(|p| p.nick == "Portier"),
+            _ => {}
+        }
+    }
+    assert!(welcomed, "porter greets");
+    assert!(got_pass, "guest pass granted");
+    assert!(porter_named, "porter comes out into the lobby and is visible by name");
+
+    // Follow him up to the reception; he announces the arrival there.
+    let body = Body { access: access::GUEST, ..body };
+    let end = g.walk_to(&b0, body, (1, Tile { x: 31, y: 19 }), &[]);
+    assert_eq!(end.floor, 1);
+    let mut arrived = false;
+    let deadline = Instant::now() + Duration::from_secs(8);
+    while Instant::now() < deadline && !arrived {
+        g.ping();
+        if let Some(Packet::Say { text, .. }) = g.recv() {
+            arrived |= text == lines::ARRIVED;
+        }
+    }
+    assert!(arrived, "porter reached the reception with the guest");
 }

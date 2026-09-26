@@ -32,7 +32,20 @@ func build(map, zoom: float) -> void:
 		sums[rid][0] += Vector2(i % map.width, i / map.width)
 		sums[rid][1] += 1
 	for rid in sums:
-		var center: Vector2 = (sums[rid][0] / float(sums[rid][1]) + Vector2(0.5, 0.5)) * tp
+		var c: Vector2 = sums[rid][0] / float(sums[rid][1])
+		# Non-convex areas (the outside wraps the building): use the room's
+		# tile nearest to the centroid.
+		if map.room_at_tile(int(c.x), int(c.y)) != rid:
+			var best := Vector2i.ZERO
+			var best_d := INF
+			for i in map.room.size():
+				if map.room[i] == rid:
+					var t := Vector2(i % map.width, i / map.width)
+					if t.distance_squared_to(c) < best_d:
+						best_d = t.distance_squared_to(c)
+						best = Vector2i(t)
+			c = Vector2(best)
+		var center: Vector2 = (c + Vector2(0.5, 0.5)) * tp
 		var l := Label.new()
 		l.text = map.room_name(rid)
 		var ls := LabelSettings.new()

@@ -4,7 +4,7 @@
 use std::path::PathBuf;
 
 use game::building::{default_building_path, Building};
-use game::map::Tile;
+use game::map::{access, Tile};
 use game::nav::Walker;
 use game::protocol::{golden_samples, to_hex};
 use game::sim::{self, Body, Pos};
@@ -39,13 +39,17 @@ fn movement_vectors() {
     let b = Building::load(&default_building_path()).unwrap();
     let mut rng = fastrand::Rng::with_seed(42);
     let mut cases = Vec::new();
-    let body_json = |x: &Body| json!([x.floor, x.pos.x, x.pos.y, x.prev_input, x.lock]);
+    let body_json = |x: &Body| json!([x.floor, x.pos.x, x.pos.y, x.prev_input, x.lock, x.access]);
 
     // Random walks from interesting spots (walls, furniture, doors, gates).
+    let guest = |b: Body| Body { access: access::GUEST, ..b };
     let starts = [
         Body::at(0, Pos::tile_center(33, 35)),                     // spawn, sidewalk
+        Body::at(0, Pos::tile_center(34, 23)),                     // gates without a pass
+        Body::at(0, Pos::tile_center(34, 18)),                     // gates from the hall (free exit)
+        Body::at(0, Pos::tile_center(10, 36)),                     // garage gate, no card
         Body::at(0, Pos::tile_center(33, 27)),                     // lobby
-        Body::at(0, Pos::tile_center(34, 23)),                     // below the card gates
+        guest(Body::at(0, Pos::tile_center(34, 23))),              // below the gates with a pass
         Body::at(0, Pos::tile_center(45, 23)),                     // shop, shelves
         Body::at(0, Pos { x: 41 * 256 + 3, y: 30 * 256 - 1 }),     // odd offsets in a door
         Body::at(0, Pos::tile_center(6, 8)),                       // parking between cars
@@ -69,8 +73,8 @@ fn movement_vectors() {
         cases.push(json!({ "start": body_json(&start), "inputs": inputs, "states": states }));
     }
 
-    // Scripted: spawn -> stairs up -> chill room -> elevator down.
-    let mut body = Body::at(0, Pos::tile_center(33, 35));
+    // Scripted (with a guest pass): spawn -> gates -> stairs up -> chill room -> elevator.
+    let mut body = guest(Body::at(0, Pos::tile_center(33, 35)));
     let start = body;
     let (mut inputs, mut states) = (Vec::new(), Vec::new());
     let mut record = |body: &mut Body, input: u8| {

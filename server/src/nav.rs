@@ -18,11 +18,16 @@ impl Walker {
     pub fn to(b: &Building, body: &Body, goal: Place) -> Option<Walker> {
         let (tx, ty) = body.pos.tile();
         let start = (body.floor, crate::map::Tile { x: tx, y: ty });
-        b.find_path(start, goal).map(Walker::new)
+        b.find_path(start, goal, body.access).map(Walker::new)
     }
 
     pub fn done(&self) -> bool {
         self.i >= self.path.len()
+    }
+
+    /// Waypoints not reached yet.
+    pub fn remaining(&self) -> &[Place] {
+        &self.path[self.i.min(self.path.len())..]
     }
 
     /// Input for the next step: head for the current waypoint's tile center,
@@ -82,6 +87,7 @@ mod tests {
                 .collect();
             let goal = tiles[tiles.len() / 2];
             let mut body = Body::at(spawn.0, Pos::tile_center(spawn.1.x, spawn.1.y));
+            body.access = crate::map::access::GUEST;
             let mut w = Walker::to(&b, &body, (1, goal)).expect("path");
             let mut steps = 0;
             while !w.done() && steps < 20_000 {
