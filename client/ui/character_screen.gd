@@ -44,7 +44,7 @@ func _ready() -> void:
 	outer.add_theme_constant_override("separation", 14)
 	center.add_child(outer)
 
-	var title := _label("Startup Sim", 64, Color.WHITE)
+	var title := _label("Startup Sim", 44, Color.WHITE)
 	title.add_theme_constant_override("outline_size", 8)
 	title.add_theme_color_override("font_outline_color", Ink.ACCENT_LO)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

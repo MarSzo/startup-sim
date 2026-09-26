@@ -64,14 +64,29 @@ func _process(delta: float) -> void:
 
 func _draw() -> void:
 	var r := Rect2(Vector2.ZERO, size)
+	var ink := Color(0.12, 0.09, 0.07)
 	if outdoors and weather == Protocol.WEATHER_FOG:
-		# Drifting fog banks.
-		draw_rect(r, Color(0.86, 0.88, 0.9, 0.35))
-		for i in 6:
-			var x := fmod(_t * (12.0 + i * 3.0) + i * 260.0, size.x + 400.0) - 200.0
-			draw_circle(Vector2(x, size.y * (0.15 + i * 0.14)), 180.0, Color(0.92, 0.93, 0.95, 0.12))
-	var rain := Color(0.75, 0.82, 0.95, 0.45)
+		# Fog banks: big soft clouds with a faint ink rim, drifting.
+		draw_rect(r, Color(0.8, 0.78, 0.74, 0.3))
+		for pass_i in 2:
+			for i in 9:
+				var x := fmod(_t * (10.0 + i * 2.5) + i * 190.0, size.x + 500.0) - 250.0
+				var y := size.y * (0.08 + (i % 5) * 0.2) + sin(_t * 0.3 + i) * 12.0
+				var rad := 90.0 + (i % 3) * 35.0
+				if pass_i == 0:
+					draw_circle(Vector2(x, y), rad + 3.0, Color(ink, 0.08))
+				else:
+					draw_circle(Vector2(x, y), rad, Color(0.88, 0.86, 0.82, 0.16))
+	if outdoors and weather == Protocol.WEATHER_STORM:
+		draw_rect(r, Color(0.05, 0.06, 0.12, 0.25))  # a dark sky
+	# Rain: slanted inked strokes with a light core; splashes on the ground.
 	for d in _drops:
-		draw_line(Vector2(d[0], d[1]), Vector2(d[0] + d[3] * 0.18, d[1] + d[3]), rain, 1.2)
+		var a := Vector2(d[0], d[1])
+		var b := a + Vector2(d[3] * 0.25, d[3] * 1.4)
+		draw_line(a, b, Color(ink, 0.55), 3.0, true)
+		draw_line(a, b, Color(0.78, 0.84, 0.92, 0.75), 1.4, true)
+		if int(d[0] * 13.0) % 7 == 0 and d[1] > size.y * 0.3:
+			var k := fmod(_t * 3.0 + d[0], 1.0)
+			draw_arc(Vector2(d[0] * 0.97, fmod(d[0] * 3.7, size.y)), 3.0 + k * 5.0, PI, TAU, 8, Color(0.8, 0.86, 0.95, 0.5 * (1.0 - k)), 1.2, true)
 	if _flash > 0.0:
-		draw_rect(r, Color(1, 1, 1, _flash * (0.8 if outdoors else 0.25)))
+		draw_rect(r, Color(1, 0.98, 0.9, _flash * (0.8 if outdoors else 0.25)))

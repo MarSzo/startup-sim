@@ -73,6 +73,12 @@ func _process(delta: float) -> void:
 	queue_redraw()  # drifting smoke, blinking detectors
 
 
+## How opaque the haze is for a smoke level 0..1: thin smoke is a light
+## veil, thick smoke (a small room, a long cigarette) hides everything.
+static func opacity(level: float) -> float:
+	return clampf(pow(level, 0.55) * 1.15, 0.0, 0.97)
+
+
 func _draw() -> void:
 	var m = building.get_floor(floor_shown) if building else null
 	if m == null:
@@ -84,17 +90,35 @@ func _draw() -> void:
 		var a: float = _shown[r]
 		if a <= 0.01 or not rooms.has(r):
 			continue
-		var haze := Color(0.82, 0.83, 0.86, minf(0.62, a * 0.75))
-		var puff := Color(0.9, 0.9, 0.92, minf(0.35, a * 0.4))
-		var i := 0
-		for tile in rooms[r]:
+		var op := opacity(a)
+		var tiles: Array = rooms[r]
+		# The veil: every tile of the room.
+		var haze := Color(0.66, 0.63, 0.58, op)
+		for tile in tiles:
 			draw_rect(Rect2(Vector2(tile) * px, Vector2(px, px)), haze)
-			# Wisps drifting on every few tiles.
-			if i % 5 == 0:
-				var ph := float(tile.x * 7 + tile.y * 13)
-				var off := Vector2(sin(t * 0.7 + ph) * px * 0.5, cos(t * 0.5 + ph) * px * 0.4)
-				draw_circle((Vector2(tile) + Vector2(0.5, 0.5)) * px + off, px * (0.6 + 0.2 * sin(t + ph)), puff)
-			i += 1
+		# Billowing puffs (Don't Starve-like): one ink rim around the whole
+		# cloud (all rims first, then all fills), soft shading inside.
+		var puffs := []
+		var step := maxi(2, int(round(5.0 - a * 3.0)))
+		for k in range(0, tiles.size(), step):
+			var tile: Vector2i = tiles[k]
+			var ph := float(tile.x * 7 + tile.y * 13)
+			var off := Vector2(sin(t * 0.35 + ph) * px * 0.7, cos(t * 0.27 + ph * 1.3) * px * 0.6)
+			var rad := px * (0.75 + 0.45 * a + 0.15 * sin(t * 0.8 + ph))
+			puffs.append([(Vector2(tile) + Vector2(0.5, 0.5)) * px + off, rad])
+		var rim := Color(0.14, 0.11, 0.08, minf(0.7, 0.2 + op * 0.55))
+		var base := Color(0.62, 0.6, 0.56, minf(0.97, 0.3 + op * 0.7))
+		for pf in puffs:
+			draw_circle(pf[0], pf[1] + 0.8, rim)
+		for pf in puffs:
+			draw_circle(pf[0], pf[1], base)
+		# Light from above-left, shadow bottom-right, both soft.
+		var lit := Color(0.72, 0.7, 0.66, base.a * 0.6)
+		var shade := Color(0.5, 0.48, 0.45, base.a * 0.35)
+		for pf in puffs:
+			draw_circle(pf[0] + Vector2(pf[1] * 0.18, pf[1] * 0.22), pf[1] * 0.75, shade)
+		for pf in puffs:
+			draw_circle(pf[0] - Vector2(pf[1] * 0.2, pf[1] * 0.25), pf[1] * 0.55, lit)
 	# Smoke detectors: white disc, red LED (a blink now and then; fast in an alarm).
 	for pos in _detectors.get(floor_shown, []):
 		draw_circle(pos, 3.5, Color("#6b6f78"))

@@ -91,6 +91,7 @@ var mood_layer := CanvasLayer.new()
 var mood := ColorRect.new()
 ## Text in the world (nicks, bubbles, room names) above the ink effect.
 var label_layer := CanvasLayer.new()
+var smoke_layer := CanvasLayer.new()
 var weather_layer := CanvasLayer.new()
 var dialog := DialogWindow.new()
 var shelf_window := ShelfWindow.new()
@@ -140,7 +141,7 @@ var _goto_floor := -1   # floor the current path was planned on
 
 
 func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Dictionary) -> void:
-	label_layer.layer = 6
+	label_layer.layer = 7
 	label_layer.follow_viewport_enabled = true
 	add_child(label_layer)
 	PlayerView.label_root = label_layer
@@ -173,8 +174,12 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 	world.y_sort_enabled = true
 	add_child(ride_mask)  # between the map and the people
 	add_child(world)
+	# Smoke over the ink effect (drawn in its own style), under the weather.
+	smoke_layer.layer = 5
+	smoke_layer.follow_viewport_enabled = true
+	add_child(smoke_layer)
 	smoke_view.setup(building)
-	add_child(smoke_view)
+	smoke_layer.add_child(smoke_view)
 	for f in views:
 		var m = building.get_floor(f)
 		stall_doors[f] = []
@@ -279,7 +284,7 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 	alarm_label.add_theme_color_override("font_outline_color", Color("#7a0000"))
 	alarm_label.visible = false
 	status_layer.add_child(alarm_label)
-	weather_layer.layer = 5  # over the world, under the HUD
+	weather_layer.layer = 6  # over the world and the smoke, under the HUD
 	add_child(weather_layer)
 	weather_layer.add_child(weather_fx)
 	status_layer.add_child(shelf_window)
@@ -980,10 +985,20 @@ func _update_ride() -> void:
 		ride_mask.show_cabin(Rect2(Vector2(r.position) * m.tile_px, Vector2(r.size) * m.tile_px).grow(2))
 		camera.offset = Vector2(randf_range(-0.35, 0.35), randf_range(-0.35, 0.35))
 		_set_door_views_visible(false)  # nothing of the floor outside the car
+		_set_floor_extras_visible(false)
 	elif ride_mask.visible:
 		ride_mask.visible = false
 		camera.offset = Vector2.ZERO
 		_set_door_views_visible(true)
+		_set_floor_extras_visible(true)
+
+
+## Smoke, detectors and room names are drawn over the ride mask: hide them
+## while riding.
+func _set_floor_extras_visible(on: bool) -> void:
+	smoke_view.visible = on
+	if views.has(pred.floor):
+		views[pred.floor].labels.visible = on
 
 
 func _set_door_views_visible(on: bool) -> void:
