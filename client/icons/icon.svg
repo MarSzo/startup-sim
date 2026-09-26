@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Startup Sim: a mug of office coffee in front of the city at dusk,
+       paper-and-ink like the rest of the game. -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1f1a2e"/>
+      <stop offset="0.55" stop-color="#5a3a4e"/>
+      <stop offset="1" stop-color="#b8735f"/>
+    </linearGradient>
+    <clipPath id="tile"><rect x="64" y="64" width="896" height="896" rx="190"/></clipPath>
+  </defs>
+  <g clip-path="url(#tile)">
+    <rect x="64" y="64" width="896" height="896" fill="url(#sky)"/>
+    <!-- stars -->
+    <g fill="#f4ead0" opacity="0.8">
+      <circle cx="210" cy="190" r="7"/><circle cx="330" cy="140" r="5"/><circle cx="780" cy="170" r="8"/>
+      <circle cx="860" cy="290" r="5"/><circle cx="640" cy="120" r="5"/><circle cx="170" cy="340" r="5"/>
+    </g>
+    <!-- moon -->
+    <circle cx="760" cy="250" r="62" fill="#f4f1c9"/>
+    <circle cx="788" cy="232" r="54" fill="#2b2238"/>
+    <!-- skyline -->
+    <g fill="#1c1622" stroke="#120d10" stroke-width="6">
+      <path d="M40 980 V640 H170 V980 Z"/>
+      <path d="M160 980 V540 H290 V980 Z"/>
+      <path d="M280 980 V690 H360 V980 Z"/>
+      <path d="M660 980 V600 H760 V980 Z"/>
+      <path d="M750 980 V500 H880 V980 Z"/>
+      <path d="M870 980 V660 H990 V980 Z"/>
+    </g>
+    <g fill="#e8b85a">
+      <rect x="190" y="580" width="26" height="34"/><rect x="240" y="580" width="26" height="34"/>
+      <rect x="190" y="650" width="26" height="34"/><rect x="240" y="720" width="26" height="34"/>
+      <rect x="70" y="690" width="26" height="34"/><rect x="120" y="760" width="26" height="34"/>
+      <rect x="780" y="540" width="26" height="34"/><rect x="830" y="610" width="26" height="34"/>
+      <rect x="780" y="680" width="26" height="34"/><rect x="690" y="640" width="26" height="34"/>
+      <rect x="900" y="700" width="26" height="34"/>
+    </g>
+  </g>
+  <!-- steam -->
+  <g fill="none" stroke="#f4ead0" stroke-width="26" stroke-linecap="round" opacity="0.9">
+    <path d="M430 400 C390 350 470 310 430 250"/>
+    <path d="M530 390 C490 330 580 290 530 210"/>
+    <path d="M630 400 C590 350 670 310 630 250"/>
+  </g>
+  <!-- mug: ink outline, paper body, red band -->
+  <g stroke="#2a2118" stroke-width="22" stroke-linejoin="round">
+    <path d="M718 540 C860 540 860 750 700 740" fill="none" stroke-width="54"/>
+    <path d="M718 540 C860 540 860 750 700 740" fill="none" stroke="#f2e7cb" stroke-width="18"/>
+    <path d="M318 450 H742 L712 820 C708 858 680 880 640 880 H420 C380 880 352 858 348 820 Z" fill="#f2e7cb"/>
+  </g>
+  <path d="M332 610 H728 L720 700 H340 Z" fill="#a8402f"/>
+  <path d="M332 610 H728 M340 700 H720" stroke="#2a2118" stroke-width="12" fill="none"/>
+  <!-- coffee surface -->
+  <ellipse cx="530" cy="462" rx="200" ry="26" fill="#5a3522" stroke="#2a2118" stroke-width="12"/>
+  <!-- highlight -->
+  <path d="M390 500 L380 800" stroke="#fffaf0" stroke-width="18" stroke-linecap="round" opacity="0.6"/>
+  <!-- tile rim -->
+  <rect x="64" y="64" width="896" height="896" rx="190" fill="none" stroke="#2a2118" stroke-width="28"/>
+</svg>

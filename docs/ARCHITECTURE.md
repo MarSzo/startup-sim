@@ -67,6 +67,7 @@ server/                 crate Rusta (lib `game` + binarki)
   tests/server_e2e.rs   prawdziwy serwer na losowym porcie + surowe klienty UDP
   tests/golden/         packets.json, movement_vectors.json
 client/                 projekt Godota 4.7
+  icons/                ikona gry (icon.svg — źródło; icon.icns / icon.ico do eksportu) i ekran startowy splash.png
   maps/building.json    lista pięter (piętro 2 zablokowane)
   maps/floor0.json      parter + teren zewnętrzny
   maps/floor1.json      piętro 1
