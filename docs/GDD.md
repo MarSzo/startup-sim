@@ -962,6 +962,20 @@ pełnym ekranie — zastąpiona stylem inspirowanym Don't Starve:
   dalej; postać w tym czasie stoi. Na pulpicie w domu to samo pod przyciskiem
   „StartOS”.
 
+### 10.36 Powrót z pracy do domu
+
+- Do domu wraca się **tak, jak się przyjechało**: E przy **swoim**
+  zaparkowanym aucie/rowerze albo — pieszo / tramwajem / taksówką — na
+  zachodnim końcu chodnika, na przystanku tramwajowym lub na postoju taksówek
+  (parter, podpowiedź „[E] Wracam do domu”).
+- Pierwsze E pyta („E jeszcze raz — tak”, 5 s), drugie potwierdza: auto/rower
+  odjeżdża ulicą, gracz ląduje w domu.
+- **Wypłata** za przepracowane minuty (jak o 22:00), od razu przy wyjściu.
+- **Dom do rana**: ekran „W domu” (w dzień ze słońcem); do biura można wrócić
+  dopiero następnego ranka (zwykły dojazd). Gdy **wszyscy** gracze są w domu
+  (i nikt nie jest w drodze), zegar leci w tempie nocnym.
+- Nie da się wyjść w nocy ani bez umowy (kandydaci, portal).
+
 ### 10.6 Stan implementacji
 
 *Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie,
@@ -1061,10 +1075,10 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
   ciszy/powrocie z tła i sam łączy się ponownie po utracie sesji.
 - **Testy**: 103 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
   zależna od uprawnień, bramki, ruch/kolizje, schody, winda, nawigacja,
-  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, zegar, dojazd, pogoda, zarząd, słodycze, obiady, wakaty, firma, ochrona i policja, kubki, dym, balkon, protokół), 2 golden, 29 e2e serwera
+  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, zegar, dojazd, pogoda, zarząd, słodycze, obiady, wakaty, firma, ochrona i policja, kubki, dym, balkon, protokół), 2 golden, 30 e2e serwera
   (m.in. portal: odrzucenie → przyjęcie → spawn; całe wdrożenie aż do karty;
   niewidoczność między piętrami; zgodność stanu serwera z predykcją) —
-  łącznie 122 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 porannego dojazdu samochodem moknięcia w deszczu spotkania z Prezesem tacy ze słodyczami obiadu z odbiorem na recepcji, obsadzonego stanowiska, panelu założyciela kradzieży w sklepie z ochroną i policją , kubka zebranego przez sprzątaczkę oraz papierosa, który uruchamia alarm pożarowy); 146 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
+  łącznie 135 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 porannego dojazdu samochodem moknięcia w deszczu spotkania z Prezesem tacy ze słodyczami obiadu z odbiorem na recepcji, obsadzonego stanowiska, panelu założyciela kradzieży w sklepie z ochroną i policją , kubka zebranego przez sprzątaczkę oraz papierosa, który uruchamia alarm pożarowy, wcześniejszego powrotu do domu z przystanku); 149 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
   adresów).
 
 #### Pomiary (MacBook, wszystko lokalnie)

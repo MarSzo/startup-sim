@@ -69,9 +69,25 @@ pub fn mode(id: u8) -> Option<&'static Mode> {
     MODES.iter().find(|m| m.id == id)
 }
 
+/// Where you go home from without a vehicle of your own: on foot the west
+/// end of the sidewalk, the tram stop, the taxi stand (floor 0 tiles), with
+/// how far from it (tiles).
+pub fn home_spot(mode_id: u8) -> Option<(Pos, i32)> {
+    match mode_id {
+        mode::WALK => Some((tile(2, 35), 2)),
+        mode::TAXI => Some((tile(34, 36), 2)),
+        mode::TRAM => Some((tile(36, 45), 2)),
+        _ => None,
+    }
+}
+
 pub mod lines {
     pub const LATE: &str = "Spóźnienie… Oby nikt nie zauważył.";
     pub const TOO_POOR: &str = "Nie stać mnie dziś na przejazd — idę pieszo.";
+    pub const GO_HOME_ASK: &str = "Wracam do domu? To koniec dnia pracy (wypłata za przepracowany czas). E jeszcze raz — tak.";
+    pub fn went_home(minutes: u32) -> String {
+        format!("Do domu! Dziś przepracowane: {} h {} min.", minutes / 60, minutes % 60)
+    }
 }
 
 fn tile(x: i32, y: i32) -> Pos {
@@ -186,6 +202,14 @@ impl Vehicle {
             facing: 2,
             moving: true,
         }
+    }
+
+    /// A parked car / bike drives home: out onto the street, then west.
+    pub fn depart(&mut self) {
+        let street = tile(0, 37).y;
+        self.path.push(Pos { x: self.pos.x, y: street });
+        self.leave(Pos { x: -6 * TILE_UNITS, y: street });
+        self.owner = 0;
     }
 
     /// Drive off the map (then `VehicleEvent::Gone`).

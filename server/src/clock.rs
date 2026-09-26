@@ -38,11 +38,13 @@ pub struct Clock {
     pub ds: u32,
     /// Daytime speed multiplier (dev / tests).
     pub scale: u32,
+    /// Everybody is at home: the daytime runs at the night rate.
+    pub fast: bool,
 }
 
 impl Clock {
     pub fn new(start_min: u32, scale: u32) -> Clock {
-        Clock { day: 1, ds: (start_min % MIN_PER_DAY) * DS_PER_MIN, scale: scale.max(1) }
+        Clock { day: 1, ds: (start_min % MIN_PER_DAY) * DS_PER_MIN, scale: scale.max(1), fast: false }
     }
 
     pub fn minute(&self) -> u32 {
@@ -61,7 +63,7 @@ impl Clock {
 
     /// Game deciseconds that pass per tick right now.
     pub fn rate(&self) -> u32 {
-        if self.is_night() {
+        if self.is_night() || self.fast {
             NIGHT_DS_PER_TICK
         } else {
             DAY_DS_PER_TICK * self.scale

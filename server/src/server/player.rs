@@ -119,6 +119,8 @@ pub(super) struct Player {
     pub(super) smoke_said: bool,
     /// Last "get out, the alarm!" reminder (tick).
     pub(super) alarm_nag: u32,
+    /// Asked "going home?" - a second E before this tick confirms.
+    pub(super) home_ask_until: u32,
     /// Salary, grosze per game hour (raises from the CEO).
     pub(super) pay_rate: i64,
     /// World day of the last raise request (cooldown).
@@ -185,6 +187,7 @@ impl Player {
             thefts_today: 0,
             smoke_said: false,
             alarm_nag: 0,
+            home_ask_until: 0,
             pay_rate: clock::PAY_PER_MIN * 60,
             last_raise_day: None,
             talk: None,

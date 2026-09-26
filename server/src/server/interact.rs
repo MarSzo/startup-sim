@@ -74,6 +74,10 @@ impl Server {
             self.says.push(Say::new(pid, line));
         } else if self.show_shelf(pid, body) {
             // The shelf window opened.
+        } else if let Some(line) = self.try_go_home(pid, body) {
+            self.says.push(Say::new(pid, line));
+        } else if self.players.get(&pid).is_some_and(|p| !matches!(p.stage, super::player::Stage::Working)) {
+            // Went home just now.
         } else if let Some(line) = self.try_pickup(pid, body) {
             self.says.push(Say::new(pid, line));
         }

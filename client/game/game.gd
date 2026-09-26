@@ -69,6 +69,7 @@ var inventory: Array = [] # hands + pockets (from the server)
 var hud := InventoryHud.new()
 var computers := {}      # entity id -> ComputerView (laptops on desks)
 var vehicles := {}       # entity id -> VehicleView (cars, bikes, taxis, trams)
+var commute_mode := 5    # how we came today (Clock.mode): where "[E] home" is
 var trays := {}          # entity id -> TrayView (sweets in the chill room)
 var screen := ComputerScreen.new()
 var screen_layer := CanvasLayer.new()
@@ -636,6 +637,7 @@ func _on_packet(p: Dictionary) -> void:
 		Protocol.T_LIGHTS:
 			light_view.on_lights(p)
 		Protocol.T_CLOCK:
+			commute_mode = p.mode
 			fire_alarm = p.get("alarm", 0) == 1
 			smoke_view.alarm = fire_alarm
 			alarm_label.visible = fire_alarm
@@ -961,6 +963,21 @@ func _update_hint() -> void:
 				if kd <= map.tile_px * 1.5 and kd < best_d:
 					best_d = kd
 					text = kitchen_names[ktype]
+	if text == "" and map and pred.floor == 0:
+		# The way home (like the server): our car / bike, or the spot on foot /
+		# at the tram stop / taxi stand.
+		var me_p := Movement.to_px(pred.pos)
+		var spots := {1: Vector2i(2, 35), 4: Vector2i(34, 36), 5: Vector2i(36, 45)}
+		if spots.has(commute_mode):
+			var sp: Vector2 = (Vector2(spots[commute_mode]) + Vector2(0.5, 0.5)) * map.tile_px
+			if sp.distance_to(me_p) <= map.tile_px * 2:
+				text = "[E] Wracam do domu"
+		elif commute_mode == 3 or commute_mode == 2:
+			var want_kind := 1 if commute_mode == 3 else 2
+			for id in vehicles:
+				if vehicles[id].kind == want_kind and vehicles[id].position.distance_to(me_p) <= map.tile_px * 2:
+					text = "[E] Wracam do domu (%s)" % ("samochodem" if commute_mode == 3 else "rowerem")
+					break
 	if text == "" and map:
 		# Light switch within reach (1 tile, like the server).
 		var me_c := Movement.to_px(pred.pos)

@@ -735,6 +735,31 @@ fn kitchenette_mugs_dishwasher_and_fridge() {
 }
 
 #[test]
+fn going_home_early_from_the_tram_stop_pays_and_speeds_the_day_up() {
+    use game::commute::lines as cl;
+    use proto::place;
+    let (addr, _) = start_server_at(access::CARD, true, true, 10 * 60, 1); // hired, comes by tram
+    let b = building();
+    let (mut ola, _) = Client::connect(addr, "Ola");
+    let ws = game::computer::find_workstations(&b);
+    let w = ws.iter().find(|w| w.room_name == "IT / Produkt").unwrap();
+    let body = Body { access: access::CARD, ..Body::at(w.floor, Pos::tile_center(w.tile.x, w.tile.y + 1)) };
+    // E anywhere else: nothing about going home.
+    let at = ola.walk_to(&b, body, (0, Tile { x: 36, y: 45 }), &[]);
+    while ola.recv().is_some() {}
+    let at = ola.press_e(&b, at);
+    assert!(ola.wait_for_line(cl::GO_HOME_ASK, Duration::from_millis(800)).is_some(), "asked first");
+    ola.press_e(&b, at);
+    let home = clock_until(&ola, Duration::from_millis(1500), |_, _, pl, _, _| pl == place::HOME);
+    let (_, m0, _, _, pay) = home.expect("at home");
+    assert!(pay > 0, "paid for the time worked");
+    // Nobody left at work: the day flies by (night speed).
+    let _ = wait_for(&ola, &[], Duration::from_millis(2500), |_| None::<()>); // keeps pinging
+    let later = clock_until(&ola, Duration::from_millis(1500), |_, _, _, _, _| true).expect("clock");
+    assert!(later.1 >= m0 + 15, "fast forward: {} -> {}", m0, later.1);
+}
+
+#[test]
 fn coffee_machine_brews_one_cup_at_a_time() {
     use game::coffee::lines as coffee_lines;
     use game::inventory::kind as item_kind;

@@ -128,13 +128,18 @@ func _render() -> void:
 	match place:
 		Protocol.PLACE_HOME:
 			visible = true
-			_bg.color = Color("#0d1330")
+			_bg.color = Color("#0d1330") if clock.night else Color("#5b7fa8")
 			_title.text = "Koniec dnia" if clock.pay_minutes > 0 else "Noc"
 			if clock.pay_minutes > 0:
 				_sub.text = "Przepracowane: %s · wypłata %d,%02d zł" % [duration(clock.pay_minutes), clock.pay / 100, clock.pay % 100]
 			else:
 				_sub.text = "Biuro zamknięte do rana."
-			_info.text = "Noc… Teraz %s — nowy dzień zaczyna się o 06:00." % hhmm(clock.minute)
+			if clock.night:
+				_info.text = "Noc… Teraz %s — nowy dzień zaczyna się o 06:00." % hhmm(clock.minute)
+			else:
+				# Home early: the day goes on for the others (fast if nobody works).
+				_title.text = "W domu"
+				_info.text = "Teraz %s. Do biura znowu rano — gdy wszyscy są w domu, czas leci szybciej." % hhmm(clock.minute)
 		Protocol.PLACE_COMMUTING:
 			visible = true
 			_bg.color = Color("#f2a65a").darkened(0.35)
@@ -162,10 +167,12 @@ func _render() -> void:
 			_info.text = hhmm(clock.minute)
 
 
-## Moon at night, rising sun on the way to work.
+## Moon at night (the sun when home early), rising sun on the way to work.
 func _draw_sky() -> void:
 	var c := Vector2(size.x / 2, size.y * 0.22)
 	match clock.get("place", -1):
+		Protocol.PLACE_HOME when not clock.get("night", true):
+			Ink.draw_disc(_sky, c, 40, Color("#ffd166"))
 		Protocol.PLACE_HOME:
 			Ink.draw_disc(_sky, c, 36, Color("#f4f1c9"))
 			Ink.draw_disc(_sky, c + Vector2(14, -8), 32, Color("#0d1330"))

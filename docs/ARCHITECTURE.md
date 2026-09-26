@@ -56,6 +56,7 @@ server/                 crate Rusta (lib `game` + binarki)
     interact.rs         klawisz E (biurko, NPC, ekspres, miejsca, winda…) i zdarzenia NPC
     snapshot.rs         interest mgmt, snapshoty, mowa, okresowe stany ekranów
     player.rs           gracz, etap (portal / praca / dom), walidacja profilu
+    leave.rs            wcześniejszy powrót do domu (E przy pojeździe / przystanku), przyspieszony zegar
     portal.rs, company.rs, items.rs, day.rs, doors.rs, alarm.rs, cleaning.rs,
     police.rs, shop.rs, lunch.rs, treats.rs, board.rs, spots.rs, computers.rs, stats.rs
     tests.rs            testy wnętrza serwera (limity, id, spotkania)
@@ -332,6 +333,10 @@ parking / stojak / krawężnik / przystanek), gracz jest `Working` z `riding`
 Na przystanku `VehicleEvent::Arrived` → wysiada, efekty na potrzeby,
 spóźnienie po 9:00. Auto i rower zostają zaparkowane do wieczora (znikają
 przy `go_home`), taksówka i tramwaj odjeżdżają (`Gone`).
+Powrót przed 22:00 (`server/leave.rs`): E przy własnym pojeździe
+(`Vehicle::depart` — odjazd ulicą) lub w `commute::home_spot` dla trybu,
+dwa naciśnięcia w `CONFIRM_TICKS` → `go_home` (wypłata). Gdy wszyscy gracze
+są w domu i nikt nie jedzie, `Clock::fast` = tempo nocne.
 
 **Sklep** (`shop.rs`): lista towarów (`PRODUCTS`: rodzaj przedmiotu, nazwa,
 cena w groszach, efekt na potrzeby, liczba sztuk) i półek (prostokąty kafli

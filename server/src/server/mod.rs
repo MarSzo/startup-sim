@@ -35,6 +35,7 @@ mod doors;
 mod interact;
 mod items;
 mod kitchen;
+mod leave;
 mod lunch;
 mod movement;
 mod player;
@@ -390,6 +391,7 @@ impl Server {
     /// One simulation step, in phases.
     fn tick(&mut self) {
         self.tick = self.tick.wrapping_add(1);
+        self.update_fast_forward();
         self.tick_clock();
         self.drop_timed_out(Instant::now());
 
