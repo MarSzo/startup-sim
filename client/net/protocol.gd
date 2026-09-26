@@ -3,7 +3,7 @@
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 16
+const VERSION := 17
 const MAX_PACKET := 1200
 const MAX_NICK_BYTES := 16
 const MAX_SAY_BYTES := 240
@@ -40,6 +40,7 @@ const T_DOOR_ACTION := 26
 const T_SHELF := 27
 const T_SHOP_TAKE := 28
 const T_CLOCK := 29
+const T_COMMUTE_CHOICE := 30
 # Clock.place
 const PLACE_BUILDING := 0
 const PLACE_HOME := 1
@@ -78,6 +79,7 @@ const KIND_PLAYER := 0
 const KIND_NPC := 1
 const KIND_ITEM := 2
 const KIND_COMPUTER := 3
+const KIND_VEHICLE := 4
 
 # What a character is doing: Snapshot.self_activity / entity activity.
 const ACT_NONE := 0
@@ -87,6 +89,7 @@ const ACT_SOFA := 3
 const ACT_TOILET := 4
 const ACT_SMOKING := 5
 const ACT_WASHING := 6
+const ACT_RIDING := 7
 # Entity flags bit 6: walks slowly (exhausted / needs the toilet).
 const FLAG_SLOW := 0x40
 # Entity flags bit 7: low hygiene (smell cloud).
@@ -231,6 +234,13 @@ static func encode_shop_take(token: int, shelf: int, kind: int) -> PackedByteArr
 	b.put_u32(token)
 	b.put_u8(shelf)
 	b.put_u8(kind)
+	return b.data_array
+
+
+static func encode_commute_choice(token: int, mode: int) -> PackedByteArray:
+	var b := _writer(T_COMMUTE_CHOICE)
+	b.put_u32(token)
+	b.put_u8(mode)
 	return b.data_array
 
 
@@ -424,6 +434,9 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			p.pay = r.u32()
 			p.pay_minutes = r.u16()
 			p.today_minutes = r.u16()
+			p.mode = r.u8()
+			p.depart = r.u16()
+			p.money = r.u32()
 		T_SHELF:
 			p.shelf = r.u8()
 			p.title = r.str16(MAX_TEXT_BYTES)

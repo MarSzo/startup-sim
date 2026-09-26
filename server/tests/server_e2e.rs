@@ -1099,23 +1099,39 @@ fn office_closes_at_ten_pm_and_pays_the_day() {
 }
 
 #[test]
-fn morning_random_arrival_between_seven_and_ten() {
+fn morning_commute_choice_ride_and_arrival() {
+    use game::commute::mode;
     use proto::place;
-    // 5:58 (night: at home), daytime 600x faster so the arrival comes quickly.
+    // 5:58 (night: at home), daytime 600x faster so the morning goes quickly.
     let (addr, _) = start_server_at(0, true, true, 5 * 60 + 58, 600);
     let (ola, _) = Client::connect(addr, "Ola");
     let (day, _, pl, _, _) = clock_until(&ola, Duration::from_millis(800), |_, _, _, _, _| true).expect("clock");
     assert_eq!((day, pl), (2, place::HOME), "hired at night: at home until the morning");
-    let (day, _, _, arrive, _) =
-        clock_until(&ola, Duration::from_millis(3000), |_, _, pl, _, _| pl == place::COMMUTING).expect("on the way");
-    assert_eq!(day, 3, "a new day");
-    assert!((7 * 60..=10 * 60).contains(&arrive), "arrival 7:00-10:00: {arrive}");
-    let (_, minute, _, _, _) =
-        clock_until(&ola, Duration::from_millis(5000), |_, _, pl, _, _| pl == place::BUILDING).expect("arrived");
-    assert!(minute >= arrive, "arrived at {minute}, planned {arrive}");
-    let snap = wait_for(&ola, &[], Duration::from_millis(800), |p| match p {
-        Packet::Snapshot { floor, .. } => Some(*floor),
+    // Morning: choose the car before leaving.
+    let depart = wait_for(&ola, &[], Duration::from_millis(3000), |p| match p {
+        Packet::Clock { place: place::COMMUTING, depart, day: 3, .. } if *depart != proto::NO_TIME => Some(*depart),
+        _ => None,
+    })
+    .expect("morning: a departure time");
+    assert!((6 * 60 + 15..=8 * 60 + 45).contains(&depart), "leaves 6:15-8:45: {depart}");
+    ola.sock.send(&Packet::CommuteChoice { token: ola.token, mode: mode::CAR }.encode()).unwrap();
+    // Leaves: pays for fuel; arrives, rides in, gets out on the car park.
+    let paid = wait_for(&ola, &[], Duration::from_millis(5000), |p| match p {
+        Packet::Clock { mode: m, money, arrive, .. } if *m == mode::CAR && *arrive != proto::NO_TIME => Some(*money),
         _ => None,
     });
-    assert_eq!(snap, Some(0), "in front of the building");
+    assert_eq!(paid, Some(200_00 - 12_00), "fuel: 12 zł");
+    let riding = wait_for(&ola, &[], Duration::from_millis(8000), |p| match p {
+        Packet::Snapshot { self_activity, .. } if *self_activity == proto::activity::RIDING => Some(()),
+        _ => None,
+    });
+    assert!(riding.is_some(), "rides in the car");
+    let out = wait_for(&ola, &[], Duration::from_millis(8000), |p| match p {
+        Packet::Snapshot { self_activity, self_x, self_y, floor: 0, .. } if *self_activity != proto::activity::RIDING => {
+            Some(Pos { x: *self_x, y: *self_y }.tile())
+        }
+        _ => None,
+    });
+    let (tx, ty) = out.expect("got out");
+    assert!((41..=43).contains(&ty) && tx < 31, "on the outside car park: ({tx},{ty})");
 }

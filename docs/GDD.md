@@ -185,7 +185,7 @@ podpisaniu umowy, kanapki, przekąski, napoje, fast food, alkohol, papierosy
   start w pracy rano o losowej godzinie między 7:00 a 10:00.
 - Pensja wypłacana za dzień pracy (zastąpi jednorazową zaliczkę).
 
-**Dojazd do pracy** — wybór: pieszo, rowerem, samochodem (parking), taksówką,
+**Dojazd do pracy** — *zrobione (10.22)*. Wybór: pieszo, rowerem, samochodem (parking), taksówką,
 tramwajem (bilet/taksówka kosztują).
 
 **Zarząd i kalendarz** — do pokoju zarządu nie można wejść bez spotkania;
@@ -647,6 +647,28 @@ Zastępuje prosty portal z 10.8. Po połączeniu gracz widzi pulpit komputera
 - **Oświetlenie**: świt fioletowo-chłodny, dzień biały, wieczór złoty, a
   przed 22:00 granatowy.
 - Do zrobienia z tej grupy: **pogoda** (backlog 9b).
+- Poranny przyjazd zależy teraz od wybranego dojazdu (10.22).
+
+### 10.22 Dojazd do pracy
+
+- **Rano (od 6:00) wybierasz, jak jedziesz** — plansza z pięcioma
+  przyciskami; wyjazd o losowej godzinie **6:15–8:45**, do tego czasu można
+  zmienić zdanie (domyślnie ostatni wybór; na start tramwaj).
+
+| Sposób | Czas | Koszt | Na potrzeby | Przyjazd |
+|---|---|---|---|---|
+| Pieszo | 45 min | 0 zł | energia −5, stres −3 | chodnikiem od zachodu |
+| Rower | 25 min | 0 zł | energia −8, stres −5, higiena −10 | rower przy stojaku przed wejściem (zostaje do wieczora) |
+| Samochód | 20 min + korki 0–20 | 12 zł | stres +5 | wjeżdża z ulicy na parking zewnętrzny i tam zostaje |
+| Taksówka | 15 min | 35 zł | — | wysadza przy krawężniku i odjeżdża |
+| Tramwaj | 30 min | 4,40 zł | energia −2, stres +4, higiena −3 | przystanek przy torach; tramwaj jedzie dalej |
+
+- Bez pieniędzy na wybrany środek — **pieszo** (droższe przyciski są
+  wyszarzone).
+- Przyjazd **widać**: gracz siedzi w pojeździe (kamera jedzie z nim), a inni na
+  zewnątrz widzą auto, taksówkę, tramwaj czy rower. Przed budynkiem jest ulica,
+  torowisko z peronem i stojak na rowery.
+- **Spóźnienie po 9:00**: stres +10 i „Spóźnienie… Oby nikt nie zauważył.”
 
 ### 10.6 Stan implementacji
 
@@ -684,6 +706,9 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Ekwipunek**: kieszenie i ręce, przedmioty (przepustka, karta, laptop,
   kawa), upuszczanie / podnoszenie / podawanie, dostęp z przedmiotów (10.13);
   protokół v8.
+- **Dojazd do pracy**: poranny wybór pięciu sposobów, czas, koszt, wpływ na
+  potrzeby, pojazdy z przyjazdem na parking / stojak / przystanek, spóźnienia
+  (10.22); protokół v17.
 - **Zegar i dni gry**: wspólny zegar, biuro 6–22, noc przewijana, poranne
   przyjazdy 7–10, dni gracza, pensja godzinowa, oświetlenie wg pory dnia
   (10.21); protokół v16.
@@ -709,12 +734,12 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Sieć mobilna**: serwer dual-stack IPv4/IPv6; gracz identyfikowany tokenem
   (zmiana adresu w trakcie gry przenosi sesję); klient przepina gniazdo po
   ciszy/powrocie z tła i sam łączy się ponownie po utracie sesji.
-- **Testy**: 77 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
+- **Testy**: 79 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
   zależna od uprawnień, bramki, ruch/kolizje, schody, winda, nawigacja,
   portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, zegar, protokół), 2 golden, 19 e2e serwera
   (m.in. portal: odrzucenie → przyjęcie → spawn; całe wdrożenie aż do karty;
   niewidoczność między piętrami; zgodność stanu serwera z predykcją) —
-  łącznie 98 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 i porannego przyjazdu); 135 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
+  łącznie 100 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 i porannego dojazdu samochodem); 136 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
   adresów).
 
 #### Pomiary (MacBook, wszystko lokalnie)

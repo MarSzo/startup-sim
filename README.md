@@ -37,7 +37,7 @@ domyślnie `server/data/recruitment.json`), oraz symulacja sieci:
 Np. RTT ~100 ms i 2% strat: `cargo run --release -- --lag-ms 50 --jitter-ms 10 --loss 0.02`.
 
 ### Klient — argumenty deweloperskie (po `--`)
-`--nick=Ala --server=127.0.0.1:7777 --autoconnect --debug`, `--auto-recruit=1 [--auto-recruit-delay=2]`
+`--nick=Ala --server=127.0.0.1:7777 --autoconnect --debug`, `--commute=3` (co rano wybierz dojazd: 1 pieszo … 5 tramwaj), `--auto-recruit=1 [--auto-recruit-delay=2]`
 (sam aplikuje na ofertę 1 i zgaduje odpowiedzi do skutku), (adres może być też IPv6: `--server=[::1]:7777`) (F3 od startu),
 `--autowalk` (losowy ruch), `--goto="27,29;E;wait:2;34,6;Recepcja"` (kolejne
 kroki: kafel / pokój na bieżącym piętrze, `E` = wciśnij E, `wait:N` = czekaj —

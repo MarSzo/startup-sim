@@ -1,4 +1,4 @@
-# Protokół sieciowy (wersja 16)
+# Protokół sieciowy (wersja 17)
 
 Własny binarny protokół na UDP. Implementacje:
 - serwer: `server/src/protocol.rs` (źródło prawdy),
@@ -23,7 +23,7 @@ przez `cargo test` i czytane przez `client/tests/run_tests.gd`.
 | pole    | typ | wartość |
 |---------|-----|---------|
 | magic   | u16 | `0x5354` (bajty `54 53`, „TS”) |
-| version | u8  | `16` |
+| version | u8  | `17` |
 | type    | u8  | typ pakietu (niżej) |
 
 ## Jednostki
@@ -289,7 +289,18 @@ pracy), `minute u16` (minuta doby 0..1439, zegar wspólny), `night u8` (biuro
 zamknięte, 22:00–6:00), `place u8` (0 w budynku, 1 w domu na noc, 2 w drodze do
 pracy, 3 na portalu), `arrive u16` (minuta przyjazdu albo 0xFFFF), `pay u32` i
 `pay_minutes u16` (ostatnia wypłata: grosze, minuty gry w pracy),
-`today_minutes u16` (minuty gry przepracowane dziś). Poza budynkiem (w domu /
+`today_minutes u16` (minuty gry przepracowane dziś), `mode u8` (dojazd: 1
+pieszo, 2 rower, 3 samochód, 4 taksówka, 5 tramwaj), `depart u16` (minuta
+wyjazdu albo 0xFFFF), `money u32` (portfel — także w domu). Rano `place` = 2 i
+`arrive` = 0xFFFF oznacza „jeszcze w domu, wybierz dojazd”; po wyjeździe
+`arrive` = minuta przyjazdu.
+
+### 30 `CommuteChoice` (C→S)
+
+token u32, mode u8 — wybór dojazdu (przed wyjazdem). Przyjazd pojazdem: gracz
+jest w budynku z czynnością 7 (jedzie — niewidoczny, bez sterowania, pozycja =
+pojazd), pojazd to encja `kind` 4 (`held`: 1 auto, 2 rower, 3 taksówka, 4
+tramwaj; `flags` kierunek + ruch). Poza budynkiem (w domu /
 w drodze) serwer nie wysyła snapshotów; przyjazd = znowu snapshoty, postać
 przed budynkiem.
 
@@ -364,6 +375,7 @@ szyfrowaniem.
 
 ## Historia wersji
 
+- **17** — dojazd: `Clock` + `mode`, `depart`, `money`; `CommuteChoice`; encja pojazdu; czynność 7 (jedzie).
 - **16** — zegar i dni: `Clock`.
 - **15** — sklep: `Stats` + `money`, `Shelf`, `ShopTake`, przedmioty 10–23.
 - **14** — `Doors` + `lift_moving`; limit 6 osób w windzie; mniejsza kabina (3×2).

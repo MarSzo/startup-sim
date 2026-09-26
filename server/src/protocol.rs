@@ -5,7 +5,7 @@
 //! `tests/golden/packets.json`.
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 16;
+pub const VERSION: u8 = 17;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
 pub const MAX_PACKET: usize = 1200;
@@ -60,6 +60,7 @@ pub mod ty {
     pub const SHELF: u8 = 27;
     pub const SHOP_TAKE: u8 = 28;
     pub const CLOCK: u8 = 29;
+    pub const COMMUTE_CHOICE: u8 = 30;
 }
 
 /// `ItemAction::action`.
@@ -178,6 +179,8 @@ pub mod activity {
     pub const SMOKING: u8 = 5;
     /// Washing hands at a sink.
     pub const WASHING: u8 = 6;
+    /// Riding a vehicle to work (hidden; the camera follows).
+    pub const RIDING: u8 = 7;
 }
 
 /// `Clock::place`: where the receiver is.
@@ -214,6 +217,9 @@ pub mod kind {
     /// A laptop on a desk (`flags`: bit 0 locked, bit 1 in use; the owner's
     /// name comes as its `PlayerInfo`).
     pub const COMPUTER: u8 = 3;
+    /// A vehicle (`held`: 1 car, 2 bike, 3 taxi, 4 tram; `flags` bits 0-2
+    /// facing + moving like players).
+    pub const VEHICLE: u8 = 4;
 }
 
 /// One conversation in the messenger sidebar.
@@ -357,7 +363,23 @@ pub enum Packet {
     /// of the day (0..1439), night (office closed), where they are
     /// (`place`), arrival time (minute of the day or `NO_TIME`), last payday
     /// (grosze, game minutes worked) and minutes worked today.
-    Clock { day: u16, minute: u16, night: bool, place: u8, arrive: u16, pay: u32, pay_minutes: u16, today_minutes: u16 },
+    /// + how the receiver commutes today (`mode`: 1 on foot, 2 bike, 3 car, 4
+    /// taxi, 5 tram), departure (minute or `NO_TIME`) and the wallet (grosze).
+    Clock {
+        day: u16,
+        minute: u16,
+        night: bool,
+        place: u8,
+        arrive: u16,
+        pay: u32,
+        pay_minutes: u16,
+        today_minutes: u16,
+        mode: u8,
+        depart: u16,
+        money: u32,
+    },
+    /// Morning choice of how to get to work (before the departure).
+    CommuteChoice { token: u32, mode: u8 },
     /// Closed doors (locked toilet stalls, elevator doors) on the receiver's
     /// floor: solid for the simulation. Plus the elevator: the floor it is at
     /// and where it is heading (`NO_FLOOR` = standing). Sent on change and
@@ -495,6 +517,7 @@ impl Packet {
             Packet::Shelf { .. } => ty::SHELF,
             Packet::ShopTake { .. } => ty::SHOP_TAKE,
             Packet::Clock { .. } => ty::CLOCK,
+            Packet::CommuteChoice { .. } => ty::COMMUTE_CHOICE,
             Packet::Doors { .. } => ty::DOORS,
             Packet::DoorAction { .. } => ty::DOOR_ACTION,
         }
@@ -728,7 +751,7 @@ impl Packet {
                 w.u8(*shelf);
                 w.u8(*kind);
             }
-            Packet::Clock { day, minute, night, place, arrive, pay, pay_minutes, today_minutes } => {
+            Packet::Clock { day, minute, night, place, arrive, pay, pay_minutes, today_minutes, mode, depart, money } => {
                 w.u16(*day);
                 w.u16(*minute);
                 w.u8(*night as u8);
@@ -737,6 +760,13 @@ impl Packet {
                 w.u32(*pay);
                 w.u16(*pay_minutes);
                 w.u16(*today_minutes);
+                w.u8(*mode);
+                w.u16(*depart);
+                w.u32(*money);
+            }
+            Packet::CommuteChoice { token, mode } => {
+                w.u32(*token);
+                w.u8(*mode);
             }
             Packet::Chat { conv, messages } => {
                 w.u16(*conv);
@@ -977,7 +1007,11 @@ impl Packet {
                 pay: r.u32()?,
                 pay_minutes: r.u16()?,
                 today_minutes: r.u16()?,
+                mode: r.u8()?,
+                depart: r.u16()?,
+                money: r.u32()?,
             },
+            ty::COMMUTE_CHOICE => Packet::CommuteChoice { token: r.u32()?, mode: r.u8()? },
             ty::CHAT => {
                 let conv = r.u16()?;
                 let n = r.u8()? as usize;
@@ -1214,8 +1248,12 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
                 pay: 230_00,
                 pay_minutes: 460,
                 today_minutes: 0,
+                mode: 2,
+                depart: 8 * 60 + 40,
+                money: 186_00,
             },
         ),
+        ("commute_choice", Packet::CommuteChoice { token: 0x01020304, mode: 5 }),
         (
             "chat",
             Packet::Chat {
@@ -1283,7 +1321,7 @@ mod tests {
                 b[0] = 0x54;
                 b[1] = 0x53;
                 b[2] = VERSION;
-                b[3] = rng.u8(1..=29);
+                b[3] = rng.u8(1..=30);
             }
             let _ = Packet::decode(&b);
         }

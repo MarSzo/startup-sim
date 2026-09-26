@@ -22,6 +22,7 @@ const StallDoorView = preload("res://game/stall_door_view.gd")
 const ElevatorDoorView = preload("res://game/elevator_door_view.gd")
 const RideMask = preload("res://game/ride_mask.gd")
 const ShelfWindow = preload("res://ui/shelf_window.gd")
+const VehicleView = preload("res://game/vehicle_view.gd")
 
 const ZOOM := 3.0
 ## Remote players are rendered this far in the past (2 snapshots at 20 Hz).
@@ -59,6 +60,7 @@ var floor_items := {}    # entity id -> ItemView (items lying on the floor)
 var inventory: Array = [] # hands + pockets (from the server)
 var hud := InventoryHud.new()
 var computers := {}      # entity id -> ComputerView (laptops on desks)
+var vehicles := {}       # entity id -> VehicleView (cars, bikes, taxis, trams)
 var screen := ComputerScreen.new()
 var screen_layer := CanvasLayer.new()
 var stats_hud := StatsHud.new()
@@ -322,7 +324,7 @@ func _refresh_own_label() -> void:
 
 
 func _sample_input(delta: float) -> int:
-	if input_blocked:
+	if input_blocked or me.status == Protocol.ACT_RIDING:
 		return 0
 	if not goto_legs.is_empty() or not _goto_path.is_empty():
 		var g := _goto_input(delta)  # dev script also drives the computer screen
@@ -475,6 +477,10 @@ func _process(delta: float) -> void:
 	if have_state:
 		_update_stall_doors()
 		_update_ride()
+	for id in vehicles.keys():
+		if latest_tick - vehicles[id].last_seen_tick > REMOTE_TIMEOUT_TICKS:
+			vehicles[id].queue_free()
+			vehicles.erase(id)
 	for id in computers.keys():
 		if latest_tick - computers[id].last_seen_tick > REMOTE_TIMEOUT_TICKS:
 			computers[id].queue_free()
@@ -590,6 +596,7 @@ func _on_snapshot(p: Dictionary) -> void:
 			est_tick += (tick - est_tick) * 0.1
 		_reconcile(Movement.body(p.floor, Vector2i(p.self_x, p.self_y), p.self_prev_input, p.self_lock, p.self_access, p.self_slow != 0), p.last_input_seq)
 		me.set_status(p.self_activity, p.self_slow != 0)
+		me.visible = p.self_activity != Protocol.ACT_RIDING  # inside the vehicle
 		screen.set_seated(p.self_activity == Protocol.ACT_COMPUTER)
 	visible_count += p.entities.size()
 	var unknown := []
@@ -604,6 +611,17 @@ func _on_snapshot(p: Dictionary) -> void:
 			iv.setup(e.held)
 			iv.position = Vector2(e.x, e.y) / float(Movement.SUBPIXELS)
 			iv.last_seen_tick = tick
+			continue
+		if e.kind == Protocol.KIND_VEHICLE:
+			var vv = vehicles.get(e.id)
+			if vv == null:
+				vv = VehicleView.new()
+				world.add_child(vv)
+				vehicles[e.id] = vv
+			vv.setup(e.held, e.id)
+			vv.push(Vector2(e.x, e.y) / float(Movement.SUBPIXELS), e.flags)
+			vv.last_seen_tick = tick
+			kinds[e.id] = e.kind
 			continue
 		if e.kind == Protocol.KIND_COMPUTER:
 			var cv = computers.get(e.id)

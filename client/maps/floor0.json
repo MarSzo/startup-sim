@@ -111,6 +111,21 @@
    "solid": true,
    "color": "#b03a2e"
   },
+  "r": {
+   "type": "street",
+   "solid": false,
+   "color": "#55585e"
+  },
+  "t": {
+   "type": "tram_track",
+   "solid": false,
+   "color": "#6b6259"
+  },
+  "b": {
+   "type": "bike_rack",
+   "solid": true,
+   "color": "#9aa4ab"
+  },
   "v": {
    "type": "grass",
    "solid": false,
@@ -167,19 +182,19 @@
   "Fv#================#......#______________#.........KKKKK.#vF",
   "Fv#================#......#P____________P#...............#vF",
   "Fv######ggggg##################GGGGG######################vF",
+  "Fpppppp=======ppppppppppppppppppppppppppbbbbpppppppppppppppF",
   "Fpppppp=======pppppppppppppppppppppppppppppppppppppppppppppF",
   "Fpppppp=======pppppppppppppppppppppppppppppppppppppppppppppF",
-  "Fpppppp=======pppppppppppppppppppppppppppppppppppppppppppppF",
-  "Fvvvvvv=======vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvF",
+  "FrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrF",
   "Fvv============================vvvvvvvvvvvvvvvvvvvvvvvvvvvvF",
   "Fvv=XXX==XXX==XXX==XXX==XXX====vvvvvvvvvvvzzzzzzzzzzzzzvvvvF",
   "Fvv=XXX==XXX==XXX==XXX==XXX====vvvvvvvvvvvzzzzzzzzzzzzzvvvvF",
   "Fvv============================vvvvvvvvvvvzzNNNzzzzzzzzvvvvF",
   "Fvv============================vvvvvvvvvvvzzzzzzzzzzzzzvvvvF",
-  "Fvv=XXX==XXX==XXX==XXX==XXX====vvvvvvvvvvvzzzzzzzzAzzzzvvvvF",
-  "Fvv=XXX==XXX==XXX==XXX==XXX====vvvvvvvvvvvzzzzzzzzzzzzzvvvvF",
+  "Fvv============================vvvvvvvvvvvzzzzzzzzAzzzzvvvvF",
   "Fvv============================vvvvvvvvvvvzzzzzzzzzzzzzvvvvF",
-  "FvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvF",
+  "Fvv============================vpppppppppvzzzzzzzzzzzzzvvvvF",
+  "FttttttttttttttttttttttttttttttttttttttttttttttttttttttttttF",
   "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
  ],
  "rooms": [
@@ -236,7 +251,10 @@
   "O": {
    "id": 1,
    "name": "Na zewnątrz",
-   "type": "outside"
+   "type": "outside",
+   "see": [
+    "R"
+   ]
   },
   "K": {
    "id": 2,
@@ -287,7 +305,10 @@
   "R": {
    "id": 7,
    "name": "Parking zewnętrzny",
-   "type": "parking"
+   "type": "parking",
+   "see": [
+    "O"
+   ]
   },
   "M": {
    "id": 8,

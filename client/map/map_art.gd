@@ -147,6 +147,10 @@ func _ground(x: int, y: int) -> void:
 			_blit(_tile_img("E", func(im): _elevator_threshold(im)), x, y)
 		"s":
 			_blit(_tile_img("s", func(im): _steps(im)), x, y)
+		"r":
+			_blit(_tile_img("r %d" % (x % 2), func(im): _street(im, x % 2)), x, y)
+		"t":
+			_blit(_tile_img("t", func(im): _tram_track(im)), x, y)
 		"S":
 			_blit(_tile_img("S", func(im): _stairs(im)), x, y)
 		"D":
@@ -289,6 +293,31 @@ func _steps(t: Image) -> void:
 			t.set_pixel(xx, yy, c)
 
 
+## Street: asphalt with a dashed centre line and kerb edges.
+func _street(t: Image, v: int) -> void:
+	_noise(t, Color("#55585e"), 0.02, 31 + v)
+	for xx in TP:
+		t.set_pixel(xx, 0, Color("#8c8f94"))
+		t.set_pixel(xx, TP - 1, Color("#8c8f94"))
+	if v == 0:
+		for xx in range(3, 12):
+			t.set_pixel(xx, 7, Color("#e9e3c8"))
+			t.set_pixel(xx, 8, Color("#e9e3c8"))
+
+
+## Tram line: gravel bed, sleepers, two rails.
+func _tram_track(t: Image) -> void:
+	_noise(t, Color("#6b6259"), 0.03, 47)
+	for xx in range(1, TP, 4):
+		for yy in range(2, 14):
+			t.set_pixel(xx, yy, Color("#4a3b2b"))
+			t.set_pixel(xx + 1, yy, Color("#4a3b2b"))
+	for xx in TP:
+		for yy in [4, 11]:
+			t.set_pixel(xx, yy, Color("#b8bec4"))
+			t.set_pixel(xx, yy + 1, Color("#7f878f"))
+
+
 func _stairs(t: Image) -> void:
 	for yy in TP:
 		var band := (yy % 4)
@@ -426,7 +455,7 @@ func _wall_shadows() -> void:
 
 # ------------------------------------------------------------------- props
 
-const PROPS := ["W", "K", "H", "Q", "T", "P", "R", "N", "A", "U", "V", "X", "C", "J", "O", "|", "Y"]
+const PROPS := ["W", "K", "H", "Q", "T", "P", "R", "N", "A", "U", "V", "X", "C", "J", "O", "|", "Y", "b"]
 
 
 ## Connected components of the same furniture char -> one object each.
@@ -480,6 +509,7 @@ func _prop(c: String, tr: Rect2i, index: int) -> void:
 		"O": _fruit_bowl(r)
 		"|": _partition(r)
 		"Y": _sanitizer(r)
+		"b": _bike_rack(r)
 
 
 func _desks(tr: Rect2i, r: Rect2i, index: int) -> void:
@@ -700,6 +730,16 @@ func _kitchen_counter(r: Rect2i) -> void:
 	if r.size.x >= 32:
 		_rect(Rect2i(x + 20, y + 2, 6, 7), Color("#9aa4ab"))
 		_rect(Rect2i(x + 21, y + 2, 4, 1), Color("#c9d1d7"))
+
+
+## Bike rack: steel hoops on the sidewalk.
+func _bike_rack(r: Rect2i) -> void:
+	for tx in range(r.position.x, r.end.x, TP):
+		var y := r.position.y
+		_tint(Rect2i(tx + 3, y + 12, 11, 2), Color(0, 0, 0, 0.2))
+		_rect(Rect2i(tx + 4, y + 4, 2, 9), Color("#9aa4ab"))
+		_rect(Rect2i(tx + 11, y + 4, 2, 9), Color("#9aa4ab"))
+		_rect(Rect2i(tx + 4, y + 3, 9, 2), Color("#c3ccd2"))
 
 
 ## Hand sanitizer: a white wall dispenser with a blue label and a drip tray.

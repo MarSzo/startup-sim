@@ -8,6 +8,7 @@ use std::time::{Duration, Instant};
 use crate::building::Building;
 use crate::clock::{self, Clock, Transition};
 use crate::coffee::{self, Cup, Machine};
+use crate::commute::{self, Vehicle, VehicleEvent};
 use crate::computer::{self, Account, Computer, Messenger, Workstation};
 use crate::elevator::{self, Elevator};
 use crate::inventory::{self, kind as item_kind, Inventory, Item};
@@ -164,6 +165,12 @@ struct Player {
     worked_ds: u64,
     /// Last payday: amount (grosze) and game minutes worked.
     last_pay: (i64, u32),
+    /// How they commute (`commute::mode`); the last choice is kept.
+    commute_mode: u8,
+    /// Morning departure (game minute, `Clock::total_minutes`), until they leave.
+    depart_at: Option<u32>,
+    /// Riding a vehicle to work (its handle): hidden, no input.
+    riding: Option<u16>,
     /// Sofa / toilet / smoke break, and where it started (moving ends it).
     rest: Option<(Rest, u8, Pos)>,
     /// Messenger spam guard / retry dedupe.
@@ -214,6 +221,8 @@ pub struct Server {
     /// Some elevator was moving last tick (resend `Doors` when it starts/stops).
     lift_was_moving: bool,
     clock: Clock,
+    /// Vehicles bringing people to work (and parked cars / bikes).
+    vehicles: Vec<Vehicle>,
     /// Send `Clock` to everyone this tick (a day started / ended, someone arrived).
     clock_dirty: bool,
     /// A stall door changed: send `Doors` to everyone this tick.
@@ -261,6 +270,7 @@ impl Server {
             cashier: None,
             lift_was_moving: false,
             clock: Clock::new(cfg.start_minute, cfg.time_scale),
+            vehicles: Vec::new(),
             clock_dirty: true,
             doors_dirty: false,
             computers: Vec::new(),
@@ -436,7 +446,8 @@ impl Server {
             | Packet::ItemAction { token, .. }
             | Packet::ComputerAction { token, .. }
             | Packet::DoorAction { token }
-            | Packet::ShopTake { token, .. } => *token,
+            | Packet::ShopTake { token, .. }
+            | Packet::CommuteChoice { token, .. } => *token,
             _ => return,
         };
         let Some(&id) = self.by_token.get(&token) else {
@@ -496,6 +507,13 @@ impl Server {
             Packet::ComputerAction { action, conv, arg, text, .. } => self.handle_computer_action(id, action, conv, arg, &text),
             Packet::DoorAction { .. } => self.handle_door_action(id),
             Packet::ShopTake { shelf, kind, .. } => self.handle_shop_take(id, shelf, kind),
+            Packet::CommuteChoice { mode, .. } => {
+                let p = self.players.get_mut(&id).unwrap();
+                if commute::mode(mode).is_some() && matches!(p.stage, Stage::Home { arrive_at: None }) {
+                    p.commute_mode = mode;
+                    self.clock_dirty = true;
+                }
+            }
             Packet::Answer { attempt, index, choice, .. } => self.handle_answer(id, attempt, index, choice),
             _ => {}
         }
@@ -552,6 +570,9 @@ impl Server {
             day: 1,
             worked_ds: 0,
             last_pay: (0, 0),
+            commute_mode: commute::mode::TRAM,
+            depart_at: None,
+            riding: None,
             rest: None,
             last_chat_tick: None,
             last_chat_nonce: 0,
@@ -891,7 +912,10 @@ impl Server {
     fn alloc_handle(&mut self) -> u16 {
         let next = |h: u16| if h + 1 >= npc::NPC_ID_BASE { DROP_HANDLE_BASE } else { h + 1 };
         let mut handle = self.next_drop_handle;
-        while self.dropped.iter().any(|d| d.handle == handle) || self.computers.iter().any(|c| c.handle == handle) {
+        while self.dropped.iter().any(|d| d.handle == handle)
+            || self.computers.iter().any(|c| c.handle == handle)
+            || self.vehicles.iter().any(|v| v.handle == handle)
+        {
             handle = next(handle);
         }
         self.next_drop_handle = next(handle);
@@ -1047,8 +1071,10 @@ impl Server {
                 let now = self.clock.total_minutes();
                 for p in self.players.values_mut() {
                     p.day += 1;
-                    if let Stage::Home { arrive_at } = &mut p.stage {
-                        *arrive_at = Some(now + self.rng.u32(clock::ARRIVAL_FROM..=clock::ARRIVAL_TO));
+                    if matches!(p.stage, Stage::Home { .. }) {
+                        // Leaves home at a random time; how they travel is
+                        // chosen until then (the last choice by default).
+                        p.depart_at = Some(now + self.rng.u32(commute::DEPART_FROM..=commute::DEPART_TO));
                     }
                 }
                 self.log(format!("* day {} starts", self.clock.day));
@@ -1057,6 +1083,26 @@ impl Server {
             None => {}
         }
         let now = self.clock.total_minutes();
+        // Leaving home: pay the fare, the trip takes its time.
+        let leaving: Vec<u16> = self
+            .players
+            .values()
+            .filter(|p| matches!(p.stage, Stage::Home { arrive_at: None }) && p.depart_at.is_some_and(|t| now >= t))
+            .map(|p| p.id)
+            .collect();
+        for pid in leaving {
+            let traffic = self.rng.u32(0..=commute::MAX_TRAFFIC);
+            let p = self.players.get_mut(&pid).unwrap();
+            let mut m = commute::mode(p.commute_mode).copied().unwrap_or(commute::MODES[0]);
+            if p.money < m.cost {
+                m = commute::MODES[0]; // can't afford it: on foot
+                p.commute_mode = m.id;
+            }
+            p.money -= m.cost;
+            let minutes = m.minutes + if m.id == commute::mode::CAR { traffic } else { 0 };
+            p.stage = Stage::Home { arrive_at: Some(now + minutes) };
+            self.clock_dirty = true;
+        }
         let arriving: Vec<u16> = self
             .players
             .values()
@@ -1071,8 +1117,10 @@ impl Server {
     /// 22:00: out of the building; salary for the hours worked today.
     fn go_home(&mut self, pid: u16) {
         self.end_session(pid);
+        self.vehicles.retain(|v| v.owner != pid); // the car / bike goes home too
         let Some(p) = self.players.get_mut(&pid) else { return };
         p.rest = None;
+        p.riding = None;
         let minutes = (p.worked_ds / clock::DS_PER_MIN as u64) as u32;
         let pay = minutes as i64 * clock::PAY_PER_MIN;
         p.money += pay;
@@ -1083,24 +1131,89 @@ impl Server {
         self.log(msg);
     }
 
-    /// Morning arrival: in front of the building.
+    /// Morning arrival: on foot along the sidewalk, or riding in a vehicle
+    /// that drops them off (see `tick_vehicles`).
     fn arrive(&mut self, pid: u16) {
-        let spawns = self.building.spawns();
-        let (floor, t) = spawns[self.next_spawn % spawns.len()];
-        self.next_spawn += 1;
-        let room = self.room_of(floor, Pos::tile_center(t.x, t.y));
+        let Some(mode) = self.players.get(&pid).map(|p| p.commute_mode) else { return };
+        let handle = self.alloc_handle();
+        let kind_of = |m: u8| Vehicle::for_mode(m, 0, 0, 0).map(|v| v.kind);
+        let slot = self.vehicles.iter().filter(|v| v.parks && Some(v.kind) == kind_of(mode)).count();
+        let vehicle = Vehicle::for_mode(mode, handle, pid, slot);
+        let (pos, riding) = match &vehicle {
+            Some(v) => (v.pos, Some(v.handle)),
+            None => (Pos::tile_center(1, 35), None), // walking in from the west
+        };
+        if let Some(v) = vehicle {
+            self.vehicles.push(v);
+        }
+        let room = self.room_of(0, pos);
         let Some(p) = self.players.get_mut(&pid) else { return };
-        p.body = Body::at(floor, Pos::tile_center(t.x, t.y));
+        p.body = Body::at(0, pos);
         p.room = room;
         p.stage = Stage::Working;
+        p.depart_at = None;
+        p.riding = riding;
         refresh(p);
         self.clock_dirty = true;
+        if riding.is_none() {
+            self.trip_done(pid);
+        }
+    }
+
+    /// Got out (or walked in): what the trip did, and whether it's late.
+    fn trip_done(&mut self, pid: u16) {
+        let late = self.clock.minute() > commute::LATE_AFTER;
+        let Some(p) = self.players.get_mut(&pid) else { return };
+        if let Some(m) = commute::mode(p.commute_mode) {
+            let e = m.effect;
+            p.needs.apply(shop::Effect { hunger: 0, energy: e.energy, stress: e.stress, bladder: 0 });
+            p.needs.hygiene = (p.needs.hygiene + e.hygiene * needs::SCALE).clamp(0, needs::MAX);
+        }
+        if late {
+            p.needs.add_stress(10);
+            self.pending_says.push((pid, commute::lines::LATE.to_string(), None));
+        }
+    }
+
+    /// Move the vehicles; riders go along and get out at the stop.
+    fn tick_vehicles(&mut self) {
+        let mut arrived = Vec::new();
+        let mut gone = Vec::new();
+        for v in &mut self.vehicles {
+            match v.tick() {
+                Some(VehicleEvent::Arrived { rider, alight }) => arrived.push((rider, alight)),
+                Some(VehicleEvent::Gone) => gone.push(v.handle),
+                None => {}
+            }
+        }
+        self.vehicles.retain(|v| !gone.contains(&v.handle));
+        // Riders sit in their vehicle.
+        let positions: Vec<(u16, Pos)> = self.vehicles.iter().map(|v| (v.handle, v.pos)).collect();
+        for p in self.players.values_mut() {
+            if let Some(h) = p.riding {
+                match positions.iter().find(|(vh, _)| *vh == h) {
+                    Some((_, pos)) => p.body.pos = *pos,
+                    None => p.riding = None,
+                }
+                p.room = self.building.floor(0).map_or(0, |m| m.room_at(p.body.pos.x, p.body.pos.y));
+            }
+        }
+        for (rider, alight) in arrived {
+            if let Some(p) = self.players.get_mut(&rider) {
+                p.riding = None;
+                p.body = Body { pos: alight, ..p.body };
+                p.room = self.building.floor(0).map_or(0, |m| m.room_at(alight.x, alight.y));
+                refresh(p);
+            }
+            self.trip_done(rider);
+        }
     }
 
     fn clock_packet(&self, p: &Player) -> Packet {
         let (place, arrive) = match p.stage {
             Stage::Portal(_) => (proto::place::PORTAL, proto::NO_TIME),
             Stage::Working => (proto::place::BUILDING, proto::NO_TIME),
+            Stage::Home { arrive_at: None } if p.depart_at.is_some() => (proto::place::COMMUTING, proto::NO_TIME),
             Stage::Home { arrive_at: None } => (proto::place::HOME, proto::NO_TIME),
             Stage::Home { arrive_at: Some(t) } => (proto::place::COMMUTING, (t % clock::MIN_PER_DAY) as u16),
         };
@@ -1113,6 +1226,9 @@ impl Server {
             pay: p.last_pay.0.clamp(0, u32::MAX as i64) as u32,
             pay_minutes: p.last_pay.1.min(u16::MAX as u32) as u16,
             today_minutes: (p.worked_ds / clock::DS_PER_MIN as u64).min(u16::MAX as u64) as u16,
+            mode: p.commute_mode,
+            depart: p.depart_at.map_or(proto::NO_TIME, |t| (t % clock::MIN_PER_DAY) as u16),
+            money: p.money.clamp(0, u32::MAX as i64) as u32,
         }
     }
 
@@ -1549,6 +1665,7 @@ impl Server {
             // ...their own go with them (no persistent accounts yet): laptop on
             // a desk, card lent to someone, anything on the floor.
             self.computers.retain(|c| c.owner() != id);
+            self.vehicles.retain(|v| v.owner != id);
             self.dropped.retain(|d| d.item.owner != id);
             for other in self.players.values_mut() {
                 let before = other.inventory.clone();
@@ -1600,6 +1717,14 @@ impl Server {
             if !matches!(p.stage, Stage::Working) {
                 p.inputs.clear(); // not in the world yet
                 portal_resend.push(p.id);
+                continue;
+            }
+            if p.riding.is_some() {
+                // In a vehicle: no walking (inputs are acknowledged, ignored).
+                if let Some((seq, _)) = p.inputs.back() {
+                    p.last_processed_seq = *seq;
+                }
+                p.inputs.clear();
                 continue;
             }
             let mut moved = false;
@@ -1756,6 +1881,7 @@ impl Server {
         self.check_computer_sessions();
         self.check_stalls();
         self.tick_elevators();
+        self.tick_vehicles();
 
         let bodies: HashMap<u16, Body> =
             self.players.values().filter(|p| matches!(p.stage, Stage::Working)).map(|p| (p.id, p.body)).collect();
@@ -1800,7 +1926,20 @@ impl Server {
 
         // 4. Interest management: group entities by (floor, room).
         let mut groups: HashMap<(u8, u16), Vec<EntityState>> = HashMap::new();
-        for p in self.players.values().filter(|p| matches!(p.stage, Stage::Working)) {
+        for v in &self.vehicles {
+            let room = self.building.floor(0).map_or(0, |m| m.room_at(v.pos.x, v.pos.y));
+            groups.entry((0, room)).or_default().push(EntityState {
+                id: v.handle,
+                kind: proto::kind::VEHICLE,
+                x: v.pos.x,
+                y: v.pos.y,
+                flags: v.facing | if v.moving { 0b100 } else { 0 },
+                held: v.kind,
+                activity: 0,
+            });
+        }
+        // Riders are inside their vehicle: not shown.
+        for p in self.players.values().filter(|p| matches!(p.stage, Stage::Working) && p.riding.is_none()) {
             groups.entry((p.body.floor, p.room)).or_default().push(EntityState {
                 id: p.id,
                 kind: proto::kind::PLAYER,
@@ -2001,6 +2140,9 @@ impl Server {
 /// What others see the player doing (one at a time, most visible first).
 fn activity(p: &Player) -> u8 {
     use proto::activity as a;
+    if p.riding.is_some() {
+        return a::RIDING;
+    }
     match (p.at_computer, p.rest.map(|r| r.0)) {
         (Some(_), _) => a::COMPUTER,
         (_, Some(Rest::Toilet)) => a::TOILET,

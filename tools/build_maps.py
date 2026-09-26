@@ -49,6 +49,11 @@ LEGEND = {
     "C": {"type": "coffee_machine", "solid": True, "color": "#2b2b30"},
     "J": {"type": "kitchen_counter", "solid": True, "color": "#d8d2c4"},
     "O": {"type": "fruit_bowl", "solid": True, "color": "#e0a040"},
+    # Commuting: the street in front of the building, the tram line and a
+    # bike rack by the entrance.
+    "r": {"type": "street", "solid": False, "color": "#55585e"},
+    "t": {"type": "tram_track", "solid": False, "color": "#6b6259"},
+    "b": {"type": "bike_rack", "solid": True, "color": "#9aa4ab"},
     # Toilet stalls: thin partitions and a door that can be locked from inside
     # (locked = solid for everyone; the server tells clients which ones).
     "|": {"type": "partition", "solid": True, "color": "#c3c9d1"},
@@ -141,7 +146,7 @@ def elevator_and_stairs(f, hall_room):
 
 def floor0():
     f = Floor(0, "v", "O")
-    f.room("O", 1, "Na zewnątrz", "outside")
+    f.room("O", 1, "Na zewnątrz", "outside", see=["R"])
     # Map edge fence
     f.area(0, 0, W - 1, 0, "F", "-")
     f.area(0, H - 1, W - 1, H - 1, "F", "-")
@@ -193,10 +198,13 @@ def floor0():
     f.area(1, 34, W - 2, 36, "p", "O")                   # sidewalk
     f.area(7, 34, 13, 37, "=", "O")                      # driveway
     f.area(3, 38, 30, 45, "=", "R")
-    f.room("R", 7, "Parking zewnętrzny", "parking")
+    f.room("R", 7, "Parking zewnętrzny", "parking", see=["O"])
     for x in (4, 9, 14, 19, 24):
-        f.put(x, 39, x + 2, 40, "X")
-        f.put(x, 43, x + 2, 44, "X")
+        f.put(x, 39, x + 2, 40, "X")                     # parked (row 43-44: free for players)
+    f.area(1, 37, W - 2, 37, "r", "O")                   # street
+    f.area(1, 46, W - 2, 46, "t", "O")                   # tram line
+    f.area(32, 45, 40, 45, "p", "O")                     # tram stop platform
+    f.put(40, 34, 43, 34, "b")                           # bike rack by the entrance
     f.area(42, 39, 54, 45, "z", "M")
     f.room("M", 8, "Strefa palenia", "smoking")
     f.put(44, 41, 46, 41, "N")                           # bench

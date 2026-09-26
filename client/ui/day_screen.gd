@@ -7,6 +7,11 @@ extends Control
 const Protocol = preload("res://net/protocol.gd")
 
 const CARD_SEC := 3.5
+## How to get to work (server/src/commute.rs): id -> [name, minutes, grosze].
+const MODES := {1: ["Pieszo", 45, 0], 2: ["Rower", 25, 0], 3: ["Samochód", 20, 1200], 4: ["Taksówka", 15, 3500], 5: ["Tramwaj", 30, 440]}
+const MODE_NOTES := {1: "zmęczy, ale odpręży", 2: "szybko, ale spocisz się", 3: "+ korki do 20 min", 4: "wygodnie", 5: "tłok, stres"}
+
+signal choose_commute(mode: int)
 
 var clock := {}           # last Clock packet
 var _day := 0             # personal day already announced
@@ -16,6 +21,8 @@ var _title := Label.new()
 var _sub := Label.new()
 var _info := Label.new()
 var _sky := Control.new()
+var _modes := HBoxContainer.new()
+var _mode_buttons := {}   # mode -> Button
 
 
 func _ready() -> void:
@@ -38,6 +45,19 @@ func _ready() -> void:
 	_sub.add_theme_font_size_override("font_size", 26)
 	_info.add_theme_font_size_override("font_size", 18)
 	_info.add_theme_color_override("font_color", Color(1, 1, 1, 0.75))
+	_modes.alignment = BoxContainer.ALIGNMENT_CENTER
+	_modes.add_theme_constant_override("separation", 10)
+	col.add_child(_modes)
+	for id in MODES:
+		var b := Button.new()
+		b.custom_minimum_size = Vector2(150, 84)
+		b.focus_mode = Control.FOCUS_NONE
+		b.add_theme_font_size_override("font_size", 15)
+		var m: int = id
+		b.pressed.connect(func(): choose_commute.emit(m))
+		_modes.add_child(b)
+		_mode_buttons[id] = b
+	_modes.visible = false
 	_fit()
 
 
@@ -79,9 +99,29 @@ func _process(_d: float) -> void:
 		_sky.queue_redraw()
 
 
+func _render_modes() -> void:
+	for id in _mode_buttons:
+		var m: Array = MODES[id]
+		var b: Button = _mode_buttons[id]
+		var cost := "za darmo" if m[2] == 0 else "%d,%02d zł" % [m[2] / 100, m[2] % 100]
+		b.text = "%s\n%d min · %s\n%s" % [m[0], m[1], cost, MODE_NOTES[id]]
+		b.disabled = m[2] > clock.money
+		var sb := StyleBoxFlat.new()
+		sb.set_corner_radius_all(10)
+		sb.set_content_margin_all(8)
+		sb.bg_color = Color("#ffd166") if id == clock.mode else Color(1, 1, 1, 0.14)
+		for st in ["normal", "hover", "pressed", "disabled"]:
+			b.add_theme_stylebox_override(st, sb)
+		var fc := Color("#1c2430") if id == clock.mode else Color.WHITE
+		for k in ["font_color", "font_hover_color", "font_pressed_color"]:
+			b.add_theme_color_override(k, fc)
+		b.add_theme_color_override("font_disabled_color", Color(1, 1, 1, 0.35))
+
+
 func _render() -> void:
 	if clock.is_empty():
 		return
+	_modes.visible = clock.place == Protocol.PLACE_COMMUTING and clock.arrive == Protocol.NO_TIME
 	var place: int = clock.place
 	var now := Time.get_ticks_msec() / 1000.0
 	match place:
@@ -98,8 +138,15 @@ func _render() -> void:
 			visible = true
 			_bg.color = Color("#f2a65a").darkened(0.35)
 			_title.text = "Dzień %d" % clock.day
-			_sub.text = "Dojazd do pracy… przyjazd o %s" % hhmm(clock.arrive)
-			_info.text = "Teraz %s" % hhmm(clock.minute)
+			var name: String = MODES.get(clock.mode, ["?"])[0]
+			if clock.arrive == Protocol.NO_TIME:
+				# Still at home: choose how to get there.
+				_sub.text = "Jak dziś dojeżdżasz? Wyjazd o %s" % hhmm(clock.depart)
+				_info.text = "Teraz %s · w portfelu %d,%02d zł · wybrano: %s" % [hhmm(clock.minute), clock.money / 100, clock.money % 100, name.to_lower()]
+				_render_modes()
+			else:
+				_sub.text = "W drodze (%s)… przyjazd o %s" % [name.to_lower(), hhmm(clock.arrive)]
+				_info.text = "Teraz %s" % hhmm(clock.minute)
 		_:
 			# A short day card over the world / the portal.
 			visible = _card_until > now

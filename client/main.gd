@@ -2,6 +2,7 @@
 ##   --nick=Ala --server=127.0.0.1:7777 --autoconnect --debug --autowalk
 ##   --screenshot=/path.png [--screenshot-delay=5]  (dev: save a frame and quit;
 ##     several delays "5,12,20" save path_1.png, path_2.png, ... and quit after the last)
+##   --commute=3  (dev: pick this way to work every morning; 1 foot .. 5 tram)
 ##   --auto-recruit=1 [--auto-recruit-delay=2]  (dev: apply for offer 1, answer
 ##     at random until hired, waiting N s before each click)
 extends Node
@@ -47,6 +48,7 @@ func _ready() -> void:
 	day_layer.layer = 30  # above the world and the home computer
 	add_child(day_layer)
 	day_layer.add_child(day_screen)
+	day_screen.choose_commute.connect(func(m: int): net.send(Protocol.encode_commute_choice(net.token, m)))
 	portal.auto_offer = int(args.get("auto-recruit", "0"))
 	portal.auto_delay = float(args.get("auto-recruit-delay", "0"))
 	portal.apply.connect(func(offer, motivation): net.send(Protocol.encode_apply(net.token, offer, motivation)))
@@ -143,6 +145,9 @@ func _on_packet(p: Dictionary) -> void:
 		portal.game_day = p.day
 		portal.game_minute = p.minute
 		day_screen.on_clock(p)
+		var want := int(args.get("commute", "0"))
+		if want > 0 and p.place == Protocol.PLACE_COMMUTING and p.arrive == Protocol.NO_TIME and p.mode != want:
+			net.send(Protocol.encode_commute_choice(net.token, want))
 		_sync_portal()
 
 
