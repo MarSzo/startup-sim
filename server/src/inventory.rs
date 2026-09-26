@@ -31,6 +31,10 @@ pub mod kind {
     pub const WINE: u8 = 22;
     pub const CIGARETTES: u8 = 23;
     pub const UMBRELLA: u8 = 24;
+    // Sweets from the chill-room tray (free; see `treats`).
+    pub const DONUT: u8 = 25;
+    pub const COOKIE: u8 = 26;
+    pub const CHEESECAKE: u8 = 27;
 }
 
 pub const POCKETS: usize = 3;
@@ -40,7 +44,7 @@ pub fn is_small(k: u8) -> bool {
         kind::GUEST_PASS | kind::EMPLOYEE_CARD | kind::FRUIT => true,
         // Shop goods fit in a pocket, except the bulky ones.
         kind::BURGER | kind::FRIES | kind::WINE => false,
-        10..=24 => true,
+        10..=27 => true,
         _ => false,
     }
 }
@@ -72,6 +76,8 @@ pub struct Item {
     pub count: u8,
     /// Taken off a shop shelf, not paid for yet.
     pub unpaid: bool,
+    /// Food past its best (fruit): upsets the stomach.
+    pub stale: bool,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -231,7 +237,7 @@ mod tests {
     use super::*;
 
     fn item(id: u32, k: u8) -> Item {
-        Item { id, kind: k, label: String::new(), expires: None, owner: 0, count: 1, unpaid: false }
+        Item { id, kind: k, label: String::new(), expires: None, owner: 0, count: 1, unpaid: false, stale: false }
     }
 
     #[test]
@@ -286,7 +292,7 @@ mod tests {
     #[test]
     fn coffee_goes_cold() {
         let mut inv = Inventory::default();
-        inv.add(Item { id: 1, kind: kind::COFFEE, label: String::new(), expires: Some(100), owner: 0, count: 1, unpaid: false }).unwrap();
+        inv.add(Item { id: 1, kind: kind::COFFEE, label: String::new(), expires: Some(100), owner: 0, count: 1, unpaid: false, stale: false }).unwrap();
         assert!(inv.expire(99).is_empty());
         assert_eq!(inv.expire(100).len(), 1);
         assert!(inv.hands_free());

@@ -28,6 +28,8 @@ OPTIONS:
   --start-time <hh:mm>  game time when the server starts (day 1)  [default: 8:00]
   --time-scale <n>      daytime passes n times faster (dev)       [default: 1 = 1 h / 5 min]
   --weather <kind>      fixed weather: sun, clouds, rain, storm, fog (dev) [default: changing]
+  --treats              a tray of sweets in the chill room right away (dev)
+  --stale-fruit <pct>   chance that fruit from the bowl is stale      [default: 15]
   --needs-speed <n>     needs (hunger, energy...) change n times faster (dev)
   --recruitment <path>  recruitment JSON  [default: data/recruitment.json]
 ";
@@ -78,6 +80,8 @@ fn main() {
         needs_speed: args.get("needs-speed", 1),
         start_minute: parse_time(args.str("start-time").unwrap_or("8:00")),
         time_scale: args.get("time-scale", 1),
+        treats_now: args.flag("treats"),
+        stale_fruit_percent: args.get("stale-fruit", game::treats::STALE_FRUIT_PERCENT),
         weather: args.str("weather").map(|w| {
             game::weather::parse(w).unwrap_or_else(|| {
                 eprintln!("invalid --weather {w} (sun, clouds, rain, storm, fog)");

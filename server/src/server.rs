@@ -21,6 +21,7 @@ use crate::recruitment::{Attempt, Recruitment};
 use crate::sim::{self, Body, Pos};
 use crate::shop::{self, Shelf};
 use crate::stalls::{self, Stall};
+use crate::treats::{self, Tray};
 use crate::weather::{self, Weather};
 
 pub const TICK_HZ: u32 = 20;
@@ -58,6 +59,10 @@ pub struct Config {
     pub time_scale: u32,
     /// Fixed weather (`weather::kind`; dev / tests), None = changing.
     pub weather: Option<u8>,
+    /// Put a tray of sweets in the chill room right away (dev / tests).
+    pub treats_now: bool,
+    /// Chance (%) that fruit from the bowl is stale.
+    pub stale_fruit_percent: u32,
 }
 
 /// Where a connected player is in the game.
@@ -248,6 +253,9 @@ pub struct Server {
     weather: Weather,
     /// Board meetings (calendar).
     meetings: Vec<Meeting>,
+    /// Sweets on the chill-room table, and when the next trays come today.
+    tray: Option<Tray>,
+    treat_drops: Vec<u32>,
     /// (floor, room) of the board room.
     board_room: Option<(u8, u16)>,
     /// (floor, room) under the open sky.
@@ -304,6 +312,8 @@ impl Server {
             vehicles: Vec::new(),
             weather: Weather::new(0),
             meetings: Vec::new(),
+            tray: None,
+            treat_drops: Vec::new(),
             board_room,
             outdoor_rooms: building
                 .active_floors()
@@ -334,6 +344,10 @@ impl Server {
             Some(k) => Weather::fixed(k),
             None => Weather::new(server.clock.total_minutes()),
         };
+        server.schedule_treats();
+        if server.cfg.treats_now {
+            server.put_tray();
+        }
         server.cashier = server.npcs.iter().find(|n| n.role == npc::Role::Cashier).map(|n| n.id);
         Ok(server)
     }
@@ -936,7 +950,7 @@ impl Server {
         let label = self.label_for(pid, k);
         let expires = (k == item_kind::COFFEE).then_some(self.tick + coffee::DRINK_TICKS);
         let owner = if k == item_kind::COFFEE { 0 } else { pid };
-        let item = Item { id: self.next_item_id, kind: k, label, expires, owner, count: 1, unpaid: false };
+        let item = Item { id: self.next_item_id, kind: k, label, expires, owner, count: 1, unpaid: false, stale: false };
         self.next_item_id += 1;
         self.give(pid, item);
     }
@@ -966,6 +980,7 @@ impl Server {
         while self.dropped.iter().any(|d| d.handle == handle)
             || self.computers.iter().any(|c| c.handle == handle)
             || self.vehicles.iter().any(|v| v.handle == handle)
+            || self.tray.as_ref().is_some_and(|t| t.handle == handle)
         {
             handle = next(handle);
         }
@@ -1042,10 +1057,14 @@ impl Server {
                     item_kind::FRUIT if p.needs.is_full() => needs::lines::NOT_HUNGRY.into(),
                     item_kind::FRUIT => {
                         let what = held.label.to_lowercase();
+                        let stale = held.stale;
                         p.inventory.take_hands();
                         let yuck = p.needs.eat_fruit();
                         refresh(p);
-                        if yuck {
+                        if stale {
+                            p.needs.upset_stomach();
+                            treats::lines::STALE_EATEN.to_string()
+                        } else if yuck {
                             format!("{} ({what})", needs::lines::YUCK)
                         } else {
                             format!("Mniam, {what}.")
@@ -1132,12 +1151,17 @@ impl Server {
                         p.depart_at = Some(now + self.rng.u32(commute::DEPART_FROM..=commute::DEPART_TO));
                     }
                 }
+                self.schedule_treats();
                 self.log(format!("* day {} starts", self.clock.day));
                 self.clock_dirty = true;
             }
             None => {}
         }
         let now = self.clock.total_minutes();
+        if self.treat_drops.first().is_some_and(|&t| now >= t) {
+            self.treat_drops.remove(0);
+            self.put_tray();
+        }
         // Leaving home: pay the fare, the trip takes its time.
         let leaving: Vec<u16> = self
             .players
@@ -1331,6 +1355,7 @@ impl Server {
             owner: 0,
             count: prod.count,
             unpaid: true,
+            stale: false,
         };
         self.next_item_id += 1;
         let p = self.players.get_mut(&pid).unwrap();
@@ -1356,6 +1381,66 @@ impl Server {
         let (nick, left) = (p.nick.clone(), p.money);
         self.log(format!("* shop: {nick} paid {}", shop::zl(total)));
         Some(shop::lines::paid(total, left))
+    }
+
+    // ------------------------------------------------------------ treats
+
+    /// Today's tray drops (1-2 random times, 9:00-16:00, still ahead).
+    fn schedule_treats(&mut self) {
+        let day0 = (self.clock.day - 1) * clock::MIN_PER_DAY;
+        let now = self.clock.total_minutes();
+        let n = self.rng.u32(treats::DROPS_MIN..=treats::DROPS_MAX);
+        let mut drops: Vec<u32> = (0..n)
+            .map(|_| day0 + self.rng.u32(treats::DROP_FROM..=treats::DROP_TO))
+            .filter(|&t| t > now)
+            .collect();
+        drops.sort();
+        self.treat_drops = drops;
+    }
+
+    /// A fresh tray on the chill-room table; HR tells everyone.
+    fn put_tray(&mut self) {
+        let kind = treats::KINDS[self.rng.usize(..treats::KINDS.len())];
+        let pieces = self.rng.u8(treats::PIECES_MIN..=treats::PIECES_MAX);
+        let handle = self.alloc_handle();
+        self.tray = Some(Tray { handle, kind, pieces });
+        let text = treats::announcement(kind, pieces);
+        if let Some(hr) = self.npcs.iter().find(|n| n.role == npc::Role::Hr) {
+            let (id, name) = (hr.id, hr.name.clone());
+            self.messenger.post_system(computer::conv::GENERAL, id, &name, &text);
+        }
+        self.log(format!("* treats: {text}"));
+    }
+
+    /// E at the tray: one piece.
+    fn take_treat(&mut self, pid: u16, body: &Body) -> Option<String> {
+        if !treats::in_reach(body) {
+            return None;
+        }
+        let tray = self.tray.as_mut()?;
+        let kind = tray.kind;
+        let p = self.players.get(&pid)?;
+        if !p.inventory.hands_free() && !p.inventory.pockets.iter().any(|s| s.is_none()) {
+            return Some(treats::lines::HANDS_FULL.into());
+        }
+        tray.pieces -= 1;
+        if tray.pieces == 0 {
+            self.tray = None;
+        }
+        let name = shop::product(kind).map_or("?", |p| p.name);
+        let item = Item {
+            id: self.next_item_id,
+            kind,
+            label: name.into(),
+            expires: None,
+            owner: 0,
+            count: 1,
+            unpaid: false,
+            stale: false,
+        };
+        self.next_item_id += 1;
+        self.give(pid, item);
+        Some(treats::lines::TAKEN.into())
     }
 
     // ------------------------------------------------------------- board
@@ -1713,14 +1798,17 @@ impl Server {
                     return Some(Some(needs::lines::HANDS_FULL.into()));
                 }
                 let fruit = FRUITS[self.rng.usize(..FRUITS.len())];
+                // Now and then the fruit is past its best (you can tell, if you look).
+                let stale = self.rng.u32(0..100) < self.cfg.stale_fruit_percent;
                 let item = Item {
                     id: self.next_item_id,
                     kind: item_kind::FRUIT,
-                    label: fruit.into(),
+                    label: if stale { format!("{fruit} (nie pierwszej świeżości)") } else { fruit.into() },
                     expires: None,
                     owner: 0,
                     count: 1,
                     unpaid: false,
+                    stale,
                 };
                 self.next_item_id += 1;
                 self.give(pid, item);
@@ -2194,6 +2282,8 @@ impl Server {
                 coffee_says.push((pid, line.to_string(), None));
             } else if let Some(said) = self.use_desk(pid, &body) {
                 coffee_says.extend(said.map(|line| (pid, line, None)));
+            } else if let Some(line) = self.take_treat(pid, &body) {
+                coffee_says.push((pid, line, None));
             } else if let Some(said) = self.use_spot(pid, &body) {
                 coffee_says.extend(said.map(|line| (pid, line, None)));
             } else if let Some(line) = self.use_elevator(&body) {
@@ -2315,6 +2405,19 @@ impl Server {
                 activity: 0,
             });
         }
+        if let Some(t) = &self.tray {
+            let (floor, pos) = treats::tray_pos();
+            let room = self.building.floor(floor).map_or(0, |m| m.room_at(pos.x, pos.y));
+            groups.entry((floor, room)).or_default().push(EntityState {
+                id: t.handle,
+                kind: proto::kind::TRAY,
+                x: pos.x,
+                y: pos.y,
+                flags: 0,
+                held: t.kind,
+                activity: t.pieces,
+            });
+        }
         for d in &self.dropped {
             let room = self.building.floor(d.floor).map_or(0, |m| m.room_at(d.pos.x, d.pos.y));
             groups.entry((d.floor, room)).or_default().push(EntityState {
@@ -2371,7 +2474,8 @@ impl Server {
             }
             if tick % STATS_EVERY_TICKS == 0 {
                 let [hunger, energy, stress, bladder, hygiene] = p.needs.points();
-                let flags = if p.needs.dirty_hands { proto::STATS_DIRTY_HANDS } else { 0 };
+                let flags = if p.needs.dirty_hands { proto::STATS_DIRTY_HANDS } else { 0 }
+                    | if p.needs.upset { proto::STATS_UPSET } else { 0 };
                 let money = p.money.clamp(0, u32::MAX as i64) as u32;
                 outgoing.push((p.addr, id, Packet::Stats { hunger, energy, stress, bladder, hygiene, flags, money }));
             }

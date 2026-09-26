@@ -58,6 +58,10 @@ pub const PRODUCTS: &[Product] = &[
     Product { kind: kind::WINE, name: "Wino", price: 25_00, effect: e(0, -10, -25, 10), count: 1, line: "Wino. To był ciężki dzień." },
     Product { kind: kind::CIGARETTES, name: "Papierosy", price: 18_00, effect: e(0, 0, 0, 0), count: 20, line: "" },
     Product { kind: kind::UMBRELLA, name: "Parasol", price: 25_00, effect: e(0, 0, 0, 0), count: 1, line: "" },
+    // Chill-room sweets (free, not on the shelves - see `treats`).
+    Product { kind: kind::DONUT, name: "Pączek", price: 0, effect: e(-12, 6, -5, 0), count: 1, line: "Pączek z różą. Niebo." },
+    Product { kind: kind::COOKIE, name: "Ciastko", price: 0, effect: e(-6, 4, -4, 0), count: 1, line: "Ciastko do kawy — idealnie." },
+    Product { kind: kind::CHEESECAKE, name: "Kawałek sernika", price: 0, effect: e(-15, 3, -6, 0), count: 1, line: "Sernik jak u babci." },
 ];
 
 pub fn product(k: u8) -> Option<&'static Product> {
@@ -151,7 +155,7 @@ mod tests {
         check(&b).unwrap();
         let mut sold: Vec<u8> = shelves().iter().flat_map(|s| s.goods.iter().copied()).collect();
         sold.sort();
-        let mut all: Vec<u8> = PRODUCTS.iter().map(|p| p.kind).collect();
+        let mut all: Vec<u8> = PRODUCTS.iter().filter(|p| p.price > 0).map(|p| p.kind).collect();
         all.sort();
         assert_eq!(sold, all);
     }

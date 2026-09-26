@@ -5,7 +5,7 @@
 //! `tests/golden/packets.json`.
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 19;
+pub const VERSION: u8 = 20;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
 pub const MAX_PACKET: usize = 1200;
@@ -223,6 +223,8 @@ pub const FLAG_UMBRELLA: u8 = 0x08;
 pub const FLAG_SMELLY: u8 = 0x80;
 /// `Stats::flags` bit: dirty hands (after the toilet, until washed).
 pub const STATS_DIRTY_HANDS: u8 = 1;
+/// `Stats::flags` bit: upset stomach (stale fruit) - run to the toilet.
+pub const STATS_UPSET: u8 = 2;
 
 /// Entity kinds. Only players exist now; NPCs will use the same snapshot slot.
 pub mod kind {
@@ -236,6 +238,9 @@ pub mod kind {
     /// A vehicle (`held`: 1 car, 2 bike, 3 taxi, 4 tram; `flags` bits 0-2
     /// facing + moving like players).
     pub const VEHICLE: u8 = 4;
+    /// A tray of sweets in the chill room (`held`: the sweet, `activity`:
+    /// pieces left).
+    pub const TRAY: u8 = 5;
 }
 
 /// One conversation in the messenger sidebar.

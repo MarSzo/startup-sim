@@ -196,7 +196,7 @@ spotkanie umawia się w kalendarzu (aplikacja na komputerze).
 - Stanowisko obsadzone przez jednego gracza **znika** dla innych (nie można
   aplikować na zajęte miejsce).
 
-**Chill room** — oprócz owoców i kawy **losowo pojawiające się ciastka /
+**Chill room** — *zrobione (10.25)*. Oprócz owoców i kawy **losowo pojawiające się ciastka /
 słodycze** w ograniczonej ilości (teraz decyduje NPC/serwer, w przyszłości
 gracze).
 
@@ -711,6 +711,19 @@ Zastępuje prosty portal z 10.8. Po połączeniu gracz widzi pulpit komputera
 - **Spóźnienie ponad 10 min** — spotkanie przepada, Prezes daje znać („Nie było
   Cię na spotkaniu o 14:30. Szkoda.”), stres +5.
 
+### 10.25 Słodycze w chill roomie i nieświeże owoce
+
+- **Taca ze słodyczami**: 1–2 razy dziennie, o losowej godzinie między 9:00 a
+  16:00, na stole w chill roomie pojawia się taca **pączków, ciastek albo
+  sernika** (4–8 sztuk). HR ogłasza to na #ogólny; kto pierwszy, ten lepszy.
+  E przy stole = jedna sztuka (do kieszeni), F = zjedz: trochę syci, dodaje
+  energii, obniża stres. Na razie decyduje serwer (w przyszłości — gracze).
+- **Nieświeże owoce**: ok. 15% owoców z misy jest „nie pierwszej świeżości”
+  (widać to w nazwie przedmiotu — można zaryzykować). Po zjedzeniu:
+  **rozstrój żołądka** — potrzeba toalety skacze do min. 70 i rośnie o ~1
+  pkt/s, w HUD czerwone ostrzeżenie. Kto nie zdąży do toalety w ~30 s, ma
+  „wpadkę”; toaleta leczy żołądek.
+
 ### 10.6 Stan implementacji
 
 *Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie,
@@ -747,6 +760,8 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Ekwipunek**: kieszenie i ręce, przedmioty (przepustka, karta, laptop,
   kawa), upuszczanie / podnoszenie / podawanie, dostęp z przedmiotów (10.13);
   protokół v8.
+- **Słodycze i nieświeże owoce**: losowe tace w chill roomie z ogłoszeniem na
+  #ogólny, rozstrój żołądka po nieświeżym owocu (10.25); protokół v20.
 - **Kalendarz i zarząd**: Prezes i Wspólniczka, drzwi otwierane na spotkanie,
   kalendarz na komputerze, cztery tematy z dialogami i skutkami (podwyżka,
   pochwała, stres), przepadające spotkania (10.24); protokół v19.
@@ -780,12 +795,12 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Sieć mobilna**: serwer dual-stack IPv4/IPv6; gracz identyfikowany tokenem
   (zmiana adresu w trakcie gry przenosi sesję); klient przepina gniazdo po
   ciszy/powrocie z tła i sam łączy się ponownie po utracie sesji.
-- **Testy**: 84 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
+- **Testy**: 86 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
   zależna od uprawnień, bramki, ruch/kolizje, schody, winda, nawigacja,
-  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, zegar, dojazd, pogoda, zarząd, protokół), 2 golden, 21 e2e serwera
+  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, zegar, dojazd, pogoda, zarząd, słodycze, protokół), 2 golden, 22 e2e serwera
   (m.in. portal: odrzucenie → przyjęcie → spawn; całe wdrożenie aż do karty;
   niewidoczność między piętrami; zgodność stanu serwera z predykcją) —
-  łącznie 107 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 porannego dojazdu samochodem moknięcia w deszczu i spotkania z Prezesem); 140 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
+  łącznie 110 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 porannego dojazdu samochodem moknięcia w deszczu spotkania z Prezesem i tacy ze słodyczami); 140 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
   adresów).
 
 #### Pomiary (MacBook, wszystko lokalnie)

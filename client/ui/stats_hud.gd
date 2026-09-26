@@ -83,8 +83,16 @@ func update_stats(p: Dictionary) -> void:
 	money = p.money
 	_money.text = "Portfel: %d,%02d zł" % [money / 100, money % 100]
 	dirty_hands = (p.stats_flags & 1) != 0
-	if _dirty.visible != dirty_hands:
-		_dirty.visible = dirty_hands
+	var upset: bool = (p.stats_flags & 2) != 0
+	var warn := ""
+	if upset:
+		warn = "Rozstrój żołądka — szybko do toalety!"
+	elif dirty_hands:
+		warn = "Brudne ręce — umyj je (umywalka / płyn)"
+	_dirty.text = warn
+	_dirty.add_theme_color_override("font_color", Color("#ff6b6b") if upset else Color("#ffb347"))
+	if _dirty.visible != (warn != ""):
+		_dirty.visible = warn != ""
 		_panel.reset_size()  # shrink back when the line hides
 	have = true
 	visible = true

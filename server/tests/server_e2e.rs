@@ -73,6 +73,8 @@ fn start_server_at(start_access: u8, skip_recruitment: bool, start_employed: boo
         start_minute,
         time_scale,
         weather: WEATHER.with(|w| w.get()),
+        treats_now: true,
+        stale_fruit_percent: game::treats::STALE_FRUIT_PERCENT,
     };
     let mut server = Server::new(map, cfg).unwrap();
     let port = server.local_addr().port();
@@ -850,7 +852,12 @@ fn needs_fruit_sofa_and_the_wrong_bathroom() {
     ola.sock.send(&Packet::ItemAction { token: ola.token, action: act::TAKE_OUT, slot: slot as u8 }.encode()).unwrap();
     std::thread::sleep(Duration::from_millis(120));
     ola.sock.send(&Packet::ItemAction { token: ola.token, action: act::USE, slot: 0 }.encode()).unwrap();
-    assert!(wait_for(&ola, &[], wait, said("Mniam")).is_some());
+    // (Sometimes the fruit is stale: a different line, same meal.)
+    let ate = wait_for(&ola, &[], wait, |p| match p {
+        Packet::Say { text, .. } if text.starts_with("Mniam") || text == game::treats::lines::STALE_EATEN => Some(()),
+        _ => None,
+    });
+    assert!(ate.is_some());
     let after = wait_for(&ola, &[], Duration::from_millis(1500), |p| match p {
         Packet::Stats { hunger, .. } if *hunger + 15 <= before => Some(*hunger),
         _ => None,
@@ -1214,4 +1221,37 @@ fn calendar_meeting_with_the_ceo() {
     ola.sock.send(&Packet::DialogAnswer { token: ola.token, id, choice: 0 }.encode()).unwrap();
     let closed = wait_for(&ola, &[], wait, |p| matches!(p, Packet::Dialog { id: 0, .. }).then_some(()));
     assert!(closed.is_some(), "meeting over");
+}
+
+#[test]
+fn sweets_tray_in_the_chill_room() {
+    use game::inventory::kind as item_kind;
+    let (addr, _) = start_server_cfg(0, true, true); // treats_now: a tray is out
+    let b = building();
+    let (mut ola, _) = Client::connect(addr, "Ola");
+    let wait = Duration::from_millis(800);
+    let ws = game::computer::find_workstations(&b);
+    let w = ws.iter().find(|w| w.room_name == "IT / Produkt").unwrap();
+    let body = Body { access: access::CARD, ..Body::at(w.floor, Pos::tile_center(w.tile.x, w.tile.y + 1)) };
+    let body = ola.walk_to(&b, body, (1, Tile { x: 37, y: 31 }), &[]);
+    while ola.recv().is_some() {}
+    let tray = |c: &Client| {
+        wait_for(c, &[], wait, |p| match p {
+            Packet::Snapshot { entities, .. } => entities.iter().find(|e| e.kind == proto::kind::TRAY).map(|e| (e.held, e.activity)),
+            _ => None,
+        })
+    };
+    let (sweet, pieces) = tray(&ola).expect("a tray on the table");
+    assert!([item_kind::DONUT, item_kind::COOKIE, item_kind::CHEESECAKE].contains(&sweet));
+    assert!((4..=8).contains(&pieces));
+    ola.press_e(&b, body);
+    let got = wait_for(&ola, &[], Duration::from_millis(2500), |p| match p {
+        Packet::Inventory { slots } if slots.iter().any(|s| s.kind == sweet) => Some(()),
+        _ => None,
+    });
+    assert!(got.is_some(), "a sweet in the pocket");
+    let after = if pieces == 1 { None } else { tray(&ola).map(|t| t.1) };
+    if pieces > 1 {
+        assert_eq!(after, Some(pieces - 1), "one piece fewer");
+    }
 }

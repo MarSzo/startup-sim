@@ -37,6 +37,8 @@ pub const SOFA_STRESS: i32 = per_tick(5);
 /// Emptying a full bladder takes 8 s.
 pub const TOILET_RELIEF: i32 = MAX / (8 * 20);
 pub const SMOKE_TICKS: u32 = 30 * 20;
+/// Upset stomach: +1 bladder point per second on top.
+pub const UPSET_RATE: i32 = SCALE / 20;
 /// A whole cigarette: -25 stress.
 pub const SMOKE_STRESS: i32 = 25 * SCALE / SMOKE_TICKS as i32;
 
@@ -170,6 +172,8 @@ pub struct Needs {
     pub hygiene: i32,
     /// After the toilet, until washed / sanitized.
     pub dirty_hands: bool,
+    /// Upset stomach (stale fruit): the bladder fills fast until the toilet.
+    pub upset: bool,
     /// Warnings already given (bit per threshold), re-armed on recovery.
     warned: u8,
 }
@@ -183,6 +187,7 @@ impl Default for Needs {
             bladder: 10 * SCALE,
             hygiene: 90 * SCALE,
             dirty_hands: false,
+            upset: false,
             warned: 0,
         }
     }
@@ -208,7 +213,7 @@ impl Needs {
         self.hunger += HUNGER_UP;
         // Starving drains energy twice as fast.
         self.energy -= if pts(self.hunger) >= 100 { 2 * ENERGY_DOWN } else { ENERGY_DOWN };
-        self.bladder += BLADDER_UP;
+        self.bladder += BLADDER_UP + if self.upset { UPSET_RATE } else { 0 };
         self.hygiene -= HYGIENE_DOWN;
         let neglected = [
             pts(self.hunger) >= HUNGRY,
@@ -226,9 +231,10 @@ impl Needs {
                 self.stress -= SOFA_STRESS;
             }
             Some(Rest::Toilet) => {
-                self.bladder -= TOILET_RELIEF + BLADDER_UP;
+                self.bladder -= TOILET_RELIEF + BLADDER_UP + if self.upset { UPSET_RATE } else { 0 };
                 if self.bladder <= 0 {
                     rest = None;
+                    self.upset = false; // the toilet sorts the stomach out
                     ev.push(Event::RestDone(lines::RELIEVED));
                 }
             }
@@ -312,6 +318,14 @@ impl Needs {
     pub fn use_toilet(&mut self) {
         self.dirty_hands = true;
         self.hygiene -= 5 * SCALE;
+        self.clamp();
+    }
+
+    /// Stale fruit: the stomach rebels - off to the toilet, quickly.
+    pub fn upset_stomach(&mut self) {
+        self.upset = true;
+        self.bladder = self.bladder.max(70 * SCALE);
+        self.stress += 5 * SCALE;
         self.clamp();
     }
 
@@ -438,6 +452,23 @@ mod tests {
         assert!(n.smelly());
         n.sanitize();
         assert!(!n.dirty_hands && !n.smelly() && n.points()[4] == 30, "sanitizer: clean hands, +10 only");
+    }
+
+    #[test]
+    fn stale_fruit_sends_you_running_and_the_toilet_cures_it() {
+        let mut n = Needs::default();
+        n.upset_stomach();
+        assert!(n.points()[3] >= 70);
+        let (_, ev) = run(&mut n, None, 20 * 20); // 20 s
+        assert!(n.points()[3] >= 90 && n.slow(), "about to burst in ~20 s: {:?}", n.points());
+        assert!(!ev.contains(&Event::Accident));
+        let (_, ev) = run(&mut n, None, 20 * 20);
+        assert!(ev.contains(&Event::Accident), "didn't make it");
+        let mut n = Needs::default();
+        n.upset_stomach();
+        let (rest, ev) = run(&mut n, Some(Rest::Toilet), 20 * 20);
+        assert_eq!(rest, None);
+        assert!(ev.contains(&Event::RestDone(lines::RELIEVED)) && !n.upset, "cured");
     }
 
     #[test]

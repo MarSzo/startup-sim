@@ -3,7 +3,7 @@
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 19
+const VERSION := 20
 const MAX_PACKET := 1200
 const MAX_NICK_BYTES := 16
 const MAX_SAY_BYTES := 240
@@ -91,6 +91,7 @@ const KIND_NPC := 1
 const KIND_ITEM := 2
 const KIND_COMPUTER := 3
 const KIND_VEHICLE := 4
+const KIND_TRAY := 5
 
 # What a character is doing: Snapshot.self_activity / entity activity.
 const ACT_NONE := 0
@@ -116,6 +117,7 @@ const WEATHER_FOG := 5
 const WEATHER_NAMES := {1: "słonecznie", 2: "pochmurno", 3: "deszcz", 4: "burza", 5: "mgła"}
 # Stats.flags bit 0: dirty hands.
 const STATS_DIRTY_HANDS := 1
+const STATS_UPSET := 2
 # Doors.lift_target: the elevator isn't heading anywhere.
 const NO_FLOOR := 255
 

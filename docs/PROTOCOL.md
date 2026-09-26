@@ -1,4 +1,4 @@
-# Protokół sieciowy (wersja 19)
+# Protokół sieciowy (wersja 20)
 
 Własny binarny protokół na UDP. Implementacje:
 - serwer: `server/src/protocol.rs` (źródło prawdy),
@@ -23,7 +23,7 @@ przez `cargo test` i czytane przez `client/tests/run_tests.gd`.
 | pole    | typ | wartość |
 |---------|-----|---------|
 | magic   | u16 | `0x5354` (bajty `54 53`, „TS”) |
-| version | u8  | `19` |
+| version | u8  | `20` |
 | type    | u8  | typ pakietu (niżej) |
 
 ## Jednostki
@@ -278,7 +278,7 @@ widzą pokój mówiącego.
 
 Potrzeby postaci odbiorcy, co 0,5 s (tylko w budynku): `hunger u8`, `energy
 u8`, `stress u8`, `bladder u8`, `hygiene u8` (każda 0..100), `flags u8` (bit 0
-brudne ręce), `money u32` (portfel w groszach). Głód, stres i toaleta: 100 =
+brudne ręce, bit 1 rozstrój żołądka), `money u32` (portfel w groszach). Głód, stres i toaleta: 100 =
 źle; energia i higiena: 0 = źle. Liczy je tylko serwer.
 
 ### 29 `Clock` (S→C)
@@ -395,6 +395,7 @@ szyfrowaniem.
 
 ## Historia wersji
 
+- **20** — słodycze: encja tacy (`kind` 5: `held` = słodycz, `activity` = liczba sztuk), przedmioty 25 pączek, 26 ciastko, 27 sernik, `Stats.flags` bit 1 = rozstrój żołądka.
 - **19** — zarząd: `Calendar`, `CalendarBook`, `Dialog`, `DialogAnswer`, uprawnienie 8 (drzwi zarządu).
 - **18** — pogoda: `Clock` + `weather`, flaga parasola (bit 3 u graczy), przedmiot 24 = parasol.
 - **17** — dojazd: `Clock` + `mode`, `depart`, `money`; `CommuteChoice`; encja pojazdu; czynność 7 (jedzie).

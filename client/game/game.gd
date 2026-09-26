@@ -25,6 +25,7 @@ const ShelfWindow = preload("res://ui/shelf_window.gd")
 const VehicleView = preload("res://game/vehicle_view.gd")
 const WeatherFx = preload("res://ui/weather_fx.gd")
 const DialogWindow = preload("res://ui/dialog_window.gd")
+const TrayView = preload("res://game/tray_view.gd")
 
 const ZOOM := 3.0
 ## Remote players are rendered this far in the past (2 snapshots at 20 Hz).
@@ -63,6 +64,7 @@ var inventory: Array = [] # hands + pockets (from the server)
 var hud := InventoryHud.new()
 var computers := {}      # entity id -> ComputerView (laptops on desks)
 var vehicles := {}       # entity id -> VehicleView (cars, bikes, taxis, trams)
+var trays := {}          # entity id -> TrayView (sweets in the chill room)
 var screen := ComputerScreen.new()
 var screen_layer := CanvasLayer.new()
 var stats_hud := StatsHud.new()
@@ -497,6 +499,10 @@ func _process(delta: float) -> void:
 		_update_stall_doors()
 		_update_ride()
 		_update_weather()
+	for id in trays.keys():
+		if latest_tick - trays[id].last_seen_tick > REMOTE_TIMEOUT_TICKS:
+			trays[id].queue_free()
+			trays.erase(id)
 	for id in vehicles.keys():
 		if latest_tick - vehicles[id].last_seen_tick > REMOTE_TIMEOUT_TICKS:
 			vehicles[id].queue_free()
@@ -636,6 +642,17 @@ func _on_snapshot(p: Dictionary) -> void:
 			iv.setup(e.held)
 			iv.position = Vector2(e.x, e.y) / float(Movement.SUBPIXELS)
 			iv.last_seen_tick = tick
+			continue
+		if e.kind == Protocol.KIND_TRAY:
+			var tv = trays.get(e.id)
+			if tv == null:
+				tv = TrayView.new()
+				world.add_child(tv)
+				trays[e.id] = tv
+			tv.set_state(e.held, e.activity)
+			tv.position = Vector2(e.x, e.y) / float(Movement.SUBPIXELS)
+			tv.last_seen_tick = tick
+			kinds[e.id] = e.kind
 			continue
 		if e.kind == Protocol.KIND_VEHICLE:
 			var vv = vehicles.get(e.id)
@@ -809,6 +826,11 @@ func _update_hint() -> void:
 						text = "Parzenie kawy…"
 					else:
 						text = "[E] Zrób kawę"
+	if text == "":
+		var me_px4 := Movement.to_px(pred.pos)
+		for id in trays:
+			if trays[id].position.distance_to(me_px4) <= 24.0:
+				text = "[E] Weź: %s (%d szt.)" % [ItemArt.item_name(trays[id].kind), trays[id].pieces]
 	if text == "" and map:
 		text = _desk_hint(map)
 	if text == "" and map:

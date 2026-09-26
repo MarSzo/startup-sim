@@ -25,13 +25,17 @@ const BEER := 21
 const WINE := 22
 const CIGARETTES := 23
 const UMBRELLA := 24
+const DONUT := 25
+const COOKIE := 26
+const CHEESECAKE := 27
 
 const NAMES := {GUEST_PASS: "Przepustka gościa", EMPLOYEE_CARD: "Karta pracownika", LAPTOP: "Laptop", COFFEE: "Kawa", FRUIT: "Owoc",
 	SANDWICH_CHEESE: "Kanapka z serem", SANDWICH_HAM: "Kanapka z szynką", WRAP: "Wrap wege", BURGER: "Hamburger",
 	FRIES: "Frytki", BUN: "Drożdżówka", BAR: "Batonik", CHIPS: "Chipsy", WATER: "Woda", ENERGY_DRINK: "Energetyk",
-	JUICE: "Sok pomarańczowy", BEER: "Piwo", WINE: "Wino", CIGARETTES: "Papierosy", UMBRELLA: "Parasol"}
+	JUICE: "Sok pomarańczowy", BEER: "Piwo", WINE: "Wino", CIGARETTES: "Papierosy", UMBRELLA: "Parasol",
+	DONUT: "Pączek", COOKIE: "Ciastko", CHEESECAKE: "Kawałek sernika"}
 const SMALL := [GUEST_PASS, EMPLOYEE_CARD, FRUIT, SANDWICH_CHEESE, SANDWICH_HAM, WRAP, BUN, BAR, CHIPS, WATER,
-	ENERGY_DRINK, JUICE, BEER, CIGARETTES, UMBRELLA]
+	ENERGY_DRINK, JUICE, BEER, CIGARETTES, UMBRELLA, DONUT, COOKIE, CHEESECAKE]
 
 
 static func item_name(kind: int) -> String:
@@ -134,6 +138,23 @@ static func draw(c: CanvasItem, kind: int, o: Vector2, s: float) -> void:
 			r.call(7, 1, 2, 4, Color("#2c3e50"))
 			r.call(6, 5, 4, 10, Color("#6d1a36"))
 			r.call(7, 8, 2, 3, Color("#f4f1ea"))
+		DONUT:
+			r.call(2, 3, 12, 11, Color("#1c1c24"))
+			r.call(3, 4, 10, 9, Color("#d9934a"))
+			r.call(4, 4, 8, 4, Color("#f06292"))
+			r.call(6, 7, 4, 3, Color("#8a5a2b"))
+			r.call(5, 5, 1, 1, Color("#fff176"))
+			r.call(9, 5, 1, 1, Color("#81d4fa"))
+		COOKIE:
+			r.call(3, 4, 10, 10, Color("#1c1c24"))
+			r.call(4, 5, 8, 8, Color("#d9a35a"))
+			for chip in [[5, 6], [9, 7], [6, 10], [10, 10]]:
+				r.call(chip[0], chip[1], 2, 2, Color("#4a2c17"))
+		CHEESECAKE:
+			r.call(2, 5, 12, 9, Color("#1c1c24"))
+			r.call(3, 6, 10, 7, Color("#f4e3b5"))
+			r.call(3, 11, 10, 2, Color("#b5824a"))
+			r.call(3, 6, 10, 1, Color("#e8c77a"))
 		UMBRELLA:
 			# Folded umbrella: canopy strap, shaft, J handle.
 			r.call(6, 1, 4, 10, Color("#1c1c24"))
