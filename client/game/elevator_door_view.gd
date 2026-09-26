@@ -33,16 +33,21 @@ static func floor_label(f: int) -> String:
 
 
 func _draw() -> void:
+	var ink := Color("#2a2118")
 	if closed:
-		draw_rect(Rect2(-8, -8, 16, 16), Color("#b9c2c9"))
-		draw_rect(Rect2(-8, -8, 16, 1), Color("#dfe5ea"))
-		draw_rect(Rect2(-1, -8, 1, 16), Color("#6f7a83"))
-		draw_rect(Rect2(0, -8, 1, 16), Color("#e6ebef"))
+		# Two brushed-steel panels meeting in the middle, inked.
+		draw_rect(Rect2(-8.2, -8.2, 16.4, 16.4), ink)
+		draw_rect(Rect2(-7.6, -7.6, 7.2, 15.2), Color("#aeb6ba"))
+		draw_rect(Rect2(0.4, -7.6, 7.2, 15.2), Color("#b8c0c3"))
+		for k in 3:
+			draw_line(Vector2(-6.5 + k * 2.2, -6.5), Vector2(-6.5 + k * 2.2, 6.5), Color(1, 1, 1, 0.18), 0.5, true)
+		draw_line(Vector2(0, -7.6), Vector2(0, 7.6), ink, 0.8, true)
 	if display:
 		# Floor indicator on the wall right of the doors (hall side): dark
 		# screen, amber pixel digits (3x5 glyphs), an arrow while moving.
 		var o := Vector2(30, 1)
 		draw_set_transform(o)
+		draw_rect(Rect2(-6.5, -16.5, 13, 8), Color("#2a2118"))
 		draw_rect(Rect2(-6, -16, 12, 7), Color("#15171c"))
 		var amber := Color("#ffb347")
 		var rows: Array = GLYPHS.get(floor_label(lift_floor), GLYPHS["?"])

@@ -237,7 +237,7 @@ czujki.
 
 **Sprzątaczka** (`cleaning.rs`): pusty kubek (`EMPTY_CUP`) powstaje po
 wypiciu / wystygnięciu kawy; umywalka i ekspres go zabierają. Od
-`Config::cleaning_at` (`--cleaning-at`, domyślnie 18:00) `tick_cleaning` prowadzi
+`Config::cleaning_at` + losowo do `cleaning_spread` minut (co dzień nowa pora; domyślnie 15:00–16:00, `--cleaning-at` = dokładnie) `tick_cleaning` prowadzi
 `Round`: gdy sprzątaczka (`Role::Cleaner`) jest bezczynna, zbiera kubki
 (`dropped`) w zasięgu, po `WIPE_TICKS` wysyła ją (`Npc::go_to` → stan `Errand`)
 do najbliższego następnego (najpierw jej piętro); nieosiągalne pomija. Koniec:

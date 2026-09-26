@@ -823,7 +823,7 @@ Zastępuje prosty portal z 10.8. Po połączeniu gracz widzi pulpit komputera
 - Kubki leżą, dopóki ktoś ich nie podniesie albo nie przyjdzie sprzątaczka —
   zostają nawet po wyjściu gracza z gry.
 - **Pani Krysia** (NPC, turkusowy fartuch i mop) siedzi w zapleczu technicznym
-  na parterze. **O 18:00** zaczyna obchód: idzie do najbliższego kubka (najpierw
+  na parterze. **Między 15:00 a 16:00** (o losowej porze, co dzień innej) zaczyna obchód: idzie do najbliższego kubka (najpierw
   na swoim piętrze), zbiera wszystkie w zasięgu, chwilę wyciera stół i idzie
   dalej — po całym budynku (ma klucze wszędzie; kubków w zamkniętej kabinie nie
   zbierze).
@@ -930,6 +930,9 @@ pełnym ekranie — zastąpiona stylem inspirowanym Don't Starve:
   tynkiem, drzwi, bramki, żywopłot, barierki i wszystkie meble — rysowane
   wektorowo raz do tekstury w potrójnej rozdzielczości. Ikony pulpitu też.
 - Kłęby dymu nie wychodzą już za ściany (przy ścianach są mniejsze).
+- Drzwi kabin (okienko wolne / zajęte), drzwi windy i wszystkie ikony
+  przedmiotów (ekwipunek, półki, obiady, rzeczy w rękach i na podłodze)
+  narysowane w tym samym stylu z konturem tuszu.
 
 ### 10.6 Stan implementacji
 
@@ -978,7 +981,7 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
   przenikający przez drzwi, czujki, alarm z ewakuacją, strażak i kara (10.31);
   protokół v26.
 - **Kubki i sprzątaczka**: pusty kubek po kawie (zostaw / umyj / dolewka z
-  ekspresu), wieczorny obchód Pani Krysi z narzekaniem i wpisem na #ogólny
+  ekspresu), popołudniowy obchód Pani Krysi (15–16) z narzekaniem i wpisem na #ogólny
   (10.30); protokół v25.
 - **Ochrona i policja**: ochroniarz w sklepie goni złodzieja, radiowóz i
   policjant przy recydywie albo ucieczce, mandat (10.29); protokół v24.

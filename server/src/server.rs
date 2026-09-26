@@ -71,11 +71,13 @@ pub struct Config {
     pub stale_fruit_percent: u32,
     /// Minute of the day the cleaner starts her round.
     pub cleaning_at: u32,
+    /// ... plus a random 0..this many minutes, drawn each day (0 = exactly).
+    pub cleaning_spread: u32,
     /// Everybody starts with a (paid) pack of cigarettes (dev).
     pub start_cigarettes: bool,
 }
 
-/// The cleaner's evening round in progress.
+/// The cleaner's afternoon round in progress.
 #[derive(Default)]
 struct Round {
     collected: u32,
@@ -308,6 +310,8 @@ pub struct Server {
     /// The cleaner's round (evening) and the world day it last ran.
     round: Option<Round>,
     round_day: u32,
+    /// Today's start of the round (minute of the day) and the day it's for.
+    round_at: (u32, u32),
     next_officer_id: u16,
     treat_drops: Vec<u32>,
     /// (floor, room) of the board room.
@@ -375,6 +379,7 @@ impl Server {
             switches: lights::switches(&building),
             next_crew_id: 0,
             round_day: 0,
+            round_at: (0, 0),
             next_officer_id: 0,
             lunch_orders: Vec::new(),
             vacancies: cfg.recruitment.offers.iter().filter(|o| o.hiring).map(|o| (o.id, o.vacancies)).collect(),
@@ -1844,14 +1849,18 @@ impl Server {
         }
     }
 
-    /// The cleaner's evening round: from `cleaning_at`, she walks to the
+    /// The cleaner's afternoon round: from today's start (15:00-16:00), she walks to the
     /// nearest mug left lying around (her floor first), collects what's in
     /// reach, grumbles about messy rooms, and at the end reports.
     fn tick_cleaning(&mut self) {
         let Some(ci) = self.npcs.iter().position(|n| n.role == npc::Role::Cleaner) else { return };
         let cleaner = self.npcs[ci].id;
         if self.round.is_none() {
-            if !self.clock.is_night() && self.clock.minute() >= self.cfg.cleaning_at && self.round_day != self.clock.day {
+            if self.round_at.0 != self.clock.day {
+                let spread = if self.cfg.cleaning_spread > 0 { self.rng.u32(0..self.cfg.cleaning_spread) } else { 0 };
+                self.round_at = (self.clock.day, self.cfg.cleaning_at + spread);
+            }
+            if !self.clock.is_night() && self.clock.minute() >= self.round_at.1 && self.round_day != self.clock.day {
                 self.round_day = self.clock.day;
                 self.round = Some(Round::default());
                 self.pending_says.push((cleaner, cleaning::lines::START.into(), None));

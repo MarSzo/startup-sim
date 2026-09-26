@@ -79,6 +79,7 @@ fn start_server_at(start_access: u8, skip_recruitment: bool, start_employed: boo
         treats_now: true,
         stale_fruit_percent: game::treats::STALE_FRUIT_PERCENT,
         cleaning_at: CLEANING_AT.with(|c| c.get()),
+        cleaning_spread: 0,
         start_cigarettes: false,
     };
     let mut server = Server::new(map, cfg).unwrap();

@@ -1,13 +1,14 @@
 //! Coffee cups and the cleaner (backlog): a drunk (or gone cold) coffee
 //! leaves an empty mug in your hands. Leave it anywhere (drop it), wash it at
 //! a sink or take it back to the coffee machine for a refill. At the end of
-//! the working day the cleaner does her round: walks to every mug left lying
+//! the afternoon (15:00-16:00) the cleaner does her round: walks to every mug left lying
 //! around, all floors, and collects them - grumbling about rooms full of
 //! mugs, and when the day's haul is big, on #ogólny too (naming the record
 //! holder).
 
-/// The round starts at 18:00.
-pub const ROUND_AT: u32 = 18 * 60;
+/// The round starts at a random minute between 15:00 and 16:00.
+pub const ROUND_AT: u32 = 15 * 60;
+pub const ROUND_SPREAD: u32 = 60;
 /// This many mugs in one room = a grumble on the spot.
 pub const ROOM_COMPLAINT: u32 = 3;
 /// This many in a day = a post on #ogólny.
@@ -31,7 +32,7 @@ pub mod lines {
     use super::mugs;
     pub const HELLO: &str = "Dzień dobry! Kubki proszę odnosić — do ekspresu albo do umywalki, dobrze?";
     pub const BUSY: &str = "Sprzątam, sprzątam — uwaga, mokra podłoga!";
-    pub const START: &str = "Dobry wieczór, sprzątanie! Zaczynam obchód.";
+    pub const START: &str = "Dzień dobry, sprzątanie! Zaczynam obchód.";
     pub const SPOTLESS: &str = "Czysto dziś, aż miło! Tak trzymać.";
     pub fn room_mess(n: u32) -> String {
         format!("No nie… {} w jednym pokoju! To jakaś kolekcja?", mugs(n))
