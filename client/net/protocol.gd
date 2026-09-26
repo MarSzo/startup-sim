@@ -3,7 +3,7 @@
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 21
+const VERSION := 22
 const MAX_PACKET := 1200
 const MAX_NICK_BYTES := 16
 const MAX_SAY_BYTES := 240
@@ -416,7 +416,7 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 				return {}
 			var offers := []
 			for i in n:
-				offers.append({"id": r.u8(), "department": r.u8(), "applied": r.u8() != 0, "company": r.str16(MAX_TEXT_BYTES),
+				offers.append({"id": r.u8(), "department": r.u8(), "applied": r.u8() != 0, "vacancies": r.u8(), "company": r.str16(MAX_TEXT_BYTES),
 					"title": r.str16(MAX_TEXT_BYTES), "description": r.str16(MAX_TEXT_BYTES)})
 			p.offers = offers
 		T_QUESTION:

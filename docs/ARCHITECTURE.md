@@ -173,6 +173,12 @@ poranek → `day += 1` wszystkim, a domownicy dostają losowy `arrive_at`
 poza `Working` (portal, dom) jest poza światem: bez snapshotów i bez udziału w
 symulacji. `--start-time hh:mm`, `--time-scale N` do testów.
 
+**Wakaty**: `Server::vacancies` (oferta → wolne miejsca, start z
+`recruitment.json`: `vacancies`), +1 losowo co rano (maks. 3). Zdana rozmowa
+przy braku miejsca = mail „obsadzone”; zajęcie ostatniego miejsca
+(`take_vacancy`) kończy rekrutację pozostałym (`position_filled_mail`).
+`Player::position` zwalnia miejsce przy wyjściu z gry.
+
 **Obiady** (`lunch.rs`): menu = produkty sklepu (rodzaje 28–33) spoza półek;
 `Order { owner, dish, arrives, delivered }` w `Server::lunch_orders`. Zamawia
 się dla konta komputera (jak kalendarz), płatność od razu; `tick_lunch`

@@ -5,7 +5,7 @@
 //! `tests/golden/packets.json`.
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 21;
+pub const VERSION: u8 = 22;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
 pub const MAX_PACKET: usize = 1200;
@@ -323,6 +323,8 @@ pub struct OfferInfo {
     pub department: u8,
     /// This player has already applied (pending, invited or answered).
     pub applied: bool,
+    /// Open positions (our startup; 0 for other companies).
+    pub vacancies: u8,
     pub company: String,
     pub title: String,
     pub description: String,
@@ -697,6 +699,7 @@ impl Packet {
                     w.u8(o.id);
                     w.u8(o.department);
                     w.u8(o.applied as u8);
+                    w.u8(o.vacancies);
                     w.str16(&o.company, MAX_TEXT_BYTES);
                     w.str16(&o.title, MAX_TEXT_BYTES);
                     w.str16(&o.description, MAX_TEXT_BYTES);
@@ -999,6 +1002,7 @@ impl Packet {
                         id: r.u8()?,
                         department: r.u8()?,
                         applied: r.u8()? != 0,
+                        vacancies: r.u8()?,
                         company: r.str16(MAX_TEXT_BYTES)?,
                         title: r.str16(MAX_TEXT_BYTES)?,
                         description: r.str16(MAX_TEXT_BYTES)?,
@@ -1304,6 +1308,7 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
                         id: 1,
                         department: 1,
                         applied: true,
+                        vacancies: 2,
                         company: "Startup Sim sp. z o.o.".into(),
                         title: "Programista/ka".into(),
                         description: "Owocowe czwartki.".into(),
@@ -1312,6 +1317,7 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
                         id: 12,
                         department: 0,
                         applied: false,
+                        vacancies: 0,
                         company: "Pizzeria u Stefana".into(),
                         title: "Dostawca/Dostawczyni".into(),
                         description: "Własny rower.".into(),

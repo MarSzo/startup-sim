@@ -468,8 +468,9 @@ fn desktop_portal_mail_interview_and_office() {
             offers.insert(o.id, o);
         }
     }
-    assert!(offers.len() >= 7, "several companies on the portal");
-    assert!(offers.values().filter(|o| o.company == "Startup Sim sp. z o.o.").count() == 4);
+    assert!(offers.len() >= 5, "several companies on the portal");
+    let open: Vec<u8> = offers.values().filter(|o| o.company == "Startup Sim sp. z o.o.").map(|o| o.vacancies).collect();
+    assert_eq!(open, [1, 0, 1, 0], "a young startup: only two openings at the start (programmer, sales)");
 
     // Another company answers with a (funny) rejection; a silent one never does.
     let apply = |offer: u8| {
@@ -1296,4 +1297,55 @@ fn lunch_ordered_in_the_app_and_picked_up_at_the_reception() {
         _ => None,
     });
     assert!(got.is_some(), "the lunch box in her hands");
+}
+
+#[test]
+fn a_filled_position_is_gone_for_the_others() {
+    let (addr, _) = start_server_full(0, false); // job portal
+    let bank = Recruitment::load(&default_recruitment_path()).unwrap();
+    let (ala, _) = Client::connect(addr, "Ala");
+    let (bob, _) = Client::connect(addr, "Bob");
+    // Both apply for the one programmer position; both get invited.
+    for c in [&ala, &bob] {
+        c.sock.send(&Packet::Apply { token: c.token, offer: 1, motivation: "Kocham kod.".into() }.encode()).unwrap();
+    }
+    let invited = |c: &Client, other: &Client| {
+        wait_for(c, &[other], Duration::from_millis(3000), |p| match p {
+            Packet::Mail { action, arg: 1, .. } if *action == proto::portal_action::JOIN_INTERVIEW => Some(()),
+            _ => None,
+        })
+    };
+    assert!(invited(&ala, &bob).is_some() && invited(&bob, &ala).is_some());
+    // Ala takes the interview and passes.
+    ala.sock.send(&Packet::PortalAction { token: ala.token, action: proto::portal_action::JOIN_INTERVIEW, arg: 1 }.encode()).unwrap();
+    let mut passed = false;
+    let deadline = Instant::now() + Duration::from_millis(5000);
+    while !passed && Instant::now() < deadline {
+        ala.ping();
+        bob.ping();
+        while bob.recv().is_some() {}
+        while let Some(p) = ala.recv() {
+            match p {
+                Packet::Question { attempt, index, text, options, .. } => {
+                    let q = bank.offer(1).unwrap().questions.iter().find(|q| q.text == text).unwrap();
+                    let right = options.iter().position(|o| *o == q.options[0]).unwrap() as u8;
+                    ala.sock.send(&Packet::Answer { token: ala.token, attempt, index, choice: right }.encode()).unwrap();
+                }
+                Packet::RecruitResult { passed: true, .. } => passed = true,
+                _ => {}
+            }
+        }
+    }
+    assert!(passed, "Ala got the job");
+    // Bob, still waiting with his invitation, hears it's been filled; the
+    // portal shows no free programmer place any more.
+    let filled = wait_for(&bob, &[&ala], Duration::from_millis(3000), |p| {
+        matches!(p, Packet::Mail { subject, .. } if subject.starts_with("Stanowisko obsadzone")).then_some(())
+    });
+    assert!(filled.is_some(), "Bob is told the position is filled");
+    let free = wait_for(&bob, &[&ala], Duration::from_millis(3000), |p| match p {
+        Packet::JobOffers { offers } => offers.iter().find(|o| o.id == 1).map(|o| o.vacancies),
+        _ => None,
+    });
+    assert_eq!(free, Some(0));
 }

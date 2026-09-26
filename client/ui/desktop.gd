@@ -354,6 +354,10 @@ func _render_browser(body: VBoxContainer) -> void:
 	ids.sort()
 	for id in ids:
 		var o: Dictionary = offers[id]
+		# Our startup: hidden while the position is filled (unless you applied).
+		var ours: bool = o.company == OUR_COMPANY
+		if ours and o.get("vacancies", 0) == 0 and not o.applied and not _pending_apply.has(id):
+			continue
 		var box := _card(body)
 		var head := HBoxContainer.new()
 		var t := _label(o.title, 21)
@@ -363,6 +367,10 @@ func _render_browser(body: VBoxContainer) -> void:
 		var company: String = o.company + ("  ·  dział " + DEPT_NAMES[o.department] if DEPT_NAMES.has(o.department) else "")
 		box.add_child(_label(company, 14, Color("#2e6bd9")))
 		box.add_child(_label(o.description, 15, Color("#4a5566")))
+		if ours:
+			var free: int = o.get("vacancies", 0)
+			var places := "Stanowisko obsadzone" if free == 0 else ("Wolne miejsca: %d" % free)
+			box.add_child(_label(places, 14, Color("#8f5a1a") if free > 0 else Color("#c0392b")))
 		if o.applied or _pending_apply.has(id):
 			box.add_child(_label("✓ Zgłoszenie wysłane — odpowiedź przyjdzie e-mailem.", 14, Color("#1e8449")))
 		else:

@@ -141,6 +141,9 @@ struct Talk {
     good: u32,
 }
 
+/// At most this many open positions per job offer.
+const MAX_VACANCIES: u8 = 3;
+
 /// Resend the game time this often (ticks).
 const CLOCK_RESEND_TICKS: u32 = 20;
 
@@ -166,6 +169,8 @@ struct Player {
     contract: bool,
     /// Recruitment attempts so far (numbers the attempts).
     attempts: u8,
+    /// The job offer (position) they were hired for - frees up when they leave.
+    position: Option<u8>,
     /// Coffee being brewed.
     cup: Cup,
     /// Pockets and hands.
@@ -254,6 +259,8 @@ pub struct Server {
     weather: Weather,
     /// Board meetings (calendar).
     meetings: Vec<Meeting>,
+    /// Open positions per job offer (our startup).
+    vacancies: HashMap<u8, u8>,
     /// Lunch orders (the app on the computer).
     lunch_orders: Vec<lunch::Order>,
     /// Sweets on the chill-room table, and when the next trays come today.
@@ -317,6 +324,7 @@ impl Server {
             meetings: Vec::new(),
             tray: None,
             lunch_orders: Vec::new(),
+            vacancies: cfg.recruitment.offers.iter().filter(|o| o.hiring).map(|o| (o.id, o.vacancies)).collect(),
             treat_drops: Vec::new(),
             board_room,
             outdoor_rooms: building
@@ -627,6 +635,7 @@ impl Server {
             department: 0,
             contract: false,
             attempts: 0,
+            position: None,
             cup: Cup::None,
             inventory: Inventory::default(),
             inv_dirty: true,
@@ -693,8 +702,13 @@ impl Server {
         let mut packets = Vec::new();
         let mut chunk = Vec::new();
         let mut size = proto::HEADER_LEN + 1;
-        for offer in r.portal(|o| desk.applied.contains(&o)) {
-            let len = 3 + 6 + offer.company.len() + offer.title.len() + offer.description.len();
+        for mut offer in r.portal(|o| desk.applied.contains(&o)) {
+            // Our startup's positions carry the number of free places; the
+            // portal hides the ones with none (unless you already applied).
+            if let Some(&free) = self.vacancies.get(&offer.id) {
+                offer.vacancies = free;
+            }
+            let len = 4 + 6 + offer.company.len() + offer.title.len() + offer.description.len();
             if size + len > proto::MAX_PACKET && !chunk.is_empty() {
                 packets.push(Packet::JobOffers { offers: std::mem::take(&mut chunk) });
                 size = proto::HEADER_LEN + 1;
@@ -735,6 +749,10 @@ impl Server {
     fn handle_apply(&mut self, id: u16, offer: u8) {
         let due = self.tick + self.cfg.recruitment.invite_delay_secs * TICK_HZ;
         let Some(o) = self.cfg.recruitment.offer(offer).map(|o| (o.hiring, o.reply.is_some())) else { return };
+        if o.0 && self.vacancies.get(&offer).copied().unwrap_or(0) == 0 {
+            self.send_portal(id, false); // filled in the meantime
+            return;
+        }
         let Some(desk) = self.desk(id) else { return };
         if desk.applied.contains(&offer) || desk.hired.is_some() {
             return; // duplicate (resent) application
@@ -787,6 +805,10 @@ impl Server {
                 if !desk.invited.contains(&arg) || desk.attempt.is_some() || desk.hired.is_some() {
                     return;
                 }
+                if self.vacancies.get(&arg).copied().unwrap_or(0) == 0 {
+                    self.position_filled_mail(id, arg);
+                    return;
+                }
                 p.attempts = p.attempts.wrapping_add(1);
                 desk.attempt = self.cfg.recruitment.start(arg, p.attempts, &mut self.rng);
                 self.send_portal(id, false);
@@ -830,7 +852,10 @@ impl Server {
         }
         let r = &self.cfg.recruitment;
         let (score, total, offer) = (a.score(), a.total(), a.offer);
-        let passed = score >= r.pass_score;
+        // First come, first served: the place may have gone meanwhile.
+        let free = self.vacancies.get(&offer).copied().unwrap_or(0);
+        let filled_meanwhile = score >= r.pass_score && free == 0;
+        let passed = score >= r.pass_score && free > 0;
         let o = r.offer(offer).expect("attempt for a known offer");
         let result = Packet::RecruitResult {
             attempt: attempt_no,
@@ -841,7 +866,20 @@ impl Server {
         };
         desk.attempt = None;
         desk.invited.retain(|x| *x != offer);
-        if passed {
+        if filled_meanwhile {
+            desk.applied.retain(|x| *x != offer);
+            desk.mail(
+                RECRUITER,
+                format!("Stanowisko obsadzone: {}", o.title),
+                format!(
+                    "Cześć {nick},\n\nrozmowa poszła dobrze ({score}/{total}), ale ktoś był szybszy — to stanowisko \
+                     zostało już obsadzone. Zajrzyj na portal: nowe miejsca pojawiają się co rano.\n\nZespół Startup Sim"
+                ),
+                proto::portal_action::NONE,
+                0,
+            );
+        } else if passed {
+            p.position = Some(offer);
             desk.hired = Some(o.department);
             desk.mail(
                 RECRUITER,
@@ -870,7 +908,78 @@ impl Server {
         }
         self.send(addr, &result);
         self.send(addr, &result); // tiny packet; a duplicate makes loss unlikely
+        if passed {
+            self.take_vacancy(offer);
+        }
         self.send_portal(id, true);
+    }
+
+    /// Somebody got the job: one place fewer; if none is left, everybody
+    /// else still in that recruitment hears it's filled.
+    fn take_vacancy(&mut self, offer: u8) {
+        let Some(free) = self.vacancies.get_mut(&offer) else { return };
+        *free = free.saturating_sub(1);
+        let left = *free;
+        if let Some(title) = self.cfg.recruitment.offer(offer).map(|o| o.title.clone()) {
+            self.log(format!("* recruitment: {title} filled ({left} left)"));
+        }
+        if left > 0 {
+            return;
+        }
+        let waiting: Vec<u16> = self
+            .players
+            .values()
+            .filter(|p| match &p.stage {
+                Stage::Portal(d) => {
+                    d.pending.iter().any(|(o, _)| *o == offer)
+                        || d.invited.contains(&offer)
+                        || d.attempt.as_ref().is_some_and(|a| a.offer == offer)
+                }
+                _ => false,
+            })
+            .map(|p| p.id)
+            .collect();
+        for pid in waiting {
+            self.position_filled_mail(pid, offer);
+        }
+    }
+
+    /// "Sorry, the position has been filled" - and the recruitment for it ends.
+    fn position_filled_mail(&mut self, pid: u16, offer: u8) {
+        let Some(title) = self.cfg.recruitment.offer(offer).map(|o| o.title.clone()) else { return };
+        let Some(p) = self.players.get_mut(&pid) else { return };
+        let nick = p.nick.clone();
+        let Stage::Portal(desk) = &mut p.stage else { return };
+        desk.pending.retain(|(o, _)| *o != offer);
+        desk.invited.retain(|o| *o != offer);
+        desk.applied.retain(|o| *o != offer);
+        if desk.attempt.as_ref().is_some_and(|a| a.offer == offer) {
+            desk.attempt = None;
+        }
+        desk.mail(
+            RECRUITER,
+            format!("Stanowisko obsadzone: {title}"),
+            format!(
+                "Cześć {nick},\n\ndziękujemy za zainteresowanie — niestety stanowisko {title} zostało już obsadzone. \
+                 Nowe miejsca pojawiają się na portalu co rano, zajrzyj jutro!\n\nZespół Startup Sim"
+            ),
+            proto::portal_action::NONE,
+            0,
+        );
+        self.send_portal(pid, true);
+    }
+
+    /// A new day: the startup opens one more position (max 3 per offer).
+    fn open_vacancy(&mut self) {
+        let open: Vec<u8> = self.vacancies.iter().filter(|(_, &n)| n < MAX_VACANCIES).map(|(&o, _)| o).collect();
+        if open.is_empty() {
+            return;
+        }
+        let offer = open[self.rng.usize(..open.len())];
+        *self.vacancies.get_mut(&offer).unwrap() += 1;
+        if let Some(title) = self.cfg.recruitment.offer(offer).map(|o| o.title.clone()) {
+            self.log(format!("* recruitment: new opening - {title} ({} free)", self.vacancies[&offer]));
+        }
     }
 
     /// Name (and official department) of a player or NPC.
@@ -1159,6 +1268,7 @@ impl Server {
                     }
                 }
                 self.schedule_treats();
+                self.open_vacancy();
                 self.log(format!("* day {} starts", self.clock.day));
                 self.clock_dirty = true;
             }
@@ -2181,6 +2291,10 @@ impl Server {
             self.computers.retain(|c| c.owner() != id);
             self.vehicles.retain(|v| v.owner != id);
             self.lunch_orders.retain(|o| o.owner != id);
+            // Their job is free again.
+            if let Some(v) = p.position.and_then(|o| self.vacancies.get_mut(&o)) {
+                *v = (*v + 1).min(MAX_VACANCIES);
+            }
             self.dropped.retain(|d| d.item.owner != id);
             for other in self.players.values_mut() {
                 let before = other.inventory.clone();

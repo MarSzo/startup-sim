@@ -191,7 +191,7 @@ tramwajem (bilet/taksówka kosztują).
 **Zarząd i kalendarz** — *zrobione (10.24)*. Do pokoju zarządu nie można wejść bez spotkania;
 spotkanie umawia się w kalendarzu (aplikacja na komputerze).
 
-**Rekrutacja i rozwój firmy**
+**Rekrutacja i rozwój firmy** — *wakaty i obsadzone stanowiska zrobione (10.27)*
 - Na starcie **mało ogłoszeń** (to start firmy); przybywa ich z rozwojem.
 - Stanowisko obsadzone przez jednego gracza **znika** dla innych (nie można
   aplikować na zajęte miejsce).
@@ -740,6 +740,23 @@ Zastępuje prosty portal z 10.8. Po połączeniu gracz widzi pulpit komputera
   recepcji.”), E przy recepcji = pudełko do rąk (trzeba mieć wolne ręce), F =
   zjedz. Nieodebrane obiady wieczorem trafiają do kosza.
 
+### 10.27 Wakaty i obsadzone stanowiska
+
+- To start firmy, więc **ogłoszeń jest mało**: na początku tylko Programista/ka
+  i Specjalista/ka ds. sprzedaży, po jednym miejscu. **Każdego ranka** firma
+  otwiera jedno nowe miejsce na losowym stanowisku (maks. 3 na stanowisko); w
+  przyszłości tempo wyznaczy wzrost firmy.
+- Na portalu przy ofertach naszego startupu widać „Wolne miejsca: N”.
+  Stanowiska bez wolnych miejsc **znikają** z portalu (chyba że już się na nie
+  aplikowało).
+- **Kto pierwszy zda rozmowę, ten dostaje miejsce.** Gdy ostatnie wolne miejsce
+  zostanie obsadzone, pozostali w trakcie tej rekrutacji (czekający na
+  zaproszenie, zaproszeni, w trakcie rozmowy) dostają maila „Stanowisko
+  obsadzone”; kto zda rozmowę po czasie, dowiaduje się tego zamiast
+  zaproszenia na dzień próbny.
+- Gdy zatrudniony gracz opuści grę, jego miejsce znów jest wolne (brak trwałych
+  kont).
+
 ### 10.6 Stan implementacji
 
 *Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie,
@@ -776,6 +793,8 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Ekwipunek**: kieszenie i ręce, przedmioty (przepustka, karta, laptop,
   kawa), upuszczanie / podnoszenie / podawanie, dostęp z przedmiotów (10.13);
   protokół v8.
+- **Wakaty**: mało ogłoszeń na start, nowe miejsca co rano, obsadzone
+  stanowiska znikają, maile „obsadzone” (10.27); protokół v22.
 - **Zamawianie obiadów**: aplikacja z menu 6 dań, płatność z konta
   właściciela komputera, dostawa na recepcję z powiadomieniem (10.26);
   protokół v21.
@@ -816,10 +835,10 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
   ciszy/powrocie z tła i sam łączy się ponownie po utracie sesji.
 - **Testy**: 87 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
   zależna od uprawnień, bramki, ruch/kolizje, schody, winda, nawigacja,
-  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, zegar, dojazd, pogoda, zarząd, słodycze, obiady, protokół), 2 golden, 23 e2e serwera
+  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, zegar, dojazd, pogoda, zarząd, słodycze, obiady, wakaty, protokół), 2 golden, 24 e2e serwera
   (m.in. portal: odrzucenie → przyjęcie → spawn; całe wdrożenie aż do karty;
   niewidoczność między piętrami; zgodność stanu serwera z predykcją) —
-  łącznie 112 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 porannego dojazdu samochodem moknięcia w deszczu spotkania z Prezesem tacy ze słodyczami i obiadu z odbiorem na recepcji); 142 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
+  łącznie 113 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 porannego dojazdu samochodem moknięcia w deszczu spotkania z Prezesem tacy ze słodyczami obiadu z odbiorem na recepcji i obsadzonego stanowiska); 142 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
   adresów).
 
 #### Pomiary (MacBook, wszystko lokalnie)

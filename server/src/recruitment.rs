@@ -34,6 +34,9 @@ pub struct Offer {
     pub hiring: bool,
     #[serde(default)]
     pub department: u8,
+    /// Open positions at the start (our startup; more appear every morning).
+    #[serde(default)]
+    pub vacancies: u8,
     pub title: String,
     pub description: String,
     #[serde(default)]
@@ -126,6 +129,7 @@ impl Recruitment {
                 id: o.id,
                 department: o.department,
                 applied: applied(o.id),
+                vacancies: 0,
                 company: o.company.clone(),
                 title: o.title.clone(),
                 description: o.description.clone(),

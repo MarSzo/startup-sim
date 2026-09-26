@@ -107,7 +107,7 @@ func test_protocol(path: String) -> void:
 	var jo := Protocol.decode(golden["job_offers"].hex_decode())
 	expect(jo.get("offers", []).size() == 2 and jo.offers[1].title == "Dostawca/Dostawczyni" and jo.offers[1].department == 0
 		and jo.offers[1].company == "Pizzeria u Stefana" and jo.offers[0].applied == true and jo.offers[1].applied == false
-		and jo.offers[0].description == "Owocowe czwartki.", "decode job_offers %s" % jo)
+		and jo.offers[0].description == "Owocowe czwartki." and jo.offers[0].vacancies == 2, "decode job_offers %s" % jo)
 	var inv := Protocol.decode(golden["inventory"].hex_decode())
 	expect(inv.get("slots", []).size() == 4 and inv.slots[0].kind == 3 and inv.slots[0].label == "Laptop: Ola"
 		and inv.slots[1].id == 76 and inv.slots[2].kind == 0, "decode inventory %s" % inv)
