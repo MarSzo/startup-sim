@@ -16,7 +16,8 @@ cd server && cargo run --release --bin bots -- --count 50 --room "Chill room" --
 ```
 
 Sterowanie: WASD / strzałki, **E** — rozmowa z NPC / winda (stojąc w kabinie) / ekspres do kawy, **F3** — overlay debug.
-Po połączeniu widać **portal z ofertami pracy**: wybierz stanowisko i odpowiedz
+Na starcie tworzysz postać (imię, płeć, wiek, miejscowość, e-mail postaci,
+wygląd z podglądem; zapamiętywana lokalnie). Po połączeniu widać **portal z ofertami pracy**: wybierz stanowisko i odpowiedz
 na 3 pytania (2 poprawne = przyjęcie; nie wyszło — spróbuj jeszcze raz).
 Przyjęty gracz startuje przed budynkiem bez przepustki: bramki w holu go nie wpuszczą,
 więc trzeba podejść do portierni i porozmawiać z portierem (E) — da przepustkę

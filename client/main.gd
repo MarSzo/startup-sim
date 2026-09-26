@@ -1,4 +1,4 @@
-## Entry point: start screen <-> game. User args (after `--`):
+## Entry point: character creation <-> game. User args (after `--`):
 ##   --nick=Ala --server=127.0.0.1:7777 --autoconnect --debug --autowalk
 ##   --screenshot=/path.png [--screenshot-delay=5]  (dev: save a frame and quit)
 ##   --auto-recruit=1 [--auto-recruit-delay=2]  (dev: apply for offer 1, answer
@@ -8,7 +8,7 @@ extends Node
 const NetClient = preload("res://net/net_client.gd")
 const Building = preload("res://map/building.gd")
 const Game = preload("res://game/game.gd")
-const StartScreen = preload("res://ui/start_screen.gd")
+const CharacterScreen = preload("res://ui/character_screen.gd")
 const Portal = preload("res://ui/portal.gd")
 const Protocol = preload("res://net/protocol.gd")
 
@@ -17,7 +17,8 @@ const BUILDING_PATH := "res://maps/building.json"
 var args := {}
 var net := NetClient.new()
 var building
-var start := StartScreen.new()
+var start := CharacterScreen.new()
+var profile := {}
 var game: Node = null
 var portal_layer := CanvasLayer.new()
 var portal := Portal.new()
@@ -48,12 +49,20 @@ func _ready() -> void:
 	add_child(ui)
 	ui.add_child(start)
 	start.connect_pressed.connect(_on_connect_pressed)
-	start.set_defaults(args.get("nick", "Gracz%d" % randi_range(100, 999)), args.get("server", "127.0.0.1:7777"))
+	if args.has("nick") or args.has("autoconnect"):
+		start.set_defaults(args.get("nick", "Gracz%d" % randi_range(100, 999)), args.get("server", ""))
+	elif args.has("server"):
+		start.addr_edit.text = args["server"]
 	if building.error != "":
 		start.set_status("Błąd mapy: " + building.error, true)
 		start.set_busy(true)
 	elif args.has("autoconnect"):
-		_on_connect_pressed(start.nick_edit.text, start.addr_edit.text)
+		# Dev: connect with the filled-in character without saving it.
+		var err: String = start.validation_error()
+		if err == "":
+			_on_connect_pressed(start.nick_edit.text.strip_edges(), start.profile(), start.addr_edit.text)
+		else:
+			start.set_status(err, true)
 	if args.has("screenshot"):
 		_take_screenshot(args["screenshot"], float(args.get("screenshot-delay", "5")))
 
@@ -69,8 +78,9 @@ func _take_screenshot(path: String, delay: float) -> void:
 	get_tree().quit()
 
 
-func _on_connect_pressed(nick: String, address: String) -> void:
-	var err: String = net.connect_to_server(address, nick)
+func _on_connect_pressed(nick: String, p_profile: Dictionary, address: String) -> void:
+	profile = p_profile
+	var err: String = net.connect_to_server(address, nick, p_profile)
 	if err != "":
 		start.set_status(err, true)
 		return
@@ -93,6 +103,7 @@ func _on_connected(welcome: Dictionary) -> void:
 	game = Game.new()
 	add_child(game)
 	game.setup(net, building, welcome, net.nick, args)
+	game.set_own_appearance(profile.appearance)
 	game.entered_world.connect(func(): portal.on_entered_world(); _sync_portal())
 	_sync_portal()
 

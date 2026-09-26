@@ -1,83 +1,83 @@
 {
   "packets": [
     {
-      "debug": "Connect { nonce: 3735928559, nick: \"Zażółć\" }",
-      "hex": "54530501efbeadde0a5a61c5bcc3b3c582c487",
+      "debug": "Connect { nonce: 3735928559, nick: \"Zażółć\", profile: Profile { gender: 0, age: 27, city: \"Łódź\", email: \"ola@poczta.pl\", appearance: Appearance { skin: 1, hair_style: 4, hair_color: 2, shirt: 9, pants: 3 } } }",
+      "hex": "54530601efbeadde0a5a61c5bcc3b3c582c487001b01040209030700c581c3b364c5ba0d006f6c6140706f637a74612e706c",
       "name": "connect"
     },
     {
       "debug": "Welcome { nonce: 3735928559, player_id: 7, token: 16909060, tick_hz: 20, input_hz: 60, map_crc: 3405691582, server_tick: 1234 }",
-      "hex": "54530502efbeadde070004030201143cbebafecad2040000",
+      "hex": "54530602efbeadde070004030201143cbebafecad2040000",
       "name": "welcome"
     },
     {
       "debug": "Reject { reason: 1 }",
-      "hex": "5453050301",
+      "hex": "5453060301",
       "name": "reject"
     },
     {
       "debug": "Input { token: 16909060, ack_tick: 1200, last_seq: 99, inputs: [0, 1, 9, 6] }",
-      "hex": "5453050404030201b0040000630000000400010906",
+      "hex": "5453060404030201b0040000630000000400010906",
       "name": "input"
     },
     {
       "debug": "Snapshot { tick: 1234, last_input_seq: 99, frag_idx: 0, frag_cnt: 1, self_x: 10000, self_y: -5, floor: 1, room: 6, self_lock: 2, self_prev_input: 17, self_access: 5, self_status: 1, entities: [EntityState { id: 3, kind: 0, x: 4096, y: 8192, flags: 5 }, EntityState { id: 65535, kind: 1, x: -1, y: 2000000, flags: 0 }] }",
-      "hex": "54530505d204000063000000000110270000fbffffff0106000211050102030000001000000020000005ffff01ffffffff80841e0000",
+      "hex": "54530605d204000063000000000110270000fbffffff0106000211050102030000001000000020000005ffff01ffffffff80841e0000",
       "name": "snapshot"
     },
     {
-      "debug": "PlayerInfo { players: [PlayerInfoEntry { id: 3, nick: \"Ala\", department: 1 }, PlayerInfoEntry { id: 4, nick: \"bot_07\", department: 0 }] }",
-      "hex": "5453050602030003416c6101040006626f745f303700",
+      "debug": "PlayerInfo { players: [PlayerInfoEntry { id: 3, nick: \"Ala\", department: 1, gender: 0, appearance: Appearance { skin: 2, hair_style: 1, hair_color: 3, shirt: 4, pants: 0 } }, PlayerInfoEntry { id: 4, nick: \"bot_07\", department: 0, gender: 1, appearance: Appearance { skin: 0, hair_style: 0, hair_color: 0, shirt: 0, pants: 0 } }] }",
+      "hex": "5453060602030003416c6101000201030400040006626f745f303700010000000000",
       "name": "player_info"
     },
     {
       "debug": "InfoRequest { token: 16909060, ids: [3, 4, 500] }",
-      "hex": "54530507040302010303000400f401",
+      "hex": "54530607040302010303000400f401",
       "name": "info_request"
     },
     {
       "debug": "Ping { token: 16909060, client_time: 777000 }",
-      "hex": "545305080403020128db0b00",
+      "hex": "545306080403020128db0b00",
       "name": "ping"
     },
     {
       "debug": "Pong { client_time: 777000, server_tick: 1234 }",
-      "hex": "5453050928db0b00d2040000",
+      "hex": "5453060928db0b00d2040000",
       "name": "pong"
     },
     {
       "debug": "Disconnect { token: 16909060, reason: 1 }",
-      "hex": "5453050a0403020101",
+      "hex": "5453060a0403020101",
       "name": "disconnect"
     },
     {
       "debug": "Say { id: 61440, text: \"Dzień dobry! Proszę za mną.\" }",
-      "hex": "5453050b00f01e00447a6965c58420646f627279212050726f737ac499207a61206d6ec4852e",
+      "hex": "5453060b00f01e00447a6965c58420646f627279212050726f737ac499207a61206d6ec4852e",
       "name": "say"
     },
     {
       "debug": "JobOffers { offers: [OfferInfo { id: 1, department: 1, title: \"Programista/ka\", description: \"Owocowe czwartki.\" }, OfferInfo { id: 2, department: 2, title: \"Marketing i sprzedaż\", description: \"Kubek z logo.\" }] }",
-      "hex": "5453050c0201010e0050726f6772616d697374612f6b6111004f776f636f776520637a776172746b692e020215004d61726b6574696e672069207370727a656461c5bc0d004b7562656b207a206c6f676f2e",
+      "hex": "5453060c0201010e0050726f6772616d697374612f6b6111004f776f636f776520637a776172746b692e020215004d61726b6574696e672069207370727a656461c5bc0d004b7562656b207a206c6f676f2e",
       "name": "job_offers"
     },
     {
       "debug": "Apply { token: 16909060, offer: 2 }",
-      "hex": "5453050d0403020102",
+      "hex": "5453060d0403020102",
       "name": "apply"
     },
     {
       "debug": "Question { attempt: 3, index: 1, total: 3, text: \"Co oznacza kod HTTP 404?\", options: [\"Nie znaleziono zasobu\", \"Skończyła się kawa\", \"Wszystko w porządku\"] }",
-      "hex": "5453050e0301031800436f206f7a6e61637a61206b6f642048545450203430343f0315004e6965207a6e616c657a696f6e6f207a61736f62751500536b6fc584637a79c58261207369c499206b617761140057737a7973746b6f207720706f727ac485646b75",
+      "hex": "5453060e0301031800436f206f7a6e61637a61206b6f642048545450203430343f0315004e6965207a6e616c657a696f6e6f207a61736f62751500536b6fc584637a79c58261207369c499206b617761140057737a7973746b6f207720706f727ac485646b75",
       "name": "question"
     },
     {
       "debug": "Answer { token: 16909060, attempt: 3, index: 1, choice: 2 }",
-      "hex": "5453050f04030201030102",
+      "hex": "5453060f04030201030102",
       "name": "answer"
     },
     {
       "debug": "RecruitResult { attempt: 3, passed: true, score: 2, total: 3, department: 1 }",
-      "hex": "545305100301020301",
+      "hex": "545306100301020301",
       "name": "recruit_result"
     }
   ]

@@ -9,7 +9,7 @@ use crate::building::Building;
 use crate::coffee::{self, Cup, Machine};
 use crate::net::{canonical, LinkConditions, Net};
 use crate::npc::{self, Npc};
-use crate::protocol::{self as proto, EntityState, Packet, PlayerInfoEntry, SelfState};
+use crate::protocol::{self as proto, EntityState, Packet, PlayerInfoEntry, Profile, SelfState};
 use crate::recruitment::{Attempt, Recruitment};
 use crate::sim::{self, Body, Pos};
 
@@ -52,6 +52,8 @@ const PORTAL_RESEND_TICKS: u32 = 20;
 
 struct Player {
     id: u16,
+    /// Character from the creation screen (age, city, e-mail stay here).
+    profile: Profile,
     stage: Stage,
     /// Department of the position the player was recruited for (0 = none).
     department: u8,
@@ -191,8 +193,8 @@ impl Server {
             }
             return;
         };
-        if let Packet::Connect { nonce, nick } = packet {
-            self.handle_connect(addr, nonce, nick, now);
+        if let Packet::Connect { nonce, nick, profile } = packet {
+            self.handle_connect(addr, nonce, nick, profile, now);
             return;
         }
         // Every other packet is identified by its session token.
@@ -262,7 +264,7 @@ impl Server {
         }
     }
 
-    fn handle_connect(&mut self, addr: SocketAddr, nonce: u32, nick: String, now: Instant) {
+    fn handle_connect(&mut self, addr: SocketAddr, nonce: u32, nick: String, profile: Profile, now: Instant) {
         if let Some(&id) = self.by_addr.get(&addr) {
             if self.players[&id].nonce == nonce {
                 // Our Welcome was lost; resend it.
@@ -277,6 +279,10 @@ impl Server {
             self.send(addr, &Packet::Reject { reason: proto::reject::BAD_NICK });
             return;
         }
+        let Some(profile) = validate_profile(profile) else {
+            self.send(addr, &Packet::Reject { reason: proto::reject::BAD_PROFILE });
+            return;
+        };
         if self.players.len() >= self.cfg.max_players {
             self.send(addr, &Packet::Reject { reason: proto::reject::SERVER_FULL });
             return;
@@ -295,6 +301,7 @@ impl Server {
         let skip = self.cfg.skip_recruitment;
         let player = Player {
             id,
+            profile,
             stage: if skip { Stage::Working } else { Stage::Portal { attempt: None } },
             department: 0,
             contract: false,
@@ -399,12 +406,16 @@ impl Server {
                 id,
                 nick: p.nick.clone(),
                 department: if p.contract { p.department } else { 0 },
+                gender: p.profile.gender,
+                appearance: p.profile.appearance,
             }),
-            None => self
-                .npcs
-                .iter()
-                .find(|n| n.id == id)
-                .map(|n| PlayerInfoEntry { id, nick: n.name.clone(), department: 0 }),
+            None => self.npcs.iter().find(|n| n.id == id).map(|n| PlayerInfoEntry {
+                id,
+                nick: n.name.clone(),
+                department: 0,
+                gender: proto::gender::OTHER,
+                appearance: proto::Appearance::default(),
+            }),
         }
     }
 
@@ -650,7 +661,13 @@ impl Server {
                 None => self.players.get(&npc_id).map(|p| ((p.body.floor, p.room), p.nick.clone())),
             };
             let Some((place, name)) = speaker else { continue };
-            let info = self.info_of(npc_id).unwrap_or(PlayerInfoEntry { id: npc_id, nick: name, department: 0 });
+            let info = self.info_of(npc_id).unwrap_or(PlayerInfoEntry {
+                id: npc_id,
+                nick: name,
+                department: 0,
+                gender: proto::gender::OTHER,
+                appearance: proto::Appearance::default(),
+            });
             for p in self.players.values_mut() {
                 if (p.body.floor, p.room) == place || Some(p.id) == to || p.id == npc_id {
                     // Name first, so the line isn't shown as "?".
@@ -717,4 +734,61 @@ impl Server {
 
 fn status_bits(cup: &Cup) -> u8 {
     (if cup.holding() { proto::status::HOLDING_COFFEE } else { 0 }) | (if cup.brewing() { proto::status::BREWING } else { 0 })
+}
+
+/// Check and normalise a character profile. `None` = reject.
+pub fn validate_profile(mut p: Profile) -> Option<Profile> {
+    let clean = |s: &str| s.chars().filter(|c| !c.is_control()).collect::<String>().trim().to_string();
+    p.city = clean(&p.city);
+    p.email = clean(&p.email).to_lowercase();
+    let email_ok = {
+        let e = &p.email;
+        let parts: Vec<&str> = e.split('@').collect();
+        parts.len() == 2
+            && !parts[0].is_empty()
+            && parts[1].contains('.')
+            && !parts[1].starts_with('.')
+            && !parts[1].ends_with('.')
+            && !e.contains(char::is_whitespace)
+    };
+    let ok = p.gender <= proto::gender::OTHER
+        && (18..=70).contains(&p.age)
+        && !p.city.is_empty()
+        && email_ok
+        && p.appearance.is_valid();
+    ok.then_some(p)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::protocol::Appearance;
+
+    fn good() -> Profile {
+        Profile { gender: 0, age: 27, city: " Łódź ".into(), email: "Ola@Poczta.PL".into(), appearance: Appearance::default() }
+    }
+
+    #[test]
+    fn profile_is_normalised() {
+        let p = validate_profile(good()).unwrap();
+        assert_eq!((p.city.as_str(), p.email.as_str()), ("Łódź", "ola@poczta.pl"));
+    }
+
+    #[test]
+    fn bad_profiles_are_rejected() {
+        let cases: Vec<Profile> = vec![
+            Profile { age: 12, ..good() },
+            Profile { age: 90, ..good() },
+            Profile { gender: 7, ..good() },
+            Profile { city: "   ".into(), ..good() },
+            Profile { email: "ola".into(), ..good() },
+            Profile { email: "ola@poczta".into(), ..good() },
+            Profile { email: "o la@poczta.pl".into(), ..good() },
+            Profile { email: "@poczta.pl".into(), ..good() },
+            Profile { appearance: Appearance { shirt: 99, ..Appearance::default() }, ..good() },
+        ];
+        for c in cases {
+            assert!(validate_profile(c.clone()).is_none(), "{c:?}");
+        }
+    }
 }

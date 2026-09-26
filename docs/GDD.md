@@ -139,6 +139,38 @@ Docelowo role w Zarządzie i HR mogą stać się dostępne dla graczy (awanse).
 - Multiplayer: ruch, pomieszczenia, synchronizacja do ~50 graczy
 - Palenie + alarm jako pierwsza mechanika systemowa
 
+## 9a. Rozszerzenia (ustalenia 2026-09-26)
+
+Ścieżka nowego gracza, doprecyzowana:
+1. **Tworzenie postaci**: imię, płeć, wiek, miejscowość, e-mail (dane
+   *postaci*, fikcyjne — widzi je tylko serwer i sam gracz, np. w CV; inni
+   widzą imię i wygląd) + wygląd (fryzura, kolory skóry, włosów, ubrań).
+2. **Pulpit komputera** → przeglądarka → **portal z ogłoszeniami**: kilka
+   fikcyjnych firm i stanowisk. Zatrudnia tylko nasz startup (Programista/ka,
+   Designer/ka — IT / Produkt; Sprzedaż, Marketing — Biznes); inne firmy
+   odpowiadają zabawną odmową albo milczą.
+3. Formularz zgłoszeniowy → po chwili **wiadomość z zaproszeniem na rozmowę**
+   → **rozmowa online** (pytania z humorystycznymi odpowiedziami) → zaproszenie
+   na dzień próbny.
+4. Dzień próbny w biurze; w HR: **karta dostępu i własny komputer**.
+
+Nowe mechaniki:
+- **Ekwipunek**: na start małe kieszenie; przedmioty można oglądać, używać,
+  wyciągać/odkładać i przekazywać innym. **Karta dostępu i przepustka to
+  przedmioty** — bramki otwierają się temu, kto ma je przy sobie (można je
+  przekazać lub zgubić).
+- **Komputer**: wyciągnięty z ekwipunku i położony na biurku; można go
+  **zablokować**. Niezablokowanego może użyć ktoś inny pod nieobecność
+  właściciela — np. napisać coś w jego imieniu. Pierwsza aplikacja:
+  **firmowy komunikator** dla wszystkich.
+- **Statystyki postaci** na ekranie: **głód, energia, stres, potrzeba
+  toalety**; zmieniają się z czasem, przywracają je jedzenie, kawa, odpoczynek
+  (sofa), przerwa/palenie, toaleta.
+
+Kolejność realizacji: (1) tworzenie postaci → (2) pulpit, portal, rozmowa →
+(3) ekwipunek i karta jako przedmiot → (4) komputer i komunikator →
+(5) statystyki.
+
 ---
 
 ## 10. Implementacja — ustalenia i stan
@@ -398,6 +430,15 @@ ekonomii (sekcja 7). Przy ekspresie: „[E] Zrób kawę” → „Parzę kawę�
 ekspres zajęty dla innych: „Ekspres zajęty — chwilka.”) → „Kawa gotowa!” →
 kubek w ręce przez 90 s, widoczny dla innych → „Kawa wypita.”
 
+### 10.11 Tworzenie postaci (etap 1 z 9a)
+
+Ekran startowy to tworzenie postaci: imię, płeć (kobieta / mężczyzna / inna),
+wiek (18–70), miejscowość, e-mail postaci oraz wygląd — kolor skóry (4),
+fryzura (6: krótkie, długie, kok, jeżyk, kucyk, łysa głowa), kolor włosów (7),
+koszula (10), spodnie (5) — z podglądem na żywo („Obróć”, „Losuj wygląd”).
+Serwer sprawdza dane; innym graczom pokazuje tylko imię, płeć i wygląd.
+Ostatnia postać jest zapamiętywana lokalnie.
+
 ### 10.6 Stan implementacji
 
 *Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie,
@@ -429,6 +470,7 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
   2 poprawne), ponawianie ekranu przy stratach UDP, przydział do działu z
   umową w HR, dział przy nicku; protokół v4.
 - **Grafika**: proceduralny pixel art otoczenia, mebli i postaci (10.9).
+- **Tworzenie postaci**: dane postaci i edytor wyglądu (10.11); protokół v6.
 - **Ekspres do kawy**: parzenie, kubek w ręce widoczny dla innych, jedna
   osoba naraz (10.10); protokół v5.
 - **Boty** (`cargo run --release --bin bots`): 50 domyślnie, chodzą po BFS po
@@ -437,12 +479,12 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Sieć mobilna**: serwer dual-stack IPv4/IPv6; gracz identyfikowany tokenem
   (zmiana adresu w trakcie gry przenosi sesję); klient przepina gniazdo po
   ciszy/powrocie z tła i sam łączy się ponownie po utracie sesji.
-- **Testy**: 51 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
+- **Testy**: 53 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
   zależna od uprawnień, bramki, ruch/kolizje, schody, winda, nawigacja,
-  portier, recepcja, HR, rekrutacja, ekspres, protokół), 2 golden, 9 e2e serwera
+  portier, recepcja, HR, rekrutacja, ekspres, protokół), 2 golden, 10 e2e serwera
   (m.in. portal: odrzucenie → przyjęcie → spawn; całe wdrożenie aż do karty;
   niewidoczność między piętrami; zgodność stanu serwera z predykcją) —
-  łącznie 62 (w tym e2e ekspresu); 113 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
+  łącznie 65 (w tym e2e ekspresu i profilu postaci); 113 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
   adresów).
 
 #### Pomiary (MacBook, wszystko lokalnie)

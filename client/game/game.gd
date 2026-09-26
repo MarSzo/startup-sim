@@ -46,6 +46,8 @@ var log_label := Label.new()
 var _log: Array = []  # [msec, text]
 var kinds := {}          # id -> entity kind (player / NPC)
 var depts := {}          # id -> department (after the contract)
+var appearances := {}    # id -> appearance dict (from PlayerInfo)
+var own_appearance := {}
 ## Set while a full-screen UI (job portal) is open: no movement input.
 var input_blocked := false
 var job_title := ""
@@ -178,6 +180,7 @@ func reset_session(welcome: Dictionary) -> void:
 	remotes.clear()
 	nicks.clear()
 	kinds.clear()
+	appearances.clear()
 	depts.clear()
 	info_requested.clear()
 	pending.clear()
@@ -190,7 +193,14 @@ func reset_session(welcome: Dictionary) -> void:
 	room_id = 0
 	me.visible = false
 	me.set_seed(net.player_id)
+	if not own_appearance.is_empty():
+		me.set_appearance(own_appearance)
 	status_label.visible = false
+
+
+func set_own_appearance(a: Dictionary) -> void:
+	own_appearance = a
+	me.set_appearance(a)
 
 
 ## Position from the job portal (department becomes official with the contract).
@@ -363,6 +373,10 @@ func _on_packet(p: Dictionary) -> void:
 			for e in p.players:
 				nicks[e.id] = e.nick
 				depts[e.id] = e.department
+				if kinds.get(e.id, Protocol.KIND_PLAYER) == Protocol.KIND_PLAYER:
+					appearances[e.id] = e.appearance
+					if remotes.has(e.id):
+						remotes[e.id].set_appearance(e.appearance)
 				info_requested.erase(e.id)
 				if remotes.has(e.id):
 					remotes[e.id].set_nick(_label_for(e.nick, e.department))
@@ -409,6 +423,8 @@ func _on_snapshot(p: Dictionary) -> void:
 			var npc: bool = e.kind == Protocol.KIND_NPC
 			r.look = (e.flags >> 3) & 7 if npc else 0
 			r.setup(e.id, _label_for(nicks.get(e.id, "..."), depts.get(e.id, 0)), ZOOM)
+			if not npc and appearances.has(e.id):
+				r.set_appearance(appearances[e.id])
 			world.add_child(r)
 			remotes[e.id] = r
 			if _pending_say.has(e.id):

@@ -1,4 +1,4 @@
-# Protokół sieciowy (wersja 5)
+# Protokół sieciowy (wersja 6)
 
 Własny binarny protokół na UDP. Implementacje:
 - serwer: `server/src/protocol.rs` (źródło prawdy),
@@ -23,7 +23,7 @@ przez `cargo test` i czytane przez `client/tests/run_tests.gd`.
 | pole    | typ | wartość |
 |---------|-----|---------|
 | magic   | u16 | `0x5354` (bajty `54 53`, „TS”) |
-| version | u8  | `5` |
+| version | u8  | `6` |
 | type    | u8  | typ pakietu (niżej) |
 
 ## Jednostki
@@ -39,7 +39,12 @@ przez `cargo test` i czytane przez `client/tests/run_tests.gd`.
 | pole  | typ |
 |-------|-----|
 | nonce | u32 — losowy, identyfikuje próbę połączenia |
-| nick  | u8 len + UTF-8 |
+| nick  | u8 len + UTF-8 (imię postaci) |
+| gender | u8 — 0 kobieta, 1 mężczyzna, 2 inna |
+| age   | u8 — 18..70 |
+| appearance | 5 × u8: skóra (0..3), fryzura (0..5), kolor włosów (0..6), koszula (0..9), spodnie (0..4) |
+| city  | u16 len + UTF-8 (≤ 48 B) |
+| email | u16 len + UTF-8 (≤ 64 B, format `x@y.z`) |
 
 Klient powtarza co 500 ms, aż dostanie `Welcome`/`Reject`; po 5 s się poddaje.
 Serwer na powtórzony `Connect` z tym samym `nonce` z tego samego adresu
@@ -59,11 +64,13 @@ adresu = ponowne połączenie (stary gracz jest usuwany).
 
 Klient liczy to samo CRC ze swoich plików `maps/` i przy różnicy się rozłącza.
 Pozycja startowa przychodzi w pierwszym `Snapshot`.
+Wiek, miejscowość i e-mail to dane *postaci* (fikcyjne) — zostają na serwerze;
+innym graczom idą tylko imię, płeć i wygląd (`PlayerInfo`).
 
 ### 3 `Reject` (S→C)
 | pole   | typ |
 |--------|-----|
-| reason | u8 — 1 serwer pełny, 2 zła wersja protokołu, 3 zły nick |
+| reason | u8 — 1 serwer pełny, 2 zła wersja protokołu, 3 złe imię, 4 złe dane postaci |
 
 ### 4 `Input` (C→S) — wysyłany co krok wejścia (60 Hz)
 | pole     | typ |
@@ -122,7 +129,7 @@ każdy z pełnymi polami `self_*`. Pusty pokój → 1 fragment z `n = 0`.
 | pole    | typ |
 |---------|-----|
 | n       | u8 |
-| players | n × (`id u16`, nick `u8 len + UTF-8`, `department u8`) |
+| players | n × (`id u16`, nick `u8 len + UTF-8`, `department u8`, `gender u8`, `appearance 5 × u8`) |
 
 Wysyłany, gdy encja (gracz lub NPC — wtedy `nick` to jego imię, np. „Portier”)
 pierwszy raz staje się widoczna dla odbiorcy, przed pierwszą skierowaną do niego
@@ -240,6 +247,7 @@ szyfrowaniem.
 
 ## Historia wersji
 
+- **6** — profil postaci w `Connect` (płeć, wiek, wygląd, miejscowość, e-mail); płeć i wygląd w `PlayerInfo`; `Reject(4)`.
 - **5** — `self_status` w snapshocie, bity czynności 6–7 we `flags` encji; `Say` także od graczy.
 - **4** — portal i rekrutacja (typy 12–16); `department` w `PlayerInfo`.
 - **3** — snapshot: `self_access`; pakiet `Say`; encje NPC (`kind` 1) z imionami w

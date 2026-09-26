@@ -166,7 +166,7 @@ fn main() {
             match b.state {
                 State::Connecting { nonce, next_send } => {
                     if now >= next_send {
-                        let _ = b.sock.send(&Packet::Connect { nonce, nick: b.nick.clone() }.encode());
+                        let _ = b.sock.send(&Packet::Connect { nonce, nick: b.nick.clone(), profile: bot_profile(&b.nick) }.encode());
                         b.state = State::Connecting { nonce, next_send: now + Duration::from_millis(500) };
                     }
                 }
@@ -345,3 +345,22 @@ impl Bot {
         bits
     }
 }
+
+/// A random but valid character for a bot.
+fn bot_profile(nick: &str) -> game::protocol::Profile {
+    use game::protocol::{appearance as a, Appearance, Profile};
+    Profile {
+        gender: fastrand::u8(0..3),
+        age: fastrand::u8(18..=65),
+        city: ["Warszawa", "Kraków", "Łódź", "Wrocław", "Poznań", "Gdańsk"][fastrand::usize(..6)].into(),
+        email: format!("{nick}@boty.test"),
+        appearance: Appearance {
+            skin: fastrand::u8(..a::SKINS),
+            hair_style: fastrand::u8(..a::HAIR_STYLES),
+            hair_color: fastrand::u8(..a::HAIR_COLORS),
+            shirt: fastrand::u8(..a::SHIRTS),
+            pants: fastrand::u8(..a::PANTS),
+        },
+    }
+}
+

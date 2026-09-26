@@ -3,7 +3,7 @@
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 5
+const VERSION := 6
 const MAX_PACKET := 1200
 const MAX_NICK_BYTES := 16
 const MAX_SAY_BYTES := 240
@@ -42,7 +42,9 @@ const DISCONNECT_KICKED := 2
 const DISCONNECT_SHUTDOWN := 3
 const DISCONNECT_SESSION_UNKNOWN := 4
 
-const REJECT_REASONS := {1: "Serwer pełny", 2: "Niezgodna wersja protokołu", 3: "Nieprawidłowy nick"}
+const REJECT_REASONS := {1: "Serwer pełny", 2: "Niezgodna wersja protokołu", 3: "Nieprawidłowe imię", 4: "Nieprawidłowe dane postaci"}
+const MAX_CITY_BYTES := 48
+const MAX_EMAIL_BYTES := 64
 const DISCONNECT_REASONS := {0: "Rozłączono", 1: "Przekroczono czas", 2: "Wyrzucono", 3: "Serwer wyłączony", 4: "Sesja wygasła"}
 
 
@@ -66,13 +68,30 @@ static func utf8_truncated(s: String, max_bytes: int) -> PackedByteArray:
 	return out
 
 
-static func encode_connect(nonce: int, nick: String) -> PackedByteArray:
+## profile: {gender, age, city, email, appearance: {skin, hair_style, hair_color, shirt, pants}}
+static func encode_connect(nonce: int, nick: String, profile: Dictionary) -> PackedByteArray:
 	var b := _writer(T_CONNECT)
 	b.put_u32(nonce)
 	var nb := utf8_truncated(nick, MAX_NICK_BYTES)
 	b.put_u8(nb.size())
 	b.put_data(nb)
+	b.put_u8(profile.gender)
+	b.put_u8(profile.age)
+	_put_appearance(b, profile.appearance)
+	_put_str16(b, profile.city, MAX_CITY_BYTES)
+	_put_str16(b, profile.email, MAX_EMAIL_BYTES)
 	return b.data_array
+
+
+static func _put_str16(b: StreamPeerBuffer, s: String, max_bytes: int) -> void:
+	var sb := utf8_truncated(s, max_bytes)
+	b.put_u16(sb.size())
+	b.put_data(sb)
+
+
+static func _put_appearance(b: StreamPeerBuffer, a: Dictionary) -> void:
+	for k in ["skin", "hair_style", "hair_color", "shirt", "pants"]:
+		b.put_u8(a[k])
 
 
 ## `inputs`: consecutive input bytes, oldest first; the last has seq `last_seq`.
@@ -214,7 +233,9 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			var n := r.u8()
 			var players := []
 			for i in n:
-				players.append({"id": r.u16(), "nick": r.str8(), "department": r.u8()})
+				var e := {"id": r.u16(), "nick": r.str8(), "department": r.u8(), "gender": r.u8()}
+				e.appearance = {"skin": r.u8(), "hair_style": r.u8(), "hair_color": r.u8(), "shirt": r.u8(), "pants": r.u8()}
+				players.append(e)
 			p.players = players
 		T_PONG:
 			p.client_time = r.u32()

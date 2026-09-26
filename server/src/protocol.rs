@@ -5,7 +5,7 @@
 //! `tests/golden/packets.json`.
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 5;
+pub const VERSION: u8 = 6;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
 pub const MAX_PACKET: usize = 1200;
@@ -47,6 +47,54 @@ pub mod reject {
     pub const SERVER_FULL: u8 = 1;
     pub const BAD_VERSION: u8 = 2;
     pub const BAD_NICK: u8 = 3;
+    /// Invalid character profile (age, e-mail, city, appearance).
+    pub const BAD_PROFILE: u8 = 4;
+}
+
+/// Character appearance: indices into the client's palettes.
+pub mod appearance {
+    pub const SKINS: u8 = 4;
+    pub const HAIR_STYLES: u8 = 6;
+    pub const HAIR_COLORS: u8 = 7;
+    pub const SHIRTS: u8 = 10;
+    pub const PANTS: u8 = 5;
+}
+
+pub mod gender {
+    pub const FEMALE: u8 = 0;
+    pub const MALE: u8 = 1;
+    pub const OTHER: u8 = 2;
+}
+
+pub const MAX_CITY_BYTES: usize = 48;
+pub const MAX_EMAIL_BYTES: usize = 64;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Appearance {
+    pub skin: u8,
+    pub hair_style: u8,
+    pub hair_color: u8,
+    pub shirt: u8,
+    pub pants: u8,
+}
+
+impl Appearance {
+    pub fn is_valid(&self) -> bool {
+        use appearance::*;
+        self.skin < SKINS && self.hair_style < HAIR_STYLES && self.hair_color < HAIR_COLORS && self.shirt < SHIRTS && self.pants < PANTS
+    }
+}
+
+/// Character profile from the creation screen. Only name, gender and
+/// appearance are shared with other players; age, city and e-mail stay on
+/// the server (the character's CV).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct Profile {
+    pub gender: u8,
+    pub age: u8,
+    pub city: String,
+    pub email: String,
+    pub appearance: Appearance,
 }
 
 pub mod disconnect {
@@ -90,6 +138,8 @@ pub struct PlayerInfoEntry {
     pub nick: String,
     /// Department (after signing the contract; 0 = none / NPC).
     pub department: u8,
+    pub gender: u8,
+    pub appearance: Appearance,
 }
 
 /// A job offer on the portal.
@@ -103,7 +153,7 @@ pub struct OfferInfo {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Packet {
-    Connect { nonce: u32, nick: String },
+    Connect { nonce: u32, nick: String, profile: Profile },
     Welcome { nonce: u32, player_id: u16, token: u32, tick_hz: u8, input_hz: u8, map_crc: u32, server_tick: u32 },
     Reject { reason: u8 },
     /// `inputs` are consecutive, oldest first; the last one has seq `last_seq`.
@@ -179,6 +229,11 @@ impl Writer {
         self.u16(b.len() as u16);
         self.0.extend_from_slice(b);
     }
+    fn appearance(&mut self, a: &Appearance) {
+        for v in [a.skin, a.hair_style, a.hair_color, a.shirt, a.pants] {
+            self.u8(v);
+        }
+    }
 }
 
 struct Reader<'a> {
@@ -213,6 +268,9 @@ impl<'a> Reader<'a> {
             return Err(DecodeError::Invalid("string too long"));
         }
         String::from_utf8(self.take(n)?.to_vec()).map_err(|_| DecodeError::Invalid("bad utf8"))
+    }
+    fn appearance(&mut self) -> Result<Appearance, DecodeError> {
+        Ok(Appearance { skin: self.u8()?, hair_style: self.u8()?, hair_color: self.u8()?, shirt: self.u8()?, pants: self.u8()? })
     }
     fn str16(&mut self, max: usize) -> Result<String, DecodeError> {
         let n = self.u16()? as usize;
@@ -263,9 +321,14 @@ impl Packet {
         w.u8(VERSION);
         w.u8(self.type_id());
         match self {
-            Packet::Connect { nonce, nick } => {
+            Packet::Connect { nonce, nick, profile } => {
                 w.u32(*nonce);
                 w.str8(nick);
+                w.u8(profile.gender);
+                w.u8(profile.age);
+                w.appearance(&profile.appearance);
+                w.str16(&profile.city, MAX_CITY_BYTES);
+                w.str16(&profile.email, MAX_EMAIL_BYTES);
             }
             Packet::Welcome { nonce, player_id, token, tick_hz, input_hz, map_crc, server_tick } => {
                 w.u32(*nonce);
@@ -330,6 +393,8 @@ impl Packet {
                     w.u16(p.id);
                     w.str8(&p.nick);
                     w.u8(p.department);
+                    w.u8(p.gender);
+                    w.appearance(&p.appearance);
                 }
             }
             Packet::InfoRequest { token, ids } => {
@@ -406,7 +471,13 @@ impl Packet {
         }
         let t = r.u8()?;
         let p = match t {
-            ty::CONNECT => Packet::Connect { nonce: r.u32()?, nick: r.str8()? },
+            ty::CONNECT => {
+                let (nonce, nick) = (r.u32()?, r.str8()?);
+                let (gender, age, appearance) = (r.u8()?, r.u8()?, r.appearance()?);
+                let city = r.str16(MAX_CITY_BYTES)?;
+                let email = r.str16(MAX_EMAIL_BYTES)?;
+                Packet::Connect { nonce, nick, profile: Profile { gender, age, city, email, appearance } }
+            }
             ty::WELCOME => Packet::Welcome {
                 nonce: r.u32()?,
                 player_id: r.u16()?,
@@ -465,7 +536,13 @@ impl Packet {
                 let n = r.u8()? as usize;
                 let mut players = Vec::with_capacity(n);
                 for _ in 0..n {
-                    players.push(PlayerInfoEntry { id: r.u16()?, nick: r.str8()?, department: r.u8()? });
+                    players.push(PlayerInfoEntry {
+                        id: r.u16()?,
+                        nick: r.str8()?,
+                        department: r.u8()?,
+                        gender: r.u8()?,
+                        appearance: r.appearance()?,
+                    });
                 }
                 Packet::PlayerInfo { players }
             }
@@ -577,7 +654,20 @@ pub fn snapshot_fragments(tick: u32, last_input_seq: u32, me: SelfState, entitie
 /// Sample packets used by golden tests on both sides (Rust and GDScript).
 pub fn golden_samples() -> Vec<(&'static str, Packet)> {
     vec![
-        ("connect", Packet::Connect { nonce: 0xDEADBEEF, nick: "Zażółć".into() }),
+        (
+            "connect",
+            Packet::Connect {
+                nonce: 0xDEADBEEF,
+                nick: "Zażółć".into(),
+                profile: Profile {
+                    gender: gender::FEMALE,
+                    age: 27,
+                    city: "Łódź".into(),
+                    email: "ola@poczta.pl".into(),
+                    appearance: Appearance { skin: 1, hair_style: 4, hair_color: 2, shirt: 9, pants: 3 },
+                },
+            },
+        ),
         (
             "welcome",
             Packet::Welcome { nonce: 0xDEADBEEF, player_id: 7, token: 0x01020304, tick_hz: 20, input_hz: 60, map_crc: 0xCAFEBABE, server_tick: 1234 },
@@ -609,8 +699,14 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
             "player_info",
             Packet::PlayerInfo {
                 players: vec![
-                    PlayerInfoEntry { id: 3, nick: "Ala".into(), department: 1 },
-                    PlayerInfoEntry { id: 4, nick: "bot_07".into(), department: 0 },
+                    PlayerInfoEntry {
+                        id: 3,
+                        nick: "Ala".into(),
+                        department: 1,
+                        gender: gender::FEMALE,
+                        appearance: Appearance { skin: 2, hair_style: 1, hair_color: 3, shirt: 4, pants: 0 },
+                    },
+                    PlayerInfoEntry { id: 4, nick: "bot_07".into(), department: 0, gender: gender::MALE, appearance: Appearance::default() },
                 ],
             },
         ),
@@ -717,7 +813,7 @@ mod tests {
 
     #[test]
     fn nick_is_truncated_on_char_boundary() {
-        let p = Packet::Connect { nonce: 1, nick: "ąąąąąąąąąą".into() }; // 20 bytes
+        let p = Packet::Connect { nonce: 1, nick: "ąąąąąąąąąą".into(), profile: Profile::default() }; // 20 bytes
         match Packet::decode(&p.encode()).unwrap() {
             Packet::Connect { nick, .. } => assert_eq!(nick, "ąąąąąąąą"),
             _ => unreachable!(),

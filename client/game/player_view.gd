@@ -32,7 +32,7 @@ var status := 0
 var highlight := false
 var skin := SKINS[0]
 var hair := HAIRS[0]
-var hair_style := 0   # 0 short, 1 long, 2 bun, 3 spiky
+var hair_style := 0   # 0 short, 1 long, 2 bun, 3 spiky, 4 ponytail, 5 bald
 var shirt := SHIRTS[0]
 var pants := PANTS[0]
 var tie := Color("#c0392b")
@@ -68,12 +68,25 @@ func setup(seed_id: int, nick: String, zoom: float) -> void:
 	queue_redraw()
 
 
+const HAIR_STYLE_NAMES := ["krótkie", "długie", "kok", "jeżyk", "kucyk", "łysa głowa"]
+
+
+## Chosen look (character creator / PlayerInfo): palette indices.
+func set_appearance(a: Dictionary) -> void:
+	skin = SKINS[clampi(a.skin, 0, SKINS.size() - 1)]
+	hair_style = clampi(a.hair_style, 0, HAIR_STYLE_NAMES.size() - 1)
+	hair = HAIRS[clampi(a.hair_color, 0, HAIRS.size() - 1)]
+	shirt = SHIRTS[clampi(a.shirt, 0, SHIRTS.size() - 1)]
+	pants = PANTS[clampi(a.pants, 0, PANTS.size() - 1)]
+	queue_redraw()
+
+
 ## Deterministic look from an id (players) - same on every client.
 func set_seed(seed_id: int) -> void:
 	var h := absi(seed_id * 2654435761) >> 3
 	skin = SKINS[h % SKINS.size()]
 	hair = HAIRS[(h / 7) % HAIRS.size()]
-	hair_style = (h / 53) % 4
+	hair_style = (h / 53) % 6
 	shirt = SHIRTS[(h / 211) % SHIRTS.size()]
 	pants = PANTS[(h / 1237) % PANTS.size()]
 	tie = [Color("#c0392b"), Color("#2e86de"), Color("#27ae60")][(h / 17) % 3]
@@ -272,12 +285,17 @@ func _draw_hair(top: float, side: bool, dir: int) -> void:
 		return
 	var h := hair
 	var hl := hair.lightened(0.18)
+	if hair_style == 5:  # bald: a hint of shine only
+		_r(-2, top, 3, 1, skin.lightened(0.25))
+		return
 	match facing:
 		FACING_UP:
 			_r(-3, top, 6, 7 if hair_style != 1 else 8, h)
 			_r(-2, top, 3, 1, hl)
 			if hair_style == 1:
 				_r(-3, top + 7, 6, 3, h)
+			elif hair_style == 4:
+				_r(-1, top + 7, 2, 4, h)
 			elif hair_style == 2:
 				_r(-1, top - 2, 3, 2, h)
 		_:
@@ -295,5 +313,10 @@ func _draw_hair(top: float, side: bool, dir: int) -> void:
 				3:  # spiky
 					for i in 3:
 						_r(-3 + i * 2, top - 1, 1, 1, h)
+				4:  # ponytail
+					if side:
+						_r(-4 if dir > 0 else 2, top + 2, 2, 5, h)
+					else:
+						_r(3, top + 2, 2, 4, h)
 			if side:
 				_r(-3 if dir > 0 else 1, top, 2, 5, h)  # back of the head

@@ -41,7 +41,8 @@ func test_protocol(path: String) -> void:
 		golden[item["name"]] = item["hex"]
 	# Mirrors protocol::golden_samples() in server/src/protocol.rs.
 	var enc := {
-		"connect": Protocol.encode_connect(0xDEADBEEF, "Zażółć"),
+		"connect": Protocol.encode_connect(0xDEADBEEF, "Zażółć", {"gender": 0, "age": 27, "city": "Łódź", "email": "ola@poczta.pl",
+			"appearance": {"skin": 1, "hair_style": 4, "hair_color": 2, "shirt": 9, "pants": 3}}),
 		"input": Protocol.encode_input(0x01020304, 1200, 99, PackedByteArray([0, 1, 9, 6])),
 		"info_request": Protocol.encode_info_request(0x01020304, [3, 4, 500]),
 		"ping": Protocol.encode_ping(0x01020304, 777000),
@@ -69,6 +70,7 @@ func test_protocol(path: String) -> void:
 		expect(e1.id == 65535 and e1.kind == 1 and e1.x == -1 and e1.y == 2000000, "entity 1 %s" % e1)
 	var pi := Protocol.decode(golden["player_info"].hex_decode())
 	expect(pi.get("players", []).size() == 2 and pi.players[0].nick == "Ala" and pi.players[0].department == 1
+		and pi.players[0].gender == 0 and pi.players[0].appearance.hair_style == 1 and pi.players[0].appearance.hair_color == 3
 		and pi.players[1].nick == "bot_07" and pi.players[1].id == 4 and pi.players[1].department == 0, "decode player_info %s" % pi)
 	var jo := Protocol.decode(golden["job_offers"].hex_decode())
 	expect(jo.get("offers", []).size() == 2 and jo.offers[1].title == "Marketing i sprzedaż" and jo.offers[1].department == 2
@@ -89,8 +91,9 @@ func test_protocol(path: String) -> void:
 	for n in snap.size():
 		expect(Protocol.decode(snap.slice(0, n)).is_empty(), "truncated snapshot len %d" % n)
 	# Nick truncated on a character boundary (20 bytes -> 16).
-	var c := Protocol.encode_connect(1, "ąąąąąąąąąą")
-	expect(c[8] == 16 and c.size() == 9 + 16, "nick truncation")
+	var c := Protocol.encode_connect(1, "ąąąąąąąąąą", {"gender": 0, "age": 20, "city": "X", "email": "a@b.c",
+		"appearance": {"skin": 0, "hair_style": 0, "hair_color": 0, "shirt": 0, "pants": 0}})
+	expect(c[8] == 16 and c.slice(9, 25).get_string_from_utf8() == "ąąąąąąąą", "nick truncation")
 
 
 func _body_from(a: Array) -> Dictionary:

@@ -31,6 +31,7 @@ const PING_INTERVAL_SEC := 1.0
 var state := State.IDLE
 var udp := PacketPeerUDP.new()
 var nick := ""
+var profile := {}
 var nonce := 0
 var player_id := 0
 var token := 0
@@ -89,13 +90,14 @@ static func parse_address(address: String) -> Array:
 	return [host, port]
 
 
-func connect_to_server(address: String, p_nick: String) -> String:
+func connect_to_server(address: String, p_nick: String, p_profile: Dictionary) -> String:
 	var hp := parse_address(address)
 	if hp.is_empty():
 		return "Nieprawidłowy adres serwera"
 	_host = hp[0]
 	_port = hp[1]
 	nick = p_nick
+	profile = p_profile
 	_reconnecting = false
 	reconnects = 0
 	return _start_connect()
@@ -212,7 +214,7 @@ func _process(delta: float) -> void:
 				if server_ip != "":
 					_open_socket()
 			if server_ip != "":
-				send(Protocol.encode_connect(nonce, nick))
+				send(Protocol.encode_connect(nonce, nick, profile))
 			_retry_timer = CONNECT_RETRY_SEC
 	elif state == State.CONNECTED:
 		_since_heard += delta

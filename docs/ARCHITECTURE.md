@@ -54,7 +54,7 @@ client/                 projekt Godota 4.7
   game/game.gd          logika sieciowa gry po stronie klienta
   game/player_view.gd   pixel-artowa postać z animacją chodu + nick + dymek
   game/remote_player.gd bufor snapshotów + interpolacja
-  ui/start_screen.gd    ekran startowy
+  ui/character_screen.gd tworzenie postaci (dane + wygląd z podglądem)
   ui/portal.gd          portal z ofertami, pytania, wynik rekrutacji
   ui/debug_overlay.gd   F3
   tests/run_tests.gd    testy headless (parytet z Rustem)
@@ -124,6 +124,11 @@ w zasięgu 1,5 kafla (gdy nie ma NPC w zasięgu rozmowy) → parzenie 3 s (ekspr
 zajęty dla innych) → kubek w ręce przez 90 s. Stan idzie w `self_status` i w
 bitach 6–7 flag encji; komunikaty to `Say` od samego gracza (dymek nad jego
 głową, widoczny dla innych w pokoju).
+
+**Profil postaci** (`Connect`): imię, płeć, wiek, miejscowość, e-mail i
+wygląd, sprawdzane w `validate_profile` (wiek 18–70, format e-maila, wygląd w
+zakresie palet) — inaczej `Reject(4)`. Wiek, miejscowość i e-mail zostają na
+serwerze; `PlayerInfo` niesie imię, płeć i wygląd.
 
 **Etapy gracza** (`Stage`): `Portal` (po połączeniu — portal z ofertami i
 quiz; poza światem: brak snapshotów, inputy ignorowane, ekran ponawiany co
@@ -232,9 +237,10 @@ nieobecny w snapshotach przez 5 ticków znika.
   miejsc). Typ mebla bierze się z legendy mapy; kolizje zależą tylko od
   `solid`, więc zmiana wyglądu nie rusza symulacji.
 - `player_view.gd` rysuje postać prostokątami w `_draw()`: głowa, fryzura
-  (4 style), koszula, ręce, spodnie, buty; 4 kierunki; cykl chodu liczony z
+  (6 stylów), koszula, ręce, spodnie, buty; 4 kierunki; cykl chodu liczony z
   przebytej drogi (ten sam dla własnej postaci i interpolowanych innych).
-  Wygląd gracza wynika z jego id (identyczny u wszystkich); NPC mają stroje
+  Wygląd gracza wybiera on sam na ekranie tworzenia postaci (indeksy palet w
+  `PlayerInfo`); przed nadejściem `PlayerInfo` — zastępczy wygląd z id; NPC mają stroje
   (portier: mundur i czapka, personel: koszula z krawatem). Własna postać ma
   jasny obrys.
 

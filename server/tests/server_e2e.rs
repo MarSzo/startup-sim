@@ -8,10 +8,20 @@ use game::map::{access, Tile};
 use game::npc::{lines, NPC_ID_BASE};
 use game::nav::Walker;
 use game::net::LinkConditions;
-use game::protocol::{self as proto, Packet};
+use game::protocol::{self as proto, Appearance, Packet, Profile};
 use game::recruitment::{default_recruitment_path, Recruitment};
 use game::server::{Config, Server};
 use game::sim::{self, Body, Pos, IN_RIGHT};
+
+fn test_profile() -> Profile {
+    Profile {
+        gender: proto::gender::FEMALE,
+        age: 30,
+        city: "Kraków".into(),
+        email: "test@firma.pl".into(),
+        appearance: Appearance { skin: 2, hair_style: 4, hair_color: 5, shirt: 6, pants: 1 },
+    }
+}
 
 fn building() -> Building {
     Building::load(&default_building_path()).unwrap()
@@ -68,7 +78,7 @@ impl Client {
 
     fn connect(server: SocketAddr, nick: &str) -> (Client, u32) {
         let sock = Client::socket_for(server);
-        sock.send(&Packet::Connect { nonce: 42, nick: nick.into() }.encode()).unwrap();
+        sock.send(&Packet::Connect { nonce: 42, nick: nick.into(), profile: test_profile() }.encode()).unwrap();
         let mut c = Client { sock, id: 0, token: 0, seq: 0 };
         let deadline = Instant::now() + Duration::from_secs(2);
         while Instant::now() < deadline {
@@ -224,12 +234,12 @@ fn rejects_empty_nick_and_bad_version() {
     let (addr, _) = start_server();
     let sock = UdpSocket::bind("127.0.0.1:0").unwrap();
     sock.set_read_timeout(Some(Duration::from_millis(500))).unwrap();
-    sock.send_to(&Packet::Connect { nonce: 1, nick: "   ".into() }.encode(), addr).unwrap();
+    sock.send_to(&Packet::Connect { nonce: 1, nick: "   ".into(), profile: test_profile() }.encode(), addr).unwrap();
     let mut buf = [0u8; 2048];
     let n = sock.recv(&mut buf).unwrap();
     assert_eq!(Packet::decode(&buf[..n]).unwrap(), Packet::Reject { reason: proto::reject::BAD_NICK });
 
-    let mut bad = Packet::Connect { nonce: 1, nick: "x".into() }.encode();
+    let mut bad = Packet::Connect { nonce: 1, nick: "x".into(), profile: test_profile() }.encode();
     bad[2] = 99;
     sock.send_to(&bad, addr).unwrap();
     let n = sock.recv(&mut buf).unwrap();
@@ -507,4 +517,34 @@ fn coffee_machine_brews_one_cup_at_a_time() {
     }
     assert!(self_holding, "A's snapshot says: holding coffee");
     assert!(others_see, "C sees A with a mug");
+}
+
+#[test]
+fn profile_is_checked_and_appearance_shared() {
+    let (addr, _) = start_server();
+    // Invalid e-mail -> rejected.
+    let sock = UdpSocket::bind("127.0.0.1:0").unwrap();
+    sock.set_read_timeout(Some(Duration::from_millis(500))).unwrap();
+    let bad = Profile { email: "nie-email".into(), ..test_profile() };
+    sock.send_to(&Packet::Connect { nonce: 1, nick: "Zly".into(), profile: bad }.encode(), addr).unwrap();
+    let mut buf = [0u8; 2048];
+    let n = sock.recv(&mut buf).unwrap();
+    assert_eq!(Packet::decode(&buf[..n]).unwrap(), Packet::Reject { reason: proto::reject::BAD_PROFILE });
+
+    // Others see name, gender and appearance - never age, city or e-mail.
+    let (a, _) = Client::connect(addr, "Ola");
+    let (b, _) = Client::connect(addr, "Obserwator");
+    let deadline = Instant::now() + Duration::from_secs(1);
+    let mut seen = None;
+    while Instant::now() < deadline && seen.is_none() {
+        a.ping();
+        b.ping();
+        if let Some(Packet::PlayerInfo { players }) = b.recv() {
+            seen = players.into_iter().find(|p| p.id == a.id);
+        }
+    }
+    let info = seen.expect("B learns about A");
+    assert_eq!(info.nick, "Ola");
+    assert_eq!(info.gender, proto::gender::FEMALE);
+    assert_eq!(info.appearance, test_profile().appearance);
 }
