@@ -881,9 +881,33 @@ pełnym ekranie — zastąpiona stylem inspirowanym Don't Starve:
 - **Świat**: efekt na cały obraz gry — kontury tuszu tam, gdzie zmienia się
   kolor, ciepłe, lekko przygaszone barwy, faktura papieru i winieta. Napisy w
   świecie (nicki, dymki, nazwy pomieszczeń) są nad efektem, więc zostają ostre.
-  Postacie mają większe głowy i cieńsze nogi. (`--no-mood` wyłącza efekt.)
+  (`--no-mood` wyłącza efekt.)
+- **Postacie** narysowane od nowa, w duchu Don't Starve: duża okrągła głowa z
+  dużymi ciemnymi oczami (z błyskiem), uszy, mały tułów-trapez, cienkie kończyny
+  jak kreski, wszystko z konturem tuszu; fryzury (krótkie, długie, kok, kolce,
+  kucyk, łysa), czapki, kask strażaka, krawat, fartuch i mop, opaska ochrony;
+  krok, machanie rękami, siedzenie; w rękach kubek (z parą), laptop, karta,
+  owoc; czynności: kropki (parzenie, pisanie), „zzz”, papieros z kłębami dymu,
+  bańki mydlane, zielone smugi zapachu, kropla potu, parasol.
+- **Dym w pomieszczeniu**: szara zasłona, której krycie rośnie nieliniowo z
+  gęstością (w małym, zadymionym pomieszczeniu nic nie widać), i kłęby jak
+  chmury z jednym konturem tuszu i miękkim światłocieniem, falujące powoli.
+- **Pogoda**: deszcz jako skośne kreski z konturem i rozpryski, mgła jako
+  dryfujące chmury, burza przyciemnia niebo.
+- Podczas jazdy windą dym, czujki i nazwy pomieszczeń piętra są ukryte.
 - Komputer w biurze: ciemna drewniana ramka monitora, bordowy pasek tytułu,
   pergaminowy ekran; pulpit: miękka tapeta z miastem o zmierzchu.
+
+### 10.33 Balkon
+
+- Na piętrze 1 przy chill roomie są drzwi na **balkon** nad wejściem do budynku
+  (drewniany pomost z barierką). Balkon jest pod gołym niebem: pada deszcz,
+  można palić bez czujek, dym od razu się rozwiewa.
+- **Z balkonu widać, co się dzieje na dole**: chodnik, ulicę, parking
+  zewnętrzny i strefę palenia (trochę przyciemnione — to niżej), razem z
+  ludźmi, pojazdami i ich dymkami. Serwer dokłada do widoczności balkonu te
+  pomieszczenia parteru (`below` w definicji pokoju); piętra mają wspólną
+  siatkę, więc klient rysuje je tam, gdzie są.
 
 ### 10.6 Stan implementacji
 
@@ -921,6 +945,7 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Ekwipunek**: kieszenie i ręce, przedmioty (przepustka, karta, laptop,
   kawa), upuszczanie / podnoszenie / podawanie, dostęp z przedmiotów (10.13);
   protokół v8.
+- **Balkon** na piętrze 1 z widokiem na ulicę i ludzi na dole (10.33).
 - **Wygląd „papier i atrament”**: skalowanie z oknem, odręczna czcionka,
   papierowe panele, tarcze statystyk, pasek ekwipunku, efekt tuszu i papieru na
   świecie, postacie z większymi głowami (10.32).
@@ -975,9 +1000,9 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Sieć mobilna**: serwer dual-stack IPv4/IPv6; gracz identyfikowany tokenem
   (zmiana adresu w trakcie gry przenosi sesję); klient przepina gniazdo po
   ciszy/powrocie z tła i sam łączy się ponownie po utracie sesji.
-- **Testy**: 93 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
+- **Testy**: 94 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
   zależna od uprawnień, bramki, ruch/kolizje, schody, winda, nawigacja,
-  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, zegar, dojazd, pogoda, zarząd, słodycze, obiady, wakaty, firma, ochrona i policja, kubki, dym, protokół), 2 golden, 27 e2e serwera
+  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, zegar, dojazd, pogoda, zarząd, słodycze, obiady, wakaty, firma, ochrona i policja, kubki, dym, balkon, protokół), 2 golden, 27 e2e serwera
   (m.in. portal: odrzucenie → przyjęcie → spawn; całe wdrożenie aż do karty;
   niewidoczność między piętrami; zgodność stanu serwera z predykcją) —
   łącznie 122 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 porannego dojazdu samochodem moknięcia w deszczu spotkania z Prezesem tacy ze słodyczami obiadu z odbiorem na recepcji, obsadzonego stanowiska, panelu założyciela kradzieży w sklepie z ochroną i policją , kubka zebranego przez sprzątaczkę oraz papierosa, który uruchamia alarm pożarowy); 146 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie

@@ -3368,9 +3368,14 @@ impl Server {
         for id in ids {
             let p = &self.players[&id];
             let also: &[u16] = self.building.floor(p.body.floor).map_or(&[], |m| m.visible_from(p.room));
+            // A balcony also sees the street below (same grid: the client
+            // draws them over its view of the floor below).
+            let below = self.building.below(p.body.floor, p.room);
             let visible: Vec<EntityState> = std::iter::once(&p.room)
                 .chain(also)
-                .filter_map(|r| groups.get(&(p.body.floor, *r)))
+                .map(|r| (p.body.floor, *r))
+                .chain(below)
+                .filter_map(|k| groups.get(&k))
                 .flatten()
                 .filter(|e| e.id != id)
                 .copied()
@@ -3450,8 +3455,9 @@ impl Server {
                 appearance: proto::Appearance::default(),
             });
             for p in self.players.values_mut() {
-                let sees = p.body.floor == place.0
-                    && self.building.floor(p.body.floor).is_some_and(|m| m.visible_from(p.room).contains(&place.1));
+                let sees = (p.body.floor == place.0
+                    && self.building.floor(p.body.floor).is_some_and(|m| m.visible_from(p.room).contains(&place.1)))
+                    || self.building.below(p.body.floor, p.room).contains(&place);
                 if (p.body.floor, p.room) == place || sees || Some(p.id) == to || p.id == npc_id {
                     // Name first, so the line isn't shown as "?".
                     if p.id != npc_id && p.known.insert(npc_id) {

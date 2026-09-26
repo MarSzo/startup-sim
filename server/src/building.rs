@@ -109,6 +109,13 @@ impl Building {
         self.floors.get(f as usize).map_or("?", |fl| fl.name.as_str())
     }
 
+    /// Rooms of the floor below seen from `room` (a balcony): (floor, room).
+    pub fn below(&self, floor: u8, room: u16) -> Vec<(u8, u16)> {
+        let (Some(m), Some(down)) = (self.floor(floor), floor.checked_sub(1).and_then(|f| self.floor(f))) else { return vec![] };
+        let Some(def) = m.rooms.iter().find(|r| r.id == room) else { return vec![] };
+        def.below.iter().filter_map(|name| down.room_by_name(name)).map(|r| (floor - 1, r.id)).collect()
+    }
+
     pub fn active_floors(&self) -> impl Iterator<Item = (u8, &Map)> {
         (0..self.floors.len() as u8).filter_map(|f| self.floor(f).map(|m| (f, m)))
     }
@@ -241,4 +248,21 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn the_balcony_is_off_the_chill_room_outdoors_and_looks_down_on_the_street() {
+        let b = Building::load(&default_building_path()).unwrap();
+        let m = b.floor(1).unwrap();
+        let balcony = m.room_by_name("Balkon").unwrap();
+        assert!(balcony.outdoor);
+        let chill = m.room_by_name("Chill room").unwrap().id;
+        let t = m.room_tiles(chill)[0];
+        let path = b.find_path((1, t), (1, Tile { x: 33, y: 35 }), 0).expect("from the chill room to the balcony");
+        assert!(!path.is_empty());
+        let below = b.below(1, balcony.id);
+        let street = b.floor(0).unwrap().room_by_name("Na zewnątrz").unwrap().id;
+        assert!(below.contains(&(0, street)) && below.len() == 3, "{below:?}");
+        assert!(b.below(1, chill).is_empty());
+    }
+
 }

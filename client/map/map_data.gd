@@ -34,6 +34,7 @@ var room_names := {}  # id -> name
 var room_types := {}  # id -> type
 var room_outdoor := {}  # id -> true: under the open sky (weather)
 var room_detector := {}  # id -> true: smoke detector on the ceiling
+var room_below := {}  # id -> true: sees the floor below (a balcony)
 var legend := {}      # char -> {type, solid, color, access?, free_dir?}
 ## [{kind: "stairs"|"elevator", rect: Rect2i, id, to_floor, to: Vector2i}]
 var links: Array = []
@@ -75,6 +76,8 @@ func parse(bytes: PackedByteArray) -> void:
 			room_outdoor[rid] = true
 		if defs[key].get("detector", false):
 			room_detector[rid] = true
+		if not defs[key].get("below", []).is_empty():
+			room_below[rid] = true
 	var tiles: Array = data["tiles"]
 	var rooms: Array = data["rooms"]
 	if tiles.size() != height or rooms.size() != height:

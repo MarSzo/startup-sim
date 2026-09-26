@@ -141,6 +141,7 @@ var _goto_floor := -1   # floor the current path was planned on
 
 
 func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Dictionary) -> void:
+	RenderingServer.set_default_clear_color(Color("#15171f"))  # the night around the building
 	label_layer.layer = 7
 	label_layer.follow_viewport_enabled = true
 	add_child(label_layer)
@@ -308,6 +309,7 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 
 func _show_floor(f: int) -> void:
 	smoke_view.set_floor(f)
+	_below_floor = -1
 	for k in views:
 		views[k].visible = (k == f)
 		views[k].labels.visible = (k == f)
@@ -682,6 +684,7 @@ func _on_snapshot(p: Dictionary) -> void:
 					remotes.erase(id)
 		room_id = p.room
 		floor_index = p.floor
+		_update_below_view()
 		if not have_time or absf(tick - est_tick) > 5.0:
 			est_tick = tick
 			have_time = true
@@ -991,6 +994,26 @@ func _update_ride() -> void:
 		camera.offset = Vector2.ZERO
 		_set_door_views_visible(true)
 		_set_floor_extras_visible(true)
+
+
+## On a balcony: the floor below shows through the open air (under this
+## floor's picture, a bit darker - it's further away); the server sends
+## who is down there, on the same grid.
+var _below_floor := -1
+
+
+func _update_below_view() -> void:
+	var m = building.get_floor(floor_index)
+	var want := floor_index - 1 if m and floor_index > 0 and m.room_below.has(room_id) else -1
+	if want == _below_floor:
+		return
+	if _below_floor >= 0 and views.has(_below_floor):
+		views[_below_floor].visible = false
+		views[_below_floor].modulate = Color.WHITE
+	_below_floor = want
+	if want >= 0 and views.has(want):
+		views[want].visible = true
+		views[want].modulate = Color(0.78, 0.78, 0.82)
 
 
 ## Smoke, detectors and room names are drawn over the ride mask: hide them

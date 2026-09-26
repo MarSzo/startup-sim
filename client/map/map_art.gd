@@ -113,9 +113,12 @@ func _floor_under(x: int, y: int) -> String:
 
 func _ground(x: int, y: int) -> void:
 	var c := _ch(x, y)
+	var orig := c
 	var t := _type(c)
 	if c == "#":
 		return
+	if c == "~" and map.floor_index > 0:
+		return  # open air above the ground floor: transparent (the balcony view shows the street below)
 	if map.legend.has(c) and map.legend[c]["solid"] and c not in ["F", "~", "L"]:
 		c = _floor_under(x, y)  # furniture stands on the room's floor
 		t = _type(c)
@@ -141,6 +144,8 @@ func _ground(x: int, y: int) -> void:
 			_blit(_tile_img("F %d" % v, func(im): _hedge(im, v)), x, y)
 		"~":
 			_blit(_tile_img("~", func(im): im.fill(Color("#15171f"))), x, y)
+		"n":
+			_blit(_tile_img("n %d" % v, func(im): _planks(im, v)), x, y)
 		"e":
 			_blit(_tile_img("e", func(im): _diamond_plate(im)), x, y)
 		"E":  # threshold; the door panels are nodes (open / closed)
@@ -165,6 +170,38 @@ func _ground(x: int, y: int) -> void:
 			_locked_door(x, y)
 		_:
 			_rect(Rect2i(x * TP, y * TP, TP, TP), Color(map.legend[c]["color"]) if map.legend.has(c) else Color.MAGENTA)
+	if orig == "h":
+		_railing(x, y)
+
+
+## Balcony deck: weathered wooden planks.
+func _planks(t: Image, v: int) -> void:
+	_noise(t, Color("#8a6a4a"), 0.02, 51 + v)
+	for py in range(0, TP, 4):
+		for i in TP:
+			t.set_pixel(i, py, Color("#5e4630"))
+	for py in range(0, TP, 4):
+		var joint := (py * 5 + v * 7) % TP
+		t.set_pixel(joint, py + 1, Color("#5e4630"))
+		t.set_pixel(joint, py + 2, Color("#5e4630"))
+
+
+## Balcony railing: a dark metal rail with posts, over the deck.
+func _railing(x: int, y: int) -> void:
+	var ox := x * TP
+	var oy := y * TP
+	var dark := Color("#2c2c34")
+	var hi := Color("#5a5a66")
+	var horizontal := _ch(x - 1, y) == "h" or _ch(x + 1, y) == "h"
+	var vertical := _ch(x, y - 1) == "h" or _ch(x, y + 1) == "h"
+	if horizontal:
+		_rect(Rect2i(ox, oy + 5, TP, 3), dark)
+		_rect(Rect2i(ox, oy + 5, TP, 1), hi)
+		for px in range(1, TP, 5):
+			_rect(Rect2i(ox + px, oy + 8, 2, 7), dark)
+	if vertical:
+		_rect(Rect2i(ox + 6, oy, 3, TP), dark)
+		_rect(Rect2i(ox + 6, oy, 1, TP), hi)
 
 
 func _floor_office(t: Image, v: int) -> void:

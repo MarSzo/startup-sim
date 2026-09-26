@@ -105,6 +105,10 @@ pub struct RoomDef {
     /// Has a smoke detector (fire.rs).
     #[serde(default)]
     pub detector: bool,
+    /// Names of rooms on the floor below that can be seen from here (a
+    /// balcony looking down on the street).
+    #[serde(default)]
+    pub below: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

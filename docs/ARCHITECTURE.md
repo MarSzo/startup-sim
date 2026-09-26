@@ -200,7 +200,17 @@ falujący kontur tuszu, postrzępione krawędzie, cień; krawędzie kafelkowane)
 motyw globalnie. Świat: `game/mood.gdshader` na `CanvasLayer` 4 (Sobel na
 jasności = tusz, gradacja kolorów, ziarno, winieta); teksty świata na
 `CanvasLayer` 6 z `follow_viewport_enabled` (`PlayerView.label_root`,
-`MapView.labels`). Okno skaluje się w trybie `canvas_items`.
+`MapView.labels`). Okno skaluje się w trybie `canvas_items`. Warstwy: świat
+(0), efekt tuszu (4), dym `SmokeView` (5, `follow_viewport`), pogoda (6),
+teksty świata (7), HUD (11+). Postać (`game/player_view.gd`) rysowana wektorowo
+(`_limb`, `_blob`, `_shape` z konturem `OL`).
+
+**Balkon**: `RoomDef::below` (nazwy pomieszczeń piętra niżej) →
+`Building::below(floor, room)`; snapshot odbiorcy na balkonie zawiera też
+encje z tych pomieszczeń, a mowa stamtąd też do niego dociera. Encje nie mają
+piętra, ale siatki pięter się pokrywają, więc klient rysuje je na miejscu; pod
+widokiem piętra pokazuje przyciemniony widok piętra niżej (`room_below`,
+`_update_below_view`), a „~” nad parterem jest przezroczyste.
 
 **Dym i straż** (`fire.rs`): `Smoke` trzyma ilość dymu na (piętro, pokój);
 stężenie = ilość / liczba kafli pokoju. `puff` (każdy tick palenia w środku),
