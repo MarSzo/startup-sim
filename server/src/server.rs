@@ -10,6 +10,7 @@ use crate::building::Building;
 use crate::clock::{self, Clock, Transition};
 use crate::coffee::{self, Cup, Machine};
 use crate::commute::{self, Vehicle, VehicleEvent};
+use crate::company::{self, Company};
 use crate::computer::{self, Account, Computer, Messenger, Workstation};
 use crate::elevator::{self, Elevator};
 use crate::inventory::{self, kind as item_kind, Inventory, Item};
@@ -91,6 +92,8 @@ struct Desk {
     attempt: Option<Attempt>,
     /// Passed an interview: department, waiting for "go to the office".
     hired: Option<u8>,
+    /// Passed an interview, waiting for the founder's decision (offer).
+    awaiting: Option<u8>,
     inbox: Vec<MailMsg>,
     next_mail: u8,
 }
@@ -114,7 +117,6 @@ impl Desk {
     }
 }
 
-const RECRUITER: &str = "Startup Sim — Rekrutacja";
 
 /// An item lying on the floor; `handle` is its entity id in snapshots.
 struct Dropped {
@@ -261,6 +263,7 @@ pub struct Server {
     meetings: Vec<Meeting>,
     /// Open positions per job offer (our startup).
     vacancies: HashMap<u8, u8>,
+    company: Company,
     /// Lunch orders (the app on the computer).
     lunch_orders: Vec<lunch::Order>,
     /// Sweets on the chill-room table, and when the next trays come today.
@@ -325,6 +328,9 @@ impl Server {
             tray: None,
             lunch_orders: Vec::new(),
             vacancies: cfg.recruitment.offers.iter().filter(|o| o.hiring).map(|o| (o.id, o.vacancies)).collect(),
+            company: Company::new(
+                &cfg.recruitment.offers.iter().find(|o| o.hiring).map_or("Startup Sim sp. z o.o.".to_string(), |o| o.company.clone()),
+            ),
             treat_drops: Vec::new(),
             board_room,
             outdoor_rooms: building
@@ -518,7 +524,8 @@ impl Server {
             | Packet::CommuteChoice { token, .. }
             | Packet::CalendarBook { token, .. }
             | Packet::DialogAnswer { token, .. }
-            | Packet::LunchOrder { token, .. } => *token,
+            | Packet::LunchOrder { token, .. }
+            | Packet::CompanyAction { token, .. } => *token,
             _ => return,
         };
         let Some(&id) = self.by_token.get(&token) else {
@@ -581,6 +588,7 @@ impl Server {
             Packet::CalendarBook { start, topic, .. } => self.handle_calendar_book(id, start as u32, topic),
             Packet::DialogAnswer { id: dialog, choice, .. } => self.handle_dialog_answer(id, dialog, choice),
             Packet::LunchOrder { dish, .. } => self.handle_lunch_order(id, dish),
+            Packet::CompanyAction { action, target, value, text, .. } => self.handle_company_action(id, action, target, value, &text),
             Packet::CommuteChoice { mode, .. } => {
                 let p = self.players.get_mut(&id).unwrap();
                 if commute::mode(mode).is_some() && matches!(p.stage, Stage::Home { arrive_at: None }) {
@@ -707,6 +715,10 @@ impl Server {
             // portal hides the ones with none (unless you already applied).
             if let Some(&free) = self.vacancies.get(&offer.id) {
                 offer.vacancies = free;
+                offer.company = self.company.name.clone();
+                if let Some(d) = self.company.descriptions.get(&offer.id) {
+                    offer.description = d.clone();
+                }
             }
             let len = 4 + 6 + offer.company.len() + offer.title.len() + offer.description.len();
             if size + len > proto::MAX_PACKET && !chunk.is_empty() {
@@ -754,7 +766,7 @@ impl Server {
             return;
         }
         let Some(desk) = self.desk(id) else { return };
-        if desk.applied.contains(&offer) || desk.hired.is_some() {
+        if desk.applied.contains(&offer) || desk.hired.is_some() || desk.awaiting.is_some() {
             return; // duplicate (resent) application
         }
         desk.applied.push(offer);
@@ -766,6 +778,7 @@ impl Server {
 
     /// Replies that are due: interview invitations / other companies' answers.
     fn deliver_replies(&mut self, id: u16) {
+        let from = format!("{} — Rekrutacja", self.company.name);
         let tick = self.tick;
         let Some(p) = self.players.get_mut(&id) else { return };
         let nick = p.nick.clone();
@@ -780,11 +793,11 @@ impl Server {
             if o.hiring {
                 desk.invited.push(offer);
                 desk.mail(
-                    RECRUITER,
+                    &from,
                     format!("Zaproszenie na rozmowę: {}", o.title),
                     format!(
                         "Cześć {nick}!\n\nDziękujemy za zgłoszenie na stanowisko {}. Zapraszamy na krótką rozmowę online — \
-                         kilka pytań, zero stresu (prawie). Kliknij „Dołącz do rozmowy”, kiedy tylko możesz.\n\nZespół Startup Sim",
+                         kilka pytań, zero stresu (prawie). Kliknij „Dołącz do rozmowy”, kiedy tylko możesz.\n\nZespół rekrutacji",
                         o.title
                     ),
                     proto::portal_action::JOIN_INTERVIEW,
@@ -802,7 +815,7 @@ impl Server {
             proto::portal_action::JOIN_INTERVIEW => {
                 let p = self.players.get_mut(&id).unwrap();
                 let Stage::Portal(desk) = &mut p.stage else { return };
-                if !desk.invited.contains(&arg) || desk.attempt.is_some() || desk.hired.is_some() {
+                if !desk.invited.contains(&arg) || desk.attempt.is_some() || desk.hired.is_some() || desk.awaiting.is_some() {
                     return;
                 }
                 if self.vacancies.get(&arg).copied().unwrap_or(0) == 0 {
@@ -838,6 +851,7 @@ impl Server {
     }
 
     fn handle_answer(&mut self, id: u16, attempt_no: u8, index: u8, choice: u8) {
+        let from = format!("{} — Rekrutacja", self.company.name);
         let p = self.players.get_mut(&id).unwrap();
         let nick = p.nick.clone();
         let addr = p.addr;
@@ -869,38 +883,25 @@ impl Server {
         if filled_meanwhile {
             desk.applied.retain(|x| *x != offer);
             desk.mail(
-                RECRUITER,
+                &from,
                 format!("Stanowisko obsadzone: {}", o.title),
                 format!(
                     "Cześć {nick},\n\nrozmowa poszła dobrze ({score}/{total}), ale ktoś był szybszy — to stanowisko \
-                     zostało już obsadzone. Zajrzyj na portal: nowe miejsca pojawiają się co rano.\n\nZespół Startup Sim"
+                     zostało już obsadzone. Zajrzyj na portal: nowe miejsca pojawiają się co rano.\n\nZespół rekrutacji"
                 ),
                 proto::portal_action::NONE,
                 0,
             );
         } else if passed {
-            p.position = Some(offer);
-            desk.hired = Some(o.department);
-            desk.mail(
-                RECRUITER,
-                "Zaproszenie na dzień próbny".into(),
-                format!(
-                    "Gratulacje, {nick}!\n\nRozmowa na stanowisko {} poszła świetnie ({score}/{total}). Zapraszamy na dzień \
-                     próbny do biura: zgłoś się na portierni — portier zaprowadzi Cię na recepcję, a w HR podpiszesz umowę \
-                     i odbierzesz kartę.\n\nDo zobaczenia!",
-                    o.title
-                ),
-                proto::portal_action::GO_TO_OFFICE,
-                0,
-            );
+            // Hired right away, or the founder decides (see below).
         } else {
             desk.applied.retain(|x| *x != offer); // may apply again
             desk.mail(
-                RECRUITER,
+                &from,
                 format!("Dziękujemy za rozmowę: {}", o.title),
                 format!(
                     "Cześć {nick},\n\ndziękujemy za rozmowę ({score}/{total}). Tym razem szukamy kogoś innego, ale nie \
-                     przejmuj się — zapraszamy do ponownej aplikacji. Pytania będą inne!\n\nZespół Startup Sim"
+                     przejmuj się — zapraszamy do ponownej aplikacji. Pytania będą inne!\n\nZespół rekrutacji"
                 ),
                 proto::portal_action::NONE,
                 0,
@@ -909,9 +910,264 @@ impl Server {
         self.send(addr, &result);
         self.send(addr, &result); // tiny packet; a duplicate makes loss unlikely
         if passed {
-            self.take_vacancy(offer);
+            if self.founder_online() {
+                let since = self.clock.total_minutes();
+                let company = self.company.name.clone();
+                self.company.candidates.push(company::Candidate { player: id, offer, score: score as u8, total: total as u8, since });
+                if let Some(Stage::Portal(desk)) = self.players.get_mut(&id).map(|p| &mut p.stage) {
+                    desk.awaiting = Some(offer);
+                    desk.mail(&from, "Decyzja zarządu wkrótce".into(), company::lines::awaiting(&nick, &company), proto::portal_action::NONE, 0);
+                }
+            } else {
+                self.hire(id, offer);
+            }
         }
         self.send_portal(id, true);
+    }
+
+    fn founder_online(&self) -> bool {
+        self.company.founder.is_some_and(|f| self.players.contains_key(&f))
+    }
+
+    /// Hired: invitation to the trial day, one place fewer.
+    fn hire(&mut self, pid: u16, offer: u8) {
+        self.company.candidates.retain(|c| c.player != pid);
+        if self.vacancies.get(&offer).copied().unwrap_or(0) == 0 {
+            self.position_filled_mail(pid, offer);
+            return;
+        }
+        let from = format!("{} — Rekrutacja", self.company.name);
+        let Some(o) = self.cfg.recruitment.offer(offer).cloned() else { return };
+        let Some(p) = self.players.get_mut(&pid) else { return };
+        let nick = p.nick.clone();
+        p.position = Some(offer);
+        let Stage::Portal(desk) = &mut p.stage else { return };
+        desk.awaiting = None;
+        self.company.hired_on.insert(pid, self.clock.day);
+        desk.hired = Some(o.department);
+        desk.mail(
+            &from,
+            "Zaproszenie na dzień próbny".into(),
+            format!(
+                "Gratulacje, {nick}!\n\nZapraszamy na dzień próbny na stanowisko {}: zgłoś się na portierni — portier \
+                 zaprowadzi Cię na recepcję, a w HR podpiszesz umowę i odbierzesz kartę.\n\nDo zobaczenia!",
+                o.title
+            ),
+            proto::portal_action::GO_TO_OFFICE,
+            0,
+        );
+        self.take_vacancy(offer);
+        self.send_portal(pid, true);
+    }
+
+    /// The founder says no (or the place is gone).
+    fn reject_candidate(&mut self, pid: u16) {
+        let Some(i) = self.company.candidates.iter().position(|c| c.player == pid) else { return };
+        let c = self.company.candidates.remove(i);
+        let from = format!("{} — Rekrutacja", self.company.name);
+        let company = self.company.name.clone();
+        let Some(p) = self.players.get_mut(&pid) else { return };
+        let nick = p.nick.clone();
+        let Stage::Portal(desk) = &mut p.stage else { return };
+        desk.awaiting = None;
+        desk.applied.retain(|o| *o != c.offer);
+        desk.mail(&from, "Decyzja zarządu".into(), company::lines::rejected(&nick, &company), proto::portal_action::NONE, 0);
+        self.send_portal(pid, true);
+    }
+
+    /// Candidates the founder didn't decide on in time (or with no founder
+    /// around): the interview result stands - hired.
+    fn tick_company(&mut self) {
+        let now = self.clock.total_minutes();
+        let founder_here = self.founder_online();
+        let due: Vec<(u16, u8)> = self
+            .company
+            .candidates
+            .iter()
+            .filter(|c| !founder_here || now >= c.since + company::DECISION_MINUTES)
+            .map(|c| (c.player, c.offer))
+            .collect();
+        for (pid, offer) in due {
+            self.hire(pid, offer);
+        }
+        self.company.candidates.retain(|c| self.players.contains_key(&c.player));
+    }
+
+    /// Found the company from the job portal: into the board, with a card and
+    /// a laptop, in the board room.
+    fn found_company(&mut self, pid: u16, name: &str) {
+        if self.company.founder.is_some() {
+            return;
+        }
+        let Some(name) = company::clean(name, company::NAME_MIN, company::NAME_MAX) else { return };
+        let Some(p) = self.players.get_mut(&pid) else { return };
+        if !matches!(p.stage, Stage::Portal(_)) {
+            return;
+        }
+        p.stage = Stage::Working;
+        p.department = company::BOARD_DEPARTMENT;
+        p.contract = true;
+        p.day = p.day.max(2);
+        p.money += shop::ADVANCE;
+        let pos = self.board_room.and_then(|(f, r)| {
+            let m = self.building.floor(f)?;
+            // By the meeting table (where the laptop goes), else anywhere free.
+            let tiles = m.room_tiles(r);
+            let by_table = crate::map::Tile { x: 50, y: 18 };
+            let t = if tiles.contains(&by_table) { Some(by_table) } else { tiles.into_iter().find(|t| !m.is_blocked(t.x, t.y)) };
+            t.map(|t| (f, t))
+        });
+        if let Some((f, t)) = pos {
+            p.body = Body::at(f, Pos::tile_center(t.x, t.y));
+            p.room = self.board_room.map_or(0, |b| b.1);
+        }
+        self.company.founder = Some(pid);
+        self.company.name = name.clone();
+        self.company.hired_on.insert(pid, self.clock.day);
+        let nick = p.nick.clone();
+        self.give_new(pid, item_kind::EMPLOYEE_CARD);
+        self.give_new(pid, item_kind::LAPTOP);
+        self.clock_dirty = true;
+        for other in self.players.values_mut() {
+            other.known.remove(&pid); // new department on the name tag
+        }
+        self.log(format!("* company founded: '{name}' by {nick}"));
+    }
+
+    /// The panel's account: the founder's computer (whoever sits at it).
+    fn is_founder_screen(&self, pid: u16) -> bool {
+        self.calendar_account(pid).is_some_and(|a| Some(a) == self.company.founder)
+    }
+
+    fn company_packets(&self, pid: u16) -> Vec<Packet> {
+        if !self.is_founder_screen(pid) {
+            return Vec::new();
+        }
+        let offers = self
+            .cfg
+            .recruitment
+            .offers
+            .iter()
+            .filter(|o| o.hiring)
+            .map(|o| {
+                let desc = self.company.descriptions.get(&o.id).cloned().unwrap_or_else(|| o.description.clone());
+                (o.id, self.vacancies.get(&o.id).copied().unwrap_or(0), o.title.clone(), desc)
+            })
+            .collect();
+        let candidates = self
+            .company
+            .candidates
+            .iter()
+            .filter_map(|c| self.players.get(&c.player).map(|p| (c.player, c.offer, c.score, c.total, p.nick.clone())))
+            .collect();
+        let staff = self
+            .players
+            .values()
+            // Signed, or hired and on the way (no contract yet).
+            .filter(|p| p.contract || p.position.is_some())
+            .map(|p| {
+                let dept = match p.department {
+                    0 => p.position.and_then(|o| self.cfg.recruitment.offer(o)).map_or(0, |o| o.department),
+                    d => d,
+                };
+                (p.id, dept, self.company.hired_on.get(&p.id).copied().unwrap_or(1) as u16, p.nick.clone())
+            })
+            .collect();
+        vec![Packet::CompanyOffers { name: self.company.name.clone(), offers }, Packet::CompanyPeople { candidates, staff }]
+    }
+
+    fn send_company(&mut self, pid: u16) {
+        let addr = self.players[&pid].addr;
+        for pk in self.company_packets(pid) {
+            self.send(addr, &pk);
+        }
+    }
+
+    fn handle_company_action(&mut self, pid: u16, action: u8, target: u16, value: u8, text: &str) {
+        use company::action as a;
+        if action == a::FOUND {
+            self.found_company(pid, text);
+            return;
+        }
+        if !self.is_founder_screen(pid) {
+            return;
+        }
+        match action {
+            a::RENAME => {
+                if let Some(name) = company::clean(text, company::NAME_MIN, company::NAME_MAX) {
+                    self.log(format!("* company renamed: '{name}'"));
+                    self.company.name = name;
+                    self.clock_dirty = true;
+                }
+            }
+            a::SET_PLACES => {
+                if let Some(v) = self.vacancies.get_mut(&(target as u8)) {
+                    *v = value.min(company::MAX_PLACES);
+                }
+            }
+            a::SET_DESCRIPTION => {
+                if self.vacancies.contains_key(&(target as u8)) {
+                    match company::clean(text, 1, company::DESCRIPTION_MAX) {
+                        Some(d) => self.company.descriptions.insert(target as u8, d),
+                        None => self.company.descriptions.remove(&(target as u8)),
+                    };
+                }
+            }
+            a::HIRE => {
+                if let Some(offer) = self.company.candidates.iter().find(|c| c.player == target).map(|c| c.offer) {
+                    self.hire(target, offer);
+                }
+            }
+            a::REJECT => self.reject_candidate(target),
+            a::FIRE => self.fire(target),
+            _ => {}
+        }
+        self.send_company(pid);
+    }
+
+    /// Fired: card and laptop back, out of the building, job hunting again.
+    fn fire(&mut self, pid: u16) {
+        if Some(pid) == self.company.founder {
+            return;
+        }
+        let Some(p) = self.players.get(&pid) else { return };
+        if !p.contract && p.position.is_none() {
+            return;
+        }
+        self.end_session(pid);
+        self.computers.retain(|c| c.owner() != pid);
+        self.vehicles.retain(|v| v.owner != pid);
+        let company = self.company.name.clone();
+        let from = format!("{company} — Zarząd");
+        let p = self.players.get_mut(&pid).unwrap();
+        let nick = p.nick.clone();
+        p.inventory.remove_owned_by(pid);
+        refresh(p);
+        p.contract = false;
+        p.department = 0;
+        p.rest = None;
+        p.riding = None;
+        let position = p.position.take();
+        let mut desk = Box::<Desk>::default();
+        // The client clears its inbox when it sees the portal again; new ids
+        // anyway, in case that Clock is lost.
+        desk.next_mail = 100;
+        desk.mail(&from, "Rozwiązanie umowy".into(), company::lines::fired(&nick, &company), proto::portal_action::NONE, 0);
+        p.stage = Stage::Portal(desk);
+        if let Some(v) = position.and_then(|o| self.vacancies.get_mut(&o)) {
+            *v = (*v + 1).min(MAX_VACANCIES);
+        }
+        self.company.hired_on.remove(&pid);
+        for other in self.players.values_mut() {
+            other.known.remove(&pid);
+        }
+        self.clock_dirty = true;
+        self.log(format!("* {nick} fired"));
+        // Clock first (back on the portal), then the new inbox.
+        let clock = self.clock_packet(&self.players[&pid]);
+        let addr = self.players[&pid].addr;
+        self.send(addr, &clock);
+        self.send_portal(pid, true);
     }
 
     /// Somebody got the job: one place fewer; if none is left, everybody
@@ -946,6 +1202,7 @@ impl Server {
 
     /// "Sorry, the position has been filled" - and the recruitment for it ends.
     fn position_filled_mail(&mut self, pid: u16, offer: u8) {
+        let from = format!("{} — Rekrutacja", self.company.name);
         let Some(title) = self.cfg.recruitment.offer(offer).map(|o| o.title.clone()) else { return };
         let Some(p) = self.players.get_mut(&pid) else { return };
         let nick = p.nick.clone();
@@ -957,11 +1214,11 @@ impl Server {
             desk.attempt = None;
         }
         desk.mail(
-            RECRUITER,
+            &from,
             format!("Stanowisko obsadzone: {title}"),
             format!(
                 "Cześć {nick},\n\ndziękujemy za zainteresowanie — niestety stanowisko {title} zostało już obsadzone. \
-                 Nowe miejsca pojawiają się na portalu co rano, zajrzyj jutro!\n\nZespół Startup Sim"
+                 Nowe miejsca pojawiają się na portalu co rano, zajrzyj jutro!\n\nZespół rekrutacji"
             ),
             proto::portal_action::NONE,
             0,
@@ -1450,6 +1707,8 @@ impl Server {
             depart: p.depart_at.map_or(proto::NO_TIME, |t| (t % clock::MIN_PER_DAY) as u16),
             money: p.money.clamp(0, u32::MAX as i64) as u32,
             weather: self.weather.now,
+            company: self.company.name.clone(),
+            founded: self.company.founder.is_some(),
         }
     }
 
@@ -1736,7 +1995,8 @@ impl Server {
         self.meetings.retain(|m| m.day + 1 >= day);
         // The board-room door lets in whoever has a meeting now.
         for p in self.players.values_mut() {
-            let open = self.meetings.iter().any(|m| m.owner == p.id && m.door_open(day, now));
+            // The founder is on the board: the door is always open for them.
+            let open = self.company.founder == Some(p.id) || self.meetings.iter().any(|m| m.owner == p.id && m.door_open(day, now));
             p.body.access = p.inventory.access() | if open { crate::map::access::BOARD } else { 0 };
         }
         let ceo = self.npcs.iter().find(|n| n.role == npc::Role::Ceo).map(|n| n.id);
@@ -1992,6 +2252,7 @@ impl Server {
         p.department = dept;
         p.contract = true;
         p.money += shop::ADVANCE;
+        self.company.hired_on.insert(id, self.clock.day);
         if let Some((floor, x, y)) = seat {
             p.body = Body::at(floor, Pos::tile_center(x, y));
             p.room = self.building.floor(floor).map_or(0, |m| m.room_at_tile(x, y));
@@ -2291,6 +2552,12 @@ impl Server {
             self.computers.retain(|c| c.owner() != id);
             self.vehicles.retain(|v| v.owner != id);
             self.lunch_orders.retain(|o| o.owner != id);
+            self.company.candidates.retain(|c| c.player != id);
+            self.company.hired_on.remove(&id);
+            if self.company.founder == Some(id) {
+                self.company.founder = None; // the company stays; someone may found it anew
+                self.clock_dirty = true;
+            }
             // Their job is free again.
             if let Some(v) = p.position.and_then(|o| self.vacancies.get_mut(&o)) {
                 *v = (*v + 1).min(MAX_VACANCIES);
@@ -2495,7 +2762,16 @@ impl Server {
                 .min_by_key(|n| (!n.is_idle(), (n.body.pos.x - body.pos.x).abs() + (n.body.pos.y - body.pos.y).abs()));
             let hands_free = p.inventory.hands_free();
             let lunch_waiting = self.lunch_orders.iter().any(|o| o.owner == pid && o.delivered);
-            if let Some(n) = nearest.as_ref().filter(|n| n.role == npc::Role::Receptionist && lunch_waiting) {
+            // A desk right in front of you (a laptop on it, or one in your
+            // hands) wins over talking to someone further away.
+            let desk_here = computer::workstation_in_reach(&self.workstations, &body).is_some_and(|ws| {
+                self.computers.iter().any(|c| c.station == ws) || p.inventory.held_kind() == item_kind::LAPTOP
+            });
+            if desk_here {
+                if let Some(said) = self.use_desk(pid, &body) {
+                    coffee_says.extend(said.map(|line| (pid, line, None)));
+                }
+            } else if let Some(n) = nearest.as_ref().filter(|n| n.role == npc::Role::Receptionist && lunch_waiting) {
                 lunch_pickups.push((pid, n.id)); // the courier left a box for you
             } else if let Some(n) = nearest {
                 events.extend(n.interact(&self.building, pid, body.access, dept.as_deref(), hands_free));
@@ -2535,6 +2811,7 @@ impl Server {
         self.tick_vehicles();
         self.tick_meetings();
         self.tick_lunch();
+        self.tick_company();
 
         for (pid, npc_id) in lunch_pickups {
             let line = self.pick_up_lunch(pid);
@@ -2568,6 +2845,7 @@ impl Server {
                     }
                 }
                 npc::Event::Contract { player } => {
+                    self.company.hired_on.insert(player, self.clock.day);
                     if let Some(p) = self.players.get_mut(&player) {
                         p.contract = true;
                         p.money += shop::ADVANCE;
@@ -2722,6 +3000,9 @@ impl Server {
                     outgoing.push((p.addr, id, pk));
                 }
                 if let Some(pk) = self.lunch_packet(id) {
+                    outgoing.push((p.addr, id, pk));
+                }
+                for pk in self.company_packets(id) {
                     outgoing.push((p.addr, id, pk));
                 }
             }

@@ -11,6 +11,10 @@
   {
    "id": 2,
    "name": "Biznes"
+  },
+  {
+   "id": 3,
+   "name": "Zarząd"
   }
  ],
  "offers": [

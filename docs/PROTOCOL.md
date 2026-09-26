@@ -294,7 +294,9 @@ pieszo, 2 rower, 3 samochód, 4 taksówka, 5 tramwaj), `depart u16` (minuta
 wyjazdu albo 0xFFFF), `money u32` (portfel — także w domu), `weather u8`
 (1 słonecznie, 2 pochmurno, 3 deszcz, 4 burza, 5 mgła). Rano `place` = 2 i
 `arrive` = 0xFFFF oznacza „jeszcze w domu, wybierz dojazd”; po wyjeździe
-`arrive` = minuta przyjazdu.
+`arrive` = minuta przyjazdu. Od v23 na końcu: `company` str16 (nazwa firmy,
+≤ 64 B) i `founded u8` (1 = firma ma założyciela; 0 = portal pokazuje „Załóż
+firmę”).
 
 ### 30 `CommuteChoice` (C→S)
 
@@ -333,6 +335,22 @@ godzinami 10–15), `dish u8`, `arrives u16` (minuta przyjazdu albo 0xFFFF), n u
 str16}. `LunchOrder`: token u32, dish u8. Dania to przedmioty 28 pierogi, 29
 pizza, 30 sushi, 31 schabowy, 32 sałatka, 33 kebab (tylko w rękach). Odbiór:
 E przy NPC „Recepcja”.
+
+### 37 `CompanyOffers`, 38 `CompanyPeople` (S→C), 39 `CompanyAction` (C→S)
+
+Panel założyciela — tylko dla założyciela przy jego własnym (odblokowanym)
+komputerze, co 1 s i po każdej akcji. `CompanyOffers`: `name` str16, n u8 ×
+{`id u8`, `places u8`, `title` str16, `description` str16}. `CompanyPeople`: n
+u8 × kandydat {`player u16`, `offer u8`, `score u8`, `total u8`, `nick` str16},
+m u8 × pracownik {`player u16`, `department u8`, `day u16` (dzień zatrudnienia),
+`nick` str16}.
+
+`CompanyAction`: token u32, `action u8`, `target u16`, `value u8`, `text` str16.
+Akcje: 1 załóż firmę (z portalu, `text` = nazwa 3–40 znaków), 2 zmień nazwę,
+3 miejsca oferty `target` = `value` (0–5), 4 opis oferty `target` = `text`
+(≤ 200 znaków), 5 zatrudnij kandydata `target`, 6 odrzuć, 7 zwolnij pracownika
+`target`. Akcje 2–7 tylko od założyciela przy jego komputerze; inne są
+ignorowane. Dział 3 = Zarząd.
 
 ### 27 `Shelf` (S→C), 28 `ShopTake` (C→S)
 
@@ -405,6 +423,7 @@ szyfrowaniem.
 
 ## Historia wersji
 
+- **23** — panel założyciela: `Clock` + `company`, `founded`; `CompanyOffers`, `CompanyPeople`, `CompanyAction`; dział 3 (Zarząd).
 - **22** — wakaty: `JobOffers` + `vacancies u8` po `applied` (wolne miejsca; stanowiska z 0 portal ukrywa, chyba że gracz już aplikował).
 - **21** — obiady: `LunchMenu`, `LunchOrder`, przedmioty 28–33.
 - **20** — słodycze: encja tacy (`kind` 5: `held` = słodycz, `activity` = liczba sztuk), przedmioty 25 pączek, 26 ciastko, 27 sernik, `Stats.flags` bit 1 = rozstrój żołądka.

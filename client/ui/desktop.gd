@@ -10,9 +10,10 @@ const PlayerView = preload("res://game/player_view.gd")
 signal apply(offer_id: int, motivation: String)
 signal answer(attempt: int, index: int, choice: int)
 signal portal_action(action: int, arg: int)
+## "Załóż firmę" (CompanyAction FOUND).
+signal found_company(name: String)
 
-const DEPT_NAMES := {1: "IT / Produkt", 2: "Biznes"}
-const OUR_COMPANY := "Startup Sim sp. z o.o."
+const DEPT_NAMES := {1: "IT / Produkt", 2: "Biznes", 3: "Zarząd"}
 const RESEND_MSEC := 1500
 
 var offers := {}          # id -> offer dict (merged from JobOffers parts)
@@ -22,10 +23,20 @@ var hired := false
 var job_title := ""
 var department := 0
 var nick := ""
+## From the server's Clock: our company's name and whether it has a founder
+## (if not, the portal offers to found it).
+var company := ""
+var founded := true
+var _founding := false
+var _found_name := ""
+## Fired: back on the portal until the next job.
+var fired := false
 var profile := {}
 ## Dev: apply for this offer, answer at random, go to the office (0 = off).
 var auto_offer := 0
 var auto_delay := 0.0
+## Dev (--found=<name>): found the company once the portal knows it can.
+var auto_found := ""
 
 var _root := Control.new()
 var _windows := {}        # name -> window PanelContainer
@@ -347,6 +358,8 @@ func _render_browser(body: VBoxContainer) -> void:
 		return
 	body.add_child(_label("Praca od zaraz — najnowsze ogłoszenia", 26))
 	body.add_child(_label("Znajdź pracę marzeń (albo chociaż taką z owocowymi czwartkami).", 15, Color("#4a5566")))
+	if not founded and not hired:
+		_render_found_card(body)
 	if offers.is_empty():
 		body.add_child(_label("Ładowanie ofert…", 18))
 		return
@@ -355,7 +368,7 @@ func _render_browser(body: VBoxContainer) -> void:
 	for id in ids:
 		var o: Dictionary = offers[id]
 		# Our startup: hidden while the position is filled (unless you applied).
-		var ours: bool = o.company == OUR_COMPANY
+		var ours: bool = o.department != 0  # this building's company
 		if ours and o.get("vacancies", 0) == 0 and not o.applied and not _pending_apply.has(id):
 			continue
 		var box := _card(body)
@@ -542,7 +555,7 @@ func _show_question(p: Dictionary, key: String) -> void:
 	body.add_child(_label("Rozmowa online: %s" % offers.get(_interview_offer, {}).get("title", "rekrutacja"), 20))
 	var tiles := HBoxContainer.new()
 	tiles.add_theme_constant_override("separation", 12)
-	_video_tile(tiles, "Kasia, HR — Startup Sim", PlayerView.LOOK_OFFICE, {}, 7)
+	_video_tile(tiles, "Kasia, HR — %s" % (company if company != "" else "Startup Sim"), PlayerView.LOOK_OFFICE, {}, 7)
 	_video_tile(tiles, nick + " (Ty)", PlayerView.LOOK_PLAYER, profile.get("appearance", {}), 1)
 	body.add_child(tiles)
 	body.add_child(_label("Pytanie %d z %d" % [p.index + 1, p.total], 15, Color("#2e6bd9")))
@@ -652,8 +665,68 @@ func _resend_actions(now: int) -> void:
 			portal_action.emit(int(parts[0]), int(parts[1]))
 
 
+## Nobody has founded the company on this server yet: found it yourself.
+func _render_found_card(body: VBoxContainer) -> void:
+	var box := _card(body)
+	box.add_child(_label("Załóż własną firmę", 21, Color("#8e44ad")))
+	box.add_child(_label("Biuro w tym budynku czeka na założyciela. Nadaj firmie nazwę — od razu trafisz do zarządu, dostaniesz kartę, laptop i panel do zatrudniania ludzi.", 15, Color("#4a5566")))
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	box.add_child(row)
+	var edit := LineEdit.new()
+	edit.placeholder_text = "Nazwa firmy, np. Pixel Pierogi sp. z o.o."
+	edit.text = _found_name
+	edit.max_length = 40
+	edit.custom_minimum_size = Vector2(380, 36)
+	edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	edit.text_changed.connect(func(t: String): _found_name = t)
+	row.add_child(edit)
+	var b := _button("Załóż firmę")
+	b.pressed.connect(func(): found(edit.text))
+	row.add_child(b)
+
+
+func found(name: String) -> void:
+	name = name.strip_edges()
+	if name.length() < 3:
+		_toast_msg("Nazwa firmy musi mieć co najmniej 3 znaki.")
+		return
+	_founding = true
+	found_company.emit(name)
+
+
+## Clock: company name / founder; being fired brings the portal back.
+func on_clock(p: Dictionary) -> void:
+	var redraw: bool = p.company != company or p.founded != founded
+	company = p.company
+	founded = p.founded
+	if hired and p.place == Protocol.PLACE_PORTAL:
+		hired = false
+		fired = true
+		job_title = ""
+		department = 0
+		mails.clear()  # a fresh inbox follows
+		unread.clear()
+		_refresh_mail_badge()
+		_browser_view = "list"
+		visible = true
+		redraw = true
+	elif fired and not hired and p.place != Protocol.PLACE_PORTAL:
+		on_entered_world()  # hired again: off to the office
+	if auto_found != "" and not founded and not hired:
+		var n := auto_found
+		auto_found = ""
+		_auto(func(): found(n))
+	if redraw and visible:
+		_render("browser")
+
+
 ## We are in the world: the desktop goes away.
 func on_entered_world() -> void:
+	if _founding:
+		_founding = false
+		job_title = "Założyciel/ka"
+		department = 3
 	hired = true
 	_pending_action.clear()
 	visible = false

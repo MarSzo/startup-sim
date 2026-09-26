@@ -13,7 +13,10 @@ signal action(action: int, conv: int, arg: int, text: String)
 signal book(start: int, topic: int)
 ## Lunch app: order `dish`.
 signal order(dish: int)
+## Company panel (founder): CompanyAction.
+signal company_action(action: int, target: int, value: int, text: String)
 
+const DEPARTMENTS := {1: "IT / Produkt", 2: "Biznes", 3: "Zarząd"}
 const SYNC_MSEC := 1000
 const RESEND_MSEC := 800
 const MAX_TRIES := 5
@@ -66,6 +69,16 @@ var _lunch_status := Label.new()
 var _lunch_list := VBoxContainer.new()
 var _lunch_sig := ""
 var _tab_lunch: Button
+## Company panel: the server sends CompanyOffers / CompanyPeople only to the
+## founder at their own computer; the tab shows while they keep coming.
+const COMPANY_FRESH_MSEC := 3000
+var company_offers := {}
+var company_people := {}
+var _company_msec := -COMPANY_FRESH_MSEC
+var _co_view := VBoxContainer.new()
+var _co_sig := ""
+var _co_drafts := {}            # text typed into the panel's fields, by key
+var _tab_company: Button
 
 
 func _ready() -> void:
@@ -214,6 +227,15 @@ func dev_command(cmd: String) -> void:
 		"unlock": action.emit(Protocol.PC_UNLOCK, 0, 0, "")
 		"take": action.emit(Protocol.PC_TAKE, 0, 0, "")
 		"close": action.emit(Protocol.PC_CLOSE, 0, 0, "")
+		"company":  # company[:<action>:<target>:<value>[:<text>]]
+			_set_tab("company")
+			var co := cmd.split(":", true, 4)
+			if co.size() > 1 and co[1] == "hire":  # the first candidate
+				for c in company_people.get("candidates", []):
+					company_action.emit(Protocol.CO_HIRE, c.id, 0, "")
+					break
+			elif co.size() > 3:
+				company_action.emit(int(co[1]), int(co[2]), int(co[3]), co[4] if co.size() > 4 else "")
 		"lunch":  # lunch:<dish kind>
 			_set_tab("lunch")
 			if parts.size() > 1:
@@ -292,6 +314,9 @@ func _build() -> void:
 	_tab_lunch = _button("Obiady", false)
 	_tab_lunch.pressed.connect(func(): _set_tab("lunch"))
 	row.add_child(_tab_lunch)
+	_tab_company = _button("Firma", false)
+	_tab_company.pressed.connect(func(): _set_tab("company"))
+	row.add_child(_tab_company)
 	_style_label(_as_owner, 14, Color("#ffcf6e"))
 	_as_owner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(_as_owner)
@@ -431,6 +456,20 @@ func _build() -> void:
 	_lunch_list.add_theme_constant_override("separation", 6)
 	_lunch_view.add_child(_lunch_list)
 
+	# Company panel (founder).
+	var co_pad := MarginContainer.new()
+	co_pad.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	for sd in ["left", "right", "top", "bottom"]:
+		co_pad.add_theme_constant_override("margin_" + sd, 18)
+	co_pad.name = "company_pad"
+	var co_scroll := ScrollContainer.new()
+	co_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	co_pad.add_child(co_scroll)
+	_co_view.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_co_view.add_theme_constant_override("separation", 8)
+	co_scroll.add_child(_co_view)
+	_screen.add_child(co_pad)
+
 	# Lock screen.
 	_lock_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_lock_view.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -475,6 +514,12 @@ func _render() -> void:
 	_screen.get_node("lunch_pad").visible = not state.locked and tab == "lunch"
 	_tab_lunch.visible = not state.locked
 	_tab_lunch.modulate = Color(1, 1, 1, 1.0 if tab == "lunch" else 0.6)
+	var founder := _company_fresh()
+	if tab == "company" and not founder:
+		tab = "chat"
+	_screen.get_node("company_pad").visible = not state.locked and tab == "company"
+	_tab_company.visible = not state.locked and founder
+	_tab_company.modulate = Color(1, 1, 1, 1.0 if tab == "company" else 0.6)
 	_tab_chat.visible = not state.locked
 	_tab_cal.visible = not state.locked
 	_tab_chat.modulate = Color(1, 1, 1, 1.0 if tab == "chat" else 0.6)
@@ -492,6 +537,9 @@ func _render() -> void:
 	if tab == "lunch":
 		_render_lunch()
 		return
+	if tab == "company":
+		_render_company()
+		return
 	_render_sidebar()
 	var c := _conv(current)
 	_conv_title.text = c.get("title", "")
@@ -503,7 +551,164 @@ func _set_tab(t: String) -> void:
 	tab = t
 	_cal_sig = ""
 	_lunch_sig = ""
+	_co_sig = ""
 	_render()
+
+
+# ----------------------------------------------------------------- company
+
+func _company_fresh() -> bool:
+	return not company_offers.is_empty() and Time.get_ticks_msec() - _company_msec < COMPANY_FRESH_MSEC
+
+
+func on_company(p: Dictionary) -> void:
+	var was := _company_fresh()
+	if p.type == Protocol.T_COMPANY_OFFERS:
+		company_offers = p
+	else:
+		company_people = p
+	_company_msec = Time.get_ticks_msec()
+	if not visible:
+		return
+	if not was:
+		_render()  # show the tab
+	elif tab == "company":
+		_render_company()
+
+
+func _co_label(text: String, size: int, color := Color("#1c2430"), wrap := false) -> Label:
+	var l := Label.new()
+	_style_label(l, size, color)
+	l.text = text
+	if wrap:
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		l.custom_minimum_size = Vector2(600, 0)
+	return l
+
+
+## A LineEdit whose typed text survives re-renders.
+func _co_edit(key: String, value: String, max_len: int, width: int) -> LineEdit:
+	var e := LineEdit.new()
+	e.text = _co_drafts.get(key, value)
+	e.max_length = max_len
+	e.custom_minimum_size = Vector2(width, 32)
+	e.add_theme_font_size_override("font_size", 14)
+	e.add_theme_color_override("font_color", Color("#1c2430"))
+	e.add_theme_color_override("font_placeholder_color", Color("#8a93a3"))
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color.WHITE
+	sb.border_color = Color("#c5ccd8")
+	sb.set_border_width_all(1)
+	sb.set_corner_radius_all(5)
+	sb.content_margin_left = 8
+	sb.content_margin_right = 8
+	e.add_theme_stylebox_override("normal", sb)
+	var fsb := sb.duplicate()
+	fsb.border_color = Color("#2e6bd9")
+	e.add_theme_stylebox_override("focus", fsb)
+	e.text_changed.connect(func(t: String): _co_drafts[key] = t)
+	return e
+
+
+func _co_row() -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	_co_view.add_child(row)
+	return row
+
+
+func _render_company() -> void:
+	if company_offers.is_empty():
+		return
+	var sig := JSON.stringify([company_offers, company_people])
+	if sig == _co_sig:
+		return
+	_co_sig = sig
+	for c in _co_view.get_children():
+		c.queue_free()
+	var titles := {}
+	for o in company_offers.offers:
+		titles[o.id] = o.title
+
+	_co_view.add_child(_co_label("Panel założyciela", 22))
+	var row := _co_row()
+	row.add_child(_co_label("Nazwa firmy:", 15, Color("#4a5566")))
+	var name_edit := _co_edit("name", company_offers.name, 40, 360)
+	row.add_child(name_edit)
+	var rename := _button("Zmień", true)
+	rename.pressed.connect(func():
+		_co_drafts.erase("name")
+		company_action.emit(Protocol.CO_RENAME, 0, 0, name_edit.text.strip_edges()))
+	row.add_child(rename)
+
+	_co_view.add_child(_co_label("Ogłoszenia na portalu", 18, Color("#3d5a86")))
+	for o in company_offers.offers:
+		var id: int = o.id
+		var places: int = o.places
+		row = _co_row()
+		var t := _co_label(o.title, 15)
+		t.custom_minimum_size = Vector2(250, 0)
+		row.add_child(t)
+		var minus := _button("−", false)
+		minus.add_theme_color_override("font_color", Color("#1c2430"))
+		minus.disabled = places == 0
+		minus.pressed.connect(func(): company_action.emit(Protocol.CO_SET_PLACES, id, places - 1, ""))
+		row.add_child(minus)
+		var n := _co_label("%d miejsc" % places if places != 1 else "1 miejsce", 15, Color("#16a085") if places else Color("#8a93a3"))
+		n.custom_minimum_size = Vector2(80, 0)
+		n.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		row.add_child(n)
+		var plus := _button("+", false)
+		plus.add_theme_color_override("font_color", Color("#1c2430"))
+		plus.disabled = places >= Protocol.CO_MAX_PLACES
+		plus.pressed.connect(func(): company_action.emit(Protocol.CO_SET_PLACES, id, places + 1, ""))
+		row.add_child(plus)
+		var key := "desc:%d" % id
+		var desc := _co_edit(key, o.description, 200, 300)
+		desc.placeholder_text = "Opis stanowiska"
+		row.add_child(desc)
+		var save := _button("Zapisz opis", false)
+		save.add_theme_color_override("font_color", Color("#1c2430"))
+		save.pressed.connect(func():
+			_co_drafts.erase(key)
+			company_action.emit(Protocol.CO_SET_DESCRIPTION, id, 0, desc.text.strip_edges()))
+		row.add_child(save)
+
+	_co_view.add_child(_co_label("Kandydaci po rozmowie", 18, Color("#3d5a86")))
+	var cands: Array = company_people.get("candidates", [])
+	if cands.is_empty():
+		_co_view.add_child(_co_label("Nikt nie czeka. Kandydaci, o których nie zdecydujesz w 30 min, są zatrudniani automatycznie.", 14, Color("#8a93a3"), true))
+	for c in cands:
+		var pid: int = c.id
+		row = _co_row()
+		var l := _co_label("%s — %s, wynik rozmowy %d/%d" % [c.nick, titles.get(c.offer, "?"), c.score, c.total], 15)
+		l.custom_minimum_size = Vector2(430, 0)
+		row.add_child(l)
+		var hire := _button("Zatrudnij", true)
+		hire.pressed.connect(func(): company_action.emit(Protocol.CO_HIRE, pid, 0, ""))
+		row.add_child(hire)
+		var rej := _button("Odrzuć", false)
+		rej.add_theme_color_override("font_color", Color("#c0392b"))
+		rej.pressed.connect(func(): company_action.emit(Protocol.CO_REJECT, pid, 0, ""))
+		row.add_child(rej)
+
+	_co_view.add_child(_co_label("Zespół", 18, Color("#3d5a86")))
+	var staff: Array = company_people.get("staff", [])
+	if staff.is_empty():
+		_co_view.add_child(_co_label("Na razie tylko Ty.", 14, Color("#8a93a3")))
+	for s in staff:
+		var pid: int = s.id
+		row = _co_row()
+		var l := _co_label("%s — %s, od dnia %d" % [s.nick, DEPARTMENTS.get(s.department, "?"), s.day], 15)
+		l.custom_minimum_size = Vector2(430, 0)
+		row.add_child(l)
+		if pid == my_id:
+			row.add_child(_co_label("(Ty)", 14, Color("#8a93a3")))
+			continue
+		var fire := _button("Zwolnij", false)
+		fire.add_theme_color_override("font_color", Color("#c0392b"))
+		fire.pressed.connect(func(): company_action.emit(Protocol.CO_FIRE, pid, 0, ""))
+		row.add_child(fire)
 
 
 func on_lunch(p: Dictionary) -> void:

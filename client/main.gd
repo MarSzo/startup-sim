@@ -54,6 +54,8 @@ func _ready() -> void:
 	portal.apply.connect(func(offer, motivation): net.send(Protocol.encode_apply(net.token, offer, motivation)))
 	portal.answer.connect(func(a, i, c): net.send(Protocol.encode_answer(net.token, a, i, c)))
 	portal.portal_action.connect(func(action, arg): net.send(Protocol.encode_portal_action(net.token, action, arg)))
+	portal.found_company.connect(func(name): net.send(Protocol.encode_company_action(net.token, Protocol.CO_FOUND, 0, 0, name)))
+	portal.auto_found = args.get("found", "")
 	var ui := CanvasLayer.new()
 	add_child(ui)
 	ui.add_child(start)
@@ -144,6 +146,7 @@ func _on_packet(p: Dictionary) -> void:
 	if p.type == Protocol.T_CLOCK:
 		portal.game_day = p.day
 		portal.game_minute = p.minute
+		portal.on_clock(p)
 		day_screen.on_clock(p)
 		var want := int(args.get("commute", "0"))
 		if want > 0 and p.place == Protocol.PLACE_COMMUTING and p.arrive == Protocol.NO_TIME and p.mode != want:

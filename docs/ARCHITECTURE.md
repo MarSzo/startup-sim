@@ -32,6 +32,7 @@ server/                 crate Rusta (lib `game` + binarki)
   src/coffee.rs         ekspresy do kawy (parzenie → kawa jako przedmiot)
   src/inventory.rs      przedmioty, kieszenie i ręce, uprawnienia z przedmiotów
   src/computer.rs       stanowiska (biurka działów), laptopy na biurkach, komunikator
+  src/company.rs        firma i założyciel: nazwa, opisy ofert, kandydaci, zespół
   src/lunch.rs          zamawianie obiadów: menu, zamówienia, dostawa na recepcję
   src/treats.rs         słodycze w chill roomie (taca, ogłoszenie), nieświeże owoce
   src/board.rs          zarząd: sloty kalendarza, spotkania, dialogi i ich skutki
@@ -178,6 +179,17 @@ symulacji. `--start-time hh:mm`, `--time-scale N` do testów.
 przy braku miejsca = mail „obsadzone”; zajęcie ostatniego miejsca
 (`take_vacancy`) kończy rekrutację pozostałym (`position_filled_mail`).
 `Player::position` zwalnia miejsce przy wyjściu z gry.
+
+**Firma** (`company.rs`): `Server::company` (nazwa z pierwszej oferty
+`recruitment.json`, `founder`, własne opisy, `candidates`, `hired_on`).
+`found_company` (akcja z portalu) robi z gracza pracownika działu 3 przy stole
+zarządu. Zdana rozmowa przy założycielu w grze → `Candidate` (+ `Desk::awaiting`
+blokuje dalsze aplikacje), inaczej od razu `hire`; `tick_company` zatrudnia po
+`DECISION_MINUTES`. Panel = `company_packets` wysyłane założycielowi, gdy
+`calendar_account` jego sesji to on sam (razem z pakietami komputera).
+`fire` kończy sesję komputera, zabiera przedmioty i pojazdy gracza i wraca go
+na portal (`Stage::Portal`, nowe id maili od 100); najpierw idzie `Clock`, po
+którym klient czyści skrzynkę.
 
 **Obiady** (`lunch.rs`): menu = produkty sklepu (rodzaje 28–33) spoza półek;
 `Order { owner, dish, arrives, delivered }` w `Server::lunch_orders`. Zamawia

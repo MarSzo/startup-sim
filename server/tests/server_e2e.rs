@@ -1349,3 +1349,102 @@ fn a_filled_position_is_gone_for_the_others() {
     });
     assert_eq!(free, Some(0));
 }
+
+#[test]
+fn founder_founds_the_company_and_hires_from_the_panel() {
+    use game::company::action as ca;
+    use proto::computer_action as pc;
+    let (addr, _) = start_server_full(0, false); // job portal
+    let b = building();
+    let bank = Recruitment::load(&default_recruitment_path()).unwrap();
+    let (mut ola, _) = Client::connect(addr, "Ola");
+    let clock = |c: &Client, keep: &[&Client]| {
+        wait_for(c, keep, Duration::from_millis(1500), |p| match p {
+            Packet::Clock { company, founded, .. } => Some((company.clone(), *founded)),
+            _ => None,
+        })
+    };
+    assert_eq!(clock(&ola, &[]).map(|c| c.1), Some(false), "no founder yet");
+    let act = |c: &Client, action: u8, target: u16, value: u8, text: &str| {
+        c.sock.send(&Packet::CompanyAction { token: c.token, action, target, value, text: text.into() }.encode()).unwrap();
+    };
+    act(&ola, ca::FOUND, 0, 0, "Pixel Pierogi sp. z o.o.");
+    let founded = wait_for(&ola, &[], Duration::from_millis(1500), |p| match p {
+        Packet::Clock { company, founded: true, .. } => Some(company.clone()),
+        _ => None,
+    });
+    assert_eq!(founded.as_deref(), Some("Pixel Pierogi sp. z o.o."));
+    // In the board room with a card and a laptop: put it on the table, sit down.
+    let body = Body { access: access::CARD | access::BOARD, ..Body::at(1, Pos::tile_center(50, 18)) };
+    let body = ola.press_e(&b, body);
+    std::thread::sleep(Duration::from_millis(150));
+    ola.press_e(&b, body);
+    let panel = wait_for(&ola, &[], Duration::from_millis(2500), |p| match p {
+        Packet::CompanyOffers { name, offers } => Some((name.clone(), offers.len())),
+        _ => None,
+    });
+    assert_eq!(panel, Some(("Pixel Pierogi sp. z o.o.".into(), 4)), "the company panel");
+
+    // Bob sees the new name on the portal, applies, passes: waits for Ola.
+    let (bob, _) = Client::connect(addr, "Bob");
+    let name = wait_for(&bob, &[&ola], Duration::from_millis(2000), |p| match p {
+        Packet::JobOffers { offers } => offers.iter().find(|o| o.id == 1).map(|o| o.company.clone()),
+        _ => None,
+    });
+    assert_eq!(name.as_deref(), Some("Pixel Pierogi sp. z o.o."));
+    bob.sock.send(&Packet::Apply { token: bob.token, offer: 1, motivation: "Chcę pierogi.".into() }.encode()).unwrap();
+    let invited = wait_for(&bob, &[&ola], Duration::from_millis(3000), |p| {
+        matches!(p, Packet::Mail { action, arg: 1, .. } if *action == proto::portal_action::JOIN_INTERVIEW).then_some(())
+    });
+    assert!(invited.is_some());
+    bob.sock.send(&Packet::PortalAction { token: bob.token, action: proto::portal_action::JOIN_INTERVIEW, arg: 1 }.encode()).unwrap();
+    let deadline = Instant::now() + Duration::from_millis(5000);
+    let mut awaiting = false;
+    while !awaiting && Instant::now() < deadline {
+        bob.ping();
+        ola.ping();
+        while ola.recv().is_some() {}
+        while let Some(p) = bob.recv() {
+            match p {
+                Packet::Question { attempt, index, text, options, .. } => {
+                    let q = bank.offer(1).unwrap().questions.iter().find(|q| q.text == text).unwrap();
+                    let right = options.iter().position(|o| *o == q.options[0]).unwrap() as u8;
+                    bob.sock.send(&Packet::Answer { token: bob.token, attempt, index, choice: right }.encode()).unwrap();
+                }
+                Packet::Mail { subject, .. } if subject == "Decyzja zarządu wkrótce" => awaiting = true,
+                _ => {}
+            }
+        }
+    }
+    assert!(awaiting, "Bob waits for the founder's decision");
+    // Ola sees him in the panel and hires him; Bob gets the trial-day invitation.
+    let cand = wait_for(&ola, &[&bob], Duration::from_millis(2500), |p| match p {
+        Packet::CompanyPeople { candidates, .. } => candidates.iter().find(|c| c.4 == "Bob").map(|c| c.0),
+        _ => None,
+    });
+    let bob_id = cand.expect("Bob among the candidates");
+    act(&ola, ca::HIRE, bob_id, 0, "");
+    let hired = wait_for(&bob, &[&ola], Duration::from_millis(2500), |p| {
+        matches!(p, Packet::Mail { action, .. } if *action == proto::portal_action::GO_TO_OFFICE).then_some(())
+    });
+    assert!(hired.is_some(), "hired by the founder");
+    // More places for designers.
+    act(&ola, ca::SET_PLACES, 2, 2, "");
+    let places = wait_for(&ola, &[&bob], Duration::from_millis(2500), |p| match p {
+        Packet::CompanyOffers { offers, .. } => offers.iter().find(|o| o.0 == 2).map(|o| o.1),
+        _ => None,
+    });
+    assert_eq!(places, Some(2));
+    // Bob is on the team (hired, contract still to sign) - and gets fired.
+    let staff = wait_for(&ola, &[&bob], Duration::from_millis(2500), |p| match p {
+        Packet::CompanyPeople { staff, .. } => staff.iter().find(|s| s.0 == bob_id).map(|s| s.1),
+        _ => None,
+    });
+    assert_eq!(staff, Some(1), "Bob in IT");
+    act(&ola, ca::FIRE, bob_id, 0, "");
+    let fired = wait_for(&bob, &[&ola], Duration::from_millis(2500), |p| {
+        matches!(p, Packet::Mail { subject, .. } if subject == "Rozwiązanie umowy").then_some(())
+    });
+    assert!(fired.is_some(), "Bob fired");
+    let _ = pc::CLOSE;
+}

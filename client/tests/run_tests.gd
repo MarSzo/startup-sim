@@ -55,6 +55,7 @@ func test_protocol(path: String) -> void:
 		"calendar_book": Protocol.encode_calendar_book(0x01020304, 840, 2),
 		"dialog_answer": Protocol.encode_dialog_answer(0x01020304, 3, 1),
 		"lunch_order": Protocol.encode_lunch_order(0x01020304, 29),
+		"company_action": Protocol.encode_company_action(0x01020304, Protocol.CO_SET_PLACES, 1, 2, ""),
 		"computer_action": Protocol.encode_computer_action(0x01020304, Protocol.PC_SEND, 17, 42, "Kto zjadł mój jogurt?"),
 		"answer": Protocol.encode_answer(0x01020304, 3, 1, 2),
 	}
@@ -87,7 +88,13 @@ func test_protocol(path: String) -> void:
 	expect(ck.get("type") == Protocol.T_CLOCK and ck.day == 2 and ck.minute == 492 and not ck.night
 		and ck.place == Protocol.PLACE_COMMUTING and ck.arrive == 545 and ck.pay == 23000 and ck.pay_minutes == 460
 		and ck.today_minutes == 0 and ck.mode == 2 and ck.depart == 520 and ck.money == 18600
-		and ck.weather == Protocol.WEATHER_RAIN, "decode clock %s" % ck)
+		and ck.weather == Protocol.WEATHER_RAIN and ck.company == "Pixel Pierogi sp. z o.o." and ck.founded, "decode clock %s" % ck)
+	var co := Protocol.decode(golden["company_offers"].hex_decode())
+	expect(co.get("type") == Protocol.T_COMPANY_OFFERS and co.name.begins_with("Pixel") and co.offers.size() == 2
+		and co.offers[0].places == 2 and co.offers[0].description == "Piszemy w Ruście.", "decode company offers %s" % co)
+	var cp := Protocol.decode(golden["company_people"].hex_decode())
+	expect(cp.get("type") == Protocol.T_COMPANY_PEOPLE and cp.candidates.size() == 1 and cp.candidates[0].nick == "Bob"
+		and cp.staff.size() == 2 and cp.staff[1].day == 5, "decode company people %s" % cp)
 	var cal := Protocol.decode(golden["calendar"].hex_decode())
 	expect(cal.get("type") == Protocol.T_CALENDAR and cal.mine_start == 840 and cal.mine_topic == 1 and cal.slots.size() == 4
 		and cal.slots[3].state == Protocol.SLOT_MINE and cal.slots[1].start == 630, "decode calendar %s" % cal)

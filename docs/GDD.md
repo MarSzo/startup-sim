@@ -203,6 +203,8 @@ gracze).
 **Obiady** — *zrobione (10.26)*. Aplikacja na komputerze do **zamawiania obiadu** w trakcie pracy
 (dostawa do biura).
 
+**Panel założyciela** — *zrobione bez płatności (10.28)*.
+
 **Model biznesowy (przyszłość)**
 - Gra **darmowa** dla graczy.
 - Każda firma = **osobny serwer / instancja gry**. Założenie firmy (własna
@@ -757,6 +759,30 @@ Zastępuje prosty portal z 10.8. Po połączeniu gracz widzi pulpit komputera
 - Gdy zatrudniony gracz opuści grę, jego miejsce znów jest wolne (brak trwałych
   kont).
 
+### 10.28 Panel założyciela (bez płatności)
+
+- Serwer bez założyciela pokazuje na portalu kartę **„Załóż własną firmę”**:
+  nazwa (3–40 znaków) i przycisk. Kto pierwszy, ten zakłada: trafia od razu do
+  budynku jako **Zarząd** (dział 3) — z umową, zaliczką, kartą i laptopem, przy
+  stole w sali zarządu, z dostępem do niej na stałe. Jeden założyciel na serwer
+  (płatne instancje firm to osobny, późniejszy projekt).
+- **Nazwa firmy** jest wszędzie: w ofertach na portalu, w nadawcy maili
+  („<firma> — Rekrutacja”), w rozmowie online i w `Clock`.
+- **Panel** to zakładka **„Firma”** na komputerze założyciela (widoczna tylko
+  przy jego własnym koncie):
+  - zmiana nazwy;
+  - ogłoszenia: liczba miejsc (−/+, 0–5) i opis stanowiska;
+  - **kandydaci** po zdanej rozmowie: Zatrudnij / Odrzuć. Kandydat dostaje
+    maila „Decyzja zarządu wkrótce”; jeśli założyciel nie zdecyduje w 30 min
+    gry albo nie ma go w grze, kandydat jest zatrudniany automatycznie (jak
+    dotąd);
+  - **zespół** (zatrudnieni, także jeszcze przed umową) z dniem zatrudnienia i
+    przyciskiem **Zwolnij**: zwolniony traci kartę, laptopy i pojazd, wraca na
+    portal z mailem „Rozwiązanie umowy” (świeża skrzynka), a jego miejsce
+    znowu jest wolne.
+- Gdy założyciel wyjdzie z gry, firma zostaje bez założyciela (nazwa
+  zostaje), a portal znowu proponuje jej założenie.
+
 ### 10.6 Stan implementacji
 
 *Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie,
@@ -793,6 +819,9 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Ekwipunek**: kieszenie i ręce, przedmioty (przepustka, karta, laptop,
   kawa), upuszczanie / podnoszenie / podawanie, dostęp z przedmiotów (10.13);
   protokół v8.
+- **Panel założyciela**: zakładanie firmy z portalu, nazwa firmy w grze,
+  zakładka „Firma” (miejsca, opisy, kandydaci, zespół, zwalnianie) (10.28);
+  protokół v23.
 - **Wakaty**: mało ogłoszeń na start, nowe miejsca co rano, obsadzone
   stanowiska znikają, maile „obsadzone” (10.27); protokół v22.
 - **Zamawianie obiadów**: aplikacja z menu 6 dań, płatność z konta
@@ -833,12 +862,12 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Sieć mobilna**: serwer dual-stack IPv4/IPv6; gracz identyfikowany tokenem
   (zmiana adresu w trakcie gry przenosi sesję); klient przepina gniazdo po
   ciszy/powrocie z tła i sam łączy się ponownie po utracie sesji.
-- **Testy**: 87 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
+- **Testy**: 88 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
   zależna od uprawnień, bramki, ruch/kolizje, schody, winda, nawigacja,
-  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, zegar, dojazd, pogoda, zarząd, słodycze, obiady, wakaty, protokół), 2 golden, 24 e2e serwera
+  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, zegar, dojazd, pogoda, zarząd, słodycze, obiady, wakaty, firma, protokół), 2 golden, 25 e2e serwera
   (m.in. portal: odrzucenie → przyjęcie → spawn; całe wdrożenie aż do karty;
   niewidoczność między piętrami; zgodność stanu serwera z predykcją) —
-  łącznie 113 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 porannego dojazdu samochodem moknięcia w deszczu spotkania z Prezesem tacy ze słodyczami obiadu z odbiorem na recepcji i obsadzonego stanowiska); 142 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
+  łącznie 115 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 porannego dojazdu samochodem moknięcia w deszczu spotkania z Prezesem tacy ze słodyczami obiadu z odbiorem na recepcji, obsadzonego stanowiska i panelu założyciela); 145 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
   adresów).
 
 #### Pomiary (MacBook, wszystko lokalnie)

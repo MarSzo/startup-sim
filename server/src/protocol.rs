@@ -5,7 +5,7 @@
 //! `tests/golden/packets.json`.
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 22;
+pub const VERSION: u8 = 23;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
 pub const MAX_PACKET: usize = 1200;
@@ -67,6 +67,9 @@ pub mod ty {
     pub const DIALOG_ANSWER: u8 = 34;
     pub const LUNCH_MENU: u8 = 35;
     pub const LUNCH_ORDER: u8 = 36;
+    pub const COMPANY_OFFERS: u8 = 37;
+    pub const COMPANY_PEOPLE: u8 = 38;
+    pub const COMPANY_ACTION: u8 = 39;
 }
 
 /// `ItemAction::action`.
@@ -416,6 +419,10 @@ pub enum Packet {
         money: u32,
         /// `weather::kind` (1 sun, 2 clouds, 3 rain, 4 storm, 5 fog).
         weather: u8,
+        /// The company: its name and whether it has a founder (else the
+        /// portal offers to found it).
+        company: String,
+        founded: bool,
     },
     /// Morning choice of how to get to work (before the departure).
     CommuteChoice { token: u32, mode: u8 },
@@ -435,6 +442,14 @@ pub enum Packet {
     /// of the day or `NO_TIME`), and the menu.
     LunchMenu { state: u8, dish: u8, arrives: u16, dishes: Vec<Dish> },
     LunchOrder { token: u32, dish: u8 },
+    /// Company panel (the founder's computer): name and the job openings
+    /// (offer id, places, title, description).
+    CompanyOffers { name: String, offers: Vec<(u8, u8, String, String)> },
+    /// Company panel: candidates (player, offer, score, total, nick) and
+    /// staff (player, department, hired on day, nick).
+    CompanyPeople { candidates: Vec<(u16, u8, u8, u8, String)>, staff: Vec<(u16, u8, u16, String)> },
+    /// Found the company (from the portal) / run it (panel): `company::action`.
+    CompanyAction { token: u32, action: u8, target: u16, value: u8, text: String },
     /// Closed doors (locked toilet stalls, elevator doors) on the receiver's
     /// floor: solid for the simulation. Plus the elevator: the floor it is at
     /// and where it is heading (`NO_FLOOR` = standing). Sent on change and
@@ -579,6 +594,9 @@ impl Packet {
             Packet::DialogAnswer { .. } => ty::DIALOG_ANSWER,
             Packet::LunchMenu { .. } => ty::LUNCH_MENU,
             Packet::LunchOrder { .. } => ty::LUNCH_ORDER,
+            Packet::CompanyOffers { .. } => ty::COMPANY_OFFERS,
+            Packet::CompanyPeople { .. } => ty::COMPANY_PEOPLE,
+            Packet::CompanyAction { .. } => ty::COMPANY_ACTION,
             Packet::Doors { .. } => ty::DOORS,
             Packet::DoorAction { .. } => ty::DOOR_ACTION,
         }
@@ -813,7 +831,22 @@ impl Packet {
                 w.u8(*shelf);
                 w.u8(*kind);
             }
-            Packet::Clock { day, minute, night, place, arrive, pay, pay_minutes, today_minutes, mode, depart, money, weather } => {
+            Packet::Clock {
+                day,
+                minute,
+                night,
+                place,
+                arrive,
+                pay,
+                pay_minutes,
+                today_minutes,
+                mode,
+                depart,
+                money,
+                weather,
+                company,
+                founded,
+            } => {
                 w.u16(*day);
                 w.u16(*minute);
                 w.u8(*night as u8);
@@ -826,6 +859,42 @@ impl Packet {
                 w.u16(*depart);
                 w.u32(*money);
                 w.u8(*weather);
+                w.str16(company, 64);
+                w.u8(*founded as u8);
+            }
+            Packet::CompanyOffers { name, offers } => {
+                w.str16(name, 64);
+                w.u8(offers.len().min(8) as u8);
+                for (id, places, title, desc) in offers.iter().take(8) {
+                    w.u8(*id);
+                    w.u8(*places);
+                    w.str16(title, 64);
+                    w.str16(desc, MAX_TEXT_BYTES);
+                }
+            }
+            Packet::CompanyPeople { candidates, staff } => {
+                w.u8(candidates.len().min(20) as u8);
+                for (pid, offer, score, total, nick) in candidates.iter().take(20) {
+                    w.u16(*pid);
+                    w.u8(*offer);
+                    w.u8(*score);
+                    w.u8(*total);
+                    w.str16(nick, MAX_NICK_BYTES);
+                }
+                w.u8(staff.len().min(30) as u8);
+                for (pid, dept, day, nick) in staff.iter().take(30) {
+                    w.u16(*pid);
+                    w.u8(*dept);
+                    w.u16(*day);
+                    w.str16(nick, MAX_NICK_BYTES);
+                }
+            }
+            Packet::CompanyAction { token, action, target, value, text } => {
+                w.u32(*token);
+                w.u8(*action);
+                w.u16(*target);
+                w.u8(*value);
+                w.str16(text, MAX_TEXT_BYTES);
             }
             Packet::CommuteChoice { token, mode } => {
                 w.u32(*token);
@@ -1120,6 +1189,46 @@ impl Packet {
                 depart: r.u16()?,
                 money: r.u32()?,
                 weather: r.u8()?,
+                company: r.str16(64)?,
+                founded: r.u8()? != 0,
+            },
+            ty::COMPANY_OFFERS => {
+                let name = r.str16(64)?;
+                let n = r.u8()? as usize;
+                if n > 8 {
+                    return Err(DecodeError::Invalid("too many offers"));
+                }
+                let mut offers = Vec::with_capacity(n);
+                for _ in 0..n {
+                    offers.push((r.u8()?, r.u8()?, r.str16(64)?, r.str16(MAX_TEXT_BYTES)?));
+                }
+                Packet::CompanyOffers { name, offers }
+            }
+            ty::COMPANY_PEOPLE => {
+                let n = r.u8()? as usize;
+                if n > 20 {
+                    return Err(DecodeError::Invalid("too many candidates"));
+                }
+                let mut candidates = Vec::with_capacity(n);
+                for _ in 0..n {
+                    candidates.push((r.u16()?, r.u8()?, r.u8()?, r.u8()?, r.str16(MAX_NICK_BYTES)?));
+                }
+                let n = r.u8()? as usize;
+                if n > 30 {
+                    return Err(DecodeError::Invalid("too many staff"));
+                }
+                let mut staff = Vec::with_capacity(n);
+                for _ in 0..n {
+                    staff.push((r.u16()?, r.u8()?, r.u16()?, r.str16(MAX_NICK_BYTES)?));
+                }
+                Packet::CompanyPeople { candidates, staff }
+            }
+            ty::COMPANY_ACTION => Packet::CompanyAction {
+                token: r.u32()?,
+                action: r.u8()?,
+                target: r.u16()?,
+                value: r.u8()?,
+                text: r.str16(MAX_TEXT_BYTES)?,
             },
             ty::COMMUTE_CHOICE => Packet::CommuteChoice { token: r.u32()?, mode: r.u8()? },
             ty::CALENDAR => {
@@ -1409,6 +1518,8 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
                 depart: 8 * 60 + 40,
                 money: 186_00,
                 weather: 3,
+                company: "Pixel Pierogi sp. z o.o.".into(),
+                founded: true,
             },
         ),
         ("commute_choice", Packet::CommuteChoice { token: 0x01020304, mode: 5 }),
@@ -1437,6 +1548,21 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
             },
         ),
         ("lunch_order", Packet::LunchOrder { token: 0x01020304, dish: 29 }),
+        (
+            "company_offers",
+            Packet::CompanyOffers {
+                name: "Pixel Pierogi sp. z o.o.".into(),
+                offers: vec![(1, 2, "Programista/ka".into(), "Piszemy w Ruście.".into()), (4, 0, "Marketing".into(), String::new())],
+            },
+        ),
+        (
+            "company_people",
+            Packet::CompanyPeople {
+                candidates: vec![(7, 1, 3, 3, "Bob".into())],
+                staff: vec![(3, 1, 2, "Ala".into()), (4, 2, 5, "Kuba".into())],
+            },
+        ),
+        ("company_action", Packet::CompanyAction { token: 0x01020304, action: 3, target: 1, value: 2, text: String::new() }),
         (
             "chat",
             Packet::Chat {
@@ -1504,7 +1630,7 @@ mod tests {
                 b[0] = 0x54;
                 b[1] = 0x53;
                 b[2] = VERSION;
-                b[3] = rng.u8(1..=36);
+                b[3] = rng.u8(1..=39);
             }
             let _ = Packet::decode(&b);
         }

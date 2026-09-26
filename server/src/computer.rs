@@ -40,11 +40,15 @@ pub fn find_workstations(b: &Building) -> Vec<Workstation> {
     for (f, m) in b.active_floors() {
         for y in 0..m.height {
             for x in 0..m.width {
-                if m.tile_type(x, y) != Some("desk") {
-                    continue;
-                }
+                // Desks in the departments; the board works at its meeting table.
                 let rid = m.room_at_tile(x, y);
-                if let Some(r) = m.rooms.iter().find(|r| r.id == rid && r.kind == "department") {
+                let Some(r) = m.rooms.iter().find(|r| r.id == rid) else { continue };
+                let ok = match m.tile_type(x, y) {
+                    Some("desk") => r.kind == "department",
+                    Some("table") => r.kind == "management",
+                    _ => false,
+                };
+                if ok {
                     out.push(Workstation { floor: f, tile: Tile { x, y }, room_name: r.name.clone() });
                 }
             }

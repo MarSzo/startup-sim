@@ -3,7 +3,7 @@
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 22
+const VERSION := 23
 const MAX_PACKET := 1200
 const MAX_NICK_BYTES := 16
 const MAX_SAY_BYTES := 240
@@ -47,6 +47,18 @@ const T_DIALOG := 33
 const T_DIALOG_ANSWER := 34
 const T_LUNCH_MENU := 35
 const T_LUNCH_ORDER := 36
+const T_COMPANY_OFFERS := 37
+const T_COMPANY_PEOPLE := 38
+const T_COMPANY_ACTION := 39
+# CompanyAction.action (server/src/company.rs)
+const CO_FOUND := 1
+const CO_RENAME := 2
+const CO_SET_PLACES := 3
+const CO_SET_DESCRIPTION := 4
+const CO_HIRE := 5
+const CO_REJECT := 6
+const CO_FIRE := 7
+const CO_MAX_PLACES := 5
 # LunchMenu.state
 const LUNCH_NONE := 0
 const LUNCH_ORDERED := 1
@@ -281,6 +293,16 @@ static func encode_calendar_book(token: int, start: int, topic: int) -> PackedBy
 	return b.data_array
 
 
+static func encode_company_action(token: int, action: int, target: int, value: int, text: String) -> PackedByteArray:
+	var b := _writer(T_COMPANY_ACTION)
+	b.put_u32(token)
+	b.put_u8(action)
+	b.put_u16(target)
+	b.put_u8(value)
+	_put_str16(b, text, MAX_TEXT_BYTES)
+	return b.data_array
+
+
 static func encode_lunch_order(token: int, dish: int) -> PackedByteArray:
 	var b := _writer(T_LUNCH_ORDER)
 	b.put_u32(token)
@@ -490,6 +512,32 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			p.depart = r.u16()
 			p.money = r.u32()
 			p.weather = r.u8()
+			p.company = r.str16(64)
+			p.founded = r.u8() != 0
+		T_COMPANY_OFFERS:
+			p.name = r.str16(64)
+			var n := r.u8()
+			if n > 16:
+				return {}
+			var offers := []
+			for i in n:
+				offers.append({"id": r.u8(), "places": r.u8(), "title": r.str16(64), "description": r.str16(MAX_TEXT_BYTES)})
+			p.offers = offers
+		T_COMPANY_PEOPLE:
+			var n := r.u8()
+			if n > 32:
+				return {}
+			var cands := []
+			for i in n:
+				cands.append({"id": r.u16(), "offer": r.u8(), "score": r.u8(), "total": r.u8(), "nick": r.str16(MAX_NICK_BYTES)})
+			p.candidates = cands
+			var m := r.u8()
+			if m > 64:
+				return {}
+			var staff := []
+			for i in m:
+				staff.append({"id": r.u16(), "department": r.u8(), "day": r.u16(), "nick": r.str16(MAX_NICK_BYTES)})
+			p.staff = staff
 		T_CALENDAR:
 			p.mine_start = r.u16()
 			p.mine_topic = r.u8()

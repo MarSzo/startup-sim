@@ -37,13 +37,13 @@ domyślnie `server/data/recruitment.json`), oraz symulacja sieci:
 Np. RTT ~100 ms i 2% strat: `cargo run --release -- --lag-ms 50 --jitter-ms 10 --loss 0.02`.
 
 ### Klient — argumenty deweloperskie (po `--`)
-`--nick=Ala --server=127.0.0.1:7777 --autoconnect --debug`, `--commute=3` (co rano wybierz dojazd: 1 pieszo … 5 tramwaj), `--auto-recruit=1 [--auto-recruit-delay=2]`
+`--nick=Ala --server=127.0.0.1:7777 --autoconnect --debug`, `--commute=3` (co rano wybierz dojazd: 1 pieszo … 5 tramwaj), `--found="Nazwa firmy"` (załóż firmę z portalu), `--auto-recruit=1 [--auto-recruit-delay=2]`
 (sam aplikuje na ofertę 1 i zgaduje odpowiedzi do skutku), (adres może być też IPv6: `--server=[::1]:7777`) (F3 od startu),
 `--autowalk` (losowy ruch), `--goto="27,29;E;wait:2;34,6;Recepcja"` (kolejne
 kroki: kafel / pokój na bieżącym piętrze, `E` = wciśnij E, `wait:N` = czekaj —
 tu: rozmowa z portierem, potem schodami do recepcji; też `item:take0|put|drop|give|use` i
 `L` = zamknij/otwórz kabinę, ekran komputera: `pc:say:general|dept|dm:<imię>:<tekst>`, `pc:open:…`, `pc:lock`, `pc:unlock`,
-`pc:take`, `pc:close`, kalendarz `pc:cal:<minuta>:<temat>`, obiad `pc:lunch:<danie>`; `dlg:<nr>` — odpowiedz w oknie rozmowy),
+`pc:take`, `pc:close`, kalendarz `pc:cal:<minuta>:<temat>`, obiad `pc:lunch:<danie>`, panel firmy `pc:company` / `pc:company:hire` (pierwszy kandydat) / `pc:company:<akcja>:<cel>:<wartość>[:<tekst>]`; `dlg:<nr>` — odpowiedz w oknie rozmowy),
 `--screenshot=/tmp/x.png --screenshot-delay=5` (zapis klatki i wyjście; kilka czasów
 `--screenshot-delay=5,12,20` zapisuje `x_1.png`, `x_2.png`, … i wychodzi po ostatnim).
 
