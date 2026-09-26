@@ -623,6 +623,38 @@ fn smoking_inside_sets_off_the_fire_alarm_and_the_smoker_pays() {
 }
 
 #[test]
+fn the_light_switch_turns_the_room_lamp_on_and_off_for_everybody() {
+    use game::lights::lines as ll;
+    let (addr, _) = start_server_cfg(access::CARD, true, true);
+    let b = building();
+    let (mut ola, _) = Client::connect(addr, "Ola");
+    let ws = game::computer::find_workstations(&b);
+    let w = ws.iter().find(|w| w.room_name == "IT / Produkt").unwrap();
+    let body = Body { access: access::CARD, ..Body::at(w.floor, Pos::tile_center(w.tile.x, w.tile.y + 1)) };
+    let it = b.floor(1).unwrap().room_by_name("IT / Produkt").unwrap();
+    let [sx, sy] = it.switch.unwrap();
+    let lamps = |c: &Client| {
+        wait_for(c, &[], Duration::from_millis(2500), |p| match p {
+            Packet::Lights { floor: 1, rooms } => Some(rooms.clone()),
+            _ => None,
+        })
+    };
+    assert_eq!(lamps(&ola), Some(vec![]), "lamps start the day off");
+    let at = ola.walk_to(&b, body, (1, Tile { x: sx, y: sy }), &[]);
+    while ola.recv().is_some() {}
+    let at = ola.press_e(&b, at);
+    assert!(ola.wait_for_line(ll::ON, Duration::from_millis(800)).is_some());
+    assert_eq!(lamps(&ola), Some(vec![it.id]));
+    ola.press_e(&b, at);
+    assert!(ola.wait_for_line(ll::OFF, Duration::from_millis(800)).is_some());
+    let off = wait_for(&ola, &[], Duration::from_millis(2500), |p| match p {
+        Packet::Lights { floor: 1, rooms } if rooms.is_empty() => Some(()),
+        _ => None,
+    });
+    assert!(off.is_some());
+}
+
+#[test]
 fn coffee_machine_brews_one_cup_at_a_time() {
     use game::coffee::lines as coffee_lines;
     use game::inventory::kind as item_kind;

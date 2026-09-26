@@ -220,65 +220,41 @@ func _icon(caption: String, kind: String, on_open: Callable) -> Control:
 	return b
 
 
-## Desktop icons: 12x12 pixel art, 3 screen pixels per art pixel.
-const ICONS := {
-	"browser": [
-		"....KKKK....",
-		"..KKbbbbKK..",
-		".KbbwbbbbbK.",
-		".KbwwbgggbK.",
-		"KbbbbgggggbK",
-		"KbbbggggbbbK",
-		"KbbbbgggbbbK",
-		"KbbbbbggbbbK",
-		".KbbbbgbbbK.",
-		".KbbbbbbbbK.",
-		"..KKbbbbKK..",
-		"....KKKK....",
-	],
-	"mail": [
-		"............",
-		"KKKKKKKKKKKK",
-		"KrwwwwwwwwrK",
-		"KwrwwwwwwrwK",
-		"KwwrwwwwrwwK",
-		"KwwwrwwrwwwK",
-		"KwwwwrrwwwwK",
-		"KwwwwwwwwwwK",
-		"KwwwwwwwwwwK",
-		"KwwwwwwwwwwK",
-		"KKKKKKKKKKKK",
-		"............",
-	],
-	"trash": [
-		"....KKKK....",
-		".KKKKKKKKKK.",
-		".KssssssssK.",
-		"..KKKKKKKK..",
-		"..KsgsgsgK..",
-		"..KsgsgsgK..",
-		"..KsgsgsgK..",
-		"..KsgsgsgK..",
-		"..KsgsgsgK..",
-		"..KsgsgsgK..",
-		"..KKKKKKKK..",
-		"............",
-	],
-}
-const ICON_COLORS := {"K": Color("#161826"), "b": Color("#3f8fe0"), "g": Color("#5bb04b"), "w": Color("#f3ead7"),
-	"r": Color("#d24b4b"), "s": Color("#aab2b8"), ".": Color(0, 0, 0, 0)}
-
-
+## Desktop icons, hand-drawn like the rest of the game (ink outlines).
 func _draw_icon(c: Control, kind: String) -> void:
-	var art: Array = ICONS.get(kind, [])
-	var px := 3.0
-	var o := Vector2((c.size.x - 12 * px) / 2, 6)
-	for y in art.size():
-		var row: String = art[y]
-		for x in row.length():
-			var col: Color = ICON_COLORS.get(row[x], Color(0, 0, 0, 0))
-			if col.a > 0:
-				c.draw_rect(Rect2(o + Vector2(x, y) * px, Vector2(px, px)), col)
+	var ink := Ink.INK
+	var o := Vector2(c.size.x / 2, 26)
+	match kind:
+		"browser":  # a globe
+			c.draw_circle(o, 19, ink)
+			c.draw_circle(o, 16.5, Color("#5b8fc2"))
+			var land := PackedVector2Array([o + Vector2(-9, -8), o + Vector2(-2, -11), o + Vector2(3, -5), o + Vector2(-1, 1), o + Vector2(-8, 0)])
+			c.draw_colored_polygon(land, Color("#7a9a4a"))
+			var land2 := PackedVector2Array([o + Vector2(4, 3), o + Vector2(12, 1), o + Vector2(11, 9), o + Vector2(5, 11)])
+			c.draw_colored_polygon(land2, Color("#7a9a4a"))
+			c.draw_arc(o, 16.5, 0, TAU, 32, ink, 2.0, true)
+			c.draw_line(o + Vector2(-16, 0), o + Vector2(16, 0), Color(ink, 0.5), 1.2, true)
+			c.draw_arc(o + Vector2(0, 0), 16.5, PI * 1.5, PI * 2.5, 16, Color(ink, 0.35), 1.2, true)
+			c.draw_arc(o + Vector2(-5, -5), 5, PI * 1.1, PI * 1.5, 6, Color(1, 1, 1, 0.5), 2.0, true)
+		"mail":  # an envelope
+			var r := Rect2(o + Vector2(-20, -13), Vector2(40, 27))
+			c.draw_rect(r.grow(1.5), ink)
+			c.draw_rect(r, Color("#efe4c8"))
+			c.draw_polyline(PackedVector2Array([r.position, o + Vector2(0, 2), Vector2(r.end.x, r.position.y)]), ink, 2.0, true)
+			c.draw_circle(o + Vector2(0, 2), 4, Color("#a8402f"))  # wax seal
+			c.draw_arc(o + Vector2(0, 2), 4, 0, TAU, 12, ink, 1.2, true)
+		"trash":  # a bin
+			var body := PackedVector2Array([o + Vector2(-13, -8), o + Vector2(13, -8), o + Vector2(10, 18), o + Vector2(-10, 18)])
+			c.draw_colored_polygon(body, Color("#9aa3a0"))
+			var closed := body.duplicate()
+			closed.append(body[0])
+			c.draw_polyline(closed, ink, 2.0, true)
+			for k in [-5.0, 0.0, 5.0]:
+				c.draw_line(o + Vector2(k, -4), o + Vector2(k * 0.8, 15), Color(ink, 0.6), 1.5, true)
+			var lid := Rect2(o + Vector2(-16, -14), Vector2(32, 5))
+			c.draw_rect(lid.grow(1.2), ink)
+			c.draw_rect(lid, Color("#b7bfbc"))
+			c.draw_rect(Rect2(o + Vector2(-4, -18), Vector2(8, 4)), ink)
 
 func _process(_d: float) -> void:
 	if not visible:

@@ -89,6 +89,8 @@ func test_protocol(path: String) -> void:
 		and ck.place == Protocol.PLACE_COMMUTING and ck.arrive == 545 and ck.pay == 23000 and ck.pay_minutes == 460
 		and ck.today_minutes == 0 and ck.mode == 2 and ck.depart == 520 and ck.money == 18600
 		and ck.weather == Protocol.WEATHER_RAIN and ck.company == "Pixel Pierogi sp. z o.o." and ck.founded and ck.alarm == 1, "decode clock %s" % ck)
+	var li := Protocol.decode(golden["lights"].hex_decode())
+	expect(li.get("type") == Protocol.T_LIGHTS and li.floor == 1 and li.rooms == [5, 12], "decode lights %s" % li)
 	var sm := Protocol.decode(golden["smoke"].hex_decode())
 	expect(sm.get("type") == Protocol.T_SMOKE and sm.floor == 1 and sm.rooms == [[9, 40], [33, 200]], "decode smoke %s" % sm)
 	var co := Protocol.decode(golden["company_offers"].hex_decode())

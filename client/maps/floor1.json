@@ -239,64 +239,108 @@
    "id": 1,
    "name": "Recepcja",
    "type": "reception",
-   "detector": true
+   "detector": true,
+   "light": "always"
   },
   "L": {
    "id": 20,
    "name": "Winda",
-   "type": "elevator"
+   "type": "elevator",
+   "light": "always"
   },
   "Q": {
    "id": 21,
    "name": "Klatka schodowa",
-   "type": "stairs"
+   "type": "stairs",
+   "light": "always"
   },
   "Z": {
    "id": 2,
    "name": "Zarząd",
    "type": "management",
-   "detector": true
+   "detector": true,
+   "light": "switch",
+   "windows": true,
+   "switch": [
+    50,
+    20
+   ]
   },
   "I": {
    "id": 3,
    "name": "IT / Produkt",
    "type": "department",
-   "detector": true
+   "detector": true,
+   "light": "switch",
+   "windows": true,
+   "switch": [
+    10,
+    20
+   ]
   },
   "R": {
    "id": 4,
    "name": "HR",
    "type": "department",
-   "detector": true
+   "detector": true,
+   "light": "switch",
+   "windows": true,
+   "switch": [
+    43,
+    12
+   ]
   },
   "K": {
    "id": 5,
    "name": "Korytarz",
    "type": "corridor",
-   "detector": true
+   "detector": true,
+   "light": "always"
   },
   "B": {
    "id": 6,
    "name": "Biznes",
    "type": "department",
-   "detector": true
+   "detector": true,
+   "light": "switch",
+   "windows": true,
+   "switch": [
+    12,
+    26
+   ]
   },
   "H": {
    "id": 7,
    "name": "Chill room",
-   "type": "common"
+   "type": "common",
+   "light": "switch",
+   "windows": true,
+   "switch": [
+    32,
+    26
+   ]
   },
   "W": {
    "id": 8,
    "name": "Łazienka damska",
    "type": "bathroom",
-   "gender": "female"
+   "gender": "female",
+   "light": "switch",
+   "switch": [
+    46,
+    26
+   ]
   },
   "M": {
    "id": 9,
    "name": "Łazienka męska",
    "type": "bathroom",
-   "gender": "male"
+   "gender": "male",
+   "light": "switch",
+   "switch": [
+    53,
+    26
+   ]
   },
   "a": {
    "id": 30,
@@ -305,7 +349,8 @@
    "gender": "female",
    "see": [
     "W"
-   ]
+   ],
+   "lit_by": "Łazienka damska"
   },
   "b": {
    "id": 31,
@@ -314,7 +359,8 @@
    "gender": "female",
    "see": [
     "W"
-   ]
+   ],
+   "lit_by": "Łazienka damska"
   },
   "c": {
    "id": 32,
@@ -323,7 +369,8 @@
    "gender": "female",
    "see": [
     "W"
-   ]
+   ],
+   "lit_by": "Łazienka damska"
   },
   "x": {
    "id": 33,
@@ -332,7 +379,8 @@
    "gender": "male",
    "see": [
     "M"
-   ]
+   ],
+   "lit_by": "Łazienka męska"
   },
   "y": {
    "id": 34,
@@ -341,7 +389,8 @@
    "gender": "male",
    "see": [
     "M"
-   ]
+   ],
+   "lit_by": "Łazienka męska"
   },
   "z": {
    "id": 35,
@@ -350,7 +399,8 @@
    "gender": "male",
    "see": [
     "M"
-   ]
+   ],
+   "lit_by": "Łazienka męska"
   },
   "X": {
    "id": 36,

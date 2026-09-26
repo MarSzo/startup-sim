@@ -909,6 +909,28 @@ pełnym ekranie — zastąpiona stylem inspirowanym Don't Starve:
   pomieszczenia parteru (`below` w definicji pokoju); piętra mają wspólną
   siatkę, więc klient rysuje je tam, gdzie są.
 
+### 10.34 Okna, światło, kamera i ręcznie rysowana mapa
+
+- **Okna**: część pomieszczeń ma okna w ścianach zewnętrznych (biura IT,
+  Biznes, HR, zarząd, chill room, portiernia, wejście, sklep); łazienki,
+  recepcja, korytarze i zaplecze — nie. Okna widać na ścianach.
+- **Światło**: każde pomieszczenie ma własną jasność:
+  - na zewnątrz — pora dnia × pogoda (pochmurno, mgła, deszcz, burza ciemniej);
+  - z oknami — to samo, trochę słabiej; bez okien — prawie ciemno;
+  - **włącznik** przy drzwiach (biura, łazienki, chill room, HR, zarząd,
+    portiernia, zaplecze): E zapala / gasi lampę dla wszystkich — jasno i
+    ciepło, nawet przy burzy; kabiny świecą lampą łazienki;
+  - korytarze, hole, klatka, winda, sklep, parking wewnętrzny i recepcja są
+    oświetlone zawsze;
+  - rano lampy są zgaszone, o 22:00 gasną wszystkie.
+- **Kamera**: kółko myszy albo `+` / `-` przybliża i oddala (0,6×–2×); nicki,
+  dymki i nazwy pomieszczeń zostają tej samej wielkości.
+- **Mapa narysowana od nowa** w stylu reszty gry: podłogi (deski, wykładzina,
+  kafle, kamień, trawa, chodnik, asfalt, tory), ściany z konturem tuszu i
+  tynkiem, drzwi, bramki, żywopłot, barierki i wszystkie meble — rysowane
+  wektorowo raz do tekstury w potrójnej rozdzielczości. Ikony pulpitu też.
+- Kłęby dymu nie wychodzą już za ściany (przy ścianach są mniejsze).
+
 ### 10.6 Stan implementacji
 
 *Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie,
@@ -945,6 +967,9 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Ekwipunek**: kieszenie i ręce, przedmioty (przepustka, karta, laptop,
   kawa), upuszczanie / podnoszenie / podawanie, dostęp z przedmiotów (10.13);
   protokół v8.
+- **Okna, światło, kamera, nowa mapa**: okna, włączniki i jasność
+  pomieszczeń, zoom kamery, ręcznie rysowane podłogi, ściany i meble (10.34);
+  protokół v27.
 - **Balkon** na piętrze 1 z widokiem na ulicę i ludzi na dole (10.33).
 - **Wygląd „papier i atrament”**: skalowanie z oknem, odręczna czcionka,
   papierowe panele, tarcze statystyk, pasek ekwipunku, efekt tuszu i papieru na
@@ -1000,9 +1025,9 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Sieć mobilna**: serwer dual-stack IPv4/IPv6; gracz identyfikowany tokenem
   (zmiana adresu w trakcie gry przenosi sesję); klient przepina gniazdo po
   ciszy/powrocie z tła i sam łączy się ponownie po utracie sesji.
-- **Testy**: 94 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
+- **Testy**: 95 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
   zależna od uprawnień, bramki, ruch/kolizje, schody, winda, nawigacja,
-  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, zegar, dojazd, pogoda, zarząd, słodycze, obiady, wakaty, firma, ochrona i policja, kubki, dym, balkon, protokół), 2 golden, 27 e2e serwera
+  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, zegar, dojazd, pogoda, zarząd, słodycze, obiady, wakaty, firma, ochrona i policja, kubki, dym, balkon, protokół), 2 golden, 28 e2e serwera
   (m.in. portal: odrzucenie → przyjęcie → spawn; całe wdrożenie aż do karty;
   niewidoczność między piętrami; zgodność stanu serwera z predykcją) —
   łącznie 122 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 porannego dojazdu samochodem moknięcia w deszczu spotkania z Prezesem tacy ze słodyczami obiadu z odbiorem na recepcji, obsadzonego stanowiska, panelu założyciela kradzieży w sklepie z ochroną i policją , kubka zebranego przez sprzątaczkę oraz papierosa, który uruchamia alarm pożarowy); 146 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie

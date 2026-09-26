@@ -141,7 +141,8 @@
   "P": {
    "id": 1,
    "name": "Półpiętro",
-   "type": "stairs"
+   "type": "stairs",
+   "light": "always"
   }
  },
  "links": [

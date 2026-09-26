@@ -5,7 +5,7 @@
 //! `tests/golden/packets.json`.
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 26;
+pub const VERSION: u8 = 27;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
 pub const MAX_PACKET: usize = 1200;
@@ -71,6 +71,7 @@ pub mod ty {
     pub const COMPANY_PEOPLE: u8 = 38;
     pub const COMPANY_ACTION: u8 = 39;
     pub const SMOKE: u8 = 40;
+    pub const LIGHTS: u8 = 41;
 }
 
 /// `ItemAction::action`.
@@ -456,6 +457,8 @@ pub enum Packet {
     /// Smoke on the receiver's floor: (room, level 1..=255); rooms not listed
     /// are clear. Every second.
     Smoke { floor: u8, rooms: Vec<(u16, u8)> },
+    /// Lamps switched on on the receiver's floor (rooms); every second.
+    Lights { floor: u8, rooms: Vec<u16> },
     /// Closed doors (locked toilet stalls, elevator doors) on the receiver's
     /// floor: solid for the simulation. Plus the elevator: the floor it is at
     /// and where it is heading (`NO_FLOOR` = standing). Sent on change and
@@ -604,6 +607,7 @@ impl Packet {
             Packet::CompanyPeople { .. } => ty::COMPANY_PEOPLE,
             Packet::CompanyAction { .. } => ty::COMPANY_ACTION,
             Packet::Smoke { .. } => ty::SMOKE,
+            Packet::Lights { .. } => ty::LIGHTS,
             Packet::Doors { .. } => ty::DOORS,
             Packet::DoorAction { .. } => ty::DOOR_ACTION,
         }
@@ -870,6 +874,13 @@ impl Packet {
                 w.str16(company, 64);
                 w.u8(*founded as u8);
                 w.u8(*alarm);
+            }
+            Packet::Lights { floor, rooms } => {
+                w.u8(*floor);
+                w.u8(rooms.len().min(64) as u8);
+                for room in rooms.iter().take(64) {
+                    w.u16(*room);
+                }
             }
             Packet::Smoke { floor, rooms } => {
                 w.u8(*floor);
@@ -1210,6 +1221,18 @@ impl Packet {
                 founded: r.u8()? != 0,
                 alarm: r.u8()?,
             },
+            ty::LIGHTS => {
+                let floor = r.u8()?;
+                let n = r.u8()? as usize;
+                if n > 64 {
+                    return Err(DecodeError::Invalid("too many rooms"));
+                }
+                let mut rooms = Vec::with_capacity(n);
+                for _ in 0..n {
+                    rooms.push(r.u16()?);
+                }
+                Packet::Lights { floor, rooms }
+            }
             ty::SMOKE => {
                 let floor = r.u8()?;
                 let n = r.u8()? as usize;
@@ -1595,6 +1618,7 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
         ),
         ("company_action", Packet::CompanyAction { token: 0x01020304, action: 3, target: 1, value: 2, text: String::new() }),
         ("smoke", Packet::Smoke { floor: 1, rooms: vec![(9, 40), (33, 200)] }),
+        ("lights", Packet::Lights { floor: 1, rooms: vec![5, 12] }),
         (
             "chat",
             Packet::Chat {
@@ -1662,7 +1686,7 @@ mod tests {
                 b[0] = 0x54;
                 b[1] = 0x53;
                 b[2] = VERSION;
-                b[3] = rng.u8(1..=40);
+                b[3] = rng.u8(1..=41);
             }
             let _ = Packet::decode(&b);
         }

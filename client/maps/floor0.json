@@ -260,28 +260,37 @@
   "K": {
    "id": 2,
    "name": "Parking wewnętrzny",
-   "type": "parking"
+   "type": "parking",
+   "light": "always"
   },
   "H": {
    "id": 3,
    "name": "Hol",
    "type": "hall",
-   "detector": true
+   "detector": true,
+   "light": "always"
   },
   "L": {
    "id": 20,
    "name": "Winda",
-   "type": "elevator"
+   "type": "elevator",
+   "light": "always"
   },
   "Q": {
    "id": 21,
    "name": "Klatka schodowa",
-   "type": "stairs"
+   "type": "stairs",
+   "light": "always"
   },
   "Y": {
    "id": 9,
    "name": "Zaplecze techniczne",
-   "type": "service"
+   "type": "service",
+   "light": "switch",
+   "switch": [
+    43,
+    12
+   ]
   },
   "P": {
    "id": 4,
@@ -290,7 +299,13 @@
    "see": [
     "E"
    ],
-   "detector": true
+   "detector": true,
+   "light": "switch",
+   "windows": true,
+   "switch": [
+    25,
+    28
+   ]
   },
   "E": {
    "id": 5,
@@ -299,13 +314,17 @@
    "see": [
     "P"
    ],
-   "detector": true
+   "detector": true,
+   "light": "always",
+   "windows": true
   },
   "Z": {
    "id": 6,
    "name": "Sklep",
    "type": "shop",
-   "detector": true
+   "detector": true,
+   "light": "always",
+   "windows": true
   },
   "R": {
    "id": 7,

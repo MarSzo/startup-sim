@@ -109,6 +109,18 @@ pub struct RoomDef {
     /// balcony looking down on the street).
     #[serde(default)]
     pub below: Vec<String>,
+    /// Lighting (lights.rs): "switch" (a light switch at `switch`), "always"
+    /// (common areas), "" (outdoors / none).
+    #[serde(default)]
+    pub light: String,
+    #[serde(default)]
+    pub switch: Option<[i32; 2]>,
+    /// Lit by another room's lamp (a toilet stall by its bathroom).
+    #[serde(default)]
+    pub lit_by: Option<String>,
+    /// Has windows (daylight comes in).
+    #[serde(default)]
+    pub windows: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -202,6 +202,16 @@ func set_facing(f: int) -> void:
 		queue_redraw()
 
 
+## Camera zoom changed: nick and bubble stay the same size on screen.
+func set_zoom(zoom: float) -> void:
+	_zoom = zoom
+	nick_label.scale = Vector2.ONE / zoom
+	nick_label.position = Vector2(-100 / zoom, HEAD_TOP - 24 / zoom)
+	bubble.scale = Vector2.ONE / zoom
+	if bubble.visible:
+		_place_bubble()
+
+
 func _process(delta: float) -> void:
 	# In the game world (not e.g. a video call tile): move the text up.
 	if _tag.get_parent() == self and label_root and is_instance_valid(label_root) \

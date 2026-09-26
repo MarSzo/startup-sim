@@ -1,11 +1,13 @@
-## Renders the floor once into a texture (procedural pixel art, map_art.gd)
-## plus faint room-name labels.
+## Renders the floor once into a texture (hand-drawn art, map_painter.gd,
+## drawn in a SubViewport at ART_SCALE x resolution) plus room-name labels.
 extends Node2D
 
 const Ink = preload("res://ui/ink_ui.gd")
 
 
-const MapArt = preload("res://map/map_art.gd")
+const MapPainter = preload("res://map/map_painter.gd")
+## Resolution of the floor picture: pixels per world pixel.
+const ART_SCALE := 3
 
 
 ## `floor_names`: floor index -> name, for "where do these stairs go" labels.
@@ -16,13 +18,23 @@ var labels := Node2D.new()
 
 func build(map, zoom: float, floor_names := {}) -> void:
 	add_child(labels)
-	var t0 := Time.get_ticks_msec()
 	var tp: int = map.tile_px
-	var img: Image = MapArt.new().build(map)
-	print("map art floor %d: %d ms" % [map.floor_index, Time.get_ticks_msec() - t0])
+	# Draw the floor once into a texture (vector art, antialiased).
+	var vp := SubViewport.new()
+	vp.size = Vector2i(map.width * tp * ART_SCALE, map.height * tp * ART_SCALE)
+	vp.transparent_bg = true
+	vp.disable_3d = true
+	vp.msaa_2d = Viewport.MSAA_4X
+	vp.render_target_update_mode = SubViewport.UPDATE_ONCE
+	var painter := MapPainter.new()
+	painter.scale = Vector2(ART_SCALE, ART_SCALE)
+	vp.add_child(painter)
+	painter.paint(map)
+	add_child(vp)
 	var sprite := Sprite2D.new()
-	sprite.texture = ImageTexture.create_from_image(img)
-	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST  # crisp tiles
+	sprite.texture = vp.get_texture()
+	sprite.scale = Vector2.ONE / ART_SCALE
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	sprite.centered = false
 	add_child(sprite)
 	# Room labels at each room's centroid.
@@ -66,6 +78,8 @@ func build(map, zoom: float, floor_names := {}) -> void:
 		l.scale = Vector2.ONE / zoom
 		l.size = Vector2(400, 40)
 		l.position = center - Vector2(200, 20) / zoom
+		l.set_meta("anchor", center)
+		l.set_meta("half", Vector2(200, 20))
 		labels.add_child(l)
 	# Stairs: where they lead.
 	for link in map.links:
@@ -87,4 +101,13 @@ func build(map, zoom: float, floor_names := {}) -> void:
 		sl.size = Vector2(300, 30)
 		var c2 := (Vector2(a.position) + Vector2(a.size) / 2.0) * tp
 		sl.position = c2 - Vector2(150, 15) / zoom
+		sl.set_meta("anchor", c2)
+		sl.set_meta("half", Vector2(150, 15))
 		labels.add_child(sl)
+
+
+## Camera zoom changed: keep the labels the same size on screen.
+func set_zoom(zoom: float) -> void:
+	for l in labels.get_children():
+		l.scale = Vector2.ONE / zoom
+		l.position = l.get_meta("anchor") - l.get_meta("half") / zoom

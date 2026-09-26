@@ -27,6 +27,7 @@ const WeatherFx = preload("res://ui/weather_fx.gd")
 const DialogWindow = preload("res://ui/dialog_window.gd")
 const TrayView = preload("res://game/tray_view.gd")
 const SmokeView = preload("res://game/smoke_view.gd")
+const LightView = preload("res://game/light_view.gd")
 const Ink = preload("res://ui/ink_ui.gd")
 
 const ZOOM := 3.0
@@ -83,6 +84,8 @@ var weather := Protocol.WEATHER_SUNNY
 var weather_fx := WeatherFx.new()
 ## Smoke in the rooms + detectors (over the world); fire alarm on screen.
 var smoke_view := SmokeView.new()
+## Room brightness (windows, lamps, time of day, weather) and the switches.
+var light_view := LightView.new()
 var fire_alarm := false
 var alarm_tint := ColorRect.new()
 var alarm_label := Label.new()
@@ -175,6 +178,8 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 	world.y_sort_enabled = true
 	add_child(ride_mask)  # between the map and the people
 	add_child(world)
+	light_view.setup(building)
+	add_child(light_view)  # over the world (and inked with it)
 	# Smoke over the ink effect (drawn in its own style), under the weather.
 	smoke_layer.layer = 5
 	smoke_layer.follow_viewport_enabled = true
@@ -305,10 +310,13 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 	dialog.answer.connect(func(id: int, choice: int): if net.is_playing(): net.send(Protocol.encode_dialog_answer(net.token, id, choice)))
 	screen_layer.add_child(screen)
 	_show_floor(0)
+	if args.has("zoom"):
+		set_zoom_level.call_deferred(float(args["zoom"]))  # dev / screenshots
 
 
 func _show_floor(f: int) -> void:
 	smoke_view.set_floor(f)
+	light_view.set_floor(f)
 	_below_floor = -1
 	for k in views:
 		views[k].visible = (k == f)
@@ -604,6 +612,8 @@ func _on_packet(p: Dictionary) -> void:
 			_shelf_at = Movement.to_px(pred.pos)
 		Protocol.T_SMOKE:
 			smoke_view.on_smoke(p)
+		Protocol.T_LIGHTS:
+			light_view.on_lights(p)
 		Protocol.T_CLOCK:
 			fire_alarm = p.get("alarm", 0) == 1
 			smoke_view.alarm = fire_alarm
@@ -746,7 +756,7 @@ func _on_snapshot(p: Dictionary) -> void:
 			r = RemotePlayer.new()
 			var npc: bool = e.kind == Protocol.KIND_NPC
 			r.look = (e.flags >> 3) & 7 if npc else 0
-			r.setup(e.id, _label_for(nicks.get(e.id, "..."), depts.get(e.id, 0)), ZOOM)
+			r.setup(e.id, _label_for(nicks.get(e.id, "..."), depts.get(e.id, 0)), ZOOM * zoom_level)
 			if not npc and appearances.has(e.id):
 				r.set_appearance(appearances[e.id])
 			world.add_child(r)
@@ -805,7 +815,35 @@ func _reconcile(server_body: Dictionary, ack: int) -> void:
 		_refresh_own_label()
 
 
+## Camera zoom (mouse wheel, + / -): a multiplier of ZOOM.
+const ZOOM_MIN := 0.6
+const ZOOM_MAX := 2.0
+var zoom_level := 1.0
+
+
+func set_zoom_level(z: float) -> void:
+	zoom_level = clampf(z, ZOOM_MIN, ZOOM_MAX)
+	var zz := ZOOM * zoom_level
+	camera.zoom = Vector2(zz, zz)
+	me.set_zoom(zz)
+	for r in remotes.values():
+		if r.has_method("set_zoom"):
+			r.set_zoom(zz)
+	for v in views.values():
+		v.set_zoom(zz)
+
+
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed and not screen.visible and not input_blocked:
+		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
+			set_zoom_level(zoom_level * 1.1)
+		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			set_zoom_level(zoom_level / 1.1)
+	if event is InputEventKey and event.pressed and not input_blocked and not screen.visible:
+		if event.physical_keycode in [KEY_EQUAL, KEY_KP_ADD]:
+			set_zoom_level(zoom_level * 1.15)
+		elif event.physical_keycode in [KEY_MINUS, KEY_KP_SUBTRACT]:
+			set_zoom_level(zoom_level / 1.15)
 	if not (event is InputEventKey and event.pressed and not event.echo) or input_blocked or screen.visible or not have_state:
 		return
 	match event.physical_keycode:
@@ -874,6 +912,15 @@ func _update_hint() -> void:
 		if best_id >= 0:
 			var who: String = nicks.get(best_id, "?")
 			text = "[E] Kasa — zapłać za zakupy" if who == "Kasa" else "[E] Porozmawiaj: %s" % who
+	if text == "" and map:
+		# Light switch within reach (1 tile, like the server).
+		var me_c := Movement.to_px(pred.pos)
+		for r in map.room_switch:
+			var st: Vector2i = map.room_switch[r]
+			var sc: Vector2 = (Vector2(st) + Vector2(0.5, 0.5)) * map.tile_px
+			if sc.distance_to(me_c) <= map.tile_px:
+				text = "[E] Zgaś światło" if light_view._on.has(r) else "[E] Włącz światło"
+				break
 	if text == "" and map:
 		# Coffee machine within reach (same radius as the server: 1.5 tiles).
 		for dy in range(-2, 3):
@@ -951,9 +998,12 @@ func _update_light() -> void:
 		Protocol.WEATHER_RAIN: tint = Color(0.74, 0.76, 0.84)
 		Protocol.WEATHER_STORM: tint = Color(0.6, 0.62, 0.72)
 		Protocol.WEATHER_FOG: tint = Color(0.9, 0.9, 0.92)
-	if not weather_fx.outdoors:
-		tint = tint.lerp(Color(1, 1, 1), 0.6)  # the office lights are on
-	daylight.color = daylight_color(game_minute) * tint
+	# Brightness is per room now (LightView); keep only a hint of the sky's
+	# colour (warm dawn, golden evening) over everything.
+	var sky := daylight_color(game_minute) * tint
+	daylight.color = Color(1, 1, 1).lerp(sky, 0.35)
+	light_view.minute = game_minute
+	light_view.weather = weather
 
 
 ## World tint by the time of day: warm dawn, white day, golden evening,

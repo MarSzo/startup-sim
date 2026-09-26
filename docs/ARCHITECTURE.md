@@ -205,6 +205,18 @@ jasności = tusz, gradacja kolorów, ziarno, winieta); teksty świata na
 teksty świata (7), HUD (11+). Postać (`game/player_view.gd`) rysowana wektorowo
 (`_limb`, `_blob`, `_shape` z konturem `OL`).
 
+**Światło** (`lights.rs`, klient `game/light_view.gd`): serwer trzyma zbiór
+zapalonych lamp (`Lights`), włączniki z mapy (`switches`), E w zasięgu
+przełącza; wieczorem gasi wszystko; `Lights` co 1 s. `LightView` (warstwa
+świata, pod dymem) rysuje ciemność na kaflach każdego pomieszczenia z
+`light_of` (pora dnia × pogoda × okna / lampa) i tabliczki włączników;
+`CanvasModulate` zostawia tylko lekki odcień nieba.
+
+**Mapa** (`map/map_painter.gd`): rysunek wektorowy (podłogi wg typu kafla,
+ściany 3/4 z tynkiem i konturem, okna tam, gdzie ściana dzieli pomieszczenie
+z `windows` od zewnątrz, drzwi, meble jako spójne grupy kafli), wykonany raz
+w `SubViewport` (`UPDATE_ONCE`, 3×, MSAA) i pokazany jako tekstura.
+
 **Balkon**: `RoomDef::below` (nazwy pomieszczeń piętra niżej) →
 `Building::below(floor, room)`; snapshot odbiorcy na balkonie zawiera też
 encje z tych pomieszczeń, a mowa stamtąd też do niego dociera. Encje nie mają

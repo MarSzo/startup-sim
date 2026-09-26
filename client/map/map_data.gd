@@ -35,6 +35,10 @@ var room_types := {}  # id -> type
 var room_outdoor := {}  # id -> true: under the open sky (weather)
 var room_detector := {}  # id -> true: smoke detector on the ceiling
 var room_below := {}  # id -> true: sees the floor below (a balcony)
+var room_windows := {}  # id -> true: has windows (daylight)
+var room_light := {}  # id -> "switch" / "always" (missing = outdoors / none)
+var room_switch := {}  # id -> Vector2i: tile by the light switch
+var room_lit_by := {}  # id -> id of the room whose lamp lights it
 var legend := {}      # char -> {type, solid, color, access?, free_dir?}
 ## [{kind: "stairs"|"elevator", rect: Rect2i, id, to_floor, to: Vector2i}]
 var links: Array = []
@@ -78,6 +82,19 @@ func parse(bytes: PackedByteArray) -> void:
 			room_detector[rid] = true
 		if not defs[key].get("below", []).is_empty():
 			room_below[rid] = true
+		if defs[key].get("windows", false):
+			room_windows[rid] = true
+		if defs[key].get("light", "") != "":
+			room_light[rid] = defs[key]["light"]
+		var sw = defs[key].get("switch", null)
+		if sw != null:
+			room_switch[rid] = Vector2i(int(sw[0]), int(sw[1]))
+	for key in defs:
+		var by = defs[key].get("lit_by", null)
+		if by != null:
+			for rid2 in room_names:
+				if room_names[rid2] == by:
+					room_lit_by[int(defs[key]["id"])] = rid2
 	var tiles: Array = data["tiles"]
 	var rooms: Array = data["rooms"]
 	if tiles.size() != height or rooms.size() != height:

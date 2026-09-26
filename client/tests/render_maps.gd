@@ -1,9 +1,10 @@
-## Dev tool: render every floor's pixel art to PNG (headless).
-## godot --headless --path client -s tests/render_maps.gd -- /output/dir
+## Dev tool: render every floor's art to PNG (needs a renderer - run
+## without --headless):
+## godot --path client -s tests/render_maps.gd -- /output/dir
 extends SceneTree
 
 const Building = preload("res://map/building.gd")
-const MapArt = preload("res://map/map_art.gd")
+const MapPainter = preload("res://map/map_painter.gd")
 
 
 func _init() -> void:
@@ -15,9 +16,20 @@ func _init() -> void:
 		var m = b.get_floor(f)
 		if m == null:
 			continue
-		var t0 := Time.get_ticks_msec()
-		var img: Image = MapArt.new().build(m)
+		var vp := SubViewport.new()
+		vp.size = Vector2i(m.width * m.tile_px * 2, m.height * m.tile_px * 2)
+		vp.transparent_bg = true
+		vp.msaa_2d = Viewport.MSAA_4X
+		vp.render_target_update_mode = SubViewport.UPDATE_ONCE
+		var painter := MapPainter.new()
+		painter.scale = Vector2(2, 2)
+		vp.add_child(painter)
+		painter.paint(m)
+		get_root().add_child(vp)
+		await process_frame
+		await process_frame
+		await process_frame
 		var path := out.path_join("floor%d.png" % f)
-		img.save_png(path)
-		print("floor %d: %dx%d in %d ms -> %s" % [f, img.get_width(), img.get_height(), Time.get_ticks_msec() - t0, path])
+		vp.get_texture().get_image().save_png(path)
+		print("floor %d -> %s" % [f, path])
 	quit()

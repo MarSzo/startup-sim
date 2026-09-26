@@ -359,6 +359,14 @@ Dym papierosowy na piętrze odbiorcy (co 1 s, tylko w budynku): `floor u8`, n
 u8 (≤ 64) × {`room u16`, `level u8` 1–255}. Pokoi spoza listy nie ma dymu.
 Czujki dymu są w danych mapy (`room_defs.*.detector`), klient rysuje je sam.
 
+### 41 `Lights` (S→C)
+
+Lampy zapalone na piętrze odbiorcy (co 1 s, tylko w budynku): `floor u8`, n u8
+(≤ 64) × `room u16`. Włącza się je E przy włączniku (`room_defs.*.switch`, kafel
+przy drzwiach, zasięg 1 kafel) — bez osobnego pakietu. Jasność pomieszczeń
+liczy klient: pora dnia (`Clock.minute`), pogoda, `windows`, `light`
+("switch" / "always"), `lit_by` (kabina → łazienka) i lampy.
+
 ### 27 `Shelf` (S→C), 28 `ShopTake` (C→S)
 
 `Shelf` — odpowiedź na E przy półce sklepowej: shelf u8, title str16, n u8 (≤ 16),
@@ -430,6 +438,7 @@ szyfrowaniem.
 
 ## Historia wersji
 
+- **27** — światło: pakiet `Lights` (41); w mapie `room_defs.*.light` / `switch` / `lit_by` / `windows`.
 - **26** — dym i straż: `Clock` + `alarm`, pakiet `Smoke` (40), wygląd NPC 6 (strażak), pojazd 6 (wóz strażacki).
 - **25** — kubki i sprzątaczka: przedmiot 34 = pusty kubek, wygląd NPC 5 (sprzątaczka); bez nowych pakietów.
 - **24** — ochrona i policja: wygląd NPC 3 (ochroniarz) i 4 (policjant), pojazd 5 (radiowóz); bez nowych pakietów.

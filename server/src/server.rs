@@ -24,6 +24,7 @@ use crate::recruitment::{Attempt, Recruitment};
 use crate::sim::{self, Body, Pos};
 use crate::security::{self, PoliceCall};
 use crate::shop::{self, Shelf};
+use crate::lights::{self, Lights, Switch};
 use crate::lunch;
 use crate::stalls::{self, Stall};
 use crate::treats::{self, Tray};
@@ -300,6 +301,9 @@ pub struct Server {
     /// Cigarette smoke in the rooms, and the fire alarm it may set off.
     smoke: Smoke,
     alarm: Option<Alarm>,
+    /// Lamps switched on, and where the switches are.
+    lights: Lights,
+    switches: Vec<Switch>,
     next_crew_id: u16,
     /// The cleaner's round (evening) and the world day it last ran.
     round: Option<Round>,
@@ -367,6 +371,8 @@ impl Server {
             round: None,
             smoke: Smoke::new(&building),
             alarm: None,
+            lights: Lights::default(),
+            switches: lights::switches(&building),
             next_crew_id: 0,
             round_day: 0,
             next_officer_id: 0,
@@ -1577,6 +1583,7 @@ impl Server {
         match transition {
             Some(Transition::Evening) => {
                 self.lunch_orders.clear(); // uncollected boxes go in the bin
+                self.lights.on.clear(); // the last one out turns off the lights
                 let ids: Vec<u16> = self.players.values().filter(|p| matches!(p.stage, Stage::Working)).map(|p| p.id).collect();
                 for pid in ids {
                     self.go_home(pid);
@@ -3199,6 +3206,9 @@ impl Server {
                 coffee_says.extend(said.map(|line| (pid, line, None)));
             } else if let Some(line) = self.take_treat(pid, &body) {
                 coffee_says.push((pid, line, None));
+            } else if let Some(s) = self.switches.iter().find(|s| lights::in_reach(s, &body)).copied() {
+                let on = self.lights.toggle((s.floor, s.room));
+                coffee_says.push((pid, if on { lights::lines::ON } else { lights::lines::OFF }.to_string(), None));
             } else if let Some(said) = self.use_spot(pid, &body) {
                 coffee_says.extend(said.map(|line| (pid, line, None)));
             } else if let Some(line) = self.use_elevator(&body) {
@@ -3474,6 +3484,8 @@ impl Server {
                 if matches!(p.stage, Stage::Working) && tick % CLOCK_RESEND_TICKS == 0 {
                     let rooms = self.smoke.floor_levels(p.body.floor);
                     outgoing.push((p.addr, p.id, Packet::Smoke { floor: p.body.floor, rooms }));
+                    let rooms = self.lights.floor_on(p.body.floor);
+                    outgoing.push((p.addr, p.id, Packet::Lights { floor: p.body.floor, rooms }));
                 }
             }
             self.clock_dirty = false;

@@ -10,6 +10,7 @@ var _target := {}   # room -> 0..1 (last packet)
 var _shown := {}    # room -> 0..1 (eased)
 var _tiles := {}    # floor -> {room: Array[Vector2i]}
 var _detectors := {}  # floor -> Array[Vector2] (px)
+var _inner := {}    # floor -> {Vector2i: tiles to the room's edge (0 = at the wall)}
 
 
 func setup(b) -> void:
@@ -22,13 +23,34 @@ func setup(b) -> void:
 		var rooms := {}
 		for y in m.height:
 			for x in m.width:
-				if m.is_blocked(x, y):
+				# Floor and furniture (not walls or open air) belong to the room.
+				var ch: String = m.tile_chars[y * m.width + x]
+				if ch == "#" or ch == "~":
 					continue
 				var r: int = m.room_at_tile(x, y)
 				if not rooms.has(r):
 					rooms[r] = []
 				rooms[r].append(Vector2i(x, y))
 		_tiles[f] = rooms
+		# How far each tile is from the room's edge: puffs stay inside.
+		var inner := {}
+		for r in rooms:
+			var own := {}
+			for t in rooms[r]:
+				own[t] = true
+			for t in rooms[r]:
+				var d := 0
+				while d < 3:
+					var ok := true
+					for dy in range(-d - 1, d + 2):
+						for dx in range(-d - 1, d + 2):
+							if not own.has(t + Vector2i(dx, dy)):
+								ok = false
+					if not ok:
+						break
+					d += 1
+				inner[t] = d
+		_inner[f] = inner
 		var dets := []
 		for r in m.room_detector:
 			if not rooms.has(r):
@@ -103,8 +125,14 @@ func _draw() -> void:
 		for k in range(0, tiles.size(), step):
 			var tile: Vector2i = tiles[k]
 			var ph := float(tile.x * 7 + tile.y * 13)
-			var off := Vector2(sin(t * 0.35 + ph) * px * 0.7, cos(t * 0.27 + ph * 1.3) * px * 0.6)
-			var rad := px * (0.75 + 0.45 * a + 0.15 * sin(t * 0.8 + ph))
+			# Near a wall: smaller and steadier, so nothing spills over it.
+			var room_d: int = _inner.get(floor_shown, {}).get(tile, 0)
+			var room_px: float = (room_d + 0.5) * px
+			var wobble := minf(1.0, room_d * 0.5 + 0.2)
+			var off := Vector2(sin(t * 0.35 + ph) * px * 0.7, cos(t * 0.27 + ph * 1.3) * px * 0.6) * wobble
+			var rad := minf(px * (0.75 + 0.45 * a + 0.15 * sin(t * 0.8 + ph)), room_px - off.length() - 0.8)
+			if rad < px * 0.3:
+				continue
 			puffs.append([(Vector2(tile) + Vector2(0.5, 0.5)) * px + off, rad])
 		var rim := Color(0.14, 0.11, 0.08, minf(0.7, 0.2 + op * 0.55))
 		var base := Color(0.62, 0.6, 0.56, minf(0.97, 0.3 + op * 0.7))
