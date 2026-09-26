@@ -393,7 +393,9 @@ impl Server {
                 .npcs
                 .iter_mut()
                 .filter(|n| n.in_talk_range(&body))
-                .min_by_key(|n| (n.body.pos.x - body.pos.x).abs() + (n.body.pos.y - body.pos.y).abs());
+                // NPCs at their post first (a porter still standing next to
+                // the guest he just brought mustn't shadow the receptionist).
+                .min_by_key(|n| (!n.is_idle(), (n.body.pos.x - body.pos.x).abs() + (n.body.pos.y - body.pos.y).abs()));
             if let Some(n) = nearest {
                 events.extend(n.interact(&self.building, pid, body.access));
             }

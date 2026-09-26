@@ -26,7 +26,7 @@ server/                 crate Rusta (lib `game` + binarki)
   src/map.rs            jedno piętro: kafle, kolizje, pokoje, linki (schody/winda)
   src/sim.rs            deterministyczny krok: ruch, kolizje, schody, winda
   src/nav.rs            podążanie ścieżką (boty, NPC)
-  src/npc.rs            NPC po stronie serwera (portier)
+  src/npc.rs            NPC po stronie serwera (portier, recepcja, HR)
   src/protocol.rs       pakiety: encode/decode, fragmentacja snapshotów
   src/net.rs            UdpSocket + symulator opóźnienia/jittera/strat
   src/server.rs         pętla ticka, handshake, inputy, interest mgmt, statystyki
@@ -92,8 +92,9 @@ maksymalny czas ticka, gracze, max widocznych, transfer na klienta
 **NPC** (`npc.rs`) to encje serwera bez adresu sieciowego: w każdym ticku
 robią 3 kroki tym samym `sim::step` (sterowane `nav::Walker`), są w
 snapshotach jako `kind` NPC i mówią pakietem `Say`. Wciśnięcie E (zbocze) przez
-gracza, który nie jedzie windą, trafia do najbliższego NPC w promieniu 3,5
-kafla (`Npc::interact`). NPC zwracają zdarzenia (`Say`, `Grant`, `Revoke`),
+gracza, który nie jedzie windą, trafia do NPC w promieniu 3,5 kafla —
+najpierw do stojących na swoim stanowisku, potem do najbliższego
+(`Npc::interact`). NPC zwracają zdarzenia (`Say`, `Grant`, `Revoke`),
 które serwer wykonuje.
 
 **Portier** (definicja w `floor0.json` → `npcs`): w spoczynku stoi w portierni.
@@ -102,6 +103,13 @@ prowadzi go na recepcję piętra 1 (bramki, schody). Czeka, jeśli gościa nie m
 ani obok niego (4 kafle), ani dalej na trasie, ani w recepcji; przypomina co
 6 s, po 30 s rezygnuje i odbiera przepustkę. Po dojściu mówi, że przepustka jest
 ważna do końca dnia, i wraca. Prowadzi jedną osobę naraz.
+
+**Recepcja** (piętro 1, za ladą) używa tej samej logiki odprowadzania: gościa
+z przepustką prowadzi do HR (bez zmiany uprawnień, rezygnując nie odbiera
+przepustki); osobę z kartą tylko wita. **HR** stoi za biurkiem: gościowi
+„podpisuje umowę” — `Grant CARD` + `Revoke GUEST`; bez przepustki odsyła na
+portiernię. Role (`npc::Role`) i ich kwestie są w `npc.rs`; wygląd idzie w
+bitach 3–5 flag encji.
 
 **Sesje** są indeksowane tokenem (`by_token`), nie adresem: pakiet z ważnym
 tokenem z nowego adresu przenosi sesję (`migrate`), jeśli dowodzi „świeżości”
@@ -228,8 +236,9 @@ stojąc w drzwiach widzisz korytarz.
 | funkcja | gdzie się wepnie |
 |---------|------------------|
 | **Piętro 2** | wpis w `building.json` z `locked: true`; odblokowanie = plik mapy + `locked: false` (winda i schody same go obsłużą; do ustalenia: odblokowanie w trakcie gry wymaga zmiany CRC albo osobnego komunikatu). |
-| **Karta z HR** | uprawnienie `CARD` już istnieje i otwiera bramki; wyda je NPC HR (`Event::Grant`). Trwałość wymaga kont (backend). |
-| **Kolejne NPC** | recepcja, Zarząd, HR: nowy `kind` w `npcs` mapy + gałąź w `npc.rs`; rozmowa, ruch, dymki i widoczność działają tak samo jak u portiera. |
+| **Trwałość karty** | karta żyje tyle, co sesja; zapis między sesjami wymaga kont (backend). |
+| **Kolejne NPC** | np. Zarząd: nowy `kind` w `npcs` mapy + `Role` w `npc.rs`; rozmowa, odprowadzanie, dymki i widoczność są wspólne. |
+| **Dział / stanowisko** | HR na razie wydaje kartę bez działu; przydział dojdzie z rekrutacją (wybór w UI → nowe uprawnienie lub pole w stanie gracza). |
 | **Akcje / interakcje** | bit 16 (E) działa jak w windzie: kontekst = link/kafel, na którym stoisz; bity 5–7 wolne. |
 | **Więcej graczy w pokoju** | fragmentacja snapshotów już działa; następny krok to delta względem `ack_tick` i/lub priorytet po odległości. |
 
@@ -247,5 +256,5 @@ połączeni, liczba w docelowym pokoju, RTT, odbierany transfer, widoczni.
 
 | polecenie | co sprawdza |
 |-----------|-------------|
-| `cd server && cargo test` | 36 testów jednostkowych (budynek i mapy wg GDD, osiągalność zależna od uprawnień, bramki z wolnym wyjściem, ruch/kolizje, schody, winda, nawigacja, portier: odprowadzenie, czekanie, rezygnacja, zajętość, zasięg rozmowy; protokół), 2 golden, 7 e2e (m.in. cała ścieżka z portierem przez sieć, widoczność między piętrami, stan serwera = predykcja) |
+| `cd server && cargo test` | 41 testów jednostkowych (budynek i mapy wg GDD, osiągalność zależna od uprawnień, bramki z wolnym wyjściem, ruch/kolizje, schody, winda, nawigacja, portier, recepcja i HR; protokół), 2 golden, 7 e2e (m.in. całe wdrożenie przez sieć: portier → recepcja → HR → karta; widoczność między piętrami; stan serwera = predykcja) |
 | `godot --headless --path client -s tests/run_tests.gd` | parytet protokołu (bajt w bajt) i ruchu — z bramkami, uprawnieniami i przejściami między piętrami — z Rustem, zgodność CRC budynku, parsowanie adresów |

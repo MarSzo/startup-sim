@@ -241,5 +241,27 @@
   }
  ],
  "spawns": [],
- "npcs": []
+ "npcs": [
+  {
+   "kind": "receptionist",
+   "name": "Recepcja",
+   "home": [
+    32,
+    15
+   ],
+   "escort_to": [
+    1,
+    43,
+    8
+   ]
+  },
+  {
+   "kind": "hr",
+   "name": "HR",
+   "home": [
+    43,
+    5
+   ]
+  }
+ ]
 }

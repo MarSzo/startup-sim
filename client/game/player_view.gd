@@ -9,8 +9,12 @@ const BUBBLE_WIDTH := 260.0
 var color := Color.WHITE
 var outline := Color(0, 0, 0, 0.8)
 var facing := 0
-## Uniform + cap instead of a plain body (NPC staff).
-var uniform := false
+## Appearance (entity flags bits 3..5): 0 player, 1 porter (uniform + cap),
+## 2 office staff (shirt + tie).
+const LOOK_PLAYER := 0
+const LOOK_PORTER := 1
+const LOOK_OFFICE := 2
+var look := LOOK_PLAYER
 var nick_label := Label.new()
 var bubble := PanelContainer.new()
 var bubble_label := Label.new()
@@ -97,7 +101,12 @@ func _draw() -> void:
 	var r := Rect2(-BODY.x / 2, -BODY.y + 4, BODY.x, BODY.y)
 	draw_rect(Rect2(r.position + Vector2(0, 1), r.size), Color(0, 0, 0, 0.25))
 	draw_rect(r, color)
-	if uniform:
+	if look == LOOK_OFFICE:
+		# White shirt with a tie, dark trousers.
+		draw_rect(Rect2(r.position.x + 2, r.position.y + 4, r.size.x - 4, 5), Color(0.96, 0.96, 0.96))
+		draw_rect(Rect2(-0.5, r.position.y + 4, 1.5, 5), color.darkened(0.3))
+		draw_rect(Rect2(r.position.x, r.end.y - 5, r.size.x, 5), Color(0.18, 0.18, 0.22))
+	elif look == LOOK_PORTER:
 		# Dark trousers, light shirt collar and a peaked cap.
 		draw_rect(Rect2(r.position.x, r.end.y - 5, r.size.x, 5), color.darkened(0.5))
 		draw_rect(Rect2(-2, r.position.y + 5, 4, 2), Color(0.95, 0.95, 0.9))

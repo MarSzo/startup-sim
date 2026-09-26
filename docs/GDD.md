@@ -153,10 +153,12 @@ Sekcja techniczna prowadzona przez zespół; sekcje 1–9 to design.
 | Transport | „np. renet” | własny protokół na UDP (decyzja z briefu etapu 1: klient w GDScript nie obsłuży renet) |
 | Platformy | desktop: Windows, macOS, Linux, Steam Deck | w rozmowie 2026-09-26 rozszerzone o Android/iOS z crossplayem („później”); konsole „może kiedyś”. Obecny priorytet: **macOS** |
 | Konta / tożsamość | Steam + backend kont (Rails) | nick + token sesji, bez kont i zapisu postępu |
-| Karta pracownika | karta po podpisaniu umowy w HR | uprawnienie istnieje i otwiera bramki, ale nie da się go zdobyć — nie ma jeszcze HR; na razie tylko przepustka gościa od portiera (ważna do końca sesji) |
+| Przydział do działu | po umowie przydział do działu / zespołu | HR wydaje kartę bez działu (decyzja 2026-09-26); przydział dojdzie z rekrutacją |
+| Trwałość | umowa, karta, stanowisko zapisują się między sesjami | przepustka i karta żyją do końca sesji (brak kont) |
 
 Rozwiązane 2026-09-26: układ parteru i piętra 1 zgodny z sekcją 3 (10.5);
-bramki na kartę działają, portier wpuszcza i odprowadza osoby bez karty (10.7).
+bramki na kartę działają, portier wpuszcza i odprowadza osoby bez karty,
+recepcja prowadzi do HR, HR wydaje kartę pracownika (10.7).
 
 ### 10.2 Stack (zaimplementowany)
 - Klient: Godot 4.7, GDScript.
@@ -314,7 +316,7 @@ holem to zamknięte „Zaplecze techniczne”.
 drugie piętro (bez odbijania, gdy trzymasz klawisz); winda — w kabinie
 klawisz **E** jedzie na następne aktywne piętro (podpowiedź na ekranie).
 
-### 10.7 Portier i dostęp (dzień próbny)
+### 10.7 Wdrożenie: portier, recepcja, HR (dzień próbny → karta)
 
 Ustalenia 2026-09-26: dopóki nie ma HR i umowy, dostęp za bramki daje
 **przepustka gościa od portiera**, ważna do końca sesji; portier **odprowadza**
@@ -330,14 +332,27 @@ do końca dnia.” → portier wraca na portiernię. Jeśli gracz nie idzie za n
 przez 30 s, portier rezygnuje i odbiera przepustkę. Prowadzi jedną osobę naraz
 („Chwileczkę, właśnie kogoś prowadzę.”); osobom z przepustką mówi, że mogą iść.
 
-Kolejny krok ścieżki z GDD (sekcja 4): recepcja → HR → umowa → **karta
-pracownika** (uprawnienie już istnieje, wyda je NPC HR).
+Ciąg dalszy (ustalenia 2026-09-26: recepcja **odprowadza** do HR; HR wydaje
+**kartę bez działu**; przydział do działu na razie nic nie zmienia): na
+recepcji gracz wciska E → „Witamy! Zaprowadzę do HR — tam podpisuje się
+umowę.” → recepcja idzie do pokoju HR (czeka i przypomina jak portier; po
+30 s wraca, nie odbierając przepustki) → „To dział HR — tutaj podpisuje się
+umowę i odbiera kartę.” → gracz wciska E przy HR → „Umowa podpisana — witamy
+w firmie! Oto karta pracownika.” — **karta pracownika zastępuje przepustkę
+gościa**. Osoby z kartą recepcja i HR tylko witają; osoby bez przepustki
+odsyłają na portiernię.
+
+NPC: Portier (mundur z czapką), Recepcja i HR (koszula z krawatem) — jako
+neutralne nazwy stanowisk. Wciśnięcie E trafia najpierw do NPC stojącego na
+swoim stanowisku (portier, który właśnie przyprowadził gościa pod ladę, nie
+zasłania recepcji).
 
 ### 10.6 Stan implementacji
 
 *Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie,
 automatyczne ponowne łączenie, budynek wg GDD (parter z terenem zewnętrznym,
-piętro 1, schody, winda) oraz pierwszy NPC — portier — i uprawnienia (bramki).*
+piętro 1, schody, winda), uprawnienia (bramki) oraz wdrożenie nowego gracza:
+portier → recepcja → HR → karta pracownika.*
 
 #### Zrobione
 - **Serwer Rust** (`server/`): tick 20 Hz bez dryfu z liczeniem zgubionych
@@ -353,22 +368,23 @@ piętro 1, schody, winda) oraz pierwszy NPC — portier — i uprawnienia (bramk
 - **Klient Godot** (`client/`): ekran startowy, mapa z kolorowych kafli i
   podpisów pomieszczeń, predykcja + rekoncyliacja z wygładzaniem korekt,
   interpolacja innych graczy (100 ms), nicki, kamera, overlay F3.
-- **Portier i uprawnienia**: bramki i brama garażowa na przepustkę/kartę z
-  wolnym wyjściem, zamknięte zaplecze; portier (NPC serwera) daje przepustkę
-  gościa i odprowadza na recepcję, z dymkami wypowiedzi i podpowiedziami;
-  protokół v3 (uprawnienia w snapshocie, pakiet `Say`, encje NPC).
+- **Wdrożenie i uprawnienia**: bramki i brama garażowa na przepustkę/kartę z
+  wolnym wyjściem, zamknięte zaplecze; NPC serwera: portier (przepustka
+  gościa, odprowadza na recepcję), recepcja (odprowadza do HR), HR (umowa →
+  karta pracownika); dymki wypowiedzi, podpowiedzi, wygląd NPC; protokół v3
+  (uprawnienia w snapshocie, pakiet `Say`, encje NPC).
 - **Boty** (`cargo run --release --bin bots`): 50 domyślnie, chodzą po BFS po
   całym budynku (schodami), część zbiera się w wybranym pokoju (domyślnie
   Chill room na piętrze 1).
 - **Sieć mobilna**: serwer dual-stack IPv4/IPv6; gracz identyfikowany tokenem
   (zmiana adresu w trakcie gry przenosi sesję); klient przepina gniazdo po
   ciszy/powrocie z tła i sam łączy się ponownie po utracie sesji.
-- **Testy**: 36 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
+- **Testy**: 41 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
   zależna od uprawnień, bramki, ruch/kolizje, schody, winda, nawigacja,
-  portier, protokół), 2 golden, 7 e2e serwera (m.in. cała ścieżka z portierem
-  przez sieć, niewidoczność między piętrami, zgodność stanu serwera z
-  predykcją) — łącznie 45; 107 sprawdzeń w Godocie (parytet protokołu i ruchu
-  z bramkami i piętrami, parsowanie adresów).
+  portier, recepcja, HR, protokół), 2 golden, 7 e2e serwera (m.in. całe
+  wdrożenie przez sieć aż do karty, niewidoczność między piętrami, zgodność
+  stanu serwera z predykcją) — łącznie 50; 107 sprawdzeń w Godocie (parytet
+  protokołu i ruchu z bramkami i piętrami, parsowanie adresów).
 
 #### Pomiary (MacBook, wszystko lokalnie)
 | scenariusz | wynik |
@@ -381,6 +397,7 @@ piętro 1, schody, winda) oraz pierwszy NPC — portier — i uprawnienia (bramk
 | 40 botów po całym budynku, połowa w Chill roomie (piętro 1) | serwer: 0 zgubionych ticków, tick śr. ~1,1 ms; boty: 0 błędnych predykcji mimo schodów |
 | klient w recepcji piętra 1, 26 widocznych | 60 FPS, 0 korekt, bufor interpolacji pusty w 0,00% klatek |
 | gość bez przepustki: bramka → rozmowa z portierem → schody → recepcja | zatrzymany na bramce, przepustka po rozmowie, portier doprowadza na recepcję; 0 korekt |
+| pełne wdrożenie w oknie klienta: portier → recepcja → HR | karta pracownika w ~35 s gry, 0 korekt, 60 FPS |
 | 50 botów z kartą (`--start-with-card`) w Chill roomie | 50/50 dochodzi przez bramki i schody, 0 zgubionych ticków, 0 błędnych predykcji |
 | klient IPv6 + klient IPv4, serwer zamrożony na 3 s | obie sesje zachowane (nowe porty, te same id) |
 | restart serwera | obaj klienci połączeni ponownie automatycznie w < 1 s od startu serwera |
@@ -392,12 +409,13 @@ piętro 1, schody, winda) oraz pierwszy NPC — portier — i uprawnienia (bramk
   nie-Godotowych, inaczej `maps/*.json` nie trafią do paczki.
 - Kilka okien klienta naraz na jednym Macu: macOS spowalnia zasłonięte okna,
   więc ich metryki płynności (F3) są wtedy zaniżone — to nie błąd gry.
-- Karty pracownika nie da się jeszcze zdobyć (brak HR); przepustka gościa
-  znika po rozłączeniu (brak kont i zapisu postępu).
+- Przepustka i karta znikają po rozłączeniu (brak kont i zapisu postępu) —
+  po każdym połączeniu wdrożenie trzeba przejść od nowa.
 - Boty bez `--start-with-card` zostają w strefie publicznej (nie rozmawiają z
   portierem).
 
 #### Następne kroki (propozycja)
-Zgodnie z MVP (sekcja 9): NPC recepcji, Zarządu i HR (umowa → karta),
-uproszczona rekrutacja, zadania działów, palenie + alarm. Punkty
+Zgodnie z MVP (sekcja 9): uproszczona rekrutacja (portal ofert + pytania) z
+przydziałem do działu, NPC Zarządu, zadania działów, palenie + alarm; do tego
+trwałość postępu (konta). Punkty
 wpięcia opisane w `docs/ARCHITECTURE.md` („Gotowość na rozbudowę”).

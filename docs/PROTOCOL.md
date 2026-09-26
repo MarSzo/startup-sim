@@ -99,7 +99,9 @@ aplikuje max 6 (średnio 3 = 60/20). Kolejka ponad 30 jest przycinana od najstar
 
 Encja (12 B): `id u16 | kind u8 | x i32 | y i32 | flags u8`.
 - `kind`: 0 gracz, 1 NPC. Id NPC zaczynają się od `0xF000` (61440); gracze mają 1..61439.
-- `flags`: bity 0–1 kierunek (0 dół, 1 góra, 2 lewo, 3 prawo), bit 2 „w ruchu”, reszta zarezerwowana.
+- `flags`: bity 0–1 kierunek (0 dół, 1 góra, 2 lewo, 3 prawo), bit 2 „w ruchu”,
+  bity 3–5 wygląd (0 gracz, 1 portier — mundur z czapką, 2 pracownik biurowy —
+  koszula z krawatem), bity 6–7 zarezerwowane.
 
 **Interest management**: lista zawiera tylko encje z tym samym `(floor, room)` co
 odbiorca (bez niego samego). Snapshot jest pełny (nie delta) — zgubienie
@@ -214,7 +216,8 @@ szyfrowaniem.
 
 ## Historia wersji
 
-- **3** — snapshot: `self_access`; pakiet `Say`; encje NPC (`kind` 1) z imionami w `PlayerInfo`.
+- **3** — snapshot: `self_access`; pakiet `Say`; encje NPC (`kind` 1) z imionami w
+  `PlayerInfo`; wygląd w bitach 3–5 `flags` (dodany bez zmiany formatu).
 - **2** — snapshot: pola `self_lock`, `self_prev_input`; bit inputu 16 (interakcja);
   `map_crc` liczone z całego budynku (wiele pięter).
 - **1** — wersja początkowa.

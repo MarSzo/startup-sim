@@ -22,7 +22,7 @@ const ERROR_DECAY := 15.0
 const MAX_PENDING := 240
 ## Talk range to NPCs (same as npc::TALK_RADIUS on the server): 3.5 tiles.
 const TALK_RADIUS_PX := 56.0
-const NPC_COLOR := Color(0.22, 0.32, 0.62)
+const NPC_COLORS := {1: Color(0.22, 0.32, 0.62), 2: Color(0.55, 0.3, 0.45)}  # by look
 const LOG_LINES := 4
 const LOG_TTL_SEC := 12.0
 
@@ -369,8 +369,8 @@ func _on_snapshot(p: Dictionary) -> void:
 		if r == null:
 			r = RemotePlayer.new()
 			var npc: bool = e.kind == Protocol.KIND_NPC
-			r.uniform = npc
-			r.setup(NPC_COLOR if npc else _color_for(e.id), nicks.get(e.id, "..."), ZOOM)
+			r.look = (e.flags >> 3) & 7 if npc else 0
+			r.setup(NPC_COLORS.get(r.look, Color.GRAY) if npc else _color_for(e.id), nicks.get(e.id, "..."), ZOOM)
 			world.add_child(r)
 			remotes[e.id] = r
 			if _pending_say.has(e.id):
@@ -430,11 +430,20 @@ func _update_hint() -> void:
 		if target >= 0:
 			text = "[E] Winda: jedź na %s" % building.floor_name(target)
 	if text == "":
+		# Same choice as the server: NPCs standing at their post first, then nearest.
 		var me_px := Movement.to_px(pred.pos)
+		var best_id := -1
+		var best_key := Vector2(INF, INF)
 		for id in remotes:
-			if kinds.get(id) == Protocol.KIND_NPC and remotes[id].position.distance_to(me_px) <= TALK_RADIUS_PX:
-				text = "[E] Porozmawiaj: %s" % nicks.get(id, "?")
-				break
+			var d: float = remotes[id].position.distance_to(me_px)
+			if kinds.get(id) == Protocol.KIND_NPC and d <= TALK_RADIUS_PX:
+				var moving: bool = remotes[id].samples.size() > 0 and (remotes[id].samples[-1][2] & 4) != 0
+				var key := Vector2(1.0 if moving else 0.0, d)
+				if key < best_key:
+					best_key = key
+					best_id = id
+		if best_id >= 0:
+			text = "[E] Porozmawiaj: %s" % nicks.get(best_id, "?")
 	if text == "" and map:
 		for dy in [-1, -2]:
 			for dx in [-1, 0, 1]:

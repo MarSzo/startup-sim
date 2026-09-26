@@ -18,7 +18,8 @@ cd server && cargo run --release --bin bots -- --count 50 --room "Chill room" --
 Sterowanie: WASD / strzałki, **E** — rozmowa z NPC / winda (stojąc w kabinie), **F3** — overlay debug.
 Gracz startuje przed budynkiem bez przepustki: bramki w holu go nie wpuszczą,
 więc trzeba podejść do portierni i porozmawiać z portierem (E) — da przepustkę
-gościa i zaprowadzi na recepcję na piętrze 1 (schodami).
+gościa i zaprowadzi na recepcję na piętrze 1 (schodami). Recepcja (E) zaprowadzi
+do HR, a HR (E) podpisze umowę i wyda kartę pracownika.
 
 ### Serwer — opcje
 `--bind`, `--map`, `--max-players`, `--stats-secs`, `--start-with-card` (każdy gracz z kartą — do testów z botami), oraz symulacja sieci:

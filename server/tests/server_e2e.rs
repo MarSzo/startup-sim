@@ -123,6 +123,33 @@ impl Client {
         body
     }
 
+    /// Press E once (input 0 then interact); returns the predicted body.
+    fn press_e(&mut self, b: &Building, body: Body) -> Body {
+        self.seq += 2;
+        let p = Packet::Input { token: self.token, ack_tick: 0, last_seq: self.seq, inputs: vec![0, sim::IN_INTERACT] };
+        self.sock.send(&p.encode()).unwrap();
+        sim::step(b, sim::step(b, body, 0), sim::IN_INTERACT)
+    }
+
+    /// Wait (pinging) until an NPC says `line`; returns the latest self_access seen.
+    fn wait_for_line(&self, line: &str, wait: Duration) -> Option<u8> {
+        let deadline = Instant::now() + wait;
+        let mut access = None;
+        let mut heard = false;
+        while Instant::now() < deadline {
+            self.ping();
+            match self.recv() {
+                Some(Packet::Say { text, .. }) => heard |= text == line,
+                Some(Packet::Snapshot { self_access, .. }) => access = Some(self_access),
+                _ => {}
+            }
+            if heard && access.is_some() {
+                break;
+            }
+        }
+        heard.then_some(access.unwrap_or(0))
+    }
+
     fn ping(&self) {
         self.sock.send(&Packet::Ping { token: self.token, client_time: 1 }.encode()).unwrap();
     }
@@ -297,7 +324,7 @@ fn other_floors_are_invisible_and_state_matches_prediction() {
 }
 
 #[test]
-fn porter_escorts_a_newcomer_with_a_guest_pass() {
+fn onboarding_porter_reception_hr_card() {
     let (addr, _) = start_server();
     let b0 = building();
     let (mut g, _) = Client::connect(addr, "Nowy");
@@ -309,10 +336,7 @@ fn porter_escorts_a_newcomer_with_a_guest_pass() {
 
     // Walk to the lodge door and press E next to the porter.
     let body = g.walk_to(&b0, start, (0, Tile { x: 27, y: 29 }), &[]);
-    g.seq += 2;
-    let press = Packet::Input { token: g.token, ack_tick: 0, last_seq: g.seq, inputs: vec![0, sim::IN_INTERACT] };
-    g.sock.send(&press.encode()).unwrap();
-    let body = sim::step(&b0, sim::step(&b0, body, 0), sim::IN_INTERACT);
+    let body = g.press_e(&b0, body);
 
     let (mut welcomed, mut got_pass, mut porter_named) = (false, false, false);
     let deadline = Instant::now() + Duration::from_millis(800);
@@ -334,15 +358,26 @@ fn porter_escorts_a_newcomer_with_a_guest_pass() {
 
     // Follow him up to the reception; he announces the arrival there.
     let body = Body { access: access::GUEST, ..body };
-    let end = g.walk_to(&b0, body, (1, Tile { x: 31, y: 19 }), &[]);
+    let end = g.walk_to(&b0, body, (1, Tile { x: 32, y: 18 }), &[]);
     assert_eq!(end.floor, 1);
-    let mut arrived = false;
-    let deadline = Instant::now() + Duration::from_secs(8);
-    while Instant::now() < deadline && !arrived {
-        g.ping();
-        if let Some(Packet::Say { text, .. }) = g.recv() {
-            arrived |= text == lines::ARRIVED;
+    assert!(g.wait_for_line(lines::ARRIVED, Duration::from_secs(8)).is_some(), "porter reached the reception");
+
+    // Reception takes us to HR.
+    let body = g.press_e(&b0, end);
+    assert!(g.wait_for_line(lines::RECEPTION_WELCOME, Duration::from_secs(1)).is_some(), "reception greets");
+    let at_hr = g.walk_to(&b0, body, (1, Tile { x: 43, y: 8 }), &[]);
+    assert!(g.wait_for_line(lines::RECEPTION_ARRIVED, Duration::from_secs(6)).is_some(), "receptionist reached HR");
+
+    // HR: contract signed, the card replaces the guest pass.
+    g.press_e(&b0, at_hr);
+    let access = g.wait_for_line(lines::HR_SIGNED, Duration::from_secs(1));
+    let deadline = Instant::now() + Duration::from_millis(300);
+    let mut latest = access;
+    while Instant::now() < deadline {
+        if let Some(Packet::Snapshot { self_access, .. }) = g.recv() {
+            latest = Some(self_access);
         }
     }
-    assert!(arrived, "porter reached the reception with the guest");
+    assert!(access.is_some(), "HR signed the contract");
+    assert_eq!(latest, Some(access::CARD), "employee card, guest pass gone");
 }

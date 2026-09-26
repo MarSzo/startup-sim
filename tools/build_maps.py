@@ -161,7 +161,7 @@ def floor0():
 
     f.spawns = [[x, y] for y in (35, 36) for x in range(28, 39)]
     # Porter: sits in the lodge; escorts newcomers to the 1st floor reception.
-    f.npcs = [{"kind": "porter", "name": "Portier", "home": [24, 29], "escort_to": [1, 32, 19]}]
+    f.npcs = [{"kind": "porter", "name": "Portier", "home": [24, 29], "escort_to": [1, 32, 18]}]
     return f
 
 
@@ -186,7 +186,14 @@ def floor1():
 
     f.box(40, 3, 47, 12, ",", "R")
     f.room("R", 4, "HR", "department")
-    f.put(42, 6, 45, 6, "T")
+    f.put(42, 6, 45, 6, "T")                             # HR desk
+
+    # Receptionist behind the desk (guests arrive in front of it, row 18) takes
+    # newcomers to HR; HR signs the contract and hands out the employee card.
+    f.npcs = [
+        {"kind": "receptionist", "name": "Recepcja", "home": [32, 15], "escort_to": [1, 43, 8]},
+        {"kind": "hr", "name": "HR", "home": [43, 5]},
+    ]
     f.area(43, 13, 44, 13, "D", "C")                     # HR <-> reception
 
     f.box(3, 22, 56, 24, ".", "K")
