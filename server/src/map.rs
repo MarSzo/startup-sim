@@ -93,6 +93,9 @@ pub struct RoomDef {
     /// porter's lodge seen through its open door). Interest management only.
     #[serde(default)]
     pub see: Vec<String>,
+    /// Bathrooms: "female" / "male".
+    #[serde(default)]
+    pub gender: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -29,6 +29,13 @@ const OUTLINE := Color(0.08, 0.08, 0.1)
 var look := LOOK_PLAYER
 var facing := FACING_DOWN
 ## Activity (Protocol.STATUS_*): brewing at the machine.
+const ACT_COMPUTER := 1
+const ACT_BREWING := 2
+const ACT_SOFA := 3
+const ACT_TOILET := 4
+const ACT_SMOKING := 5
+
+var slow := false
 var status := 0
 ## Item in hands (ItemArt kinds), visible to everyone.
 var held := 0
@@ -148,9 +155,11 @@ func set_held(k: int) -> void:
 		queue_redraw()
 
 
-func set_status(s: int) -> void:
-	if s != status:
+## Activity (Protocol.ACT_*) and the slow walk (tired / needs the toilet).
+func set_status(s: int, p_slow := false) -> void:
+	if s != status or p_slow != slow:
 		status = s
+		slow = p_slow
 		queue_redraw()
 
 
@@ -167,8 +176,8 @@ func _process(delta: float) -> void:
 			bubble.visible = false
 		else:
 			_place_bubble()
-	if status & 2:
-		queue_redraw()  # animated "brewing" dots
+	if status in [ACT_BREWING, ACT_SOFA, ACT_SMOKING, ACT_COMPUTER] or slow:
+		queue_redraw()  # animated dots / zzz / smoke / sweat
 	# Walk cycle from the distance travelled since the last frame.
 	if _last_pos != Vector2.INF:
 		var d := position.distance_to(_last_pos)
@@ -204,16 +213,18 @@ func _draw() -> void:
 	draw_rect(Rect2(-5, 1, 10, 3), Color(0, 0, 0, 0.28))
 	draw_rect(Rect2(-4, 0, 8, 1), Color(0, 0, 0, 0.18))
 
-	var top := HEAD_TOP + bob  # head top
+	# Sitting (sofa, toilet, computer): lower body, short legs.
+	var sit := status in [ACT_SOFA, ACT_TOILET, ACT_COMPUTER] and _idle >= 0.12
+	var top := HEAD_TOP + bob + (3 if sit else 0)  # head top
 	# Outline silhouette first (1px bigger), then the parts.
 	var ol := OUTLINE if not highlight else Color(1, 1, 1, 0.95)
 	_r(-4, top - 1, 8, 9, ol)           # head
 	_r(-5, top + 7, 10, 9, ol)          # torso + arms
-	_r(-4, top + 15, 8, 6 - bob, ol)    # legs
+	_r(-4, top + 15, 8, (3 if sit else 6) - bob, ol)    # legs
 
 	# Legs + shoes.
 	var leg_y := top + 15
-	var leg_h := 5 - bob
+	var leg_h := (2 if sit else 5) - bob
 	if side:
 		_r(-2 + step, leg_y, 3, leg_h, pants)
 		_r(-1 - step, leg_y, 3, leg_h, pants.darkened(0.2))
@@ -294,11 +305,40 @@ func _draw_status(top: float, ty: float, side: bool, dir: int) -> void:
 				_r(mx, ty + 5, 3, 1, Color("#2e6bd9"))
 			ItemArt.GUEST_PASS:
 				_r(mx, ty + 5, 3, 2, Color("#f1c40f"))
-	if status & 2:
-		# "Brewing…" dots above the head.
-		var n := (Time.get_ticks_msec() / 300) % 4
-		for i in n:
-			_r(-4 + i * 3, top - 5, 2, 2, Color(1, 1, 1, 0.9))
+			ItemArt.FRUIT:
+				_r(mx, ty + 4, 3, 3, Color("#e74c3c"))
+				_r(mx + 1, ty + 3, 1, 1, Color("#27ae60"))
+	var ms := Time.get_ticks_msec()
+	match status:
+		ACT_BREWING, ACT_COMPUTER:
+			# "Brewing…" / typing dots above the head (blue at the computer).
+			var n := (ms / 300) % 4
+			var dc := Color(1, 1, 1, 0.9) if status == ACT_BREWING else Color("#8fc4ff")
+			for i in n:
+				_r(-4 + i * 3, top - 5, 2, 2, dc)
+		ACT_SOFA:
+			# Floating "z".
+			var zy := top - 5 - float((ms / 250) % 6) * 0.5
+			var zc := Color(1, 1, 1, 0.85)
+			_r(3, zy, 3, 1, zc)
+			_r(4, zy + 1, 1, 1, zc)
+			_r(3, zy + 2, 3, 1, zc)
+		ACT_TOILET:
+			# A roll of toilet paper above the head.
+			_r(-2, top - 7, 4, 4, Color("#f4f4f4"))
+			_r(-1, top - 6, 2, 2, Color("#b8bec4"))
+		ACT_SMOKING:
+			# Cigarette + smoke puffs rising.
+			var cx := (dir * 3.0) if side else 1.0
+			_r(cx, top + 6, 3, 1, Color("#f4f1ea"))
+			_r(cx + (2 if dir > 0 or not side else 0), top + 6, 1, 1, Color("#ff7043"))
+			var k := float(ms % 1200) / 1200.0
+			_r(cx + 1 + k * 2, top + 3 - k * 6, 2, 2, Color(0.8, 0.8, 0.8, 0.7 * (1.0 - k)))
+			_r(cx + 2 - k, top - 1 - k * 5, 2, 2, Color(0.8, 0.8, 0.8, 0.5 * (1.0 - k)))
+	if slow:
+		# A drop of sweat.
+		if (ms / 500) % 2 == 0:
+			_r(4, top + 1, 1, 2, Color("#7fd3ff"))
 
 
 func _draw_hair(top: float, side: bool, dir: int) -> void:

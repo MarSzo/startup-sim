@@ -6,6 +6,7 @@ pub mod coffee;
 pub mod computer;
 pub mod inventory;
 pub mod map;
+pub mod needs;
 pub mod nav;
 pub mod npc;
 pub mod net;

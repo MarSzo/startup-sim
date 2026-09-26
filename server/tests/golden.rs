@@ -39,7 +39,7 @@ fn movement_vectors() {
     let b = Building::load(&default_building_path()).unwrap();
     let mut rng = fastrand::Rng::with_seed(42);
     let mut cases = Vec::new();
-    let body_json = |x: &Body| json!([x.floor, x.pos.x, x.pos.y, x.prev_input, x.lock, x.access]);
+    let body_json = |x: &Body| json!([x.floor, x.pos.x, x.pos.y, x.prev_input, x.lock, x.access, x.slow as u8]);
 
     // Random walks from interesting spots (walls, furniture, doors, gates).
     let guest = |b: Body| Body { access: access::GUEST, ..b };
@@ -57,6 +57,8 @@ fn movement_vectors() {
         Body::at(0, Pos::tile_center(26, 10)),                     // elevator cabin
         Body::at(1, Pos::tile_center(34, 10)),                     // stairs arrival upstairs
         Body::at(1, Pos::tile_center(10, 22)),                     // corridor upstairs
+        Body { slow: true, ..Body::at(1, Pos::tile_center(30, 28)) }, // exhausted, chill room
+        Body { slow: true, ..Body::at(0, Pos::tile_center(34, 11)) }, // slow on the stairs
     ];
     for start in starts {
         let mut body = start;

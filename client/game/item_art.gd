@@ -7,9 +7,10 @@ const GUEST_PASS := 1
 const EMPLOYEE_CARD := 2
 const LAPTOP := 3
 const COFFEE := 4
+const FRUIT := 5
 
-const NAMES := {GUEST_PASS: "Przepustka gościa", EMPLOYEE_CARD: "Karta pracownika", LAPTOP: "Laptop", COFFEE: "Kawa"}
-const SMALL := [GUEST_PASS, EMPLOYEE_CARD]
+const NAMES := {GUEST_PASS: "Przepustka gościa", EMPLOYEE_CARD: "Karta pracownika", LAPTOP: "Laptop", COFFEE: "Kawa", FRUIT: "Owoc"}
+const SMALL := [GUEST_PASS, EMPLOYEE_CARD, FRUIT]
 
 
 static func item_name(kind: int) -> String:
@@ -51,3 +52,9 @@ static func draw(c: CanvasItem, kind: int, o: Vector2, s: float) -> void:
 			r.call(12, 9, 1, 1, Color("#1c1c24"))
 			r.call(6, 2, 1, 2, Color(1, 1, 1, 0.6))
 			r.call(8, 1, 1, 3, Color(1, 1, 1, 0.5))
+		FRUIT:
+			r.call(3, 5, 10, 9, Color("#1c1c24"))
+			r.call(4, 6, 8, 7, Color("#e74c3c"))
+			r.call(5, 7, 2, 2, Color("#f5a09a"))
+			r.call(7, 2, 1, 4, Color("#5d4037"))
+			r.call(8, 3, 3, 2, Color("#27ae60"))

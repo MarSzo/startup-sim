@@ -14,12 +14,13 @@ pub mod kind {
     pub const EMPLOYEE_CARD: u8 = 2;
     pub const LAPTOP: u8 = 3;
     pub const COFFEE: u8 = 4;
+    pub const FRUIT: u8 = 5;
 }
 
 pub const POCKETS: usize = 3;
 
 pub fn is_small(k: u8) -> bool {
-    matches!(k, kind::GUEST_PASS | kind::EMPLOYEE_CARD)
+    matches!(k, kind::GUEST_PASS | kind::EMPLOYEE_CARD | kind::FRUIT)
 }
 
 pub fn display_name(k: u8) -> &'static str {
@@ -28,6 +29,7 @@ pub fn display_name(k: u8) -> &'static str {
         kind::EMPLOYEE_CARD => "Karta pracownika",
         kind::LAPTOP => "Laptop",
         kind::COFFEE => "Kawa",
+        kind::FRUIT => "Owoc",
         _ => "?",
     }
 }

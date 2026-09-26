@@ -403,7 +403,7 @@ func _wall_shadows() -> void:
 
 # ------------------------------------------------------------------- props
 
-const PROPS := ["W", "K", "H", "Q", "T", "P", "R", "N", "A", "U", "V", "X", "C", "J"]
+const PROPS := ["W", "K", "H", "Q", "T", "P", "R", "N", "A", "U", "V", "X", "C", "J", "O"]
 
 
 ## Connected components of the same furniture char -> one object each.
@@ -454,6 +454,7 @@ func _prop(c: String, tr: Rect2i, index: int) -> void:
 		"X": _car(r, index)
 		"C": _coffee_machine(r)
 		"J": _kitchen_counter(r)
+		"O": _fruit_bowl(r)
 
 
 func _desks(tr: Rect2i, r: Rect2i, index: int) -> void:
@@ -666,15 +667,28 @@ func _kitchen_counter(r: Rect2i) -> void:
 	_rect(Rect2i(top.position.x, top.end.y, top.size.x, 3), Color("#8f8778"))
 	var x := top.position.x
 	var y := top.position.y
-	# Mugs, a fruit bowl ("owocowe czwartki") and a kettle.
+	# Mugs and a kettle (the fruit bowl is its own tile, "O").
 	for i in 3:
 		var mug: Color = [Color("#f4f1ea"), Color("#2e86de"), Color("#e67e22")][i]
 		_rect(Rect2i(x + 3 + i * 4, y + 4, 3, 3), mug)
 		_px(x + 6 + i * 4, y + 5, mug.darkened(0.3))
-	_rect(Rect2i(x + 19, y + 5, 10, 4), Color("#a0703a"))
-	for f in [[20, 4, "#e74c3c"], [23, 3, "#f1c40f"], [26, 4, "#27ae60"], [22, 5, "#e67e22"]]:
-		_rect(Rect2i(x + f[0], y + f[1], 2, 2), Color(f[2]))
-	if r.size.x >= 48:
-		_rect(Rect2i(x + 36, y + 2, 6, 7), Color("#9aa4ab"))
-		_rect(Rect2i(x + 37, y + 2, 4, 1), Color("#c9d1d7"))
+	if r.size.x >= 32:
+		_rect(Rect2i(x + 20, y + 2, 6, 7), Color("#9aa4ab"))
+		_rect(Rect2i(x + 21, y + 2, 4, 1), Color("#c9d1d7"))
+
+
+## Counter with a big bowl of free fruit ("owocowe czwartki", every day).
+func _fruit_bowl(r: Rect2i) -> void:
+	var top := Rect2i(r.position.x, r.position.y + 1, r.size.x, r.size.y - 4)
+	_shadow(top)
+	_rect(top, Color("#d8d2c4"))
+	_rect(Rect2i(top.position.x, top.position.y, top.size.x, 1), Color("#ece8de"))
+	_rect(Rect2i(top.position.x, top.end.y, top.size.x, 3), Color("#8f8778"))
+	var x := r.position.x
+	var y := r.position.y + 1
+	_rect(Rect2i(x + 2, y + 5, 12, 5), Color("#a0703a"))
+	_rect(Rect2i(x + 3, y + 9, 10, 1), Color("#7a5228"))
+	for f in [[3, 3, "#e74c3c"], [6, 2, "#f1c40f"], [9, 3, "#27ae60"], [5, 5, "#e67e22"], [8, 5, "#c0392b"], [11, 4, "#f39c12"]]:
+		_rect(Rect2i(x + f[0], y + f[1], 3, 3), Color(f[2]))
+	_px(x + 7, y + 1, Color("#5d4037"))
 

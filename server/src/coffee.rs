@@ -21,7 +21,7 @@ pub mod lines {
     pub const HANDS_FULL: &str = "Najpierw muszę mieć wolne ręce.";
     pub const DRUNK: &str = "Pycha! Kawa wypita.";
     pub const COLD: &str = "Kawa wystygła…";
-    pub const WAITING: &str = "Kawa czeka przy ekspresie — miałem zajęte ręce.";
+    pub const WAITING: &str = "Kawa czeka przy ekspresie — ręce były zajęte.";
 }
 
 /// Player's brewing state (server-side, per player).

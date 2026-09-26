@@ -47,6 +47,7 @@ LEGEND = {
     "X": {"type": "car", "solid": True, "color": "#b03a2e"},
     "C": {"type": "coffee_machine", "solid": True, "color": "#2b2b30"},
     "J": {"type": "kitchen_counter", "solid": True, "color": "#d8d2c4"},
+    "O": {"type": "fruit_bowl", "solid": True, "color": "#e0a040"},
     "v": {"type": "grass", "solid": False, "color": "#5e8c4a"},
     "p": {"type": "sidewalk", "solid": False, "color": "#a8a8a0"},
     "z": {"type": "smoking_area", "solid": False, "color": "#8a7f6a"},
@@ -65,8 +66,12 @@ class Floor:
         self.spawns = []
         self.npcs = []
 
-    def room(self, key, rid, name, kind, see=None):
+    def room(self, key, rid, name, kind, see=None, gender=None):
         self.rooms[key] = {"id": rid, "name": name, "type": kind}
+        if gender:
+            # Bathrooms: "female" / "male" (using the other one is allowed,
+            # but embarrassing).
+            self.rooms[key]["gender"] = gender
         if see:
             # Rooms whose people are visible from here (open door / window).
             self.rooms[key]["see"] = see
@@ -232,14 +237,15 @@ def floor1():
     f.put(27, 28, 29, 29, "Q")                           # sofa
     f.put(36, 30, 39, 30, "T")                           # table
     f.put(36, 26, 36, 26, "C")                           # coffee machine
-    f.put(37, 26, 39, 26, "J")                           # kitchenette counter
+    f.put(37, 26, 38, 26, "J")                           # kitchenette counter
+    f.put(39, 26, 39, 26, "O")                           # fruit bowl (free fruit)
     f.area(32, 25, 34, 25, "D", "K")
 
     f.box(44, 26, 49, 32, ":", "W")
-    f.room("W", 8, "Łazienka damska", "bathroom")
+    f.room("W", 8, "Łazienka damska", "bathroom", gender="female")
     f.area(46, 25, 46, 25, "D", "K")
     f.box(51, 26, 56, 32, ":", "M")
-    f.room("M", 9, "Łazienka męska", "bathroom")
+    f.room("M", 9, "Łazienka męska", "bathroom", gender="male")
     f.area(53, 25, 53, 25, "D", "K")
     for y in (28, 30, 32):
         f.put(44, y, 44, y, "U")                         # toilets

@@ -1,4 +1,4 @@
-# Protokół sieciowy (wersja 9)
+# Protokół sieciowy (wersja 10)
 
 Własny binarny protokół na UDP. Implementacje:
 - serwer: `server/src/protocol.rs` (źródło prawdy),
@@ -23,7 +23,7 @@ przez `cargo test` i czytane przez `client/tests/run_tests.gd`.
 | pole    | typ | wartość |
 |---------|-----|---------|
 | magic   | u16 | `0x5354` (bajty `54 53`, „TS”) |
-| version | u8  | `9` |
+| version | u8  | `10` |
 | type    | u8  | typ pakietu (niżej) |
 
 ## Jednostki
@@ -101,20 +101,24 @@ aplikuje max 6 (średnio 3 = 60/20). Kolejka ponad 30 jest przycinana od najstar
 | self_lock      | u8 — blokada schodów odbiorcy (`sim::Body::lock`: 0 brak, 1 trzymane, 2 zwolnione) |
 | self_prev_input| u8 — poprzedni input odbiorcy (`sim::Body::prev_input`, do akcji „na wciśnięcie”) |
 | self_access    | u8 — uprawnienia odbiorcy (`map::access`: 1 przepustka gościa, 2 karta pracownika, 4 obsługa) |
-| self_status    | u8 — czynność odbiorcy (nie symulowana): bit 0 siedzi przy komputerze (klient pokazuje jego ekran, dopóki bit jest ustawiony), bit 1 parzy kawę |
+| self_slow      | u8 — `sim::Body::slow` odbiorcy (1 = wolny chód: wyczerpanie / pilna toaleta); część symulowanego stanu |
+| self_activity  | u8 — czynność odbiorcy (nie symulowana), jak `activity` encji; 1 = przy komputerze (klient pokazuje jego ekran, dopóki trwa) |
 | n              | u8 |
-| entities       | n × 13 B |
+| entities       | n × 14 B |
 
-Encja (13 B): `id u16 | kind u8 | x i32 | y i32 | flags u8 | held u8`.
+Encja (14 B): `id u16 | kind u8 | x i32 | y i32 | flags u8 | held u8 | activity u8`.
 - `kind`: 0 gracz, 1 NPC, 2 przedmiot na podłodze, 3 laptop na biurku.
   Id: gracze 1..0xDFFF, przedmioty na podłodze i laptopy na biurkach od
   `0xE000` (wspólna pula), NPC od `0xF000`. `PlayerInfo` laptopa niesie imię
   i dział jego właściciela.
 - `held`: przedmiot w rękach (0 brak, 1 przepustka gościa, 2 karta
-  pracownika, 3 laptop, 4 kawa); dla `kind` 2 i 3 — sam przedmiot.
+  pracownika, 3 laptop, 4 kawa, 5 owoc); dla `kind` 2 i 3 — sam przedmiot.
+- `activity`: 0 nic, 1 przy komputerze, 2 parzy kawę, 3 odpoczywa na sofie,
+  4 w toalecie, 5 pali (strefa palenia).
 - `flags`: bity 0–1 kierunek (0 dół, 1 góra, 2 lewo, 3 prawo), bit 2 „w ruchu”,
   bity 3–5 wygląd (0 gracz, 1 portier — mundur z czapką, 2 pracownik biurowy —
-  koszula z krawatem), bit 6 siedzi przy komputerze, bit 7 parzy kawę.
+  koszula z krawatem), bit 6 wolny chód (zmęczenie / pilna toaleta), bit 7
+  zarezerwowany.
   Dla laptopa (`kind` 3): bit 0 zablokowany, bit 1 ktoś przy nim siedzi.
 
 **Interest management**: lista zawiera tylko encje z tym samym `(floor, room)` co
@@ -127,8 +131,8 @@ niepotwierdzone inputy dokładnie od tego stanu, także przez schody i windę.
 Uprawnienia zmienia tylko serwer (np. portier daje przepustkę); klient poznaje
 je ze snapshotu i od razu uwzględnia w predykcji kolizji z bramkami.
 
-**Fragmentacja**: stała część snapshotu ma 30 B, więc mieści się 90 encji
-(30 + 90·13 = 1200 B). Więcej encji → kilka fragmentów z tym samym `tick`,
+**Fragmentacja**: stała część snapshotu ma 31 B, więc mieści się 83 encje
+(31 + 83·14 = 1193 B). Więcej encji → kilka fragmentów z tym samym `tick`,
 każdy z pełnymi polami `self_*`. Pusty pokój → 1 fragment z `n = 0`.
 
 ### 6 `PlayerInfo` (S→C)
@@ -247,6 +251,12 @@ więc zgubiony pakiet nie gubi wiadomości.
 Historia jest tylko w pamięci serwera (60 wiadomości na rozmowę); wiadomości
 prywatne gracza, który wyszedł, są usuwane (jego id może dostać ktoś inny).
 
+### 24 `Stats` (S→C)
+
+Potrzeby postaci odbiorcy, co 0,5 s (tylko w budynku): `hunger u8`, `energy
+u8`, `stress u8`, `bladder u8`, każda 0..100. Głód, stres i toaleta: 100 =
+źle; energia: 0 = źle. Liczy je tylko serwer.
+
 ## Połączenie i timeouty
 
 ```
@@ -305,6 +315,7 @@ szyfrowaniem.
 
 ## Historia wersji
 
+- **10** — potrzeby: `activity` w encji (14 B) i `self_activity` w miejsce bitów `self_status`, `self_slow` (wolny chód w symulacji — też w wektorach golden ruchu), flaga 6 = wolny chód, pakiet `Stats`, przedmiot 5 = owoc.
 - **9** — komputer i komunikator: encja laptopa (`kind` 3), bit „przy komputerze” (`self_status` 0 / flaga 6, w miejsce „trzyma kawę”), `Computer`, `ComputerAction`, `Chat`.
 - **8** — ekwipunek: `held` w encji (13 B), encje przedmiotów na podłodze, `Inventory`, `ItemAction`; kubek kawy jako przedmiot.
 - **7** — pulpit: firmy i flaga `applied` w `JobOffers` (dzielonych na pakiety), `motivation` w `Apply`, `Mail`, `PortalAction`.

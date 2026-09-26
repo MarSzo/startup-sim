@@ -59,6 +59,7 @@ fn start_server_cfg(start_access: u8, skip_recruitment: bool, start_employed: bo
         },
         skip_recruitment,
         start_employed,
+        needs_speed: 1,
     };
     let mut server = Server::new(map, cfg).unwrap();
     let port = server.local_addr().port();
@@ -342,7 +343,7 @@ fn other_floors_are_invisible_and_state_matches_prediction() {
     }
     let (floor, room, x, y, lock, prev, ack) = last.expect("B gets snapshots");
     assert_eq!(ack, b.seq);
-    let server = Body { floor, pos: Pos { x, y }, prev_input: prev, lock, access: access::CARD };
+    let server = Body { floor, pos: Pos { x, y }, prev_input: prev, lock, access: access::CARD, slow: false };
     assert_eq!(server, predicted, "server state == client prediction, bit for bit");
     assert_eq!(b0.floor(1).unwrap().room_name(room), "Recepcja");
 
@@ -701,12 +702,12 @@ fn laptop_on_desk_messenger_lock_and_take() {
         _ => None,
     };
     let status = |p: &Packet| match p {
-        Packet::Snapshot { self_status, .. } => Some(*self_status),
+        Packet::Snapshot { self_activity, .. } => Some(*self_activity),
         _ => None,
     };
     let at_computer = |c: &Client, keep: &[&Client], want: bool| {
         wait_for(c, keep, Duration::from_millis(800), |p| {
-            status(p).filter(|s| (s & proto::status::AT_COMPUTER != 0) == want)
+            status(p).filter(|s| (*s == proto::activity::COMPUTER) == want)
         })
         .is_some()
     };
@@ -791,4 +792,70 @@ fn laptop_on_desk_messenger_lock_and_take() {
         _ => None,
     });
     assert_eq!(computers, Some(0), "Kuba's computer is in Biznes, Ola's is gone");
+}
+
+#[test]
+fn needs_fruit_sofa_and_the_wrong_bathroom() {
+    use game::inventory::kind as item_kind;
+    use game::needs::lines as nl;
+    use proto::item_action as act;
+    let (addr, _) = start_server_cfg(0, true, true);
+    let b = building();
+    let (mut ola, _) = Client::connect(addr, "Ola"); // female, IT, at the first IT desk
+    let wait = Duration::from_millis(800);
+    let said = |line: &'static str| move |p: &Packet| matches!(p, Packet::Say { text, .. } if text.starts_with(line)).then_some(());
+    let hunger = |c: &Client| wait_for(c, &[], wait, |p| if let Packet::Stats { hunger, .. } = p { Some(*hunger) } else { None });
+    let activity = |c: &Client| {
+        let mut last = None;
+        let deadline = Instant::now() + Duration::from_millis(300);
+        while Instant::now() < deadline {
+            c.ping();
+            while let Some(p) = c.recv() {
+                if let Packet::Snapshot { self_activity, .. } = p {
+                    last = Some(self_activity);
+                }
+            }
+        }
+        last
+    };
+    let ws = game::computer::find_workstations(&b);
+    let w = ws.iter().find(|w| w.room_name == "IT / Produkt").unwrap();
+    let mut body = Body { access: access::CARD, ..Body::at(w.floor, Pos::tile_center(w.tile.x, w.tile.y + 1)) };
+
+    // Laptop down first (hands free), then fruit from the bowl in the chill room.
+    body = ola.press_e(&b, body);
+    assert!(wait_for(&ola, &[], wait, said(game::computer::lines::PLACED)).is_some());
+    body = ola.walk_to(&b, body, (1, Tile { x: 39, y: 27 }), &[]);
+    body = ola.press_e(&b, body);
+    assert!(wait_for(&ola, &[], wait, said(nl::FRUIT)).is_some());
+    let slot = wait_for(&ola, &[], wait, |p| match p {
+        Packet::Inventory { slots } => slots[1..].iter().position(|s| s.kind == item_kind::FRUIT),
+        _ => None,
+    })
+    .expect("fruit in a pocket");
+    let before = hunger(&ola).unwrap();
+    ola.sock.send(&Packet::ItemAction { token: ola.token, action: act::TAKE_OUT, slot: slot as u8 }.encode()).unwrap();
+    std::thread::sleep(Duration::from_millis(120));
+    ola.sock.send(&Packet::ItemAction { token: ola.token, action: act::USE, slot: 0 }.encode()).unwrap();
+    assert!(wait_for(&ola, &[], wait, said("Mniam")).is_some());
+    let after = wait_for(&ola, &[], Duration::from_millis(1500), |p| match p {
+        Packet::Stats { hunger, .. } if *hunger + 15 <= before => Some(*hunger),
+        _ => None,
+    });
+    assert!(after.is_some(), "fruit lowers hunger (was {before})");
+
+    // Sofa: sitting shows as an activity; stepping away ends it.
+    body = ola.walk_to(&b, body, (1, Tile { x: 30, y: 28 }), &[]);
+    body = ola.press_e(&b, body);
+    assert!(wait_for(&ola, &[], wait, said(nl::SOFA)).is_some());
+    assert_eq!(activity(&ola), Some(proto::activity::SOFA));
+    ola.send_inputs(IN_RIGHT, 3);
+    body = sim::step(&b, sim::step(&b, sim::step(&b, body, IN_RIGHT), IN_RIGHT), IN_RIGHT);
+    assert_eq!(activity(&ola), Some(proto::activity::NONE), "got up");
+
+    // Ola is female: the men's room works, but it's embarrassing.
+    body = ola.walk_to(&b, body, (1, Tile { x: 55, y: 28 }), &[]);
+    ola.press_e(&b, body);
+    assert!(wait_for(&ola, &[], wait, said(nl::WRONG_BATHROOM)).is_some());
+    assert_eq!(activity(&ola), Some(proto::activity::TOILET));
 }

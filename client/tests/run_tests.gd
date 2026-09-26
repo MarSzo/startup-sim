@@ -63,14 +63,16 @@ func test_protocol(path: String) -> void:
 	var s := Protocol.decode(golden["snapshot"].hex_decode())
 	expect(s.get("tick") == 1234 and s.last_input_seq == 99 and s.frag_cnt == 1 and s.self_x == 10000 and s.self_y == -5
 		and s.floor == 1 and s.room == 6 and s.self_lock == 2 and s.self_prev_input == 17 and s.self_access == 5
-		and s.self_status == 1
+		and s.self_slow == 1 and s.self_activity == Protocol.ACT_SOFA
 		and s.entities.size() == 2,
 		"decode snapshot %s" % s)
 	if s.has("entities") and s.entities.size() == 2:
 		var e0: Dictionary = s.entities[0]
 		var e1: Dictionary = s.entities[1]
-		expect(e0.id == 3 and e0.kind == 0 and e0.x == 4096 and e0.y == 8192 and e0.flags == 5 and e0.held == 3, "entity 0 %s" % e0)
-		expect(e1.id == 65535 and e1.kind == 1 and e1.x == -1 and e1.y == 2000000, "entity 1 %s" % e1)
+		expect(e0.id == 3 and e0.kind == 0 and e0.x == 4096 and e0.y == 8192 and e0.flags == 5 and e0.held == 3 and e0.activity == Protocol.ACT_COMPUTER, "entity 0 %s" % e0)
+		expect(e1.id == 65535 and e1.kind == 1 and e1.x == -1 and e1.y == 2000000 and e1.flags == Protocol.FLAG_SLOW, "entity 1 %s" % e1)
+	var st := Protocol.decode(golden["stats"].hex_decode())
+	expect(st.get("type") == Protocol.T_STATS and st.hunger == 35 and st.energy == 80 and st.stress == 12 and st.bladder == 64, "decode stats %s" % st)
 	var pi := Protocol.decode(golden["player_info"].hex_decode())
 	expect(pi.get("players", []).size() == 2 and pi.players[0].nick == "Ala" and pi.players[0].department == 1
 		and pi.players[0].gender == 0 and pi.players[0].appearance.hair_style == 1 and pi.players[0].appearance.hair_color == 3
@@ -114,7 +116,7 @@ func test_protocol(path: String) -> void:
 
 
 func _body_from(a: Array) -> Dictionary:
-	return Movement.body(int(a[0]), Vector2i(int(a[1]), int(a[2])), int(a[3]), int(a[4]), int(a[5]))
+	return Movement.body(int(a[0]), Vector2i(int(a[1]), int(a[2])), int(a[3]), int(a[4]), int(a[5]), int(a[6]) != 0)
 
 
 func test_movement(path: String) -> void:

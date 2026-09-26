@@ -31,6 +31,7 @@ server/                 crate Rusta (lib `game` + binarki)
   src/coffee.rs         ekspresy do kawy (parzenie → kawa jako przedmiot)
   src/inventory.rs      przedmioty, kieszenie i ręce, uprawnienia z przedmiotów
   src/computer.rs       stanowiska (biurka działów), laptopy na biurkach, komunikator
+  src/needs.rs          potrzeby postaci (głód, energia, stres, toaleta), sofa / toaleta / papieros / owoce
   data/recruitment.json oferty i pule pytań (pierwsza odpowiedź = poprawna)
   src/protocol.rs       pakiety: encode/decode, fragmentacja snapshotów
   src/net.rs            UdpSocket + symulator opóźnienia/jittera/strat
@@ -59,6 +60,7 @@ client/                 projekt Godota 4.7
   game/item_view.gd     przedmiot leżący na podłodze
   ui/inventory_hud.gd   pasek ekwipunku (ręce + 3 kieszenie)
   ui/computer_screen.gd ekran komputera: komunikator i ekran blokady
+  ui/stats_hud.gd       paski potrzeb (prawy górny róg)
   game/computer_view.gd laptop na biurku (ekran: niebieski / czat / zablokowany)
   game/remote_player.gd bufor snapshotów + interpolacja
   ui/character_screen.gd tworzenie postaci (dane + wygląd z podglądem)
@@ -135,6 +137,19 @@ przepustkę i daje kartę (podpisaną imieniem i działem) oraz laptop — wymag
 wolnych rąk. Przedmioty na podłodze (`Dropped`) są encjami `kind` 2 w
 snapshotach; E podnosi najbliższy w zasięgu 1,25 kafla (po NPC i ekspresie).
 Gdy przedmiot się nie mieści, ląduje na podłodze pod nogami.
+
+**Potrzeby** (`needs.rs`): `Needs` w stałym przecinku (10 000 jednostek na
+punkt), zmiana co tick: głód 0→100 w 25 min, energia 100→0 w 35 min, toaleta
+0→100 w 20 min; stres rośnie za każdą zaniedbaną potrzebę, a bez zaniedbań
+powoli spada. Odpoczynek (`Rest`: sofa, toaleta, papieros) włącza się E przy
+miejscu znalezionym w mapie po typie kafla (`find_spots`, zasięg 1,5 kafla) i
+kończy ruchem, ponownym E albo sam (pusta toaleta, koniec papierosa). Kawa i
+owoc działają przy użyciu (F). Progi dają jednorazowe ostrzeżenia w dymku;
+toaleta na 100 = „wpadka” (stres +30, reset). `Needs::slow()` ustawia
+`sim::Body::slow` — wolniejszy chód jest częścią wspólnej symulacji (Rust i
+GDScript, wektory golden), a klient poznaje go ze snapshotu. Łazienki mają w
+mapie `gender`; użycie „nie tej” to komentarz i trochę stresu.
+`--needs-speed N` przyspiesza potrzeby do testów.
 
 **Komputery** (`computer.rs`): stanowiska to kafle typu `desk` w pokojach typu
 `department` (nazwa pokoju = nazwa działu). E z laptopem w rękach przy

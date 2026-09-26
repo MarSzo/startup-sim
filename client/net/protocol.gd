@@ -3,7 +3,7 @@
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 9
+const VERSION := 10
 const MAX_PACKET := 1200
 const MAX_NICK_BYTES := 16
 const MAX_SAY_BYTES := 240
@@ -34,6 +34,7 @@ const T_ITEM_ACTION := 20
 const T_COMPUTER := 21
 const T_COMPUTER_ACTION := 22
 const T_CHAT := 23
+const T_STATS := 24
 
 const PC_CLOSE := 1
 const PC_LOCK := 2
@@ -67,10 +68,15 @@ const KIND_NPC := 1
 const KIND_ITEM := 2
 const KIND_COMPUTER := 3
 
-# Activity bits: Snapshot.self_status bits 0..1 = entity flags bits 6..7.
-const STATUS_AT_COMPUTER := 1
-const STATUS_BREWING := 2
-const STATUS_FLAGS_SHIFT := 6
+# What a character is doing: Snapshot.self_activity / entity activity.
+const ACT_NONE := 0
+const ACT_COMPUTER := 1
+const ACT_BREWING := 2
+const ACT_SOFA := 3
+const ACT_TOILET := 4
+const ACT_SMOKING := 5
+# Entity flags bit 6: walks slowly (exhausted / needs the toilet).
+const FLAG_SLOW := 0x40
 
 const DISCONNECT_QUIT := 0
 const DISCONNECT_TIMEOUT := 1
@@ -286,11 +292,12 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			p.self_lock = r.u8()
 			p.self_prev_input = r.u8()
 			p.self_access = r.u8()
-			p.self_status = r.u8()
+			p.self_slow = r.u8()
+			p.self_activity = r.u8()
 			var n := r.u8()
 			var ents := []
 			for i in n:
-				ents.append({"id": r.u16(), "kind": r.u8(), "x": r.i32(), "y": r.i32(), "flags": r.u8(), "held": r.u8()})
+				ents.append({"id": r.u16(), "kind": r.u8(), "x": r.i32(), "y": r.i32(), "flags": r.u8(), "held": r.u8(), "activity": r.u8()})
 			p.entities = ents
 		T_PLAYER_INFO:
 			var n := r.u8()
@@ -358,6 +365,11 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			for i in n:
 				convs.append({"conv": r.u16(), "unread": r.u8(), "title": r.str16(MAX_NICK_BYTES + 8)})
 			p.convs = convs
+		T_STATS:
+			p.hunger = r.u8()
+			p.energy = r.u8()
+			p.stress = r.u8()
+			p.bladder = r.u8()
 		T_CHAT:
 			p.conv = r.u16()
 			var n := r.u8()

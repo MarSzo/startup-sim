@@ -488,6 +488,31 @@ Zastępuje prosty portal z 10.8. Po połączeniu gracz widzi pulpit komputera
 - Bez trwałych kont: laptop i rozmowy prywatne gracza znikają, gdy wyjdzie z
   gry; historia kanałów trwa do restartu serwera.
 
+### 10.15 Statystyki postaci (etap 5 z 9a)
+
+- Paski w prawym górnym rogu: **Głód**, **Energia**, **Stres**, **Toaleta**
+  (0–100, z zielonego na czerwony; krytyczne migają).
+- Tempo (czas rzeczywisty): głód 0→100 w ~25 min, energia 100→0 w ~35 min,
+  toaleta 0→100 w ~20 min; stres rośnie, gdy któraś potrzeba jest zaniedbana
+  (głód ≥ 70, energia ≤ 25, toaleta ≥ 80), a bez tego powoli spada.
+- Co pomaga:
+  - **Owoc** — darmowa misa na blacie w chill roomie („owocowe czwartki,
+    codziennie”): E = weź (jabłko, banan, gruszka, mandarynka), F = zjedz
+    (głód −20, energia +3).
+  - **Kawa** (F) — energia +25, stres −3, ale toaleta +8.
+  - **Sofa** (E) — odpoczynek: energia i stres szybko w dobrą stronę.
+  - **Toaleta** (E) — opróżnia pęcherz w ~8 s („Ulga!”).
+  - **Papieros** przy popielniczce w strefie palenia (E) — 30 s, stres −25.
+  - Ruch albo ponowne E kończy odpoczynek.
+- Konsekwencje (miękkie): jednorazowe ostrzeżenia w dymku, stres z
+  zaniedbania, głód 100 = energia spada 2× szybciej, toaleta 100 = „wpadka”
+  (komunikat dla pokoju, stres +30), a przy energii ≤ 10 albo toalecie ≥ 90
+  postać **chodzi wolniej** (kropla potu nad głową).
+- **Łazienki wg płci**: „nie ta” łazienka działa, ale z zawstydzonym
+  komentarzem i odrobiną stresu (postać o płci „inna” — bez komentarza).
+- Inni widzą, co robisz: siedzenie (sofa, toaleta, komputer), papieros z
+  dymkiem, „zzz” na sofie, zmęczenie.
+
 ### 10.6 Stan implementacji
 
 *Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie,
@@ -524,6 +549,9 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Ekwipunek**: kieszenie i ręce, przedmioty (przepustka, karta, laptop,
   kawa), upuszczanie / podnoszenie / podawanie, dostęp z przedmiotów (10.13);
   protokół v8.
+- **Statystyki postaci**: głód, energia, stres, toaleta; owoce, kawa, sofa,
+  toaleta, papieros; ostrzeżenia, „wpadka”, wolny chód; łazienki wg płci
+  (10.15); protokół v10.
 - **Komputer i komunikator**: laptop na biurku działu, ekran komputera z
   komunikatorem (kanały, prywatne, nieprzeczytane), blokada, pisanie z cudzego
   komputera w imieniu właściciela, zabieranie laptopa (10.14); protokół v9.
@@ -535,12 +563,12 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Sieć mobilna**: serwer dual-stack IPv4/IPv6; gracz identyfikowany tokenem
   (zmiana adresu w trakcie gry przenosi sesję); klient przepina gniazdo po
   ciszy/powrocie z tła i sam łączy się ponownie po utracie sesji.
-- **Testy**: 61 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
+- **Testy**: 66 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
   zależna od uprawnień, bramki, ruch/kolizje, schody, winda, nawigacja,
-  portier, recepcja, HR, rekrutacja, ekspres, komunikator, protokół), 2 golden, 12 e2e serwera
+  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, protokół), 2 golden, 13 e2e serwera
   (m.in. portal: odrzucenie → przyjęcie → spawn; całe wdrożenie aż do karty;
   niewidoczność między piętrami; zgodność stanu serwera z predykcją) —
-  łącznie 75 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty i komputera z komunikatorem); 122 sprawdzenia w Godocie (parytet protokołu i ruchu, parsowanie
+  łącznie 81 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem i potrzeb); 128 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
   adresów).
 
 #### Pomiary (MacBook, wszystko lokalnie)

@@ -25,6 +25,7 @@ OPTIONS:
   --skip-recruitment    spawn straight into the building, no job portal (dev)
   --start-employed      like --skip-recruitment, but already hired: contract, card and
                         laptop, spawned at a desk (departments alternate by player id)
+  --needs-speed <n>     needs (hunger, energy...) change n times faster (dev)
   --recruitment <path>  recruitment JSON  [default: data/recruitment.json]
 ";
 
@@ -59,6 +60,7 @@ fn main() {
         recruitment,
         skip_recruitment: args.flag("skip-recruitment") || args.flag("start-employed"),
         start_employed: args.flag("start-employed"),
+        needs_speed: args.get("needs-speed", 1),
     };
     let mut cfg = cfg;
     if args.str("bind").is_none() && game::net::bind_udp(cfg.bind).is_err() {

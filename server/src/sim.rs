@@ -16,6 +16,9 @@ pub const INPUT_HZ: u32 = 60;
 pub const SPEED: i32 = 24;
 /// Per-axis movement on a diagonal step (24 / sqrt(2) ~= 17).
 pub const SPEED_DIAG: i32 = 17;
+/// Exhausted or desperate for the toilet (`Body::slow`): 14 units -> 52 px/s.
+pub const SPEED_SLOW: i32 = 14;
+pub const SPEED_SLOW_DIAG: i32 = 10;
 
 /// Collision box half extents (box is 10 x 8 px, centered on the position).
 pub const HALF_W: i32 = 5 * SUBPIXELS;
@@ -69,11 +72,21 @@ pub fn input_dir(input: u8) -> (i32, i32) {
 /// `access`. Movement is resolved per axis (X, then Y) so the player slides
 /// along walls.
 pub fn move_on(map: &Map, pos: Pos, input: u8, access: u8) -> Pos {
+    move_at(map, pos, input, access, false)
+}
+
+/// `move_on` at normal or slow (`Body::slow`) speed.
+pub fn move_at(map: &Map, pos: Pos, input: u8, access: u8, slow: bool) -> Pos {
     let (dx, dy) = input_dir(input);
     if dx == 0 && dy == 0 {
         return pos;
     }
-    let speed = if dx != 0 && dy != 0 { SPEED_DIAG } else { SPEED };
+    let speed = match (dx != 0 && dy != 0, slow) {
+        (true, false) => SPEED_DIAG,
+        (false, false) => SPEED,
+        (true, true) => SPEED_SLOW_DIAG,
+        (false, true) => SPEED_SLOW,
+    };
     let mut p = pos;
     if dx != 0 {
         p.x = move_x(map, p, dx * speed, access);
@@ -148,11 +161,14 @@ pub struct Body {
     /// Rights (`map::access::*`): which gates/doors open. Changed only by the
     /// server (porter, HR...); the client learns it from snapshots.
     pub access: u8,
+    /// Walks slowly (exhausted / needs the toilet badly). Set by the server
+    /// from the character's needs; the client learns it from snapshots.
+    pub slow: bool,
 }
 
 impl Body {
     pub fn at(floor: u8, pos: Pos) -> Body {
-        Body { floor, pos, prev_input: 0, lock: LOCK_NONE, access: 0 }
+        Body { floor, pos, prev_input: 0, lock: LOCK_NONE, access: 0, slow: false }
     }
 }
 
@@ -167,7 +183,7 @@ impl Body {
 pub fn step(b: &Building, body: Body, input: u8) -> Body {
     let Some(map) = b.floor(body.floor) else { return body };
     let mut n = body;
-    n.pos = move_on(map, body.pos, input, body.access);
+    n.pos = move_at(map, body.pos, input, body.access, body.slow);
     if n.lock == LOCK_HELD && (input & IN_MOVE_MASK) != (body.prev_input & IN_MOVE_MASK) {
         n.lock = LOCK_RELEASED;
     }

@@ -5,7 +5,7 @@
 //! `tests/golden/packets.json`.
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 9;
+pub const VERSION: u8 = 10;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
 pub const MAX_PACKET: usize = 1200;
@@ -25,8 +25,8 @@ pub const MAX_CONVS: usize = 40;
 pub const MAX_INPUTS_PER_PACKET: usize = 8;
 
 /// Fixed part of a Snapshot packet (header + fields before the entity list).
-pub const SNAPSHOT_FIXED_LEN: usize = HEADER_LEN + 4 + 4 + 1 + 1 + (4 + 4 + 1 + 2 + 1 + 1 + 1 + 1) + 1;
-pub const ENTITY_LEN: usize = 13;
+pub const SNAPSHOT_FIXED_LEN: usize = HEADER_LEN + 4 + 4 + 1 + 1 + (4 + 4 + 1 + 2 + 1 + 1 + 1 + 1 + 1) + 1;
+pub const ENTITY_LEN: usize = 14;
 /// Entities per snapshot fragment so a fragment never exceeds `MAX_PACKET`.
 pub const MAX_ENTITIES_PER_SNAPSHOT: usize = (MAX_PACKET - SNAPSHOT_FIXED_LEN) / ENTITY_LEN;
 
@@ -54,6 +54,7 @@ pub mod ty {
     pub const COMPUTER: u8 = 21;
     pub const COMPUTER_ACTION: u8 = 22;
     pub const CHAT: u8 = 23;
+    pub const STATS: u8 = 24;
 }
 
 /// `ItemAction::action`.
@@ -159,15 +160,21 @@ pub mod disconnect {
     pub const SESSION_UNKNOWN: u8 = 4;
 }
 
-/// Activity bits: `Snapshot::self_status` bits 0..1, and the same two
-/// bits at 6..7 of every entity's `flags`.
-pub mod status {
+/// What a character is doing (not simulated): `Snapshot::self_activity` and
+/// `EntityState::activity`.
+pub mod activity {
+    pub const NONE: u8 = 0;
     /// Sitting at a computer (the client shows its screen while set).
-    pub const AT_COMPUTER: u8 = 1;
+    pub const COMPUTER: u8 = 1;
     pub const BREWING: u8 = 2;
-    /// Shift of the status bits inside `EntityState::flags`.
-    pub const FLAGS_SHIFT: u8 = 6;
+    /// Resting on a sofa.
+    pub const SOFA: u8 = 3;
+    pub const TOILET: u8 = 4;
+    pub const SMOKING: u8 = 5;
 }
+
+/// `EntityState::flags` bit: walks slowly (exhausted / needs the toilet).
+pub const FLAG_SLOW: u8 = 0x40;
 
 /// Entity kinds. Only players exist now; NPCs will use the same snapshot slot.
 pub mod kind {
@@ -204,10 +211,12 @@ pub struct EntityState {
     pub x: i32,
     pub y: i32,
     /// Bit 0-1: facing (0 down, 1 up, 2 left, 3 right); bit 2: moving;
-    /// bits 3-5 look; bits 6-7 status (see `status`).
+    /// bits 3-5 look; bit 6 slow (`FLAG_SLOW`); bit 7 reserved.
     pub flags: u8,
     /// Item kind in hands (`inventory::kind`), or the item itself for `kind::ITEM`.
     pub held: u8,
+    /// `activity::*`.
+    pub activity: u8,
 }
 
 /// One inventory slot as sent to its owner.
@@ -262,8 +271,10 @@ pub enum Packet {
         self_prev_input: u8,
         /// Receiver's rights (`map::access::*`): part of the simulated state.
         self_access: u8,
-        /// Receiver's activity bits (not simulated): see `status`.
-        self_status: u8,
+        /// Receiver's `sim::Body::slow` (simulated: movement speed).
+        self_slow: u8,
+        /// Receiver's activity (not simulated): see `activity`.
+        self_activity: u8,
         entities: Vec<EntityState>,
     },
     PlayerInfo { players: Vec<PlayerInfoEntry> },
@@ -297,6 +308,8 @@ pub enum Packet {
     ComputerAction { token: u32, action: u8, conv: u16, arg: u32, text: String },
     /// Messages of a conversation (sync reply or live push).
     Chat { conv: u16, messages: Vec<ChatEntry> },
+    /// Character needs, 0..=100 each (sent to the owner twice a second).
+    Stats { hunger: u8, energy: u8, stress: u8, bladder: u8 },
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -423,6 +436,7 @@ impl Packet {
             Packet::Computer { .. } => ty::COMPUTER,
             Packet::ComputerAction { .. } => ty::COMPUTER_ACTION,
             Packet::Chat { .. } => ty::CHAT,
+            Packet::Stats { .. } => ty::STATS,
         }
     }
 
@@ -473,7 +487,8 @@ impl Packet {
                 self_lock,
                 self_prev_input,
                 self_access,
-                self_status,
+                self_slow,
+                self_activity,
                 entities,
             } => {
                 w.u32(*tick);
@@ -487,7 +502,8 @@ impl Packet {
                 w.u8(*self_lock);
                 w.u8(*self_prev_input);
                 w.u8(*self_access);
-                w.u8(*self_status);
+                w.u8(*self_slow);
+                w.u8(*self_activity);
                 let n = entities.len().min(MAX_ENTITIES_PER_SNAPSHOT);
                 w.u8(n as u8);
                 for e in &entities[..n] {
@@ -497,6 +513,7 @@ impl Packet {
                     w.i32(e.y);
                     w.u8(e.flags);
                     w.u8(e.held);
+                    w.u8(e.activity);
                 }
             }
             Packet::PlayerInfo { players } => {
@@ -615,6 +632,12 @@ impl Packet {
                 w.u32(*arg);
                 w.str16(text, MAX_CHAT_BYTES);
             }
+            Packet::Stats { hunger, energy, stress, bladder } => {
+                w.u8(*hunger);
+                w.u8(*energy);
+                w.u8(*stress);
+                w.u8(*bladder);
+            }
             Packet::Chat { conv, messages } => {
                 w.u16(*conv);
                 w.u8(messages.len().min(255) as u8);
@@ -679,11 +702,12 @@ impl Packet {
                 let self_lock = r.u8()?;
                 let self_prev_input = r.u8()?;
                 let self_access = r.u8()?;
-                let self_status = r.u8()?;
+                let self_slow = r.u8()?;
+                let self_activity = r.u8()?;
                 let n = r.u8()? as usize;
                 let mut entities = Vec::with_capacity(n);
                 for _ in 0..n {
-                    entities.push(EntityState { id: r.u16()?, kind: r.u8()?, x: r.i32()?, y: r.i32()?, flags: r.u8()?, held: r.u8()? });
+                    entities.push(EntityState { id: r.u16()?, kind: r.u8()?, x: r.i32()?, y: r.i32()?, flags: r.u8()?, held: r.u8()?, activity: r.u8()? });
                 }
                 Packet::Snapshot {
                     tick,
@@ -697,7 +721,8 @@ impl Packet {
                     self_lock,
                     self_prev_input,
                     self_access,
-                    self_status,
+                    self_slow,
+                    self_activity,
                     entities,
                 }
             }
@@ -810,6 +835,7 @@ impl Packet {
                 arg: r.u32()?,
                 text: r.str16(MAX_CHAT_BYTES)?,
             },
+            ty::STATS => Packet::Stats { hunger: r.u8()?, energy: r.u8()?, stress: r.u8()?, bladder: r.u8()? },
             ty::CHAT => {
                 let conv = r.u16()?;
                 let n = r.u8()? as usize;
@@ -843,7 +869,8 @@ pub struct SelfState {
     pub lock: u8,
     pub prev_input: u8,
     pub access: u8,
-    pub status: u8,
+    pub slow: bool,
+    pub activity: u8,
 }
 
 /// Split a room's entity list into snapshot fragments that each fit in `MAX_PACKET`.
@@ -870,7 +897,8 @@ pub fn snapshot_fragments(tick: u32, last_input_seq: u32, me: SelfState, entitie
             self_lock: me.lock,
             self_prev_input: me.prev_input,
             self_access: me.access,
-            self_status: me.status,
+            self_slow: me.slow as u8,
+            self_activity: me.activity,
             entities: c.to_vec(),
         })
         .collect()
@@ -913,10 +941,11 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
                 self_lock: 2,
                 self_prev_input: 17,
                 self_access: 5,
-                self_status: 1,
+                self_slow: 1,
+                self_activity: 3,
                 entities: vec![
-                    EntityState { id: 3, kind: kind::PLAYER, x: 4096, y: 8192, flags: 0b101, held: 3 },
-                    EntityState { id: 65535, kind: kind::NPC, x: -1, y: 2_000_000, flags: 0, held: 0 },
+                    EntityState { id: 3, kind: kind::PLAYER, x: 4096, y: 8192, flags: 0b101, held: 3, activity: 1 },
+                    EntityState { id: 65535, kind: kind::NPC, x: -1, y: 2_000_000, flags: 0x40, held: 0, activity: 0 },
                 ],
             },
         ),
@@ -1017,6 +1046,7 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
             "computer_action",
             Packet::ComputerAction { token: 0x01020304, action: computer_action::SEND, conv: 17, arg: 42, text: "Kto zjadł mój jogurt?".into() },
         ),
+        ("stats", Packet::Stats { hunger: 35, energy: 80, stress: 12, bladder: 64 }),
         (
             "chat",
             Packet::Chat {
@@ -1084,7 +1114,7 @@ mod tests {
                 b[0] = 0x54;
                 b[1] = 0x53;
                 b[2] = VERSION;
-                b[3] = rng.u8(1..=23);
+                b[3] = rng.u8(1..=24);
             }
             let _ = Packet::decode(&b);
         }
@@ -1112,8 +1142,8 @@ mod tests {
 
     #[test]
     fn snapshot_fragments_fit_mtu() {
-        let ents: Vec<EntityState> = (0..250)
-            .map(|i| EntityState { id: i, kind: kind::PLAYER, x: i as i32 * 100, y: -(i as i32), flags: 0, held: 0 })
+        let ents: Vec<EntityState> = (0..240)
+            .map(|i| EntityState { id: i, kind: kind::PLAYER, x: i as i32 * 100, y: -(i as i32), flags: 0, held: 0, activity: 0 })
             .collect();
         let frags = snapshot_fragments(5, 6, SelfState { x: 1, y: 2, room: 3, ..Default::default() }, &ents);
         assert_eq!(frags.len(), 3);
@@ -1129,7 +1159,7 @@ mod tests {
                 _ => unreachable!(),
             }
         }
-        assert_eq!(seen, 250);
+        assert_eq!(seen, 240);
         let full = &frags[0].encode();
         assert_eq!(full.len(), SNAPSHOT_FIXED_LEN + MAX_ENTITIES_PER_SNAPSHOT * ENTITY_LEN);
     }

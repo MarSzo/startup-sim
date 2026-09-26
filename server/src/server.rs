@@ -10,6 +10,7 @@ use crate::coffee::{self, Cup, Machine};
 use crate::computer::{self, Account, Computer, Messenger, Workstation};
 use crate::inventory::{self, kind as item_kind, Inventory, Item};
 use crate::net::{canonical, LinkConditions, Net};
+use crate::needs::{self, Needs, Rest, Spot, SpotKind};
 use crate::npc::{self, Npc};
 use crate::protocol::{self as proto, EntityState, Packet, PlayerInfoEntry, Profile, SelfState};
 use crate::recruitment::{Attempt, Recruitment};
@@ -42,6 +43,8 @@ pub struct Config {
     /// Also already hired (contract, card, laptop) and spawned at a desk of
     /// the department (odd player ids IT, even Biznes). Dev / tests.
     pub start_employed: bool,
+    /// Needs change this many times faster (dev / testing; 1 = normal).
+    pub needs_speed: u32,
 }
 
 /// Where a connected player is in the game.
@@ -107,6 +110,11 @@ const GIVE_RADIUS: i32 = sim::TILE_UNITS * 2;
 /// Resend the inventory this often (ticks).
 const INVENTORY_RESEND_TICKS: u32 = 40;
 
+/// Send the character's needs this often (ticks).
+const STATS_EVERY_TICKS: u32 = 10;
+/// Fruit in the bowl (label of the item).
+const FRUITS: [&str; 4] = ["Jabłko", "Banan", "Gruszka", "Mandarynka"];
+
 /// Resend the computer screen state this often (ticks).
 const COMPUTER_RESEND_TICKS: u32 = 20;
 
@@ -132,6 +140,10 @@ struct Player {
     inv_dirty: bool,
     /// Handle of the computer whose screen the player is looking at.
     at_computer: Option<u16>,
+    /// Hunger, energy, stress, bladder.
+    needs: Needs,
+    /// Sofa / toilet / smoke break, and where it started (moving ends it).
+    rest: Option<(Rest, u8, Pos)>,
     /// Messenger spam guard / retry dedupe.
     last_chat_tick: Option<u32>,
     last_chat_nonce: u32,
@@ -167,6 +179,8 @@ pub struct Server {
     machines: Vec<Machine>,
     /// Items lying on the floor.
     dropped: Vec<Dropped>,
+    /// Sofas, toilets, ashtrays, the fruit bowl.
+    spots: Vec<Spot>,
     /// Desks where a laptop can stand, and the laptops standing on them.
     workstations: Vec<Workstation>,
     computers: Vec<Computer>,
@@ -199,6 +213,7 @@ impl Server {
             machines: coffee::find_machines(&building),
             dropped: Vec::new(),
             workstations: computer::find_workstations(&building),
+            spots: needs::find_spots(&building),
             computers: Vec::new(),
             messenger: Messenger::default(),
             next_item_id: 1,
@@ -405,6 +420,8 @@ impl Server {
             inventory: Inventory::default(),
             inv_dirty: true,
             at_computer: None,
+            needs: Needs::default(),
+            rest: None,
             last_chat_tick: None,
             last_chat_nonce: 0,
             token,
@@ -802,8 +819,17 @@ impl Server {
                 let line = match held.kind {
                     item_kind::COFFEE => {
                         p.inventory.take_hands();
+                        p.needs.drink_coffee();
                         refresh(p);
                         coffee::lines::DRUNK.to_string()
+                    }
+                    item_kind::FRUIT if p.needs.is_full() => needs::lines::NOT_HUNGRY.into(),
+                    item_kind::FRUIT => {
+                        let what = held.label.to_lowercase();
+                        p.inventory.take_hands();
+                        p.needs.eat_fruit();
+                        refresh(p);
+                        format!("Mniam, {what}.")
                     }
                     item_kind::EMPLOYEE_CARD => format!("Karta pracownika: {}.", held.label),
                     item_kind::GUEST_PASS => "Przepustka gościa — ważna do końca dnia.".into(),
@@ -864,6 +890,54 @@ impl Server {
         }
         self.give_new(id, item_kind::EMPLOYEE_CARD);
         self.give_new(id, item_kind::LAPTOP);
+    }
+
+    /// E at a sofa, toilet, ashtray or the fruit bowl. `None` = nothing in
+    /// reach; `Some(line)` = handled. E while resting gets you up.
+    fn use_spot(&mut self, pid: u16, body: &Body) -> Option<Option<String>> {
+        let p = self.players.get_mut(&pid)?;
+        if p.rest.take().is_some() {
+            return Some(None);
+        }
+        let spot = needs::spot_in_reach(&self.spots, body)?.clone();
+        let (floor, pos) = (p.body.floor, p.body.pos);
+        let line = match spot.kind {
+            SpotKind::FruitBowl => {
+                let has_room = p.inventory.hands_free() || p.inventory.pockets.iter().any(|s| s.is_none());
+                if !has_room {
+                    return Some(Some(needs::lines::HANDS_FULL.into()));
+                }
+                let fruit = FRUITS[self.rng.usize(..FRUITS.len())];
+                let item = Item { id: self.next_item_id, kind: item_kind::FRUIT, label: fruit.into(), expires: None, owner: 0 };
+                self.next_item_id += 1;
+                self.give(pid, item);
+                format!("{} {}", needs::lines::FRUIT, fruit)
+            }
+            SpotKind::Sofa => {
+                p.rest = Some((Rest::Sofa, floor, pos));
+                needs::lines::SOFA.into()
+            }
+            SpotKind::Ashtray => {
+                p.rest = Some((Rest::Smoking { until: self.tick + needs::SMOKE_TICKS }, floor, pos));
+                needs::lines::SMOKE.into()
+            }
+            SpotKind::Toilet => {
+                p.rest = Some((Rest::Toilet, floor, pos));
+                let mine = match p.profile.gender {
+                    proto::gender::FEMALE => Some("female"),
+                    proto::gender::MALE => Some("male"),
+                    _ => None,
+                };
+                match (mine, spot.gender.as_deref()) {
+                    (Some(m), Some(g)) if m != g => {
+                        p.needs.add_stress(5);
+                        needs::lines::WRONG_BATHROOM.into()
+                    }
+                    _ => needs::lines::TOILET.into(),
+                }
+            }
+        };
+        Some(Some(line))
     }
 
     /// Hired employees = messenger accounts.
@@ -1149,7 +1223,29 @@ impl Server {
                 refresh(p);
                 coffee_says.push((p.id, coffee::lines::COLD.to_string(), None));
             }
-            p.flags = (p.flags & 0x3f) | status_bits(p) << proto::status::FLAGS_SHIFT;
+            // Needs: moving ends a rest; exhausted / desperate = slow.
+            if let Some((_, floor, pos)) = p.rest {
+                if (floor, pos) != (p.body.floor, p.body.pos) {
+                    p.rest = None;
+                }
+            }
+            let mut rest = p.rest.map(|r| r.0);
+            let mut events = Vec::new();
+            for _ in 0..self.cfg.needs_speed.max(1) {
+                let (r, ev) = p.needs.tick(rest, self.tick);
+                rest = r;
+                events.extend(ev);
+            }
+            p.rest = rest.map(|r| (r, p.body.floor, p.body.pos));
+            for e in events {
+                let line = match e {
+                    needs::Event::Warn(l) | needs::Event::RestDone(l) => l,
+                    needs::Event::Accident => needs::lines::ACCIDENT,
+                };
+                coffee_says.push((p.id, line.to_string(), None));
+            }
+            p.body.slow = p.needs.slow();
+            p.flags = (p.flags & 0x3f) | if p.body.slow { proto::FLAG_SLOW } else { 0 };
         }
         for pid in coffee_ready {
             let free = self.players[&pid].inventory.hands_free();
@@ -1186,9 +1282,10 @@ impl Server {
                     coffee::Outcome::Busy => coffee::lines::BUSY,
                     coffee::Outcome::HandsFull => coffee::lines::HANDS_FULL,
                 };
-                p.flags = (p.flags & 0x3f) | status_bits(p) << proto::status::FLAGS_SHIFT;
                 coffee_says.push((pid, line.to_string(), None));
             } else if let Some(said) = self.use_desk(pid, &body) {
+                coffee_says.extend(said.map(|line| (pid, line, None)));
+            } else if let Some(said) = self.use_spot(pid, &body) {
                 coffee_says.extend(said.map(|line| (pid, line, None)));
             } else if let Some(line) = self.try_pickup(pid, &body) {
                 coffee_says.push((pid, line, None));
@@ -1241,6 +1338,7 @@ impl Server {
                 y: p.body.pos.y,
                 flags: p.flags,
                 held: p.inventory.held_kind(),
+                activity: activity(p),
             });
         }
         for n in &self.npcs {
@@ -1251,6 +1349,7 @@ impl Server {
                 y: n.body.pos.y,
                 flags: n.flags,
                 held: 0,
+                activity: 0,
             });
         }
         for c in &self.computers {
@@ -1264,6 +1363,7 @@ impl Server {
                 y: pos.y,
                 flags: computer::entity_flags(c),
                 held: c.item.kind,
+                activity: 0,
             });
         }
         for d in &self.dropped {
@@ -1275,6 +1375,7 @@ impl Server {
                 y: d.pos.y,
                 flags: 0,
                 held: d.item.kind,
+                activity: 0,
             });
         }
 
@@ -1307,13 +1408,18 @@ impl Server {
                 lock: p.body.lock,
                 prev_input: p.body.prev_input,
                 access: p.body.access,
-                status: status_bits(p),
+                slow: p.body.slow,
+                activity: activity(p),
             };
             for f in proto::snapshot_fragments(tick, p.last_processed_seq, me, &visible) {
                 outgoing.push((p.addr, id, f));
             }
             if p.inv_dirty || tick % INVENTORY_RESEND_TICKS == 0 {
                 outgoing.push((p.addr, id, inventory_packet(&p.inventory)));
+            }
+            if tick % STATS_EVERY_TICKS == 0 {
+                let [hunger, energy, stress, bladder] = p.needs.points();
+                outgoing.push((p.addr, id, Packet::Stats { hunger, energy, stress, bladder }));
             }
             if tick % COMPUTER_RESEND_TICKS == 0 {
                 if let Some(pk) = self.computer_packet(id) {
@@ -1406,9 +1512,17 @@ impl Server {
     }
 }
 
-fn status_bits(p: &Player) -> u8 {
-    (if p.cup.brewing() { proto::status::BREWING } else { 0 })
-        | (if p.at_computer.is_some() { proto::status::AT_COMPUTER } else { 0 })
+/// What others see the player doing (one at a time, most visible first).
+fn activity(p: &Player) -> u8 {
+    use proto::activity as a;
+    match (p.at_computer, p.rest.map(|r| r.0)) {
+        (Some(_), _) => a::COMPUTER,
+        (_, Some(Rest::Toilet)) => a::TOILET,
+        (_, Some(Rest::Sofa)) => a::SOFA,
+        (_, Some(Rest::Smoking { .. })) => a::SMOKING,
+        _ if p.cup.brewing() => a::BREWING,
+        _ => a::NONE,
+    }
 }
 
 /// After an inventory change: access follows the carried items.

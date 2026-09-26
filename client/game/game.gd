@@ -17,6 +17,7 @@ const ItemView = preload("res://game/item_view.gd")
 const InventoryHud = preload("res://ui/inventory_hud.gd")
 const ComputerView = preload("res://game/computer_view.gd")
 const ComputerScreen = preload("res://ui/computer_screen.gd")
+const StatsHud = preload("res://ui/stats_hud.gd")
 
 const ZOOM := 3.0
 ## Remote players are rendered this far in the past (2 snapshots at 20 Hz).
@@ -56,6 +57,7 @@ var hud := InventoryHud.new()
 var computers := {}      # entity id -> ComputerView (laptops on desks)
 var screen := ComputerScreen.new()
 var screen_layer := CanvasLayer.new()
+var stats_hud := StatsHud.new()
 var depts := {}          # id -> department (after the contract)
 var appearances := {}    # id -> appearance dict (from PlayerInfo)
 var own_appearance := {}
@@ -170,6 +172,7 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 	status_layer.add_child(log_label)
 	status_layer.add_child(hud)
 	hud.slot_clicked.connect(_pocket_key)
+	status_layer.add_child(stats_hud)
 	screen_layer.layer = 12
 	add_child(screen_layer)
 	screen.my_id = net.player_id
@@ -416,6 +419,8 @@ func _on_packet(p: Dictionary) -> void:
 			inventory = p.slots
 			hud.update_slots(inventory)
 			me.set_held(inventory[0].kind if not inventory.is_empty() else 0)
+		Protocol.T_STATS:
+			stats_hud.update_stats(p)
 		Protocol.T_COMPUTER:
 			screen.on_computer(p)
 		Protocol.T_CHAT:
@@ -481,9 +486,9 @@ func _on_snapshot(p: Dictionary) -> void:
 			have_time = true
 		else:
 			est_tick += (tick - est_tick) * 0.1
-		_reconcile(Movement.body(p.floor, Vector2i(p.self_x, p.self_y), p.self_prev_input, p.self_lock, p.self_access), p.last_input_seq)
-		me.set_status(p.self_status)
-		screen.set_seated((p.self_status & Protocol.STATUS_AT_COMPUTER) != 0)
+		_reconcile(Movement.body(p.floor, Vector2i(p.self_x, p.self_y), p.self_prev_input, p.self_lock, p.self_access, p.self_slow != 0), p.last_input_seq)
+		me.set_status(p.self_activity, p.self_slow != 0)
+		screen.set_seated(p.self_activity == Protocol.ACT_COMPUTER)
 	visible_count += p.entities.size()
 	var unknown := []
 	var now := Time.get_ticks_msec()
@@ -524,7 +529,7 @@ func _on_snapshot(p: Dictionary) -> void:
 					r.say(_pending_say[e.id][1])
 				_pending_say.erase(e.id)
 		r.push_sample(tick, Vector2(e.x, e.y) / float(Movement.SUBPIXELS), e.flags)
-		r.set_status((e.flags >> Protocol.STATUS_FLAGS_SHIFT) & 3)
+		r.set_status(e.activity, (e.flags & Protocol.FLAG_SLOW) != 0)
 		r.set_held(e.held)
 		kinds[e.id] = e.kind
 		if not nicks.has(e.id) and now - info_requested.get(e.id, -100000) > 500:
@@ -643,12 +648,14 @@ func _update_hint() -> void:
 				if Movement.to_px(Movement.tile_center(tx, ty)).distance_to(Movement.to_px(pred.pos)) <= 24.0:
 					if me.held != 0:
 						text = "Najpierw odłóż to, co trzymasz (1–3 / Q)"
-					elif me.status & Protocol.STATUS_BREWING:
+					elif me.status == Protocol.ACT_BREWING:
 						text = "Parzenie kawy…"
 					else:
 						text = "[E] Zrób kawę"
 	if text == "" and map:
 		text = _desk_hint(map)
+	if text == "" and map:
+		text = _spot_hint(map)
 	if text == "":
 		var me_px2 := Movement.to_px(pred.pos)
 		for id in floor_items:
@@ -669,6 +676,27 @@ func _update_hint() -> void:
 					text = "Bramka wymaga przepustki — porozmawiaj z portierem (portiernia)" if (need & MapData.ACCESS_GUEST) else "Wstęp tylko dla obsługi"
 	hint_label.text = text
 	hint_label.visible = text != ""
+
+
+const SPOT_HINTS := {"sofa": "[E] Usiądź na sofie", "toilet": "[E] Skorzystaj z toalety", "ashtray": "[E] Zapal", "fruit_bowl": "[E] Weź owoc"}
+
+
+## Sofa / toilet / ashtray / fruit bowl within reach (1.5 tiles, as the server).
+func _spot_hint(map) -> String:
+	if me.status in [Protocol.ACT_SOFA, Protocol.ACT_TOILET, Protocol.ACT_SMOKING]:
+		return "[E] Wstań" if me.status != Protocol.ACT_SMOKING else "[E] Zgaś papierosa"
+	var me_px := Movement.to_px(pred.pos)
+	var t := Movement.tile_of_pos(pred.pos)
+	for dy in range(-2, 3):
+		for dx in range(-2, 3):
+			var tx: int = t.x + dx
+			var ty: int = t.y + dy
+			if tx < 0 or ty < 0 or tx >= map.width or ty >= map.height:
+				continue
+			var type: String = map.legend.get(map.tile_chars[ty * map.width + tx], {}).get("type", "")
+			if SPOT_HINTS.has(type) and Movement.to_px(Movement.tile_center(tx, ty)).distance_to(me_px) <= 24.0:
+				return SPOT_HINTS[type]
+	return ""
 
 
 ## Desk within reach (same rule as the server: nearest desk tile, 1.25 tiles).
