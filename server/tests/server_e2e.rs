@@ -7,6 +7,7 @@ use game::building::{default_building_path, Building, Place};
 use game::map::{access, Tile};
 use game::npc::{lines, NPC_ID_BASE};
 use game::nav::Walker;
+use game::security;
 use game::net::LinkConditions;
 use game::protocol::{self as proto, Appearance, Packet, Profile};
 use game::recruitment::{default_recruitment_path, Recruitment};
@@ -1058,9 +1059,11 @@ fn shop_take_from_shelf_alarm_and_pay() {
     .expect("sandwich in a pocket");
     assert!(slots.iter().any(|s| s.label.contains("niezapłacone")));
 
-    // Walking out without paying: beep, the sandwich stays.
+    // Walking out without paying: beep, the guard comes after Ola and the
+    // sandwich goes back.
     let out = ola.walk_to(&b, body, (0, Tile { x: 39, y: 29 }), &[]);
     assert!(wait_for(&ola, &[], wait, said(|t| t == sl::ALARM)).is_some());
+    assert!(wait_for(&ola, &[], Duration::from_millis(3000), said(|t| t == security::lines::GUARD_CAUGHT)).is_some());
     assert!(inventory(&ola).is_some_and(|s| s.iter().all(|s| s.kind != item_kind::SANDWICH_HAM)));
 
     // Back in, take it again, pay at the till, eat it.
@@ -1075,7 +1078,17 @@ fn shop_take_from_shelf_alarm_and_pay() {
     let slots = inventory(&ola).unwrap();
     let pocket = slots[1..].iter().position(|s| s.kind == item_kind::SANDWICH_HAM).expect("paid sandwich");
     assert!(!slots[pocket + 1].label.contains("niezapłacone"));
-    let _ = body;
+
+    // Once more without paying the same day: the guard calls the police, a
+    // patrol car pulls up and the officer fines Ola (all she has left).
+    let body = ola.walk_to(&b, body, (0, Tile { x: 47, y: 25 }), &[]);
+    take(&ola, 1, item_kind::WRAP);
+    std::thread::sleep(Duration::from_millis(150));
+    let _out = ola.walk_to(&b, body, (0, Tile { x: 39, y: 29 }), &[]);
+    assert!(wait_for(&ola, &[], Duration::from_millis(3000), said(|t| t == security::lines::GUARD_POLICE_AGAIN)).is_some());
+    let fine = security::lines::police_fine(186_00);
+    assert!(wait_for(&ola, &[], Duration::from_millis(8000), |p| matches!(p, Packet::Say { text, .. } if *text == fine).then_some(())).is_some());
+    assert_eq!(money(&ola), Some(0));
 }
 
 /// Latest Clock packet matching `f` within `wait`.

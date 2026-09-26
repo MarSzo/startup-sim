@@ -1,4 +1,4 @@
-## A vehicle outside (entity kind VEHICLE): car, bike, taxi or tram, drawn
+## A vehicle outside (entity kind VEHICLE): car, bike, taxi, tram or patrol car, drawn
 ## top-down; follows the server's positions smoothly.
 extends Node2D
 
@@ -6,6 +6,7 @@ const CAR := 1
 const BIKE := 2
 const TAXI := 3
 const TRAM := 4
+const POLICE := 5
 const CAR_COLORS := [Color("#c0392b"), Color("#2e5fa8"), Color("#ecf0f1"), Color("#2c2f36"), Color("#27ae60"), Color("#8e44ad")]
 
 var kind := CAR
@@ -35,13 +36,15 @@ func push(pos: Vector2, flags: int) -> void:
 
 func _process(delta: float) -> void:
 	position = position.lerp(target, minf(1.0, delta * 12.0))
+	if kind == POLICE:
+		queue_redraw()  # flashing lights
 
 
 func _draw() -> void:
 	var flip := facing == 3  # facing right: mirror
 	match kind:
-		CAR, TAXI:
-			var body := color if kind == CAR else Color("#f4c20d")
+		CAR, TAXI, POLICE:
+			var body := color if kind == CAR else (Color("#f4c20d") if kind == TAXI else Color("#eef1f4"))
 			var r := Rect2(-22, -11, 44, 20)
 			draw_rect(Rect2(r.position + Vector2(2, 3), r.size), Color(0, 0, 0, 0.25))
 			draw_rect(r, body.darkened(0.25))
@@ -58,6 +61,11 @@ func _draw() -> void:
 			if kind == TAXI:
 				draw_rect(Rect2(-5, -4, 10, 5), Color("#15171c"))
 				draw_rect(Rect2(-4, -3, 8, 3), Color("#ffe066"))
+			if kind == POLICE:
+				draw_rect(Rect2(-21, -2, 42, 3), Color("#1f3a8a"))  # stripe
+				var blink := (Time.get_ticks_msec() / 250) % 2 == 0
+				draw_rect(Rect2(-6, -5, 6, 4), Color("#2f6bff") if blink else Color("#15306e"))
+				draw_rect(Rect2(0, -5, 6, 4), Color("#15306e") if blink else Color("#2f6bff"))
 		TRAM:
 			var r := Rect2(-48, -12, 96, 22)
 			draw_rect(Rect2(r.position + Vector2(2, 3), r.size), Color(0, 0, 0, 0.25))

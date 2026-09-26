@@ -7,6 +7,10 @@
 //!   1st floor reception;
 //! - the **receptionist** escorts guests to HR;
 //! - **HR** signs the contract and swaps the guest pass for an employee card.
+//!
+//! The shop's **security guard** chases anybody leaving with unpaid goods;
+//! a **police officer** (spawned by the server with a patrol car) chases
+//! whoever the guard couldn't stop.
 
 use std::collections::HashMap;
 
@@ -29,12 +33,23 @@ const STEPS_PER_TICK: usize = 3;
 const GIVE_UP_TICKS: u32 = 600;
 /// An escort reminds a lagging guest every this many ticks (6 s).
 const NAG_TICKS: u32 = 120;
+/// Chasing: a bit faster than a player (4 steps per tick instead of 3).
+const CHASE_STEPS_PER_TICK: usize = 4;
+/// Caught when this close (same floor): 1.5 tiles.
+pub const CATCH_RADIUS: i32 = 24 * SUBPIXELS;
+/// The chase path is re-planned this often (1 s).
+const REPATH_TICKS: u32 = 20;
+/// The guard gives up after 20 s, the police after 3 min.
+const GUARD_GIVE_UP_TICKS: u32 = 400;
+const POLICE_GIVE_UP_TICKS: u32 = 3600;
 
 /// Appearance, sent in entity flags bits 3..5 (see PROTOCOL.md).
 pub mod look {
     pub const PLAYER: u8 = 0;
     pub const PORTER: u8 = 1;
     pub const OFFICE: u8 = 2;
+    pub const GUARD: u8 = 3;
+    pub const POLICE: u8 = 4;
 }
 
 pub mod lines {
@@ -62,6 +77,11 @@ pub mod lines {
     }
     pub const HR_HAS_CARD: &str = "Umowa już podpisana, karta działa. Powodzenia!";
     pub const HR_HANDS_FULL: &str = "Proszę odłożyć to, co masz w rękach — zaraz dostaniesz laptopa.";
+    // Security / police
+    pub const GUARD_HELLO: &str = "Dzień dobry. Płacimy przy kasie, prawda?";
+    pub const GUARD_STOP: &str = "Stać! Ochrona! Proszę wrócić z towarem!";
+    pub const GUARD_BUSY: &str = "Nie teraz — jestem w pościgu!";
+    pub const POLICE_BUSY: &str = "Proszę się odsunąć, trwa interwencja.";
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -74,6 +94,10 @@ pub enum Role {
     /// The board: meetings booked in the calendar.
     Ceo,
     CoFounder,
+    /// Shop security: chases shoplifters.
+    Guard,
+    /// Comes by patrol car when called (not placed in the building).
+    Police,
 }
 
 impl Role {
@@ -85,6 +109,7 @@ impl Role {
             "cashier" => Some(Role::Cashier),
             "ceo" => Some(Role::Ceo),
             "cofounder" => Some(Role::CoFounder),
+            "guard" => Some(Role::Guard),
             _ => None,
         }
     }
@@ -93,6 +118,8 @@ impl Role {
         match self {
             Role::Porter => look::PORTER,
             Role::Receptionist | Role::Hr | Role::Cashier | Role::Ceo | Role::CoFounder => look::OFFICE,
+            Role::Guard => look::GUARD,
+            Role::Police => look::POLICE,
         }
     }
 }
@@ -129,12 +156,17 @@ pub enum Event {
     Checkout { npc: u16, player: u16 },
     /// Board member: the server runs the meeting (calendar) as `npc`.
     Meeting { npc: u16, player: u16 },
+    /// A chase ended next to the player.
+    Caught { npc: u16, player: u16 },
+    /// A chase was given up (too long, or the player left the building).
+    Escaped { npc: u16, player: u16 },
 }
 
 enum State {
     Idle,
     Escorting { guest: u16, walker: Walker, waited: u32 },
     Returning { walker: Walker },
+    Chasing { target: u16, walker: Option<Walker>, ticks: u32 },
 }
 
 pub struct Npc {
@@ -180,6 +212,28 @@ impl Npc {
         }
     }
 
+    /// A police officer next to the patrol car at `pos` (floor 0); its
+    /// "home" is the car.
+    pub fn police(b: &Building, id: u16, pos: Pos) -> Npc {
+        let def = NpcDef { kind: "police".into(), name: "Policja".into(), home: { let (x, y) = pos.tile(); crate::map::Tile { x, y } }, escort_to: None };
+        let mut n = Npc::new(b, id, 0, &def, Role::Police);
+        n.body.pos = pos;
+        n.body.access = access::GUEST | access::CARD | access::SERVICE | access::BOARD;
+        n
+    }
+
+    /// Run after `target` (shoplifter).
+    pub fn chase(&mut self, target: u16) {
+        self.state = State::Chasing { target, walker: None, ticks: 0 };
+    }
+
+    pub fn chasing(&self) -> Option<u16> {
+        match self.state {
+            State::Chasing { target, .. } => Some(target),
+            _ => None,
+        }
+    }
+
     pub fn is_idle(&self) -> bool {
         matches!(self.state, State::Idle)
     }
@@ -222,6 +276,14 @@ impl Npc {
         if matches!(self.role, Role::Ceo | Role::CoFounder) {
             return vec![Event::Meeting { npc: self.id, player }];
         }
+        if matches!(self.role, Role::Guard | Role::Police) {
+            let line = match (self.role, self.chasing().is_some()) {
+                (Role::Police, _) => lines::POLICE_BUSY,
+                (_, true) => lines::GUARD_BUSY,
+                _ => lines::GUARD_HELLO,
+            };
+            return vec![say(line)];
+        }
         if self.role == Role::Hr {
             return if has_card {
                 vec![say(lines::HR_HAS_CARD)]
@@ -263,6 +325,7 @@ impl Npc {
             State::Escorting { guest, .. } if *guest == player => vec![say(l.on_the_way)],
             State::Escorting { .. } => vec![say(lines::BUSY)],
             State::Returning { .. } => vec![say(l.back_soon)],
+            State::Chasing { .. } => vec![],
         }
     }
 
@@ -306,12 +369,36 @@ impl Npc {
                 }
             }
             State::Returning { .. } => walk = true,
+            State::Chasing { target, walker, ticks } => {
+                let target = *target;
+                *ticks += 1;
+                let give_up = if role == Role::Police { POLICE_GIVE_UP_TICKS } else { GUARD_GIVE_UP_TICKS };
+                match players.get(&target) {
+                    Some(t) if t.floor == self.body.floor && dist2(t.pos, self.body.pos) <= CATCH_RADIUS * CATCH_RADIUS => {
+                        events.push(Event::Caught { npc: self.id, player: target });
+                        self.go_home(b);
+                    }
+                    Some(t) if *ticks < give_up => {
+                        if walker.as_ref().map_or(true, |w| w.done()) || *ticks % REPATH_TICKS == 1 {
+                            let (tx, ty) = t.pos.tile();
+                            if let Some(w) = Walker::to(b, &self.body, (t.floor, crate::map::Tile { x: tx, y: ty })) {
+                                *walker = Some(w);
+                            }
+                        }
+                        walk = true;
+                    }
+                    _ => {
+                        events.push(Event::Escaped { npc: self.id, player: target });
+                        self.go_home(b);
+                    }
+                }
+            }
         }
         if walk {
             self.walk_steps(b);
             let finished = match &self.state {
                 State::Escorting { walker, .. } | State::Returning { walker } => walker.done(),
-                State::Idle => false,
+                State::Idle | State::Chasing { .. } => false,
             };
             if finished {
                 if let State::Escorting { guest, .. } = self.state {
@@ -336,10 +423,14 @@ impl Npc {
     }
 
     fn walk_steps(&mut self, b: &Building) {
-        let (State::Escorting { walker, .. } | State::Returning { walker }) = &mut self.state else { return };
+        let (walker, steps) = match &mut self.state {
+            State::Escorting { walker, .. } | State::Returning { walker } => (walker, STEPS_PER_TICK),
+            State::Chasing { walker: Some(walker), .. } => (walker, CHASE_STEPS_PER_TICK),
+            _ => return,
+        };
         let mut moved = false;
         let mut facing = self.flags & 3;
-        for _ in 0..STEPS_PER_TICK {
+        for _ in 0..steps {
             let input = walker.next_input(&self.body);
             if input == 0 {
                 break;
@@ -487,6 +578,45 @@ mod tests {
     }
 
     #[test]
+    fn the_guard_catches_a_runner_or_gives_up() {
+        let (b, mut npcs) = everyone();
+        let guard = by_role(&mut npcs, Role::Guard);
+        let home = guard.body;
+        // A thief standing in the lobby: caught.
+        let thief = Body::at(0, Pos::tile_center(34, 29));
+        guard.chase(9);
+        let mut caught = false;
+        for _ in 0..400 {
+            let ev = guard.tick(&b, &HashMap::from([(9u16, thief)]));
+            if ev.contains(&Event::Caught { npc: guard.id, player: 9 }) {
+                caught = true;
+                break;
+            }
+        }
+        assert!(caught, "the guard reached the thief");
+        assert!(guard.chasing().is_none());
+        for _ in 0..2000 {
+            guard.tick(&b, &HashMap::new());
+        }
+        assert!(guard.is_idle() && guard.body.pos == home.pos, "back at the shop door");
+        // Out of the game (not in the world): gives up at once.
+        guard.chase(9);
+        let ev = guard.tick(&b, &HashMap::new());
+        assert!(ev.contains(&Event::Escaped { npc: guard.id, player: 9 }));
+        // Somewhere the guard can't follow (the server room): gives up.
+        let far = Body::at(0, Pos::tile_center(44, 6));
+        guard.chase(9);
+        let mut escaped = false;
+        for _ in 0..GUARD_GIVE_UP_TICKS + 5 {
+            if guard.tick(&b, &HashMap::from([(9u16, far)])).contains(&Event::Escaped { npc: guard.id, player: 9 }) {
+                escaped = true;
+                break;
+            }
+        }
+        assert!(escaped);
+    }
+
+    #[test]
     fn spawns_the_staff_with_looks() {
         let (_, npcs) = everyone();
         let roles: Vec<(Role, &str, u8)> = npcs.iter().map(|n| (n.role, n.name.as_str(), n.flags >> 3)).collect();
@@ -495,6 +625,7 @@ mod tests {
             vec![
                 (Role::Porter, "Portier", look::PORTER),
                 (Role::Cashier, "Kasa", look::OFFICE),
+                (Role::Guard, "Ochrona", look::GUARD),
                 (Role::Receptionist, "Recepcja", look::OFFICE),
                 (Role::Hr, "HR", look::OFFICE),
                 (Role::Ceo, "Prezes", look::OFFICE),
@@ -502,7 +633,7 @@ mod tests {
             ]
         );
         let ids: Vec<u16> = npcs.iter().map(|n| n.id).collect();
-        assert_eq!(ids, (0..6).map(|i| NPC_ID_BASE + i).collect::<Vec<_>>());
+        assert_eq!(ids, (0..7).map(|i| NPC_ID_BASE + i).collect::<Vec<_>>());
     }
 
     #[test]

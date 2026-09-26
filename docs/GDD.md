@@ -205,6 +205,15 @@ gracze).
 
 **Panel założyciela** — *zrobione bez płatności (10.28)*.
 
+**Pomysły 2026-09-26 (II)** — kolejność: sklep → kubki → dym → interfejs.
+- Kradzież w sklepie: ochrona, a potem policja — *zrobione (10.29)*.
+- Kubki po kawie zostawiane gdzie popadnie; NPC sprzątaczka pod koniec dnia
+  obchodzi pokoje i sprząta, przy dużej liczbie kubków narzeka.
+- Papierosa można zapalić wszędzie; w środku dym rozchodzi się po pokoju, w
+  części pomieszczeń czujka → alarm, straż pożarna, ewakuacja, kara.
+- Interfejs w pikselowym stylu gry: HUD (ekwipunek, statystyki), komputer,
+  portal z ofertami — pikselowa czcionka i ramki.
+
 **Model biznesowy (przyszłość)**
 - Gra **darmowa** dla graczy.
 - Każda firma = **osobny serwer / instancja gry**. Założenie firmy (własna
@@ -783,6 +792,25 @@ Zastępuje prosty portal z 10.8. Po połączeniu gracz widzi pulpit komputera
 - Gdy założyciel wyjdzie z gry, firma zostaje bez założyciela (nazwa
   zostaje), a portal znowu proponuje jej założenie.
 
+### 10.29 Ochrona i policja w sklepie
+
+- W sklepie przy drzwiach stoi **ochroniarz** (NPC „Ochrona”, czarny strój z
+  żółtą opaską). Wyjście z niezapłaconym towarem: bramka piszczy, ochroniarz
+  woła „Stać!” i **goni** złodzieja (trochę szybciej niż gracz, także po
+  schodach i przez bramki).
+- **Złapany przez ochronę**: towar wraca na półkę, upomnienie, +10 stresu. Jeśli
+  w międzyczasie zapłacił przy kasie — tylko uwaga. Ochroniarz wraca pod drzwi.
+- **Policja** przyjeżdża, gdy to **druga kradzież tego dnia** (po złapaniu przez
+  ochronę) albo gdy złodziej **uciekł** ochronie (20 s pościgu bez skutku) lub
+  ochroniarz jest zajęty innym pościgiem. Radiowóz (biało-niebieski, migający
+  kogut) podjeżdża ulicą pod wejście, policjant wysiada i idzie po złodzieja
+  **gdziekolwiek w budynku** (ma wszystkie uprawnienia).
+- **Złapany przez policję**: mandat 300 zł (albo tyle, ile jest w portfelu; przy
+  pustym — pouczenie), towar zabezpieczony, +25 stresu, „Ale wstyd…” — wszystko
+  słychać w pokoju. Po 3 min pościgu policja odjeżdża, a mandat i tak schodzi z
+  konta. Policjant wraca do radiowozu i odjeżdża.
+- Licznik kradzieży zeruje się każdego ranka.
+
 ### 10.6 Stan implementacji
 
 *Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie,
@@ -819,6 +847,8 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Ekwipunek**: kieszenie i ręce, przedmioty (przepustka, karta, laptop,
   kawa), upuszczanie / podnoszenie / podawanie, dostęp z przedmiotów (10.13);
   protokół v8.
+- **Ochrona i policja**: ochroniarz w sklepie goni złodzieja, radiowóz i
+  policjant przy recydywie albo ucieczce, mandat (10.29); protokół v24.
 - **Panel założyciela**: zakładanie firmy z portalu, nazwa firmy w grze,
   zakładka „Firma” (miejsca, opisy, kandydaci, zespół, zwalnianie) (10.28);
   protokół v23.
@@ -862,12 +892,12 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Sieć mobilna**: serwer dual-stack IPv4/IPv6; gracz identyfikowany tokenem
   (zmiana adresu w trakcie gry przenosi sesję); klient przepina gniazdo po
   ciszy/powrocie z tła i sam łączy się ponownie po utracie sesji.
-- **Testy**: 88 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
+- **Testy**: 90 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
   zależna od uprawnień, bramki, ruch/kolizje, schody, winda, nawigacja,
-  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, zegar, dojazd, pogoda, zarząd, słodycze, obiady, wakaty, firma, protokół), 2 golden, 25 e2e serwera
+  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, zegar, dojazd, pogoda, zarząd, słodycze, obiady, wakaty, firma, ochrona i policja, protokół), 2 golden, 25 e2e serwera
   (m.in. portal: odrzucenie → przyjęcie → spawn; całe wdrożenie aż do karty;
   niewidoczność między piętrami; zgodność stanu serwera z predykcją) —
-  łącznie 115 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 porannego dojazdu samochodem moknięcia w deszczu spotkania z Prezesem tacy ze słodyczami obiadu z odbiorem na recepcji, obsadzonego stanowiska i panelu założyciela); 145 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
+  łącznie 117 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 porannego dojazdu samochodem moknięcia w deszczu spotkania z Prezesem tacy ze słodyczami obiadu z odbiorem na recepcji, obsadzonego stanowiska, panelu założyciela i kradzieży w sklepie z ochroną i policją); 145 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
   adresów).
 
 #### Pomiary (MacBook, wszystko lokalnie)

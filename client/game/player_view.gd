@@ -19,6 +19,8 @@ const HEAD_TOP := -21.0  # sprite top relative to the feet
 const LOOK_PLAYER := 0
 const LOOK_PORTER := 1
 const LOOK_OFFICE := 2
+const LOOK_GUARD := 3      # shop security
+const LOOK_POLICE := 4
 
 const SKINS := [Color("#f2cfae"), Color("#e3b08c"), Color("#c68c63"), Color("#8d5a3b")]
 const HAIRS := [Color("#2b2118"), Color("#5a3b22"), Color("#a0703a"), Color("#d9b66b"), Color("#8a8a8a"), Color("#b5462e"), Color("#1d1d27")]
@@ -111,6 +113,12 @@ func set_seed(seed_id: int) -> void:
 		LOOK_OFFICE:
 			shirt = Color("#f4f6f8")
 			pants = Color("#2d3036")
+		LOOK_GUARD:
+			shirt = Color("#23262b")
+			pants = Color("#1a1c20")
+		LOOK_POLICE:
+			shirt = Color("#1f3358")
+			pants = Color("#17233d")
 	queue_redraw()
 
 
@@ -260,6 +268,15 @@ func _draw() -> void:
 	_r(-4, ty, 8, 1, shirt.lightened(0.15))
 	if look == LOOK_OFFICE and facing != FACING_UP:
 		_r(-0.5 if not side else dir * 1.5 - 0.5, ty + 1, 1.5, 5, tie)
+	if look == LOOK_GUARD:
+		_r(-4, ty + 2, 8, 2, Color("#f1c40f"))  # "OCHRONA" band
+		if facing != FACING_UP:
+			_r(-2, ty + 2, 4, 1, Color("#23262b"))
+	if look == LOOK_POLICE:
+		_r(-4, ty + 5, 8, 1, Color("#101010"))  # belt
+		if facing != FACING_UP and not side:
+			_r(1, ty + 1, 2, 2, Color("#d9d9d9"))  # badge
+		_r(-5 if not side else -1, ty + 1, 2, 1, Color("#d4ac2b"))  # epaulette
 	if look == LOOK_PORTER:
 		_r(-4, ty + 5, 8, 1, Color("#d4ac2b"))  # belt
 		if facing != FACING_UP and not side:
@@ -289,6 +306,13 @@ func _draw() -> void:
 			_r(dir * 1.5 - 0.5, top + 4, 1, 1, eye)
 			_r(dir * 3 - (1 if dir > 0 else 0), top + 5, 1, 1, skin.darkened(0.15))  # nose
 	_draw_status(top, ty, side, dir)
+	if look == LOOK_POLICE:
+		_r(-4, top - 1, 8, 3, Color("#17233d"))           # cap
+		_r(-4, top + 1, 8, 1, Color("#e8e8e8"))           # band
+		for i in 4:
+			_r(-4 + i * 2, top + 1, 1, 1, Color("#17233d"))
+		if facing == FACING_DOWN:
+			_r(-4, top + 2, 8, 1, Color("#0b0f1a"))        # visor
 	if look == LOOK_PORTER:
 		_r(-4, top - 1, 8, 3, Color("#1b2440"))           # cap
 		_r(-2, top, 4, 1, Color("#d4ac2b"))                # cap badge
@@ -382,7 +406,7 @@ func _draw_status(top: float, ty: float, side: bool, dir: int) -> void:
 
 
 func _draw_hair(top: float, side: bool, dir: int) -> void:
-	if look == LOOK_PORTER:
+	if look == LOOK_PORTER or look == LOOK_POLICE:
 		_r(-3, top + 1, 6, 2, hair)  # a bit of hair under the cap
 		return
 	var h := hair

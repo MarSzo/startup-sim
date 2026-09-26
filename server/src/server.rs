@@ -20,6 +20,7 @@ use crate::npc::{self, Npc};
 use crate::protocol::{self as proto, EntityState, Packet, PlayerInfoEntry, Profile, SelfState};
 use crate::recruitment::{Attempt, Recruitment};
 use crate::sim::{self, Body, Pos};
+use crate::security::{self, PoliceCall};
 use crate::shop::{self, Shelf};
 use crate::lunch;
 use crate::stalls::{self, Stall};
@@ -199,6 +200,8 @@ struct Player {
     riding: Option<u16>,
     /// Already told "it's pouring" (until back indoors).
     soaked_said: bool,
+    /// Left the shop with unpaid goods today (the second time = police).
+    thefts_today: u8,
     /// Salary, grosze per game hour (raises from the CEO).
     pay_rate: i64,
     /// World day of the last raise request (cooldown).
@@ -268,6 +271,9 @@ pub struct Server {
     lunch_orders: Vec<lunch::Order>,
     /// Sweets on the chill-room table, and when the next trays come today.
     tray: Option<Tray>,
+    /// Patrol cars called for shoplifters.
+    police_calls: Vec<PoliceCall>,
+    next_officer_id: u16,
     treat_drops: Vec<u32>,
     /// (floor, room) of the board room.
     board_room: Option<(u8, u16)>,
@@ -326,6 +332,8 @@ impl Server {
             weather: Weather::new(0),
             meetings: Vec::new(),
             tray: None,
+            police_calls: Vec::new(),
+            next_officer_id: 0,
             lunch_orders: Vec::new(),
             vacancies: cfg.recruitment.offers.iter().filter(|o| o.hiring).map(|o| (o.id, o.vacancies)).collect(),
             company: Company::new(
@@ -657,6 +665,7 @@ impl Server {
             depart_at: None,
             riding: None,
             soaked_said: false,
+            thefts_today: 0,
             pay_rate: clock::PAY_PER_MIN * 60,
             last_raise_day: None,
             talk: None,
@@ -1520,6 +1529,7 @@ impl Server {
                 let now = self.clock.total_minutes();
                 for p in self.players.values_mut() {
                     p.day += 1;
+                    p.thefts_today = 0;
                     if matches!(p.stage, Stage::Home { .. }) {
                         // Leaves home at a random time; how they travel is
                         // chosen until then (the last choice by default).
@@ -1651,6 +1661,104 @@ impl Server {
         if late {
             p.needs.add_stress(10);
             self.pending_says.push((pid, commute::lines::LATE.to_string(), None));
+        }
+    }
+
+    /// A patrol car for `pid` (one per person).
+    fn call_police(&mut self, pid: u16) {
+        if self.police_calls.iter().any(|c| c.target == pid) {
+            return;
+        }
+        let car = self.alloc_handle();
+        self.vehicles.push(Vehicle::police(car));
+        self.police_calls.push(PoliceCall { target: pid, car, officer: None });
+        let nick = self.players.get(&pid).map_or("?".into(), |p| p.nick.clone());
+        self.log(format!("* police called for {nick}"));
+    }
+
+    /// Patrol cars: the officer gets out once the car stands at the
+    /// entrance, and when back by the car both leave.
+    fn tick_police(&mut self) {
+        let mut done = Vec::new();
+        for i in 0..self.police_calls.len() {
+            let PoliceCall { target, car, officer } = self.police_calls[i].clone();
+            match officer {
+                None => {
+                    if self.vehicles.iter().any(|v| v.handle == car && v.parked()) {
+                        let id = npc::NPC_ID_BASE + 0x0F00 + self.next_officer_id % 0x100;
+                        self.next_officer_id = self.next_officer_id.wrapping_add(1);
+                        let mut n = Npc::police(&self.building, id, security::officer_spawn());
+                        n.chase(target);
+                        self.npcs.push(n);
+                        self.police_calls[i].officer = Some(id);
+                    }
+                }
+                Some(id) => {
+                    if self.npcs.iter().any(|n| n.id == id && n.is_idle()) {
+                        self.npcs.retain(|n| n.id != id);
+                        if let Some(v) = self.vehicles.iter_mut().find(|v| v.handle == car) {
+                            v.leave(security::car_exit());
+                        }
+                        done.push(car);
+                    }
+                }
+            }
+        }
+        self.police_calls.retain(|c| !done.contains(&c.car));
+    }
+
+    /// A chase ended next to the player: what the guard / officer does.
+    fn caught(&mut self, npc_id: u16, pid: u16) -> Vec<(u16, String, Option<u16>)> {
+        let Some(role) = self.npcs.iter().find(|n| n.id == npc_id).map(|n| n.role) else { return vec![] };
+        let Some(p) = self.players.get_mut(&pid) else { return vec![] };
+        let had = p.inventory.items().any(|i| i.unpaid);
+        let mut says = Vec::new();
+        match role {
+            npc::Role::Police => {
+                let fine = security::FINE.min(p.money.max(0));
+                p.money -= fine;
+                p.inventory.remove_unpaid();
+                p.needs.add_stress(security::POLICE_STRESS);
+                refresh(p);
+                let nick = p.nick.clone();
+                says.push((npc_id, security::lines::police_fine(fine), Some(pid)));
+                says.push((pid, security::lines::SHAME.to_string(), None));
+                self.log(format!("* police fined {nick} {}", shop::zl(fine)));
+            }
+            _ if had => {
+                p.inventory.remove_unpaid();
+                p.needs.add_stress(security::GUARD_STRESS);
+                refresh(p);
+                says.push((npc_id, security::lines::GUARD_CAUGHT.to_string(), Some(pid)));
+                if p.thefts_today >= security::THEFTS_FOR_POLICE {
+                    says.push((npc_id, security::lines::GUARD_POLICE_AGAIN.to_string(), Some(pid)));
+                    self.call_police(pid);
+                }
+            }
+            _ => says.push((npc_id, security::lines::GUARD_PAID.to_string(), Some(pid))),
+        }
+        says
+    }
+
+    /// The chase was given up: the guard calls the police; the police send
+    /// the fine anyway.
+    fn escaped(&mut self, npc_id: u16, pid: u16) -> Vec<(u16, String, Option<u16>)> {
+        let Some(role) = self.npcs.iter().find(|n| n.id == npc_id).map(|n| n.role) else { return vec![] };
+        let Some(p) = self.players.get_mut(&pid) else { return vec![] };
+        match role {
+            npc::Role::Police => {
+                let fine = security::FINE.min(p.money.max(0));
+                p.money -= fine;
+                p.inventory.remove_unpaid();
+                p.needs.add_stress(security::POLICE_STRESS);
+                refresh(p);
+                vec![(pid, security::lines::fine_by_mail(fine), None)]
+            }
+            _ if p.inventory.items().any(|i| i.unpaid) => {
+                self.call_police(pid);
+                vec![(npc_id, security::lines::GUARD_ESCAPED.to_string(), Some(pid))]
+            }
+            _ => vec![],
         }
     }
 
@@ -2709,15 +2817,27 @@ impl Server {
                 | if p.body.slow { proto::FLAG_SLOW } else { 0 }
                 | if p.needs.smelly() { proto::FLAG_SMELLY } else { 0 };
         }
-        // The security gate beeps; the goods stay in the shop.
+        // The security gate beeps and the guard runs after the thief (busy
+        // with somebody else: straight to the police).
         for pid in shoplifters {
+            if self.npcs.iter().any(|n| n.chasing() == Some(pid)) || self.police_calls.iter().any(|c| c.target == pid) {
+                continue; // already after them
+            }
             if let Some(p) = self.players.get_mut(&pid) {
-                p.inventory.remove_unpaid();
-                p.needs.add_stress(10);
-                refresh(p);
+                p.thefts_today = p.thefts_today.saturating_add(1);
             }
             let speaker = self.cashier.unwrap_or(pid);
             coffee_says.push((speaker, shop::lines::ALARM.to_string(), Some(pid)));
+            match self.npcs.iter_mut().find(|n| n.role == npc::Role::Guard && n.chasing().is_none()) {
+                Some(g) => {
+                    g.chase(pid);
+                    coffee_says.push((g.id, npc::lines::GUARD_STOP.to_string(), Some(pid)));
+                }
+                None => {
+                    coffee_says.push((speaker, security::lines::CALLED.to_string(), Some(pid)));
+                    self.call_police(pid);
+                }
+            }
         }
         // Somebody in the bathroom saw it.
         for (pid, floor, bath) in unwashed_exits {
@@ -2811,6 +2931,7 @@ impl Server {
         self.check_stalls();
         self.tick_elevators();
         self.tick_vehicles();
+        self.tick_police();
         self.tick_meetings();
         self.tick_lunch();
         self.tick_company();
@@ -2836,6 +2957,8 @@ impl Server {
                     }
                 }
                 npc::Event::Say { npc, text, to } => says.push((npc, text, to)),
+                npc::Event::Caught { npc, player } => says.extend(self.caught(npc, player)),
+                npc::Event::Escaped { npc, player } => says.extend(self.escaped(npc, player)),
                 npc::Event::Meeting { npc, player } => {
                     if let Some(line) = self.start_meeting(npc, player) {
                         says.push((npc, line, Some(player)));

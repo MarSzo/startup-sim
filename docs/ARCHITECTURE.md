@@ -32,6 +32,7 @@ server/                 crate Rusta (lib `game` + binarki)
   src/coffee.rs         ekspresy do kawy (parzenie → kawa jako przedmiot)
   src/inventory.rs      przedmioty, kieszenie i ręce, uprawnienia z przedmiotów
   src/computer.rs       stanowiska (biurka działów), laptopy na biurkach, komunikator
+  src/security.rs       kradzież w sklepie: mandat, radiowóz (trasa), wezwania policji
   src/company.rs        firma i założyciel: nazwa, opisy ofert, kandydaci, zespół
   src/lunch.rs          zamawianie obiadów: menu, zamówienia, dostawa na recepcję
   src/treats.rs         słodycze w chill roomie (taca, ogłoszenie), nieświeże owoce
@@ -179,6 +180,15 @@ symulacji. `--start-time hh:mm`, `--time-scale N` do testów.
 przy braku miejsca = mail „obsadzone”; zajęcie ostatniego miejsca
 (`take_vacancy`) kończy rekrutację pozostałym (`position_filled_mail`).
 `Player::position` zwalnia miejsce przy wyjściu z gry.
+
+**Ochrona i policja** (`security.rs`, `npc.rs`): NPC ma stan `Chasing` —
+co 1 s nowa ścieżka (`Walker::to`) do bieżącego kafla celu, 4 kroki na tick,
+`Event::Caught` w promieniu 1,5 kafla, `Event::Escaped` po czasie (ochrona
+20 s, policja 3 min) albo gdy cel zniknie ze świata. Wyjście ze sklepu z
+towarem `unpaid` → `Player::thefts_today` + pościg ochroniarza. `call_police`
+dodaje `Vehicle::police` (parkuje przy wejściu) i `PoliceCall`; `tick_police`
+wypuszcza policjanta (`Npc::police`, id od `NPC_ID_BASE + 0xF00`), a gdy ten
+wróci do auta — usuwa NPC i odsyła radiowóz (`Vehicle::leave`).
 
 **Firma** (`company.rs`): `Server::company` (nazwa z pierwszej oferty
 `recruitment.json`, `founder`, własne opisy, `candidates`, `hired_on`).

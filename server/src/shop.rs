@@ -125,7 +125,7 @@ pub fn zl(gr: i64) -> String {
 pub mod lines {
     pub const NO_ROOM: &str = "Nie mam już gdzie tego włożyć.";
     pub const NOTHING_TO_PAY: &str = "Dzień dobry! Proszę coś wybrać z półek — płaci się tutaj.";
-    pub const ALARM: &str = "Piiip! Towar niezapłacony — zostaje w sklepie.";
+    pub const ALARM: &str = "Piiip! Piiip! Niezapłacony towar!";
     pub const PAY_FIRST: &str = "Najpierw trzeba zapłacić przy kasie.";
     pub const NO_CIGARETTES: &str = "Nie mam papierosów — sklep jest na parterze.";
     pub fn paid(total: i64, left: i64) -> String {

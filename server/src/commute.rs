@@ -24,6 +24,8 @@ pub mod vehicle {
     pub const BIKE: u8 = 2;
     pub const TAXI: u8 = 3;
     pub const TRAM: u8 = 4;
+    /// Patrol car (security.rs): not anybody's commute.
+    pub const POLICE: u8 = 5;
 }
 
 /// Needs changed by the trip (points).
@@ -153,6 +155,33 @@ impl Vehicle {
             facing: 2,
             moving: true,
         })
+    }
+
+    /// A patrol car: drives up to the entrance and waits there (`leave`).
+    pub fn police(handle: u16) -> Vehicle {
+        let path = crate::security::car_path();
+        Vehicle {
+            handle,
+            kind: vehicle::POLICE,
+            owner: 0,
+            pos: path[0],
+            path,
+            next: 1,
+            speed: 128,
+            stop: usize::MAX - 1,
+            dwell: 0,
+            rider: None,
+            alight: Pos { x: 0, y: 0 },
+            parks: true,
+            facing: 2,
+            moving: true,
+        }
+    }
+
+    /// Drive off the map (then `VehicleEvent::Gone`).
+    pub fn leave(&mut self, exit: Pos) {
+        self.parks = false;
+        self.path.push(exit);
     }
 
     pub fn parked(&self) -> bool {
