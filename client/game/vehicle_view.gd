@@ -7,6 +7,7 @@ const BIKE := 2
 const TAXI := 3
 const TRAM := 4
 const POLICE := 5
+const FIRE_ENGINE := 6
 const CAR_COLORS := [Color("#c0392b"), Color("#2e5fa8"), Color("#ecf0f1"), Color("#2c2f36"), Color("#27ae60"), Color("#8e44ad")]
 
 var kind := CAR
@@ -36,7 +37,7 @@ func push(pos: Vector2, flags: int) -> void:
 
 func _process(delta: float) -> void:
 	position = position.lerp(target, minf(1.0, delta * 12.0))
-	if kind == POLICE:
+	if kind == POLICE or kind == FIRE_ENGINE:
 		queue_redraw()  # flashing lights
 
 
@@ -66,6 +67,24 @@ func _draw() -> void:
 				var blink := (Time.get_ticks_msec() / 250) % 2 == 0
 				draw_rect(Rect2(-6, -5, 6, 4), Color("#2f6bff") if blink else Color("#15306e"))
 				draw_rect(Rect2(0, -5, 6, 4), Color("#15306e") if blink else Color("#2f6bff"))
+		FIRE_ENGINE:
+			var r := Rect2(-34, -13, 68, 24)
+			draw_rect(Rect2(r.position + Vector2(2, 3), r.size), Color(0, 0, 0, 0.25))
+			draw_rect(r, Color("#8e1b1b"))
+			draw_rect(r.grow(-1), Color("#d32f2f"))
+			var cab := 20.0 if flip else -32.0
+			draw_rect(Rect2(cab, -10, 12, 18), Color("#b71c1c"))
+			draw_rect(Rect2(cab + (8.0 if flip else 0.0), -8, 4, 14), Color("#1f2a38"))  # windscreen
+			# Ladder on the roof.
+			var lx := -24.0 if not flip else -14.0
+			draw_rect(Rect2(lx, -6, 38, 2), Color("#cfd4da"))
+			draw_rect(Rect2(lx, 2, 38, 2), Color("#cfd4da"))
+			for i in 7:
+				draw_rect(Rect2(lx + i * 6, -6, 1, 10), Color("#cfd4da"))
+			draw_rect(Rect2(-33, 6, 66, 2), Color("#f1e05a"))  # stripe
+			var blink := (Time.get_ticks_msec() / 200) % 2 == 0
+			draw_rect(Rect2(cab + 2, -13, 4, 3), Color("#2f6bff") if blink else Color("#15306e"))
+			draw_rect(Rect2(cab + 7, -13, 4, 3), Color("#15306e") if blink else Color("#2f6bff"))
 		TRAM:
 			var r := Rect2(-48, -12, 96, 22)
 			draw_rect(Rect2(r.position + Vector2(2, 3), r.size), Color(0, 0, 0, 0.25))

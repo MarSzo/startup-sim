@@ -3,7 +3,7 @@
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 25
+const VERSION := 26
 const MAX_PACKET := 1200
 const MAX_NICK_BYTES := 16
 const MAX_SAY_BYTES := 240
@@ -50,6 +50,7 @@ const T_LUNCH_ORDER := 36
 const T_COMPANY_OFFERS := 37
 const T_COMPANY_PEOPLE := 38
 const T_COMPANY_ACTION := 39
+const T_SMOKE := 40
 # CompanyAction.action (server/src/company.rs)
 const CO_FOUND := 1
 const CO_RENAME := 2
@@ -514,6 +515,16 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			p.weather = r.u8()
 			p.company = r.str16(64)
 			p.founded = r.u8() != 0
+			p.alarm = r.u8()
+		T_SMOKE:
+			p.floor = r.u8()
+			var n := r.u8()
+			if n > 64:
+				return {}
+			var rooms := []
+			for i in n:
+				rooms.append([r.u16(), r.u8()])
+			p.rooms = rooms
 		T_COMPANY_OFFERS:
 			p.name = r.str16(64)
 			var n := r.u8()

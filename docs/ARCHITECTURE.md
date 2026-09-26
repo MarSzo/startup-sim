@@ -32,6 +32,7 @@ server/                 crate Rusta (lib `game` + binarki)
   src/coffee.rs         ekspresy do kawy (parzenie → kawa jako przedmiot)
   src/inventory.rs      przedmioty, kieszenie i ręce, uprawnienia z przedmiotów
   src/computer.rs       stanowiska (biurka działów), laptopy na biurkach, komunikator
+  src/fire.rs           dym (ilość na pokój, przenikanie drzwiami), czujki, alarm i straż
   src/cleaning.rs       kubki po kawie i wieczorny obchód sprzątaczki (stałe, teksty)
   src/security.rs       kradzież w sklepie: mandat, radiowóz (trasa), wezwania policji
   src/company.rs        firma i założyciel: nazwa, opisy ofert, kandydaci, zespół
@@ -190,6 +191,17 @@ towarem `unpaid` → `Player::thefts_today` + pościg ochroniarza. `call_police`
 dodaje `Vehicle::police` (parkuje przy wejściu) i `PoliceCall`; `tick_police`
 wypuszcza policjanta (`Npc::police`, id od `NPC_ID_BASE + 0xF00`), a gdy ten
 wróci do auta — usuwa NPC i odsyła radiowóz (`Vehicle::leave`).
+
+**Dym i straż** (`fire.rs`): `Smoke` trzyma ilość dymu na (piętro, pokój);
+stężenie = ilość / liczba kafli pokoju. `puff` (każdy tick palenia w środku),
+`tick` co `DRIFT_EVERY` przelewa przez każde przejście między pokojami
+(`Map::room_adjacency`) `różnica × DOORWAY` (nie więcej niż wyrównanie;
+pokoje otwarte pochłaniają), co `DECAY_EVERY` zanika. `tick_smoke_and_alarm`:
+skargi, czujka (`RoomDef::detector`) ≥ `ALARM` → `Alarm` + `Vehicle::fire_engine`;
+po zaparkowaniu `Npc::firefighter` idzie (`go_to`) na miejsce palacza, sprawdza
+`CHECK_TICKS`, `clear`, kara i wpis na #ogólny, wraca; przy wozie — koniec.
+`Clock.alarm` i pakiet `Smoke` (co 1 s) dla klienta; `SmokeView` rysuje mgłę i
+czujki.
 
 **Sprzątaczka** (`cleaning.rs`): pusty kubek (`EMPTY_CUP`) powstaje po
 wypiciu / wystygnięciu kawy; umywalka i ekspres go zabierają. Od

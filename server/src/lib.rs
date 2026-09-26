@@ -7,6 +7,7 @@ pub mod clock;
 pub mod cleaning;
 pub mod coffee;
 pub mod elevator;
+pub mod fire;
 pub mod commute;
 pub mod company;
 pub mod computer;

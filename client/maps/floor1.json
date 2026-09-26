@@ -228,7 +228,8 @@
   "C": {
    "id": 1,
    "name": "Recepcja",
-   "type": "reception"
+   "type": "reception",
+   "detector": true
   },
   "L": {
    "id": 20,
@@ -243,27 +244,32 @@
   "Z": {
    "id": 2,
    "name": "Zarząd",
-   "type": "management"
+   "type": "management",
+   "detector": true
   },
   "I": {
    "id": 3,
    "name": "IT / Produkt",
-   "type": "department"
+   "type": "department",
+   "detector": true
   },
   "R": {
    "id": 4,
    "name": "HR",
-   "type": "department"
+   "type": "department",
+   "detector": true
   },
   "K": {
    "id": 5,
    "name": "Korytarz",
-   "type": "corridor"
+   "type": "corridor",
+   "detector": true
   },
   "B": {
    "id": 6,
    "name": "Biznes",
-   "type": "department"
+   "type": "department",
+   "detector": true
   },
   "H": {
    "id": 7,

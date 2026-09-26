@@ -102,6 +102,9 @@ pub struct RoomDef {
     /// Under the open sky (weather applies).
     #[serde(default)]
     pub outdoor: bool,
+    /// Has a smoke detector (fire.rs).
+    #[serde(default)]
+    pub detector: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -392,6 +395,32 @@ impl Map {
 
     pub fn link_at(&self, tx: i32, ty: i32) -> Option<&Link> {
         self.links.iter().find(|l| l.area.contains(tx, ty))
+    }
+
+    /// Pairs of rooms whose walkable tiles touch (a doorway), each once.
+    pub fn room_adjacency(&self) -> Vec<(u16, u16)> {
+        let mut out = Vec::new();
+        for ty in 0..self.height {
+            for tx in 0..self.width {
+                if self.is_blocked(tx, ty) {
+                    continue;
+                }
+                let a = self.room_at_tile(tx, ty);
+                for (nx, ny) in [(tx + 1, ty), (tx, ty + 1)] {
+                    if nx >= self.width || ny >= self.height || self.is_blocked(nx, ny) {
+                        continue;
+                    }
+                    let c = self.room_at_tile(nx, ny);
+                    if a != c && a != NO_ROOM && c != NO_ROOM {
+                        let pair = (a.min(c), a.max(c));
+                        if !out.contains(&pair) {
+                            out.push(pair);
+                        }
+                    }
+                }
+            }
+        }
+        out
     }
 
     /// All walkable tiles belonging to a room.

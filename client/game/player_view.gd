@@ -22,6 +22,7 @@ const LOOK_OFFICE := 2
 const LOOK_GUARD := 3      # shop security
 const LOOK_POLICE := 4
 const LOOK_CLEANER := 5
+const LOOK_FIREFIGHTER := 6
 
 const SKINS := [Color("#f2cfae"), Color("#e3b08c"), Color("#c68c63"), Color("#8d5a3b")]
 const HAIRS := [Color("#2b2118"), Color("#5a3b22"), Color("#a0703a"), Color("#d9b66b"), Color("#8a8a8a"), Color("#b5462e"), Color("#1d1d27")]
@@ -123,6 +124,9 @@ func set_seed(seed_id: int) -> void:
 		LOOK_CLEANER:
 			shirt = Color("#2bb3a8")
 			pants = Color("#3d4f5c")
+		LOOK_FIREFIGHTER:
+			shirt = Color("#1d2433")
+			pants = Color("#1d2433")
 	queue_redraw()
 
 
@@ -272,6 +276,9 @@ func _draw() -> void:
 	_r(-4, ty, 8, 1, shirt.lightened(0.15))
 	if look == LOOK_OFFICE and facing != FACING_UP:
 		_r(-0.5 if not side else dir * 1.5 - 0.5, ty + 1, 1.5, 5, tie)
+	if look == LOOK_FIREFIGHTER:
+		_r(-4, ty + 2, 8, 1, Color("#f1e05a"))  # reflective stripes
+		_r(-4, ty + 5, 8, 1, Color("#c9d1d9"))
 	if look == LOOK_CLEANER:
 		if facing != FACING_UP:
 			_r(-3, ty + 2, 6, 5, Color("#e8f4f2"))  # apron
@@ -317,6 +324,10 @@ func _draw() -> void:
 			_r(dir * 1.5 - 0.5, top + 4, 1, 1, eye)
 			_r(dir * 3 - (1 if dir > 0 else 0), top + 5, 1, 1, skin.darkened(0.15))  # nose
 	_draw_status(top, ty, side, dir)
+	if look == LOOK_FIREFIGHTER:
+		_r(-4, top - 2, 8, 4, Color("#d62f2f"))           # helmet
+		_r(-5, top + 1, 10, 1, Color("#a31f1f"))          # brim
+		_r(-1, top - 2, 2, 1, Color("#f1e05a"))            # badge
 	if look == LOOK_POLICE:
 		_r(-4, top - 1, 8, 3, Color("#17233d"))           # cap
 		_r(-4, top + 1, 8, 1, Color("#e8e8e8"))           # band
@@ -417,7 +428,7 @@ func _draw_status(top: float, ty: float, side: bool, dir: int) -> void:
 
 
 func _draw_hair(top: float, side: bool, dir: int) -> void:
-	if look == LOOK_PORTER or look == LOOK_POLICE:
+	if look == LOOK_PORTER or look == LOOK_POLICE or look == LOOK_FIREFIGHTER:
 		_r(-3, top + 1, 6, 2, hair)  # a bit of hair under the cap
 		return
 	var h := hair

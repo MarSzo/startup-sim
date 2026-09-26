@@ -31,6 +31,7 @@ OPTIONS:
   --treats              a tray of sweets in the chill room right away (dev)
   --stale-fruit <pct>   chance that fruit from the bowl is stale      [default: 15]
   --cleaning-at <hh:mm> when the cleaner starts her round             [default: 18:00]
+  --start-cigarettes    with --start-employed: a pack of cigarettes in the pocket (dev)
   --needs-speed <n>     needs (hunger, energy...) change n times faster (dev)
   --recruitment <path>  recruitment JSON  [default: data/recruitment.json]
 ";
@@ -78,6 +79,7 @@ fn main() {
         recruitment,
         skip_recruitment: args.flag("skip-recruitment") || args.flag("start-employed"),
         start_employed: args.flag("start-employed"),
+        start_cigarettes: args.flag("start-cigarettes"),
         needs_speed: args.get("needs-speed", 1),
         start_minute: parse_time(args.str("start-time").unwrap_or("8:00")),
         time_scale: args.get("time-scale", 1),

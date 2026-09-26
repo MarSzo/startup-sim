@@ -51,6 +51,7 @@ pub mod look {
     pub const GUARD: u8 = 3;
     pub const POLICE: u8 = 4;
     pub const CLEANER: u8 = 5;
+    pub const FIREFIGHTER: u8 = 6;
 }
 
 pub mod lines {
@@ -101,6 +102,8 @@ pub enum Role {
     Police,
     /// Evening round: collects the mugs left lying around (cleaning.rs).
     Cleaner,
+    /// Comes with the fire engine on a fire alarm (fire.rs).
+    Firefighter,
 }
 
 impl Role {
@@ -125,6 +128,7 @@ impl Role {
             Role::Guard => look::GUARD,
             Role::Police => look::POLICE,
             Role::Cleaner => look::CLEANER,
+            Role::Firefighter => look::FIREFIGHTER,
         }
     }
 }
@@ -228,8 +232,20 @@ impl Npc {
     /// A police officer next to the patrol car at `pos` (floor 0); its
     /// "home" is the car.
     pub fn police(b: &Building, id: u16, pos: Pos) -> Npc {
-        let def = NpcDef { kind: "police".into(), name: "Policja".into(), home: { let (x, y) = pos.tile(); crate::map::Tile { x, y } }, escort_to: None };
-        let mut n = Npc::new(b, id, 0, &def, Role::Police);
+        Npc::visitor(b, id, pos, Role::Police, "Policja")
+    }
+
+    /// A firefighter off the fire engine at `pos` (floor 0).
+    pub fn firefighter(b: &Building, id: u16, pos: Pos) -> Npc {
+        Npc::visitor(b, id, pos, Role::Firefighter, "Straż pożarna")
+    }
+
+    /// Someone from outside, arriving by car at `pos` (floor 0; "home" = the
+    /// car), allowed everywhere.
+    fn visitor(b: &Building, id: u16, pos: Pos, role: Role, name: &str) -> Npc {
+        let (x, y) = pos.tile();
+        let def = NpcDef { kind: String::new(), name: name.into(), home: crate::map::Tile { x, y }, escort_to: None };
+        let mut n = Npc::new(b, id, 0, &def, role);
         n.body.pos = pos;
         n.body.access = access::GUEST | access::CARD | access::SERVICE | access::BOARD;
         n
@@ -308,6 +324,9 @@ impl Npc {
         }
         if matches!(self.role, Role::Ceo | Role::CoFounder) {
             return vec![Event::Meeting { npc: self.id, player }];
+        }
+        if self.role == Role::Firefighter {
+            return vec![say(crate::fire::lines::GET_OUT)];
         }
         if self.role == Role::Cleaner {
             let line = if self.at_home() { crate::cleaning::lines::HELLO } else { crate::cleaning::lines::BUSY };

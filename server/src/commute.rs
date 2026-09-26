@@ -26,6 +26,8 @@ pub mod vehicle {
     pub const TRAM: u8 = 4;
     /// Patrol car (security.rs): not anybody's commute.
     pub const POLICE: u8 = 5;
+    /// Fire engine (fire.rs).
+    pub const FIRE_ENGINE: u8 = 6;
 }
 
 /// Needs changed by the trip (points).
@@ -159,10 +161,18 @@ impl Vehicle {
 
     /// A patrol car: drives up to the entrance and waits there (`leave`).
     pub fn police(handle: u16) -> Vehicle {
-        let path = crate::security::car_path();
+        Vehicle::emergency(handle, vehicle::POLICE, crate::security::car_path())
+    }
+
+    /// A fire engine: to the building, waits (`leave`).
+    pub fn fire_engine(handle: u16) -> Vehicle {
+        Vehicle::emergency(handle, vehicle::FIRE_ENGINE, crate::fire::truck_path())
+    }
+
+    fn emergency(handle: u16, kind: u8, path: Vec<Pos>) -> Vehicle {
         Vehicle {
             handle,
-            kind: vehicle::POLICE,
+            kind,
             owner: 0,
             pos: path[0],
             path,

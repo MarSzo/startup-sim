@@ -14,6 +14,7 @@ use crate::commute::{self, Vehicle, VehicleEvent};
 use crate::company::{self, Company};
 use crate::computer::{self, Account, Computer, Messenger, Workstation};
 use crate::elevator::{self, Elevator};
+use crate::fire::{self, Alarm, Smoke};
 use crate::inventory::{self, kind as item_kind, Inventory, Item};
 use crate::net::{canonical, LinkConditions, Net};
 use crate::needs::{self, Needs, Rest, Spot, SpotKind};
@@ -69,6 +70,8 @@ pub struct Config {
     pub stale_fruit_percent: u32,
     /// Minute of the day the cleaner starts her round.
     pub cleaning_at: u32,
+    /// Everybody starts with a (paid) pack of cigarettes (dev).
+    pub start_cigarettes: bool,
 }
 
 /// The cleaner's evening round in progress.
@@ -219,6 +222,10 @@ struct Player {
     soaked_said: bool,
     /// Left the shop with unpaid goods today (the second time = police).
     thefts_today: u8,
+    /// Already complained about the smoke in this room.
+    smoke_said: bool,
+    /// Last "get out, the alarm!" reminder (tick).
+    alarm_nag: u32,
     /// Salary, grosze per game hour (raises from the CEO).
     pay_rate: i64,
     /// World day of the last raise request (cooldown).
@@ -290,6 +297,10 @@ pub struct Server {
     tray: Option<Tray>,
     /// Patrol cars called for shoplifters.
     police_calls: Vec<PoliceCall>,
+    /// Cigarette smoke in the rooms, and the fire alarm it may set off.
+    smoke: Smoke,
+    alarm: Option<Alarm>,
+    next_crew_id: u16,
     /// The cleaner's round (evening) and the world day it last ran.
     round: Option<Round>,
     round_day: u32,
@@ -354,6 +365,9 @@ impl Server {
             tray: None,
             police_calls: Vec::new(),
             round: None,
+            smoke: Smoke::new(&building),
+            alarm: None,
+            next_crew_id: 0,
             round_day: 0,
             next_officer_id: 0,
             lunch_orders: Vec::new(),
@@ -688,6 +702,8 @@ impl Server {
             riding: None,
             soaked_said: false,
             thefts_today: 0,
+            smoke_said: false,
+            alarm_nag: 0,
             pay_rate: clock::PAY_PER_MIN * 60,
             last_raise_day: None,
             talk: None,
@@ -719,6 +735,13 @@ impl Server {
                 if self.clock.is_night() {
                     p.stage = Stage::Home { arrive_at: None };
                 }
+            }
+            if self.cfg.start_cigarettes {
+                let mut pack = shop::product(item_kind::CIGARETTES).map_or(0, |p| p.count);
+                pack = pack.max(1);
+                let item = Item { id: self.next_item_id, kind: item_kind::CIGARETTES, label: String::new(), expires: None, owner: id, count: pack, unpaid: false, stale: false };
+                self.next_item_id += 1;
+                self.give(id, item);
             }
         } else if skip && self.cfg.start_access & crate::map::access::CARD != 0 {
             self.give_new(id, item_kind::EMPLOYEE_CARD); // load tests: straight in with a card
@@ -1482,7 +1505,17 @@ impl Server {
                     item_kind::EMPLOYEE_CARD => format!("Karta pracownika: {}.", held.label),
                     item_kind::GUEST_PASS => "Przepustka gościa — ważna do końca dnia.".into(),
                     _ if held.unpaid => shop::lines::PAY_FIRST.into(),
-                    item_kind::CIGARETTES => format!("Zostało {} papierosów. Palić tylko w strefie palenia.", held.count),
+                    // Light up right here - wherever that is.
+                    item_kind::CIGARETTES => {
+                        let pack = p.inventory.hands.as_mut().unwrap();
+                        pack.count -= 1;
+                        if pack.count == 0 {
+                            p.inventory.hands = None;
+                        }
+                        refresh(p);
+                        p.rest = Some((Rest::Smoking { until: self.tick + needs::SMOKE_TICKS }, p.body.floor, p.body.pos));
+                        if self.smoke.is_open_air((p.body.floor, p.room)) { fire::lines::LIT } else { fire::lines::LIT_INSIDE }.into()
+                    }
                     k if shop::product(k).is_some() => {
                         let prod = shop::product(k).unwrap();
                         p.inventory.take_hands();
@@ -1687,6 +1720,120 @@ impl Server {
         if late {
             p.needs.add_stress(10);
             self.pending_says.push((pid, commute::lines::LATE.to_string(), None));
+        }
+    }
+
+    /// Smoke: complaints in smoky rooms, detectors, the fire alarm and the
+    /// fire brigade (engine at the entrance, a firefighter checks the room,
+    /// airs it, fines the smoker; back at the engine = the alarm is over).
+    fn tick_smoke_and_alarm(&mut self) {
+        for p in self.players.values_mut().filter(|p| matches!(p.stage, Stage::Working)) {
+            let level = self.smoke.get((p.body.floor, p.room));
+            // (Not about your own smoke.)
+            let smoking = matches!(p.rest, Some((Rest::Smoking { .. }, _, _)))
+                || self.smoke.smoker.get(&(p.body.floor, p.room)).is_some_and(|s| s.0 == p.id);
+            if level >= fire::NOTICEABLE && !smoking && !p.smoke_said {
+                p.smoke_said = true;
+                p.needs.add_stress(fire::SMOKY_STRESS);
+                self.pending_says.push((p.id, fire::lines::SMOKY.into(), None));
+            } else if level < fire::NOTICEABLE / 2 {
+                p.smoke_said = false;
+            }
+        }
+        let Some(alarm) = self.alarm.clone() else {
+            // A detector goes off?
+            let hit = self
+                .smoke
+                .levels()
+                .into_iter()
+                .filter(|(_, l)| *l >= fire::ALARM)
+                .map(|(k, _)| k)
+                .find(|&(f, r)| self.building.floor(f).is_some_and(|m| m.rooms.iter().any(|d| d.id == r && d.detector)));
+            let Some(place) = hit else { return };
+            let fallback = || {
+                let t = self.building.floor(place.0).and_then(|m| m.room_tiles(place.1).first().copied());
+                t.map_or(Pos { x: 0, y: 0 }, |t| Pos::tile_center(t.x, t.y))
+            };
+            let (smoker, spot) = match self.smoke.smoker.get(&place) {
+                Some(&(pid, pos)) => (Some(pid), pos),
+                None => (None, fallback()),
+            };
+            let truck = self.alloc_handle();
+            self.vehicles.push(Vehicle::fire_engine(truck));
+            self.alarm = Some(Alarm { place, smoker, spot, truck, firefighter: None, checking_until: None, done: false });
+            self.clock_dirty = true;
+            let room = self.building.floor(place.0).map_or("-", |m| m.room_name(place.1)).to_string();
+            self.log(format!("* FIRE ALARM: smoke in {room} (floor {})", place.0));
+            return;
+        };
+        // Everybody out! Reminders (and stress) for those still inside.
+        let tick = self.tick;
+        for p in self.players.values_mut().filter(|p| matches!(p.stage, Stage::Working)) {
+            if !self.smoke.is_open_air((p.body.floor, p.room)) && tick.wrapping_sub(p.alarm_nag) >= fire::NAG_TICKS {
+                p.alarm_nag = tick;
+                p.needs.add_stress(fire::STAYING_IN_STRESS);
+                self.pending_says.push((p.id, fire::lines::GET_OUT.into(), None));
+            }
+        }
+        let Some(id) = alarm.firefighter else {
+            if self.vehicles.iter().any(|v| v.handle == alarm.truck && v.parked()) {
+                let id = npc::NPC_ID_BASE + 0x0E00 + self.next_crew_id % 0x100;
+                self.next_crew_id = self.next_crew_id.wrapping_add(1);
+                let mut n = Npc::firefighter(&self.building, id, fire::crew_spawn());
+                let (x, y) = alarm.spot.tile();
+                let sent = n.go_to(&self.building, (alarm.place.0, crate::map::Tile { x, y }));
+                self.npcs.push(n);
+                self.pending_says.push((id, fire::lines::ARRIVED.into(), None));
+                let a = self.alarm.as_mut().unwrap();
+                a.firefighter = Some(id);
+                a.done = !sent; // can't get there: nothing to do
+            }
+            return;
+        };
+        let Some(i) = self.npcs.iter().position(|n| n.id == id) else {
+            self.alarm = None;
+            return;
+        };
+        if alarm.done {
+            if self.npcs[i].at_home() {
+                self.npcs.remove(i);
+                if let Some(v) = self.vehicles.iter_mut().find(|v| v.handle == alarm.truck) {
+                    v.leave(fire::truck_exit());
+                }
+                self.alarm = None;
+                self.clock_dirty = true;
+                self.log("* fire alarm over");
+            } else if self.npcs[i].is_idle() {
+                self.npcs[i].return_home(&self.building);
+            }
+            return;
+        }
+        if !self.npcs[i].is_idle() {
+            return; // on the way
+        }
+        match alarm.checking_until {
+            None => {
+                self.alarm.as_mut().unwrap().checking_until = Some(tick + fire::CHECK_TICKS);
+                self.pending_says.push((id, fire::lines::CHECKING.into(), None));
+            }
+            Some(t) if tick >= t => {
+                self.smoke.clear(alarm.place);
+                let room = self.building.floor(alarm.place.0).map_or("-", |m| m.room_name(alarm.place.1)).to_string();
+                self.pending_says.push((id, fire::lines::verdict(&room), None));
+                let mut nick = None;
+                if let Some(p) = alarm.smoker.and_then(|pid| self.players.get_mut(&pid)) {
+                    let fine = fire::FINE.min(p.money.max(0));
+                    p.money -= fine;
+                    nick = Some(p.nick.clone());
+                    self.pending_says.push((id, fire::lines::fined(fine), Some(p.id)));
+                    self.pending_says.push((p.id, fire::lines::SHAME.into(), None));
+                }
+                let text = fire::lines::post(&clock::hhmm(self.clock.minute()), &room, nick.as_deref());
+                self.messenger.post_system(computer::conv::GENERAL, id, "Administracja budynku", &text);
+                self.alarm.as_mut().unwrap().done = true;
+                self.npcs[i].return_home(&self.building);
+            }
+            _ => {}
         }
     }
 
@@ -1935,6 +2082,7 @@ impl Server {
             weather: self.weather.now,
             company: self.company.name.clone(),
             founded: self.company.founder.is_some(),
+            alarm: self.alarm.is_some() as u8,
         }
     }
 
@@ -2836,6 +2984,7 @@ impl Server {
         let mut coffee_says: Vec<(u16, String, Option<u16>)> = std::mem::take(&mut self.pending_says);
         let mut coffee_ready = Vec::new();
         let mut cold_cups = Vec::new();
+        let mut puffs = Vec::new();
         let mut portal_resend = Vec::new();
         // Left a bathroom with dirty hands: (player, floor, bathroom room).
         let mut unwashed_exits: Vec<(u16, u8, u16)> = Vec::new();
@@ -2919,6 +3068,9 @@ impl Server {
                 };
                 coffee_says.push((p.id, line.to_string(), None));
             }
+            if matches!(p.rest, Some((Rest::Smoking { .. }, _, _))) {
+                puffs.push(((p.body.floor, p.room), p.id, p.body.pos));
+            }
             // Weather under the open sky.
             let outdoors = self.outdoor_rooms.contains(&(p.body.floor, p.room));
             let umbrella = p.inventory.has(item_kind::UMBRELLA);
@@ -2987,6 +3139,11 @@ impl Server {
         for pid in cold_cups {
             self.give_new(pid, item_kind::EMPTY_CUP);
         }
+        for (place, pid, pos) in puffs {
+            self.smoke.puff(place, pid, pos);
+        }
+        self.smoke.tick(self.tick);
+        self.tick_smoke_and_alarm();
 
         for id in portal_resend {
             self.deliver_replies(id);
@@ -3308,6 +3465,10 @@ impl Server {
         if self.clock_dirty || tick % CLOCK_RESEND_TICKS == 0 {
             for p in self.players.values() {
                 outgoing.push((p.addr, p.id, self.clock_packet(p)));
+                if matches!(p.stage, Stage::Working) && tick % CLOCK_RESEND_TICKS == 0 {
+                    let rooms = self.smoke.floor_levels(p.body.floor);
+                    outgoing.push((p.addr, p.id, Packet::Smoke { floor: p.body.floor, rooms }));
+                }
             }
             self.clock_dirty = false;
         }

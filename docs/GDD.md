@@ -211,7 +211,8 @@ gracze).
   obchodzi pokoje i sprząta, przy dużej liczbie kubków narzeka — *zrobione
   (10.30)*.
 - Papierosa można zapalić wszędzie; w środku dym rozchodzi się po pokoju, w
-  części pomieszczeń czujka → alarm, straż pożarna, ewakuacja, kara.
+  części pomieszczeń czujka → alarm, straż pożarna, ewakuacja, kara —
+  *zrobione (10.31)*.
 - Interfejs w pikselowym stylu gry: HUD (ekwipunek, statystyki), komputer,
   portal z ofertami — pikselowa czcionka i ramki.
 
@@ -831,6 +832,31 @@ Zastępuje prosty portal z 10.8. Po połączeniu gracz widzi pulpit komputera
   kubkach dziennie także wpis na **#ogólny** z rekordzistą dnia (kto zostawił
   najwięcej). Czysto — pochwała.
 
+### 10.31 Palenie wszędzie, dym i straż pożarna
+
+- Papierosy w rękach + **F (użyj)** = zapalenie **w dowolnym miejscu** (30 s,
+  jak przy popielniczce; ruch albo E gasi). Na zewnątrz i w strefie palenia dym
+  od razu się rozwiewa.
+- **Dym w środku** gromadzi się w pomieszczeniu zależnie od jego wielkości
+  (kabina w toalecie — od razu gęsto, duże biuro — po kilkunastu sekundach),
+  przenika przez drzwi do sąsiednich pomieszczeń i powoli się rozwiewa (przy
+  drzwiach na zewnątrz szybciej). Widać go jako szarą mgłę z kłębami.
+- Kto wejdzie w zadymione pomieszczenie (a nie pali), narzeka: „Kto tu pali?!”
+  i ma trochę stresu.
+- **Czujki dymu** (białe krążki z czerwoną diodą na suficie) są w: holu przy
+  windach, wejściu, portierni, sklepie, recepcji, zarządzie, działach (IT,
+  Biznes, HR) i korytarzu. **Nie ma** ich w łazienkach, kabinach, chill roomie,
+  klatce schodowej i na zewnątrz — tam da się „po cichu”, choć dym z łazienki i
+  tak wyjdzie na korytarz.
+- Gęsty dym przy czujce = **alarm pożarowy**: ekran pulsuje na czerwono, napis
+  „ALARM POŻAROWY — wyjdź z budynku!”, diody migają. Kto zostaje w środku,
+  co kilka sekund dostaje przypomnienie i stres.
+- Przyjeżdża **wóz strażacki** (czerwony, z drabiną i kogutem), **strażak**
+  idzie do pomieszczenia z alarmem, sprawdza je (5 s), wietrzy, ogłasza
+  fałszywy alarm i nakłada na palacza **karę 500 zł** (albo tyle, ile ma).
+  Administracja budynku pisze na #ogólny, gdzie i o której był alarm i kto
+  palił. Gdy strażak wróci do wozu — koniec alarmu.
+
 ### 10.6 Stan implementacji
 
 *Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie,
@@ -867,6 +893,9 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Ekwipunek**: kieszenie i ręce, przedmioty (przepustka, karta, laptop,
   kawa), upuszczanie / podnoszenie / podawanie, dostęp z przedmiotów (10.13);
   protokół v8.
+- **Palenie, dym i straż**: papieros wszędzie, dym w pomieszczeniach
+  przenikający przez drzwi, czujki, alarm z ewakuacją, strażak i kara (10.31);
+  protokół v26.
 - **Kubki i sprzątaczka**: pusty kubek po kawie (zostaw / umyj / dolewka z
   ekspresu), wieczorny obchód Pani Krysi z narzekaniem i wpisem na #ogólny
   (10.30); protokół v25.
@@ -915,12 +944,12 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Sieć mobilna**: serwer dual-stack IPv4/IPv6; gracz identyfikowany tokenem
   (zmiana adresu w trakcie gry przenosi sesję); klient przepina gniazdo po
   ciszy/powrocie z tła i sam łączy się ponownie po utracie sesji.
-- **Testy**: 91 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
+- **Testy**: 93 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
   zależna od uprawnień, bramki, ruch/kolizje, schody, winda, nawigacja,
-  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, zegar, dojazd, pogoda, zarząd, słodycze, obiady, wakaty, firma, ochrona i policja, kubki, protokół), 2 golden, 26 e2e serwera
+  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, zegar, dojazd, pogoda, zarząd, słodycze, obiady, wakaty, firma, ochrona i policja, kubki, dym, protokół), 2 golden, 27 e2e serwera
   (m.in. portal: odrzucenie → przyjęcie → spawn; całe wdrożenie aż do karty;
   niewidoczność między piętrami; zgodność stanu serwera z predykcją) —
-  łącznie 119 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 porannego dojazdu samochodem moknięcia w deszczu spotkania z Prezesem tacy ze słodyczami obiadu z odbiorem na recepcji, obsadzonego stanowiska, panelu założyciela kradzieży w sklepie z ochroną i policją oraz kubka zebranego przez sprzątaczkę); 145 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
+  łącznie 122 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 porannego dojazdu samochodem moknięcia w deszczu spotkania z Prezesem tacy ze słodyczami obiadu z odbiorem na recepcji, obsadzonego stanowiska, panelu założyciela kradzieży w sklepie z ochroną i policją , kubka zebranego przez sprzątaczkę oraz papierosa, który uruchamia alarm pożarowy); 146 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
   adresów).
 
 #### Pomiary (MacBook, wszystko lokalnie)

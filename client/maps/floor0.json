@@ -265,7 +265,8 @@
   "H": {
    "id": 3,
    "name": "Hol",
-   "type": "hall"
+   "type": "hall",
+   "detector": true
   },
   "L": {
    "id": 20,
@@ -288,7 +289,8 @@
    "type": "reception",
    "see": [
     "E"
-   ]
+   ],
+   "detector": true
   },
   "E": {
    "id": 5,
@@ -296,12 +298,14 @@
    "type": "entrance",
    "see": [
     "P"
-   ]
+   ],
+   "detector": true
   },
   "Z": {
    "id": 6,
    "name": "Sklep",
-   "type": "shop"
+   "type": "shop",
+   "detector": true
   },
   "R": {
    "id": 7,

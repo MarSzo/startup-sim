@@ -26,6 +26,7 @@ const VehicleView = preload("res://game/vehicle_view.gd")
 const WeatherFx = preload("res://ui/weather_fx.gd")
 const DialogWindow = preload("res://ui/dialog_window.gd")
 const TrayView = preload("res://game/tray_view.gd")
+const SmokeView = preload("res://game/smoke_view.gd")
 
 const ZOOM := 3.0
 ## Remote players are rendered this far in the past (2 snapshots at 20 Hz).
@@ -79,6 +80,11 @@ var daylight := CanvasModulate.new()   # time-of-day tint of the world
 var game_minute := 8 * 60
 var weather := Protocol.WEATHER_SUNNY
 var weather_fx := WeatherFx.new()
+## Smoke in the rooms + detectors (over the world); fire alarm on screen.
+var smoke_view := SmokeView.new()
+var fire_alarm := false
+var alarm_tint := ColorRect.new()
+var alarm_label := Label.new()
 var weather_layer := CanvasLayer.new()
 var dialog := DialogWindow.new()
 var shelf_window := ShelfWindow.new()
@@ -154,6 +160,8 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 	world.y_sort_enabled = true
 	add_child(ride_mask)  # between the map and the people
 	add_child(world)
+	smoke_view.setup(building)
+	add_child(smoke_view)
 	for f in views:
 		var m = building.get_floor(f)
 		stall_doors[f] = []
@@ -241,6 +249,22 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 	cp.add_child(clock_label)
 	status_layer.add_child(cp)
 	add_child(daylight)
+	alarm_tint.set_anchors_preset(Control.PRESET_FULL_RECT)
+	alarm_tint.color = Color(0.9, 0.05, 0.05, 0.0)
+	alarm_tint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	status_layer.add_child(alarm_tint)
+	status_layer.move_child(alarm_tint, 0)  # under the HUD
+	alarm_label.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	alarm_label.position = Vector2(-330, 70)
+	alarm_label.size = Vector2(660, 40)
+	alarm_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	alarm_label.text = "ALARM POŻAROWY — wyjdź z budynku!"
+	alarm_label.add_theme_font_size_override("font_size", 26)
+	alarm_label.add_theme_color_override("font_color", Color("#ffdddd"))
+	alarm_label.add_theme_constant_override("outline_size", 8)
+	alarm_label.add_theme_color_override("font_outline_color", Color("#7a0000"))
+	alarm_label.visible = false
+	status_layer.add_child(alarm_label)
 	weather_layer.layer = 5  # over the world, under the HUD
 	add_child(weather_layer)
 	weather_layer.add_child(weather_fx)
@@ -264,6 +288,7 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 
 
 func _show_floor(f: int) -> void:
+	smoke_view.set_floor(f)
 	for k in views:
 		views[k].visible = (k == f)
 	for k in stall_doors:
@@ -484,6 +509,10 @@ func _physics_process(delta: float) -> void:
 
 
 func _process(delta: float) -> void:
+	# Fire alarm: the screen pulses red.
+	var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 1000.0 * TAU * 1.5)
+	alarm_tint.color.a = 0.16 * pulse if fire_alarm else 0.0
+	alarm_label.modulate.a = 0.55 + 0.45 * pulse
 	if have_state:
 		error_offset *= exp(-ERROR_DECAY * delta)
 		if error_offset.length_squared() < 0.0025:
@@ -551,7 +580,12 @@ func _on_packet(p: Dictionary) -> void:
 		Protocol.T_SHELF:
 			shelf_window.show_shelf(p)
 			_shelf_at = Movement.to_px(pred.pos)
+		Protocol.T_SMOKE:
+			smoke_view.on_smoke(p)
 		Protocol.T_CLOCK:
+			fire_alarm = p.get("alarm", 0) == 1
+			smoke_view.alarm = fire_alarm
+			alarm_label.visible = fire_alarm
 			game_minute = p.minute
 			var part := "noc" if p.night else ("rano" if p.minute < 10 * 60 else ("dzień" if p.minute < 18 * 60 else "wieczór"))
 			weather = p.weather

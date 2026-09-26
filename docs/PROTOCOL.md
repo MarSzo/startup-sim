@@ -118,7 +118,7 @@ Encja (14 B): `id u16 | kind u8 | x i32 | y i32 | flags u8 | held u8 | activity 
 - `flags`: bity 0–1 kierunek (0 dół, 1 góra, 2 lewo, 3 prawo), bit 2 „w ruchu”,
   bity 3–5 wygląd (0 gracz, 1 portier — mundur z czapką, 2 pracownik biurowy —
   koszula z krawatem, 3 ochroniarz — czarny strój z żółtą opaską, 4 policjant —
-  granatowy mundur z czapką, 5 sprzątaczka — turkusowy fartuch i mop), bit 6 wolny chód (zmęczenie / pilna toaleta), bit 7
+  granatowy mundur z czapką, 5 sprzątaczka — turkusowy fartuch i mop, 6 strażak — czerwony hełm, odblaski), bit 6 wolny chód (zmęczenie / pilna toaleta), bit 7
   niska higiena (chmurka). U graczy (nie NPC) bit 3 = rozłożony parasol.
   Dla laptopa (`kind` 3): bit 0 zablokowany, bit 1 ktoś przy nim siedzi.
 
@@ -297,14 +297,14 @@ wyjazdu albo 0xFFFF), `money u32` (portfel — także w domu), `weather u8`
 `arrive` = 0xFFFF oznacza „jeszcze w domu, wybierz dojazd”; po wyjeździe
 `arrive` = minuta przyjazdu. Od v23 na końcu: `company` str16 (nazwa firmy,
 ≤ 64 B) i `founded u8` (1 = firma ma założyciela; 0 = portal pokazuje „Załóż
-firmę”).
+firmę”). Od v26: `alarm u8` (1 = alarm pożarowy w budynku — ewakuacja).
 
 ### 30 `CommuteChoice` (C→S)
 
 token u32, mode u8 — wybór dojazdu (przed wyjazdem). Przyjazd pojazdem: gracz
 jest w budynku z czynnością 7 (jedzie — niewidoczny, bez sterowania, pozycja =
 pojazd), pojazd to encja `kind` 4 (`held`: 1 auto, 2 rower, 3 taksówka, 4
-tramwaj, 5 radiowóz — z niczyim dojazdem niezwiązany; `flags` kierunek + ruch). Poza budynkiem (w domu /
+tramwaj, 5 radiowóz, 6 wóz strażacki — oba z niczyim dojazdem niezwiązane; `flags` kierunek + ruch). Poza budynkiem (w domu /
 w drodze) serwer nie wysyła snapshotów; przyjazd = znowu snapshoty, postać
 przed budynkiem.
 
@@ -352,6 +352,12 @@ Akcje: 1 załóż firmę (z portalu, `text` = nazwa 3–40 znaków), 2 zmień na
 (≤ 200 znaków), 5 zatrudnij kandydata `target`, 6 odrzuć, 7 zwolnij pracownika
 `target`. Akcje 2–7 tylko od założyciela przy jego komputerze; inne są
 ignorowane. Dział 3 = Zarząd.
+
+### 40 `Smoke` (S→C)
+
+Dym papierosowy na piętrze odbiorcy (co 1 s, tylko w budynku): `floor u8`, n
+u8 (≤ 64) × {`room u16`, `level u8` 1–255}. Pokoi spoza listy nie ma dymu.
+Czujki dymu są w danych mapy (`room_defs.*.detector`), klient rysuje je sam.
 
 ### 27 `Shelf` (S→C), 28 `ShopTake` (C→S)
 
@@ -424,6 +430,7 @@ szyfrowaniem.
 
 ## Historia wersji
 
+- **26** — dym i straż: `Clock` + `alarm`, pakiet `Smoke` (40), wygląd NPC 6 (strażak), pojazd 6 (wóz strażacki).
 - **25** — kubki i sprzątaczka: przedmiot 34 = pusty kubek, wygląd NPC 5 (sprzątaczka); bez nowych pakietów.
 - **24** — ochrona i policja: wygląd NPC 3 (ochroniarz) i 4 (policjant), pojazd 5 (radiowóz); bez nowych pakietów.
 - **23** — panel założyciela: `Clock` + `company`, `founded`; `CompanyOffers`, `CompanyPeople`, `CompanyAction`; dział 3 (Zarząd).

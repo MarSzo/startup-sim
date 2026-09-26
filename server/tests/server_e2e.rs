@@ -79,6 +79,7 @@ fn start_server_at(start_access: u8, skip_recruitment: bool, start_employed: boo
         treats_now: true,
         stale_fruit_percent: game::treats::STALE_FRUIT_PERCENT,
         cleaning_at: CLEANING_AT.with(|c| c.get()),
+        start_cigarettes: false,
     };
     let mut server = Server::new(map, cfg).unwrap();
     let port = server.local_addr().port();
@@ -569,6 +570,56 @@ fn a_mug_left_in_the_chill_room_is_collected_by_the_cleaner() {
     // At 10:04 the cleaner comes up from the service room and takes it.
     assert!(ola.wait_for_line(&cl::few(1), Duration::from_secs(40)).is_some(), "the cleaner collected the mug");
     let _ = at;
+}
+
+#[test]
+fn smoking_inside_sets_off_the_fire_alarm_and_the_smoker_pays() {
+    use game::fire::lines as fl;
+    use game::inventory::kind as item_kind;
+    use proto::item_action as act;
+    let (addr, _) = start_server_at(access::CARD, true, true, 10 * 60, 1); // hired: 200 zł
+    let b = building();
+    let (mut ola, _) = Client::connect(addr, "Ola");
+    let wait = Duration::from_millis(1500);
+    let ws = game::computer::find_workstations(&b);
+    let w = ws.iter().find(|w| w.room_name == "IT / Produkt").unwrap();
+    let body = Body { access: access::CARD, ..Body::at(w.floor, Pos::tile_center(w.tile.x, w.tile.y + 1)) };
+    let action = |c: &Client, a: u8, slot: u8| c.sock.send(&Packet::ItemAction { token: c.token, action: a, slot }.encode()).unwrap();
+    let said = |line: String| move |p: &Packet| matches!(p, Packet::Say { text, .. } if *text == line).then_some(());
+    let alarm = |c: &Client, on: u8, wait: Duration| {
+        wait_for(c, &[], wait, |p| matches!(p, Packet::Clock { alarm, .. } if *alarm == on).then_some(())).is_some()
+    };
+    action(&ola, act::DROP, 0); // the laptop stays at the desk
+    std::thread::sleep(Duration::from_millis(100));
+    // A pack of cigarettes from the shop, paid for.
+    let body = ola.walk_to(&b, body, (0, Tile { x: 55, y: 25 }), &[]);
+    ola.sock.send(&Packet::ShopTake { token: ola.token, shelf: 5, kind: item_kind::CIGARETTES }.encode()).unwrap();
+    std::thread::sleep(Duration::from_millis(150));
+    let body = ola.walk_to(&b, body, (0, Tile { x: 53, y: 30 }), &[]);
+    while ola.recv().is_some() {}
+    let body = ola.press_e(&b, body);
+    assert!(wait_for(&ola, &[], wait, said("Razem 18,00 zł. Dziękuję! Zostało Ci 182,00 zł.".into())).is_some());
+    // Into the hall by the lifts (it has a smoke detector) and light up.
+    let _body = ola.walk_to(&b, body, (0, Tile { x: 30, y: 17 }), &[]);
+    let slot = wait_for(&ola, &[], Duration::from_millis(2500), |p| match p {
+        Packet::Inventory { slots } => slots[1..].iter().position(|s| s.kind == item_kind::CIGARETTES),
+        _ => None,
+    })
+    .expect("cigarettes in a pocket");
+    action(&ola, act::TAKE_OUT, slot as u8);
+    std::thread::sleep(Duration::from_millis(150));
+    action(&ola, act::USE, 0);
+    assert!(wait_for(&ola, &[], wait, said(fl::LIT_INSIDE.into())).is_some());
+    let smoky = wait_for(&ola, &[], Duration::from_millis(4000), |p| match p {
+        Packet::Smoke { floor: 0, rooms } if !rooms.is_empty() => Some(()),
+        _ => None,
+    });
+    assert!(smoky.is_some(), "smoke in the hall");
+    // Some seconds later the detector goes off; the firefighter comes, checks and
+    // fines Ola; back at the engine the alarm is over.
+    assert!(alarm(&ola, 1, Duration::from_secs(25)), "fire alarm");
+    assert!(wait_for(&ola, &[], Duration::from_secs(30), said(fl::fined(182_00))).is_some(), "fined");
+    assert!(alarm(&ola, 0, Duration::from_secs(30)), "alarm over");
 }
 
 #[test]

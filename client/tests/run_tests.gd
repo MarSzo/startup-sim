@@ -88,7 +88,9 @@ func test_protocol(path: String) -> void:
 	expect(ck.get("type") == Protocol.T_CLOCK and ck.day == 2 and ck.minute == 492 and not ck.night
 		and ck.place == Protocol.PLACE_COMMUTING and ck.arrive == 545 and ck.pay == 23000 and ck.pay_minutes == 460
 		and ck.today_minutes == 0 and ck.mode == 2 and ck.depart == 520 and ck.money == 18600
-		and ck.weather == Protocol.WEATHER_RAIN and ck.company == "Pixel Pierogi sp. z o.o." and ck.founded, "decode clock %s" % ck)
+		and ck.weather == Protocol.WEATHER_RAIN and ck.company == "Pixel Pierogi sp. z o.o." and ck.founded and ck.alarm == 1, "decode clock %s" % ck)
+	var sm := Protocol.decode(golden["smoke"].hex_decode())
+	expect(sm.get("type") == Protocol.T_SMOKE and sm.floor == 1 and sm.rooms == [[9, 40], [33, 200]], "decode smoke %s" % sm)
 	var co := Protocol.decode(golden["company_offers"].hex_decode())
 	expect(co.get("type") == Protocol.T_COMPANY_OFFERS and co.name.begins_with("Pixel") and co.offers.size() == 2
 		and co.offers[0].places == 2 and co.offers[0].description == "Piszemy w Ruście.", "decode company offers %s" % co)
