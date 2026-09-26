@@ -23,6 +23,30 @@ impl LinkConditions {
     }
 }
 
+/// Bind a UDP socket. An IPv6 wildcard (`[::]`) is made dual-stack so IPv4
+/// clients are accepted too (they appear as `::ffff:a.b.c.d`); Windows and
+/// some BSDs default to IPv6-only, so the flag is set explicitly.
+pub fn bind_udp(addr: SocketAddr) -> io::Result<UdpSocket> {
+    use socket2::{Domain, Protocol, Socket, Type};
+    let socket = Socket::new(Domain::for_address(addr), Type::DGRAM, Some(Protocol::UDP))?;
+    if addr.is_ipv6() {
+        socket.set_only_v6(false)?;
+    }
+    socket.bind(&addr.into())?;
+    Ok(socket.into())
+}
+
+/// Normalize `::ffff:a.b.c.d` to plain IPv4 (for logs and address comparisons).
+pub fn canonical(addr: SocketAddr) -> SocketAddr {
+    match addr {
+        SocketAddr::V6(v6) => match v6.ip().to_ipv4_mapped() {
+            Some(v4) => SocketAddr::new(v4.into(), v6.port()),
+            None => addr,
+        },
+        v4 => v4,
+    }
+}
+
 type Queued = Reverse<(Instant, u64, SocketAddr, Vec<u8>)>;
 
 pub struct Net {
@@ -42,7 +66,7 @@ pub struct Net {
 
 impl Net {
     pub fn bind(addr: SocketAddr, cond: LinkConditions) -> io::Result<Net> {
-        let socket = UdpSocket::bind(addr)?;
+        let socket = bind_udp(addr)?;
         Ok(Net {
             socket,
             cond,

@@ -5,6 +5,7 @@ extends SceneTree
 const Protocol = preload("res://net/protocol.gd")
 const Movement = preload("res://sim/movement.gd")
 const MapData = preload("res://map/map_data.gd")
+const NetClient = preload("res://net/net_client.gd")
 
 var failures := 0
 var checks := 0
@@ -15,6 +16,7 @@ func _init() -> void:
 	test_protocol(golden.path_join("packets.json"))
 	test_movement(golden.path_join("movement_vectors.json"))
 	test_rejects_garbage()
+	test_parse_address()
 	print("%d checks, %d failures" % [checks, failures])
 	quit(1 if failures > 0 else 0)
 
@@ -102,3 +104,28 @@ func test_rejects_garbage() -> void:
 	expect(Protocol.decode(PackedByteArray([0, 0, 1, 2])).is_empty(), "bad magic")
 	expect(Protocol.decode(PackedByteArray([0x54, 0x53, 9, 2])).is_empty(), "bad version")
 	expect(Protocol.decode(PackedByteArray([0x54, 0x53, 1, 200])).is_empty(), "unknown type")
+
+
+func test_parse_address() -> void:
+	var cases := {
+		"127.0.0.1:7777": ["127.0.0.1", 7777],
+		"127.0.0.1": ["127.0.0.1", 7777],
+		"game.example.com:9000": ["game.example.com", 9000],
+		"localhost": ["localhost", 7777],
+		"[::1]:7000": ["::1", 7000],
+		"[::1]": ["::1", 7777],
+		"::1": ["::1", 7777],
+		"2001:db8::5": ["2001:db8::5", 7777],
+		"[2001:db8::5]:1234": ["2001:db8::5", 1234],
+		"  10.0.0.2:80  ": ["10.0.0.2", 80],
+		"": [],
+		"host:": [],
+		"host:abc": [],
+		"host:70000": [],
+		"[::1": [],
+		"[::1]x": [],
+		":7777": [],
+	}
+	for input in cases:
+		var got := NetClient.parse_address(input)
+		expect(got == cases[input], "parse_address(%s) = %s, want %s" % [input, got, cases[input]])

@@ -132,7 +132,9 @@ Klient pinguje co 1 s; RTT = teraz − `client_time`. Serwer odpowiada natychmia
 (poza tickiem).
 
 ### 10 `Disconnect` (obie strony)
-`token u32 | reason u8` — 0 wyjście klienta, 1 timeout, 2 wyrzucenie, 3 wyłączenie serwera.
+`token u32 | reason u8` — 0 wyjście klienta, 1 timeout, 2 wyrzucenie, 3 wyłączenie serwera,
+4 nieznana sesja (odpowiedź serwera na `Input`/`Ping` z tokenem, którego nie zna —
+sesja wygasła albo serwer był restartowany).
 
 ## Połączenie i timeouty
 
@@ -147,9 +149,40 @@ klient                         serwer
 ```
 
 - Serwer usuwa klienta po **5 s** bez żadnego poprawnego pakietu (i wysyła mu `Disconnect(1)`).
-- Klient uznaje połączenie za zerwane po 5 s bez pakietów od serwera.
-- Pakiety C→S (poza `Connect`) są akceptowane tylko z adresu przypisanego do
-  gracza i z poprawnym `token`.
+
+## Sesja, zmiana adresu i ponowne łączenie
+
+**Gracza identyfikuje `token`, nie adres.** Pakiety C→S (poza `Connect`) są
+przypisywane do sesji po tokenie, z dowolnego adresu i rodziny (IPv4/IPv6).
+
+- **Migracja adresu**: jeśli `Ping` albo `Input` z *nowymi* inputami
+  (`last_seq` > ostatnio odebrany) przyjdzie z innego adresu, serwer od razu
+  przenosi sesję na ten adres — snapshoty idą tam od następnego ticku. Stare,
+  spóźnione pakiety z poprzedniego adresu nie mogą przenieść sesji z powrotem.
+  Pokrywa to zmianę Wi-Fi ↔ LTE, nowy port NAT, wybudzenie laptopa.
+- **Nieznany token** → serwer odpowiada `Disconnect(4)`; klient zaczyna nowy
+  `Connect` (nowe `player_id` i `token`).
+- **Klient** (`net_client.gd`):
+  - po **1,5 s** ciszy otwiera nowe gniazdo (nowy port, ponowne rozwiązanie
+    nazwy hosta) i wysyła `Ping` z tym samym tokenem; powtarza co 1,5 s;
+  - po powrocie aplikacji z tła (mobile) robi to od razu;
+  - po **5 s** ciszy, `Disconnect(1)` lub `Disconnect(4)` łączy się od nowa
+    (`Connect`), próbując przez **30 s**, zanim wróci do ekranu startowego.
+    Gra w tym czasie jest zamrożona z komunikatem „Łączenie ponownie…”.
+
+Bezpieczeństwo: `token` to 32-bitowa losowa wartość wysyłana otwartym tekstem,
+więc chroni przed przypadkowym i „ślepym” podszyciem się, ale nie przed kimś,
+kto podsłuchuje ruch. Docelowo (konta, konsole) zastąpi go uwierzytelnienie z
+szyfrowaniem.
+
+## IPv6
+
+- Serwer domyślnie nasłuchuje na `[::]:7777` w trybie **dual-stack**
+  (`IPV6_V6ONLY = 0` ustawiane jawnie), więc obsługuje klientów IPv4 i IPv6 na
+  jednym gnieździe; bez IPv6 na hoście spada na `0.0.0.0:7777`.
+- Klient rozwiązuje nazwę hosta z `IP.TYPE_ANY` (działa w sieciach tylko-IPv6,
+  wymaganych przez App Store) i akceptuje adresy `host`, `host:port`,
+  `1.2.3.4:port`, `[2001:db8::1]:port`, `[::1]` i gołe `::1` (port domyślny 7777).
 
 ## Rozmiary i transfer (zmierzone)
 

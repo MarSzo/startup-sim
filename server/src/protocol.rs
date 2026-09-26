@@ -43,6 +43,9 @@ pub mod disconnect {
     pub const TIMEOUT: u8 = 1;
     pub const KICKED: u8 = 2;
     pub const SERVER_SHUTDOWN: u8 = 3;
+    /// Reply to a packet whose token matches no session (expired / server
+    /// restarted). The client should start a fresh `Connect`.
+    pub const SESSION_UNKNOWN: u8 = 4;
 }
 
 /// Entity kinds. Only players exist now; NPCs will use the same snapshot slot.

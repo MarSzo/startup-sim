@@ -27,6 +27,7 @@ func _ready() -> void:
 	add_child(net)
 	net.connected.connect(_on_connected)
 	net.disconnected.connect(_on_disconnected)
+	net.reconnecting.connect(_on_reconnecting)
 	var ui := CanvasLayer.new()
 	add_child(ui)
 	ui.add_child(start)
@@ -67,11 +68,19 @@ func _on_connected(welcome: Dictionary) -> void:
 		start.set_busy(false)
 		start.set_status("Niezgodna wersja mapy (serwer %08x, klient %08x)" % [welcome.map_crc, map.crc], true)
 		return
+	if game:
+		game.reset_session(welcome)  # auto-reconnect: keep the world, new session
+		return
 	start.get_parent().visible = false
 	get_window().title = "Startup Sim — %s" % net.nick
 	game = Game.new()
 	add_child(game)
 	game.setup(net, map, welcome, net.nick, args)
+
+
+func _on_reconnecting(reason: String) -> void:
+	if game:
+		game.on_reconnecting(reason)
 
 
 func _on_disconnected(reason: String) -> void:

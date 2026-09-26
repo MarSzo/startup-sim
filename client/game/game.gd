@@ -28,6 +28,8 @@ var world := Node2D.new()
 var me := PlayerView.new()
 var camera := Camera2D.new()
 var overlay := DebugOverlay.new()
+var status_layer := CanvasLayer.new()
+var status_label := Label.new()
 var remotes := {}        # id -> RemotePlayer
 var nicks := {}          # id -> String
 var info_requested := {} # id -> msec of last request
@@ -92,6 +94,47 @@ func setup(p_net, p_map, welcome: Dictionary, p_nick: String, args: Dictionary) 
 	add_child(overlay)
 	overlay.game = self
 	overlay.visible = args.has("debug")
+
+	status_layer.layer = 11
+	add_child(status_layer)
+	status_label.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	status_label.position = Vector2(-200, 24)
+	status_label.size = Vector2(400, 40)
+	status_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	status_label.add_theme_font_size_override("font_size", 22)
+	status_label.add_theme_constant_override("outline_size", 6)
+	status_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	status_label.visible = false
+	status_layer.add_child(status_label)
+
+
+## Session lost; the net client is getting a new one. Freeze local simulation.
+func on_reconnecting(reason: String) -> void:
+	have_state = false
+	status_label.text = "Łączenie ponownie… (%s)" % reason if reason != "" else "Łączenie ponownie…"
+	status_label.visible = true
+
+
+## New session after an automatic reconnect: new player id/token, fresh state.
+func reset_session(welcome: Dictionary) -> void:
+	tick_hz = welcome.tick_hz
+	for r in remotes.values():
+		r.queue_free()
+	remotes.clear()
+	nicks.clear()
+	info_requested.clear()
+	pending.clear()
+	seq = 0
+	last_ack = 0
+	error_offset = Vector2.ZERO
+	have_state = false
+	have_time = false
+	latest_tick = 0
+	room_id = 0
+	me.visible = false
+	me.color = _color_for(net.player_id)
+	me.queue_redraw()
+	status_label.visible = false
 
 
 func _color_for(id: int) -> Color:
@@ -160,7 +203,7 @@ func _plan_path_to_room(room_name: String) -> Array[Vector2i]:
 
 
 func _physics_process(delta: float) -> void:
-	if not have_state:
+	if not have_state or not net.is_playing():
 		return
 	var bits := _sample_input(delta)
 	seq += 1
@@ -252,7 +295,7 @@ func _on_snapshot(p: Dictionary) -> void:
 		if not nicks.has(e.id) and now - info_requested.get(e.id, -100000) > 500:
 			info_requested[e.id] = now
 			unknown.append(e.id)
-	if not unknown.is_empty():
+	if not unknown.is_empty() and net.is_playing():
 		net.send(Protocol.encode_info_request(net.token, unknown))
 
 
@@ -294,4 +337,5 @@ func debug_text() -> String:
 		"Inputy w locie: %d  korekty: %d" % [pending.size(), corrections],
 		"Bufor interpolacji pusty: %.2f%% klatek" % (100.0 * interp_underruns / maxi(interp_frames, 1)),
 		"Ruch: %.1f KB/s in / %.1f KB/s out" % [net.bytes_in_per_sec / 1024.0, net.bytes_out_per_sec / 1024.0],
+		"Serwer: %s  zmiany gniazda: %d  ponowne połączenia: %d" % [net.server_ip, net.rebinds, net.reconnects],
 	])

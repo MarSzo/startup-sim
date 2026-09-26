@@ -19,8 +19,14 @@ const T_PING := 8
 const T_PONG := 9
 const T_DISCONNECT := 10
 
+const DISCONNECT_QUIT := 0
+const DISCONNECT_TIMEOUT := 1
+const DISCONNECT_KICKED := 2
+const DISCONNECT_SHUTDOWN := 3
+const DISCONNECT_SESSION_UNKNOWN := 4
+
 const REJECT_REASONS := {1: "Serwer pełny", 2: "Niezgodna wersja protokołu", 3: "Nieprawidłowy nick"}
-const DISCONNECT_REASONS := {0: "Rozłączono", 1: "Przekroczono czas", 2: "Wyrzucono", 3: "Serwer wyłączony"}
+const DISCONNECT_REASONS := {0: "Rozłączono", 1: "Przekroczono czas", 2: "Wyrzucono", 3: "Serwer wyłączony", 4: "Sesja wygasła"}
 
 
 static func _writer(type: int) -> StreamPeerBuffer:

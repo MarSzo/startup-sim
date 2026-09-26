@@ -9,7 +9,7 @@ Etap 1: fundament sieci. Dokumentacja: [GDD](docs/GDD.md) ·
 Wymagania: Rust (rustup), Godot 4.7 (`godot` w PATH).
 
 ```bash
-cd server && cargo run --release            # serwer na 0.0.0.0:7777
+cd server && cargo run --release            # serwer na [::]:7777 (IPv4 + IPv6)
 godot --path client                         # klient (można odpalić kilka razy)
 cd server && cargo run --release --bin bots -- --count 50 --room "Open space" --all-in-room
 ```
@@ -22,7 +22,7 @@ Sterowanie: WASD / strzałki, **F3** — overlay debug.
 Np. RTT ~100 ms i 2% strat: `cargo run --release -- --lag-ms 50 --jitter-ms 10 --loss 0.02`.
 
 ### Klient — argumenty deweloperskie (po `--`)
-`--nick=Ala --server=127.0.0.1:7777 --autoconnect --debug` (F3 od startu),
+`--nick=Ala --server=127.0.0.1:7777 --autoconnect --debug` (adres może być też IPv6: `--server=[::1]:7777`) (F3 od startu),
 `--autowalk` (losowy ruch), `--goto="Open space"` (idzie do pokoju),
 `--screenshot=/tmp/x.png --screenshot-delay=5` (zapis klatki i wyjście).
 

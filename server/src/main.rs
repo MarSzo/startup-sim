@@ -12,7 +12,8 @@ Startup sim - dedicated game server
 USAGE: cargo run [--release] -- [OPTIONS]
 
 OPTIONS:
-  --bind <addr>         listen address        [default: 0.0.0.0:7777]
+  --bind <addr>         listen address        [default: [::]:7777, dual-stack IPv6+IPv4;
+                                               falls back to 0.0.0.0:7777 without IPv6]
   --map <path>          map JSON              [default: ../client/maps/floor0.json]
   --max-players <n>                           [default: 256]
   --stats-secs <n>      stats log interval    [default: 5]
@@ -38,16 +39,24 @@ fn main() {
         loss: args.get("loss", 0.0),
     };
     let cfg = Config {
-        bind: args.get("bind", "0.0.0.0:7777".parse().unwrap()),
+        bind: args.get("bind", "[::]:7777".parse().unwrap()),
         link,
         max_players: args.get("max-players", 256),
         stats_every: Duration::from_secs(args.get("stats-secs", 5)),
         client_timeout: DEFAULT_CLIENT_TIMEOUT,
     };
-    let mut server = Server::new(map, cfg).unwrap_or_else(|e| {
-        eprintln!("failed to bind: {e}");
-        std::process::exit(1);
-    });
+    let mut cfg = cfg;
+    if args.str("bind").is_none() && game::net::bind_udp(cfg.bind).is_err() {
+        // No IPv6 on this host: plain IPv4.
+        cfg.bind = "0.0.0.0:7777".parse().unwrap();
+    }
+    let mut server = match Server::new(map, cfg) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("failed to bind: {e}");
+            std::process::exit(1);
+        }
+    };
     println!(
         "server listening on {} | tick {} Hz | map '{}' crc {:08x} ({}) | link: lag {:?} jitter {:?} loss {:.1}%",
         server.local_addr(),

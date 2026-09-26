@@ -6,7 +6,7 @@ use std::net::SocketAddr;
 use std::time::{Duration, Instant};
 
 use crate::map::Map;
-use crate::net::{LinkConditions, Net};
+use crate::net::{canonical, LinkConditions, Net};
 use crate::protocol::{self as proto, EntityState, Packet, PlayerInfoEntry};
 use crate::sim::{self, Pos};
 
@@ -63,6 +63,10 @@ pub struct Server {
     net: Net,
     cfg: Config,
     players: BTreeMap<u16, Player>,
+    /// Session lookup: the token identifies the player, not the address, so a
+    /// client survives a network change (Wi-Fi <-> LTE, new NAT port).
+    by_token: HashMap<u32, u16>,
+    /// Only used to dedupe `Connect` retries from the same address.
     by_addr: HashMap<SocketAddr, u16>,
     tick: u32,
     next_id: u16,
@@ -80,6 +84,7 @@ impl Server {
             net,
             cfg,
             players: BTreeMap::new(),
+            by_token: HashMap::new(),
             by_addr: HashMap::new(),
             tick: 0,
             next_id: 1,
@@ -157,19 +162,34 @@ impl Server {
             self.handle_connect(addr, nonce, nick, now);
             return;
         }
-        // Every other packet must come from a known address with the right token.
-        let Some(&id) = self.by_addr.get(&addr) else { return };
-        let token_ok = match &packet {
+        // Every other packet is identified by its session token.
+        let token = match &packet {
             Packet::Input { token, .. }
             | Packet::InfoRequest { token, .. }
             | Packet::Ping { token, .. }
-            | Packet::Disconnect { token, .. } => self.players[&id].token == *token,
+            | Packet::Disconnect { token, .. } => *token,
+            _ => return,
+        };
+        let Some(&id) = self.by_token.get(&token) else {
+            // Unknown/expired session: tell the client so it can reconnect.
+            if matches!(packet, Packet::Input { .. } | Packet::Ping { .. }) {
+                self.send(addr, &Packet::Disconnect { token, reason: proto::disconnect::SESSION_UNKNOWN });
+            }
+            return;
+        };
+        // Address migration: only packets that prove liveness *now* (a ping or
+        // new inputs) may move the session, so a late reordered packet from the
+        // old address cannot pull it back.
+        let fresh = match &packet {
+            Packet::Ping { .. } => true,
+            Packet::Input { last_seq, .. } => *last_seq > self.players[&id].last_received_seq,
             _ => false,
         };
-        if !token_ok {
-            return;
+        if fresh && self.players[&id].addr != addr {
+            self.migrate(id, addr);
         }
         self.players.get_mut(&id).unwrap().last_heard = now;
+        let addr = self.players[&id].addr;
         match packet {
             Packet::Input { last_seq, inputs, .. } => {
                 let p = self.players.get_mut(&id).unwrap();
@@ -229,12 +249,18 @@ impl Server {
             return;
         }
         let id = self.alloc_id();
+        let token = loop {
+            let t = self.rng.u32(1..);
+            if !self.by_token.contains_key(&t) {
+                break t;
+            }
+        };
         let spawn = self.map.spawns[self.next_spawn % self.map.spawns.len()];
         self.next_spawn += 1;
         let pos = Pos::tile_center(spawn.x, spawn.y);
         let player = Player {
             id,
-            token: self.rng.u32(1..),
+            token,
             nonce,
             addr,
             nick,
@@ -249,9 +275,10 @@ impl Server {
             known: HashSet::new(),
             bytes_out: 0,
         };
-        self.log(format!("+ player {} '{}' from {} ({} online)", id, player.nick, addr, self.players.len() + 1));
+        self.log(format!("+ player {} '{}' from {} ({} online)", id, player.nick, canonical(addr), self.players.len() + 1));
         self.players.insert(id, player);
         self.by_addr.insert(addr, id);
+        self.by_token.insert(token, id);
         let welcome = self.welcome(id);
         self.send(addr, &welcome);
     }
@@ -279,9 +306,22 @@ impl Server {
         }
     }
 
+    fn migrate(&mut self, id: u16, addr: SocketAddr) {
+        let p = self.players.get_mut(&id).unwrap();
+        let old = std::mem::replace(&mut p.addr, addr);
+        if self.by_addr.get(&old) == Some(&id) {
+            self.by_addr.remove(&old);
+        }
+        self.by_addr.insert(addr, id);
+        self.log(format!("~ player {id} moved {} -> {}", canonical(old), canonical(addr)));
+    }
+
     fn remove_player(&mut self, id: u16, why: &str) {
         if let Some(p) = self.players.remove(&id) {
-            self.by_addr.remove(&p.addr);
+            self.by_token.remove(&p.token);
+            if self.by_addr.get(&p.addr) == Some(&id) {
+                self.by_addr.remove(&p.addr);
+            }
             for other in self.players.values_mut() {
                 other.known.remove(&id);
             }

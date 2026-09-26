@@ -20,7 +20,7 @@ Startup sim - load-test bots
 USAGE: cargo run --release --bin bots -- [OPTIONS]
 
 OPTIONS:
-  --server <addr>       server address                  [default: 127.0.0.1:7777]
+  --server <addr>       server address, IPv4 or [IPv6]  [default: 127.0.0.1:7777]
   --count <n>           number of bots                  [default: 50]
   --room <name>         room some bots gather in        [default: Open space]
   --room-share <0..1>   fraction of bots in that room   [default: 0.5]
@@ -91,7 +91,8 @@ fn main() {
 
     let mut bots: Vec<Bot> = (0..count)
         .map(|i| {
-            let sock = UdpSocket::bind("0.0.0.0:0").expect("bind");
+            let local = if server.is_ipv6() { "[::]:0" } else { "0.0.0.0:0" };
+            let sock = UdpSocket::bind(local).expect("bind");
             sock.connect(server).expect("connect");
             sock.set_nonblocking(true).unwrap();
             Bot {

@@ -9,20 +9,25 @@ use game::protocol::{self as proto, Packet};
 use game::server::{Config, Server};
 use game::sim::{IN_RIGHT, IN_UP};
 
+/// Server on a random port, dual-stack. Returns (IPv4 loopback addr, map crc).
 fn start_server() -> (SocketAddr, u32) {
     let map = Map::load(&default_map_path()).unwrap();
     let crc = map.crc;
     let cfg = Config {
-        bind: "127.0.0.1:0".parse().unwrap(),
+        bind: "[::]:0".parse().unwrap(),
         link: LinkConditions::default(),
         max_players: 16,
         stats_every: Duration::from_secs(3600),
         client_timeout: Duration::from_millis(600),
     };
     let mut server = Server::new(map, cfg).unwrap();
-    let addr = server.local_addr();
+    let port = server.local_addr().port();
     std::thread::spawn(move || server.run());
-    (addr, crc)
+    (SocketAddr::from(([127, 0, 0, 1], port)), crc)
+}
+
+fn v6(addr: SocketAddr) -> SocketAddr {
+    format!("[::1]:{}", addr.port()).parse().unwrap()
 }
 
 struct Client {
@@ -33,10 +38,15 @@ struct Client {
 }
 
 impl Client {
-    fn connect(server: SocketAddr, nick: &str) -> (Client, u32) {
-        let sock = UdpSocket::bind("127.0.0.1:0").unwrap();
+    fn socket_for(server: SocketAddr) -> UdpSocket {
+        let sock = UdpSocket::bind(if server.is_ipv6() { "[::1]:0" } else { "127.0.0.1:0" }).unwrap();
         sock.connect(server).unwrap();
         sock.set_read_timeout(Some(Duration::from_millis(20))).unwrap();
+        sock
+    }
+
+    fn connect(server: SocketAddr, nick: &str) -> (Client, u32) {
+        let sock = Client::socket_for(server);
         sock.send(&Packet::Connect { nonce: 42, nick: nick.into() }.encode()).unwrap();
         let mut c = Client { sock, id: 0, token: 0, seq: 0 };
         let deadline = Instant::now() + Duration::from_secs(2);
@@ -158,4 +168,69 @@ fn rejects_empty_nick_and_bad_version() {
     sock.send_to(&bad, addr).unwrap();
     let n = sock.recv(&mut buf).unwrap();
     assert_eq!(Packet::decode(&buf[..n]).unwrap(), Packet::Reject { reason: proto::reject::BAD_VERSION });
+}
+
+/// Collect entity ids seen in snapshots for `wait`, pinging to stay alive.
+fn visible_ids(c: &Client, others: &[&Client], wait: Duration) -> Vec<u16> {
+    let deadline = Instant::now() + wait;
+    let mut ids = Vec::new();
+    while Instant::now() < deadline {
+        c.ping();
+        for o in others {
+            o.ping();
+        }
+        if let Some(Packet::Snapshot { entities, .. }) = c.recv() {
+            ids = entities.iter().map(|e| e.id).collect();
+        }
+    }
+    ids
+}
+
+#[test]
+fn ipv4_and_ipv6_clients_share_one_world() {
+    let (addr4, _) = start_server();
+    let (a, _) = Client::connect(addr4, "ipv4");
+    let (b, _) = Client::connect(v6(addr4), "ipv6");
+    assert!(visible_ids(&a, &[&b], Duration::from_millis(300)).contains(&b.id));
+    assert!(visible_ids(&b, &[&a], Duration::from_millis(300)).contains(&a.id));
+}
+
+#[test]
+fn session_survives_address_change() {
+    let (addr, _) = start_server();
+    let (mut a, _) = Client::connect(addr, "roamer");
+    let (b, _) = Client::connect(addr, "watcher");
+    assert!(visible_ids(&b, &[&a], Duration::from_millis(300)).contains(&a.id));
+
+    // "Wi-Fi -> LTE": same token, new socket (new source port), even another IP family.
+    let old = std::mem::replace(&mut a.sock, Client::socket_for(v6(addr)));
+    a.send_inputs(IN_RIGHT, 3);
+    a.ping();
+    let (_, _, _, _, ack) = a.latest_snapshot(Duration::from_millis(300)).expect("snapshots follow the new address");
+    assert_eq!(ack, a.seq, "inputs from the new address are applied");
+
+    // Old address gets nothing new; the player keeps its id for others.
+    while old.recv(&mut [0u8; 2048]).is_ok() {}
+    std::thread::sleep(Duration::from_millis(150));
+    assert!(old.recv(&mut [0u8; 2048]).is_err(), "old address no longer receives");
+    assert!(visible_ids(&b, &[&a], Duration::from_millis(200)).contains(&a.id));
+
+    // A late, stale input from the old address must not steal the session back.
+    old.send(&Packet::Input { token: a.token, ack_tick: 0, last_seq: 1, inputs: vec![0] }.encode()).unwrap();
+    std::thread::sleep(Duration::from_millis(100));
+    assert!(a.latest_snapshot(Duration::from_millis(200)).is_some(), "still served on the new address");
+}
+
+#[test]
+fn unknown_token_is_told_to_reconnect() {
+    let (addr, _) = start_server();
+    let sock = Client::socket_for(addr);
+    sock.set_read_timeout(Some(Duration::from_millis(500))).unwrap();
+    sock.send(&Packet::Ping { token: 12345, client_time: 0 }.encode()).unwrap();
+    let mut buf = [0u8; 2048];
+    let n = sock.recv(&mut buf).unwrap();
+    assert_eq!(
+        Packet::decode(&buf[..n]).unwrap(),
+        Packet::Disconnect { token: 12345, reason: proto::disconnect::SESSION_UNKNOWN }
+    );
 }

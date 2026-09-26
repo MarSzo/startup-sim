@@ -51,7 +51,9 @@ docs/                   GDD, PROTOCOL, ARCHITECTURE
 
 ## Serwer
 
-**Jeden wątek, bez async.** `std::net::UdpSocket` z timeoutem odczytu. Przy
+**Jeden wątek, bez async.** `std::net::UdpSocket` z timeoutem odczytu, domyślnie
+na `[::]:7777` w trybie dual-stack (IPv4 + IPv6; gniazdo tworzone przez `socket2`,
+bo std nie pozwala wyłączyć `IPV6_V6ONLY`). Przy
 dziesiątkach–setkach graczy koszt ticka to ~0,2–1,5 ms (głównie `sendto`), więc
 tokio nic by nie dało, a pętla jest deterministyczna i łatwa w debugowaniu.
 
@@ -78,6 +80,12 @@ Pakiety są obsługiwane od razu po odebraniu: `Input` trafia do kolejki gracza,
 maksymalny czas ticka, gracze, max widocznych, transfer na klienta
 (średnia/min/max), pakiety/s wejście/wyjście, pakiety wycięte przez symulator.
 
+**Sesje** są indeksowane tokenem (`by_token`), nie adresem: pakiet z ważnym
+tokenem z nowego adresu przenosi sesję (`migrate`), jeśli dowodzi „świeżości”
+(`Ping` albo nowe inputy). Nieznany token dostaje `Disconnect(4)`. `by_addr`
+służy już tylko do deduplikacji powtórzonych `Connect`. Szczegóły:
+`docs/PROTOCOL.md` („Sesja, zmiana adresu i ponowne łączenie”).
+
 **Symulator sieci** (`net.rs`): `--lag-ms` (opóźnienie w jedną stronę, dla
 obu kierunków — RTT rośnie o 2×), `--jitter-ms` (losowe 0..=j, może zmienić
 kolejność jak prawdziwe UDP), `--loss` (prawdopodobieństwo zgubienia, osobno
@@ -97,6 +105,12 @@ int, więc wyniki są bit w bit równe. `tests/golden/movement_vectors.json`
 przez Rust i odtwarzany w Godocie.
 
 ## Klient
+
+**Połączenie** (`net_client.gd`): parsowanie adresów z IPv6, rozwiązywanie
+nazw `TYPE_ANY`, nowe gniazdo po 1,5 s ciszy lub powrocie z tła (ta sama
+sesja), automatyczne ponowne łączenie przez 30 s po utracie sesji — `main.gd`
+zostawia wtedy scenę gry, a `game.gd` zamraża się (`on_reconnecting`) i
+czyści stan po nowym `Welcome` (`reset_session`).
 
 **Predykcja własnej postaci** (`game.gd`): w `_physics_process` (60 Hz)
 klient próbkuje klawisze, nadaje inputowi `seq`, od razu liczy nową pozycję

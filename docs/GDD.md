@@ -8,9 +8,33 @@
 
 ## Stack
 
-- Klient: Godot 4 (4.7), GDScript, aplikacja desktopowa.
+- Klient: Godot 4 (4.7), GDScript.
 - Serwer: dedykowany, autorytatywny, Rust (`std::net::UdpSocket`, jeden wątek).
 - Transport: UDP, własny binarny protokół (`docs/PROTOCOL.md`).
+
+## Platformy i crossplay
+
+Decyzja (2026-09-26): zostajemy przy Godocie; Unity rozważone i odrzucone.
+
+- **Docelowo:** Windows, macOS, Linux, Android, iOS — wszystkie z pełnym
+  crossplayem (jeden serwer, jeden protokół, deterministyczny ruch na int).
+- **Konsole (Switch, Xbox, PlayStation): „może kiedyś”.** Jeśli gra chwyci —
+  port przez firmę zewnętrzną (np. W4 Games). Wtedy dojdą konta platform
+  (PSN / Xbox network / Nintendo Account) z uwierzytelnieniem na serwerze,
+  certyfikacja oraz wymogi crossplay (blokowanie/zgłaszanie, filtr nicków,
+  kontrola rodzicielska). Serwer i protokół nie zależą od platformy.
+
+Wymagania wynikające z platform mobilnych:
+- ✅ IPv6 po obu stronach (wymóg App Store: sieci tylko-IPv6).
+- ✅ Identyfikacja gracza po tokenie, a nie po adresie — przeżycie zmiany sieci
+  (Wi-Fi ↔ LTE).
+- ✅ Automatyczne ponowne łączenie (po zmianie sieci, powrocie z tła, restarcie
+  serwera).
+- ⬜ Pozostałe poniżej:
+- Sterowanie dotykowe (wirtualny joystick → te same bity inputu).
+- UI skalowane pod różne ekrany; renderer Compatibility dla słabszych Androidów.
+- Dystrybucja: konta Apple Developer / Google Play, podpis i notaryzacja macOS,
+  eksport iOS na Macu z Xcode.
 
 ## Etap 1 — pionowy wycinek sieci
 
@@ -100,7 +124,8 @@ holu, `=` parking, `D` drzwi, `G` szklane drzwi wejściowe (na razie zamknięte 
 
 ## Stan implementacji
 
-*Stan na 2026-09-25 — etap 1 (sieć) ukończony.*
+*Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie
+i automatyczne ponowne łączenie.*
 
 ### Zrobione
 - **Serwer Rust** (`server/`): tick 20 Hz bez dryfu z liczeniem zgubionych
@@ -116,8 +141,13 @@ holu, `=` parking, `D` drzwi, `G` szklane drzwi wejściowe (na razie zamknięte 
   interpolacja innych graczy (100 ms), nicki, kamera, overlay F3.
 - **Boty** (`cargo run --release --bin bots`): 50 domyślnie, chodzą po BFS,
   część zbiera się w wybranym pokoju.
-- **Testy**: 19 jednostkowych w Rust (mapa, ruch/kolizje, protokół), golden +
-  e2e serwera (łącznie 23), 79 sprawdzeń w Godocie (parytet protokołu i ruchu).
+- **Sieć mobilna**: serwer dual-stack IPv4/IPv6; gracz identyfikowany tokenem
+  (zmiana adresu w trakcie gry przenosi sesję); klient przepina gniazdo po
+  ciszy/powrocie z tła i sam łączy się ponownie po utracie sesji.
+- **Testy**: 19 jednostkowych w Rust (mapa, ruch/kolizje, protokół), 2 golden,
+  5 e2e serwera (handshake, widoczność, timeout, odrzucenia, IPv4+IPv6, migracja
+  adresu, nieznany token) — łącznie 26; 96 sprawdzeń w Godocie (parytet
+  protokołu i ruchu, parsowanie adresów).
 
 ### Pomiary (MacBook, wszystko lokalnie)
 | scenariusz | wynik |
@@ -127,6 +157,8 @@ holu, `=` parking, `D` drzwi, `G` szklane drzwi wejściowe (na razie zamknięte 
 | RTT ~117 ms, jitter 10 ms, 2% strat | 60 FPS, 0 korekt, bufor interpolacji pusty w 0,40% klatek |
 | RTT ~226 ms, jitter 20 ms, 2% strat | 60 FPS, 0 korekt, bufor pusty w 0,25% klatek |
 | przejście z Wejścia do Korytarza | widoczni: 42 → 5 |
+| klient IPv6 + klient IPv4, serwer zamrożony na 3 s | obie sesje zachowane (nowe porty, te same id) |
+| restart serwera | obaj klienci połączeni ponownie automatycznie w < 1 s od startu serwera |
 
 ### Znane ograniczenia
 - Brak kolizji między graczami (celowo — to biuro, nie bijatyka).
