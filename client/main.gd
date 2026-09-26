@@ -20,6 +20,7 @@ const DayScreen = preload("res://ui/day_screen.gd")
 const TitleScreen = preload("res://ui/title_screen.gd")
 const PauseMenu = preload("res://ui/pause_menu.gd")
 const Settings = preload("res://ui/settings.gd")
+const Audio = preload("res://audio/audio.gd")
 
 const BUILDING_PATH := "res://maps/building.json"
 
@@ -38,6 +39,8 @@ var title := TitleScreen.new()
 var pause_layer := CanvasLayer.new()
 var pause := PauseMenu.new()
 var _leaving := false  # "Wyjdź do menu": the disconnect goes to the title
+var audio := Audio.new()
+var _last_place := -1
 
 
 func _ready() -> void:
@@ -52,6 +55,12 @@ func _ready() -> void:
 	get_tree().auto_accept_quit = false
 	Settings.load_once()
 	Settings.apply_window()
+	add_child(audio)
+	Settings.apply_audio()
+	# Every button in the game clicks.
+	get_tree().node_added.connect(func(n: Node):
+		if n is BaseButton:
+			n.pressed.connect(func(): audio.play("ui_click", -6.0, 0.08)))
 	building = Building.new()
 	building.load_path(BUILDING_PATH)
 	add_child(net)
@@ -195,6 +204,9 @@ func _on_packet(p: Dictionary) -> void:
 		portal.game_minute = p.minute
 		portal.on_clock(p)
 		day_screen.on_clock(p)
+		if p.place == Protocol.PLACE_HOME and _last_place != Protocol.PLACE_HOME and _last_place >= 0 and p.pay > 0:
+			audio.play("coin", -4.0)  # payday
+		_last_place = p.place
 		var want := int(args.get("commute", "0"))
 		if want > 0 and p.place == Protocol.PLACE_COMMUTING and p.arrive == Protocol.NO_TIME and p.mode != want:
 			net.send(Protocol.encode_commute_choice(net.token, want))
@@ -204,6 +216,14 @@ func _on_packet(p: Dictionary) -> void:
 func _process(_d: float) -> void:
 	if game:
 		game.input_blocked = portal.visible or day_screen.blocking() or pause.visible  # no walking under the menu
+	# Music: the menu tune on the title / character screens, a calm one at
+	# home (desktop, night, the way to work); in the office only ambience.
+	if title_layer.visible or start.get_parent().visible:
+		audio.music("music_menu")
+	elif portal_layer.visible or day_screen.blocking():
+		audio.music("music_home")
+	else:
+		audio.music("")
 
 
 func _show_title() -> void:
@@ -234,8 +254,10 @@ func _end_game() -> void:
 	portal_layer.visible = false
 	day_screen.visible = false
 	if game:
+		audio.leave_world()
 		game.queue_free()
 		game = null
+	_last_place = -1
 	get_window().title = "Startup Sim"
 
 

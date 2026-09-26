@@ -23,6 +23,9 @@ const STATS_EVERY_TICKS: u32 = 10;
 /// Resend the computer screen state this often (ticks).
 const COMPUTER_RESEND_TICKS: u32 = 20;
 
+/// Sounds carry this far on a floor: 28 tiles.
+const HEAR_RADIUS: i32 = 28 * crate::sim::TILE_UNITS;
+
 /// A packet queued for a player: (address, player id, packet).
 pub(super) type Outgoing = (SocketAddr, u16, Packet);
 
@@ -37,6 +40,7 @@ impl Server {
         let groups = self.interest_groups();
         self.queue_snapshots(&groups, &mut out);
         self.queue_says(&mut out);
+        self.queue_sounds(&mut out);
         self.queue_world_state(&mut out);
         for (addr, id, packet) in out.drain(..) {
             let n = self.send(addr, &packet);
@@ -174,6 +178,30 @@ impl Server {
                     }
                     out.push((p.addr, p.id, Packet::Say { id: speaker, text: text.clone() }));
                 }
+            }
+        }
+    }
+
+    /// This tick's sounds to everyone in the building on the same floor
+    /// within `HEAR_RADIUS`.
+    fn queue_sounds(&mut self, out: &mut Vec<Outgoing>) {
+        let sounds = std::mem::take(&mut self.sounds);
+        if sounds.is_empty() {
+            return;
+        }
+        let r2 = (HEAR_RADIUS as i64) * (HEAR_RADIUS as i64);
+        for p in self.players.values().filter(|p| p.in_building()) {
+            let heard: Vec<(u8, i32, i32)> = sounds
+                .iter()
+                .filter(|(_, f, pos)| {
+                    let (dx, dy) = ((pos.x - p.body.pos.x) as i64, (pos.y - p.body.pos.y) as i64);
+                    *f == p.body.floor && dx * dx + dy * dy <= r2
+                })
+                .map(|&(k, _, pos)| (k, pos.x, pos.y))
+                .take(proto::MAX_SOUNDS)
+                .collect();
+            if !heard.is_empty() {
+                out.push((p.addr, p.id, Packet::Sound { sounds: heard }));
             }
         }
     }

@@ -251,6 +251,17 @@ impl Packet {
                 Packet::Fridge { items, milk: r.u8()?, water: r.u8()?, juice: r.u8()? }
             }
             ty::SKIP_WAIT => Packet::SkipWait { token: r.u32()? },
+            ty::SOUND => {
+                let n = r.u8()? as usize;
+                if n > MAX_SOUNDS {
+                    return Err(DecodeError::Invalid("too many sounds"));
+                }
+                let mut sounds = Vec::with_capacity(n);
+                for _ in 0..n {
+                    sounds.push((r.u8()?, r.i32()?, r.i32()?));
+                }
+                Packet::Sound { sounds }
+            }
             ty::FRIDGE_ACTION => Packet::FridgeAction { token: r.u32()?, action: r.u8()?, arg: r.u8()? },
             ty::LIGHTS => {
                 let floor = r.u8()?;

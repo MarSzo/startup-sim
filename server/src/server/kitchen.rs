@@ -56,6 +56,7 @@ impl Server {
     }
 
     fn use_cupboard(&mut self, pid: u16) {
+        self.sound(crate::protocol::sound::CUPBOARD, pid);
         let Some(p) = self.players.get_mut(&pid) else { return };
         let Some(k) = self.kitchen.as_mut() else { return };
         let line = match p.inventory.held_kind() {
@@ -104,6 +105,9 @@ impl Server {
             lines::dw_running(t.saturating_sub(now).max(1))
         } else if k.dirty > 0 {
             k.running_until = Some(now + kitchen::WASH_MINUTES);
+            if let Some(p) = self.players.get(&pid) {
+                self.sounds.push((crate::protocol::sound::DISHWASHER, p.body.floor, p.body.pos));
+            }
             lines::DW_STARTED.to_string()
         } else {
             lines::DW_EMPTY.to_string()
@@ -122,6 +126,7 @@ impl Server {
     }
 
     fn send_fridge(&mut self, pid: u16) {
+        self.sound(crate::protocol::sound::FRIDGE, pid);
         if let Some(pk) = self.fridge_packet() {
             self.send_to(pid, &pk);
         }

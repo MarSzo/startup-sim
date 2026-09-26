@@ -3,7 +3,7 @@
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 29
+const VERSION := 30
 const MAX_PACKET := 1200
 const MAX_NICK_BYTES := 16
 const MAX_SAY_BYTES := 240
@@ -55,6 +55,11 @@ const T_LIGHTS := 41
 const T_FRIDGE := 42
 const T_FRIDGE_ACTION := 43
 const T_SKIP_WAIT := 44
+const T_SOUND := 45
+## Sound.kind -> file in res://sounds (server/src/protocol/mod.rs `sound`).
+const SOUND_FILES := {1: "coffee", 2: "till", 3: "gate_alarm", 4: "ding", 5: "lock", 6: "switch",
+	7: "flush", 8: "tap", 9: "lighter", 10: "dishwasher", 11: "fridge", 12: "cupboard",
+	13: "pickup", 14: "drop", 15: "eat", 16: "drink", 17: "whistle"}
 # FridgeAction.action (server/src/kitchen.rs)
 const FRIDGE_TAKE := 1
 const FRIDGE_PUT := 2
@@ -542,6 +547,14 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			p.founded = r.u8() != 0
 			p.alarm = r.u8()
 			p.skip = r.u8()
+		T_SOUND:
+			var n := r.u8()
+			if n > 64:
+				return {}
+			var sounds := []
+			for i in n:
+				sounds.append([r.u8(), r.i32(), r.i32()])
+			p.sounds = sounds
 		T_FRIDGE:
 			var n := r.u8()
 			if n > 16:

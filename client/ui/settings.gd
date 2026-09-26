@@ -1,5 +1,5 @@
 ## Player settings, kept in user://settings.cfg: full screen, the world's
-## ink effect, the default camera zoom.
+## ink effect, the default camera zoom, sound volumes (0..1).
 extends RefCounted
 
 const PATH := "user://settings.cfg"
@@ -7,6 +7,9 @@ const PATH := "user://settings.cfg"
 static var fullscreen := false
 static var mood := true
 static var zoom := 1.0
+static var vol_sfx := 0.8
+static var vol_ambient := 0.6
+static var vol_music := 0.5
 static var _loaded := false
 
 
@@ -20,6 +23,9 @@ static func load_once() -> void:
 	fullscreen = cfg.get_value("video", "fullscreen", false)
 	mood = cfg.get_value("video", "mood", true)
 	zoom = clampf(float(cfg.get_value("video", "zoom", 1.0)), 0.6, 2.0)
+	vol_sfx = clampf(float(cfg.get_value("audio", "sfx", 0.8)), 0.0, 1.0)
+	vol_ambient = clampf(float(cfg.get_value("audio", "ambient", 0.6)), 0.0, 1.0)
+	vol_music = clampf(float(cfg.get_value("audio", "music", 0.5)), 0.0, 1.0)
 
 
 static func save() -> void:
@@ -27,7 +33,16 @@ static func save() -> void:
 	cfg.set_value("video", "fullscreen", fullscreen)
 	cfg.set_value("video", "mood", mood)
 	cfg.set_value("video", "zoom", zoom)
+	cfg.set_value("audio", "sfx", vol_sfx)
+	cfg.set_value("audio", "ambient", vol_ambient)
+	cfg.set_value("audio", "music", vol_music)
 	cfg.save(PATH)
+
+
+static func apply_audio() -> void:
+	var a = preload("res://audio/audio.gd").inst
+	if a:
+		a.set_volumes(vol_sfx, vol_ambient, vol_music)
 
 
 static func apply_window() -> void:

@@ -1,5 +1,6 @@
 ## The settings (title screen and the Esc menu): full screen, the ink
-## effect over the world, the camera zoom. Changes apply and save at once.
+## effect over the world, the camera zoom, sound volumes. Changes apply and
+## save at once.
 extends VBoxContainer
 
 const Ink = preload("res://ui/ink_ui.gd")
@@ -54,9 +55,37 @@ func _ready() -> void:
 	add_child(zr)
 	_update_zoom_label()
 	add_child(Ink.label("W grze: kółko myszy albo + / - zmienia przybliżenie na chwilę.", 16, Ink.TEXT_MUTED))
+	_volume("Efekty", Settings.vol_sfx, func(v: float): Settings.vol_sfx = v)
+	_volume("Otoczenie", Settings.vol_ambient, func(v: float): Settings.vol_ambient = v)
+	_volume("Muzyka", Settings.vol_music, func(v: float): Settings.vol_music = v)
 	var b := Ink.button("Wróć")
 	b.pressed.connect(func(): back.emit())
 	add_child(b)
+
+
+## A volume slider row (0..100 %).
+func _volume(title: String, value: float, set_value: Callable) -> void:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	var l := Ink.label("", 18, Ink.TEXT_INK)
+	l.custom_minimum_size = Vector2(210, 0)
+	row.add_child(l)
+	var s := HSlider.new()
+	s.min_value = 0.0
+	s.max_value = 1.0
+	s.step = 0.05
+	s.value = value
+	s.custom_minimum_size = Vector2(220, 24)
+	s.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var show := func(v: float): l.text = "%s: %d%%" % [title, roundi(v * 100)]
+	show.call(value)
+	s.value_changed.connect(func(v: float):
+		set_value.call(v)
+		show.call(v)
+		Settings.apply_audio()
+		_save())
+	row.add_child(s)
+	add_child(row)
 
 
 func _update_zoom_label() -> void:

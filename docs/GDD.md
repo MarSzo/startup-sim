@@ -992,6 +992,27 @@ pełnym ekranie — zastąpiona stylem inspirowanym Don't Starve:
 - Podpowiedzi w aneksie: najbliższa rzecz (ekspres, owoce, płyn nie są już
   opisywane jako szafka / zlew / lodówka).
 
+### 10.38 Dźwięk
+
+- Wszystkie dźwięki są **syntetyzowane skryptem** (`tools/sounds/gen_sounds.py`
+  → `client/sounds/*.wav`) — bez próbek i cudzych licencji.
+- **Kroki** zależne od podłoża (podłoga, wykładzina, płytki / balkon, na
+  zewnątrz); własne i ludzi obok.
+- **Zdarzenia w świecie** (serwer wysyła `Sound` wszystkim na piętrze w
+  promieniu 28 kafli, słychać je z miejsca zdarzenia): ekspres, kasa, bramka
+  sklepu, gwizdek ochroniarza, winda (ding), zamek kabiny, włącznik światła,
+  spłuczka, kran, zapalniczka, zmywarka, lodówka, szafka z kubkami,
+  podniesienie / upuszczenie, jedzenie, picie.
+- **Po stronie klienta**: klik przycisków, szelest okien, „blip” przy dymkach
+  (wysokość zależna od osoby), powiadomienie o mailu, moneta przy wypłacie,
+  grzmot po błyskawicy, syreny policji / straży na pojazdach, dzwonek alarmu.
+- **Otoczenie**: ulica (głośno na zewnątrz, cicho w środku), szum biura,
+  deszcz (na zewnątrz / stłumiony w środku).
+- **Muzyka** (pętle lo-fi): w menu i przy tworzeniu postaci; spokojniejsza w
+  domu (pulpit, noc, wybór dojazdu). W biurze tylko otoczenie.
+- **Ustawienia**: suwaki Efekty / Otoczenie / Muzyka (szyny SFX, Ambient,
+  Music), zapisywane w `user://settings.cfg`.
+
 ### 10.6 Stan implementacji
 
 *Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie,
@@ -1094,7 +1115,7 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
   portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, zegar, dojazd, pogoda, zarząd, słodycze, obiady, wakaty, firma, ochrona i policja, kubki, dym, balkon, protokół), 2 golden, 30 e2e serwera
   (m.in. portal: odrzucenie → przyjęcie → spawn; całe wdrożenie aż do karty;
   niewidoczność między piętrami; zgodność stanu serwera z predykcją) —
-  łącznie 135 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 porannego dojazdu samochodem moknięcia w deszczu spotkania z Prezesem tacy ze słodyczami obiadu z odbiorem na recepcji, obsadzonego stanowiska, panelu założyciela kradzieży w sklepie z ochroną i policją , kubka zebranego przez sprzątaczkę oraz papierosa, który uruchamia alarm pożarowy, wcześniejszego powrotu do domu z przystanku i pomijania czekania, zatrzymania przez ochronę); 150 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
+  łącznie 135 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 porannego dojazdu samochodem moknięcia w deszczu spotkania z Prezesem tacy ze słodyczami obiadu z odbiorem na recepcji, obsadzonego stanowiska, panelu założyciela kradzieży w sklepie z ochroną i policją , kubka zebranego przez sprzątaczkę oraz papierosa, który uruchamia alarm pożarowy, wcześniejszego powrotu do domu z przystanku i pomijania czekania, zatrzymania przez ochronę, dźwięku ekspresu słyszanego przez innych); 151 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
   adresów).
 
 #### Pomiary (MacBook, wszystko lokalnie)

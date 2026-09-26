@@ -148,6 +148,8 @@ func test_protocol(path: String) -> void:
 	expect(d.get("reason") == 1 and d.token == 0x01020304, "decode disconnect")
 	var say := Protocol.decode(golden["say"].hex_decode())
 	expect(say.get("type") == Protocol.T_SAY and say.id == 61440 and say.text == "Dzień dobry! Proszę za mną.", "decode say %s" % say)
+	var snd := Protocol.decode(golden["sound"].hex_decode())
+	expect(snd.get("type") == Protocol.T_SOUND and snd.sounds == [[1, 12288, -256], [17, 0, 65536]], "decode sound %s" % snd)
 	# Truncation must never decode.
 	var snap: PackedByteArray = golden["snapshot"].hex_decode()
 	for n in snap.size():

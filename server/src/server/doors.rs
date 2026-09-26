@@ -64,11 +64,16 @@ impl Server {
             }
             if let Some((from, to)) = up.arrived {
                 let e = &self.elevators[i];
+                let mut riders = Vec::new();
                 for p in self.players.values_mut() {
                     if p.in_building() && e.in_cabin(from, p.body.pos) && p.body.floor == from {
                         p.body.floor = to;
                         p.room = self.building.floor(to).map_or(0, |m| m.room_at(p.body.pos.x, p.body.pos.y));
+                        riders.push(p.body.pos);
                     }
+                }
+                if let Some(&pos) = riders.first() {
+                    self.sounds.push((crate::protocol::sound::DING, to, pos));
                 }
             }
         }
@@ -98,6 +103,7 @@ impl Server {
         let door = self.stalls[i].door;
         if self.stalls[i].locked_by.is_some() {
             self.set_stall_lock(i, None);
+            self.sound(crate::protocol::sound::LOCK, pid);
             self.says.push(say(stalls::lines::UNLOCKED));
             return;
         }
@@ -111,6 +117,7 @@ impl Server {
             return;
         }
         self.set_stall_lock(i, Some(pid));
+        self.sound(crate::protocol::sound::LOCK, pid);
         self.says.push(say(stalls::lines::LOCKED));
     }
 

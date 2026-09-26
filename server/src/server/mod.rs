@@ -239,6 +239,8 @@ pub struct Server {
     next_drop_handle: u16,
     /// Speech waiting to be sent at the end of the tick.
     says: Vec<Say>,
+    /// Sounds this tick: (kind, floor, position), sent with the updates.
+    sounds: Vec<(u8, u8, Pos)>,
     /// Packets queued this tick (kept to reuse the allocation).
     outbox: Vec<Outgoing>,
     net: Net,
@@ -313,6 +315,7 @@ impl Server {
             next_item_id: 1,
             next_drop_handle: DROP_HANDLE_BASE,
             says: Vec::new(),
+            sounds: Vec::new(),
             outbox: Vec::new(),
             building,
             net,
@@ -434,6 +437,13 @@ impl Server {
     fn send_to(&mut self, pid: u16, p: &Packet) {
         if let Some(addr) = self.players.get(&pid).map(|p| p.addr) {
             self.send(addr, p);
+        }
+    }
+
+    /// A sound where the player stands (heard by those nearby).
+    fn sound(&mut self, kind: u8, pid: u16) {
+        if let Some(p) = self.players.get(&pid) {
+            self.sounds.push((kind, p.body.floor, p.body.pos));
         }
     }
 

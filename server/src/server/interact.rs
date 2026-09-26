@@ -67,6 +67,7 @@ impl Server {
             self.says.push(Say::new(pid, line));
         } else if let Some(s) = self.switches.iter().find(|s| lights::in_reach(s, body)).copied() {
             let on = self.lights.toggle((s.floor, s.room));
+            self.sound(crate::protocol::sound::SWITCH, pid);
             self.says.push(Say::new(pid, if on { lights::lines::ON } else { lights::lines::OFF }));
         } else if let Some(said) = self.use_spot(pid, body) {
             self.says.extend(said.map(|line| Say::new(pid, line)));
@@ -113,6 +114,9 @@ impl Server {
                 coffee::Outcome::HandsFull => coffee::lines::HANDS_FULL,
             },
         };
+        if line == coffee::lines::BREWING {
+            self.sound(crate::protocol::sound::COFFEE, pid);
+        }
         self.says.push(Say::new(pid, line));
         true
     }

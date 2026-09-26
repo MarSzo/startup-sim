@@ -359,6 +359,13 @@ Dym papierosowy na piętrze odbiorcy (co 1 s, tylko w budynku): `floor u8`, n
 u8 (≤ 64) × {`room u16`, `level u8` 1–255}. Pokoi spoza listy nie ma dymu.
 Czujki dymu są w danych mapy (`room_defs.*.detector`), klient rysuje je sam.
 
+### 45 `Sound` (S→C)
+
+n u8 (≤ 64) × {`kind u8`, `x i32`, `y i32`} (sub-piksele). Dźwięki zdarzeń z
+tego ticku na piętrze odbiorcy w promieniu 28 kafli; klient gra je w miejscu
+zdarzenia (`SOUND_FILES` w `net/protocol.gd`). Nie są potwierdzane — zgubiony
+dźwięk po prostu przepada.
+
 ### 44 `SkipWait` (C→S)
 
 token u32. „Pomiń czekanie” — tylko w domu / w drodze. Gdy poprosili wszyscy
@@ -453,6 +460,7 @@ szyfrowaniem.
 
 ## Historia wersji
 
+- **30** — dźwięki: `Sound` (45, S→C): n u8 (≤ 64) × {kind u8, x i32, y i32} — zdarzenia słyszalne na piętrze odbiorcy w promieniu 28 kafli (1 ekspres, 2 kasa, 3 bramka sklepu, 4 winda, 5 zamek kabiny, 6 włącznik, 7 spłuczka, 8 kran, 9 zapalniczka, 10 zmywarka, 11 lodówka, 12 szafka, 13 podniesienie, 14 upuszczenie, 15 jedzenie, 16 picie, 17 gwizdek).
 - **29** — `SkipWait` (44, C→S: token u32) — „Pomiń czekanie” w domu; `Clock` + `skip` u8 (0 nie, 1 poproszono, 2 czas pędzi); aktywność 8 = zatrzymany (ochrona / policja).
 - **28** — aneks kuchenny: `Fridge` (42), `FridgeAction` (43); przedmioty 35 kubek (czysty), 36 mleko (karton), 37 kawa z mlekiem; 34 = brudny kubek.
 - **27** — światło: pakiet `Lights` (41); w mapie `room_defs.*.light` / `switch` / `lit_by` / `windows`.

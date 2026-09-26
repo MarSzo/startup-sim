@@ -648,6 +648,9 @@ func on_packet(p: Dictionary) -> void:
 				unread[p.id] = true
 				_refresh_mail_badge()
 				_toast_msg("Nowa wiadomość od: %s\n%s" % [p.from, p.subject])
+				var audio = preload("res://audio/audio.gd").inst
+				if audio:
+					audio.play("notify", -4.0)
 				if _windows.has("mail"):
 					_render("mail")
 				if auto_offer > 0:

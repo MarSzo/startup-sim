@@ -791,6 +791,11 @@ fn coffee_machine_brews_one_cup_at_a_time() {
     a.press_e(&b, at_a);
     let seen = a.wait_for_line(coffee_lines::BREWING, Duration::from_millis(500));
     assert!(seen.is_some(), "A starts brewing");
+    // C, standing next to it, hears the machine.
+    let heard = wait_for(&c, &[&a], Duration::from_millis(500), |p| {
+        matches!(p, Packet::Sound { sounds } if sounds.iter().any(|s| s.0 == proto::sound::COFFEE)).then_some(())
+    });
+    assert!(heard.is_some(), "C hears the coffee machine");
     // C tries meanwhile: the machine is busy.
     c.press_e(&b, at_c);
     assert!(c.wait_for_line(coffee_lines::BUSY, Duration::from_millis(500)).is_some(), "one at a time");

@@ -48,6 +48,7 @@ impl Packet {
             Packet::Fridge { .. } => ty::FRIDGE,
             Packet::FridgeAction { .. } => ty::FRIDGE_ACTION,
             Packet::SkipWait { .. } => ty::SKIP_WAIT,
+            Packet::Sound { .. } => ty::SOUND,
             Packet::Doors { .. } => ty::DOORS,
             Packet::DoorAction { .. } => ty::DOOR_ACTION,
         }
@@ -328,6 +329,14 @@ impl Packet {
                 w.u8(*juice);
             }
             Packet::SkipWait { token } => w.u32(*token),
+            Packet::Sound { sounds } => {
+                w.u8(sounds.len().min(MAX_SOUNDS) as u8);
+                for (kind, x, y) in sounds.iter().take(MAX_SOUNDS) {
+                    w.u8(*kind);
+                    w.i32(*x);
+                    w.i32(*y);
+                }
+            }
             Packet::FridgeAction { token, action, arg } => {
                 w.u32(*token);
                 w.u8(*action);

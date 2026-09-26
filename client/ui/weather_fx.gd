@@ -5,6 +5,8 @@ extends Control
 
 const Protocol = preload("res://net/protocol.gd")
 
+signal lightning
+
 var weather := Protocol.WEATHER_SUNNY
 var outdoors := false
 var _drops: Array = []     # [x, y, speed, length] in screen space
@@ -57,6 +59,7 @@ func _process(delta: float) -> void:
 		_next_flash -= delta
 		if _next_flash <= 0.0:
 			_flash = 0.85
+			lightning.emit()
 			_next_flash = randf_range(3.0, 9.0)
 	_flash = maxf(0.0, _flash - delta * 2.5)
 	queue_redraw()

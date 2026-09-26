@@ -58,11 +58,13 @@ impl Server {
                     cup.kind = item_kind::CUP;
                     cup.label = "Umyty".into();
                 }
+                self.sounds.push((crate::protocol::sound::TAP, floor, pos));
                 refresh(p);
                 crate::kitchen::lines::WASHED.into()
             }
             SpotKind::Sink => {
                 p.rest = Some((Rest::Washing { until: self.tick + needs::WASH_TICKS }, floor, pos));
+                self.sounds.push((crate::protocol::sound::TAP, floor, pos));
                 needs::lines::WASHING.into()
             }
             SpotKind::Sanitizer => {

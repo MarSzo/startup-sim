@@ -23,7 +23,7 @@ pub use golden::{golden_samples, to_hex};
 pub use snapshot::{snapshot_fragments, SelfState};
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 29;
+pub const VERSION: u8 = 30;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
 pub const MAX_PACKET: usize = 1200;
@@ -93,6 +93,7 @@ pub mod ty {
     pub const FRIDGE: u8 = 42;
     pub const FRIDGE_ACTION: u8 = 43;
     pub const SKIP_WAIT: u8 = 44;
+    pub const SOUND: u8 = 45;
 }
 
 /// `ItemAction::action`.
@@ -216,6 +217,30 @@ pub mod activity {
     /// Stopped by the guard / the police (can't move for a moment).
     pub const HELD: u8 = 8;
 }
+
+/// `Sound` kinds: things happening in the world that others hear too.
+pub mod sound {
+    pub const COFFEE: u8 = 1;
+    pub const TILL: u8 = 2;
+    pub const GATE_ALARM: u8 = 3;
+    pub const DING: u8 = 4;
+    pub const LOCK: u8 = 5;
+    pub const SWITCH: u8 = 6;
+    pub const FLUSH: u8 = 7;
+    pub const TAP: u8 = 8;
+    pub const LIGHTER: u8 = 9;
+    pub const DISHWASHER: u8 = 10;
+    pub const FRIDGE: u8 = 11;
+    pub const CUPBOARD: u8 = 12;
+    pub const PICKUP: u8 = 13;
+    pub const DROP: u8 = 14;
+    pub const EAT: u8 = 15;
+    pub const DRINK: u8 = 16;
+    pub const WHISTLE: u8 = 17;
+}
+
+/// Most sounds in one `Sound` packet.
+pub const MAX_SOUNDS: usize = 64;
 
 /// `Clock::place`: where the receiver is.
 pub mod place {
@@ -493,6 +518,9 @@ pub enum Packet {
     /// At home: "skip the waiting" (to the morning / departure; once
     /// everybody at home asked).
     SkipWait { token: u32 },
+    /// Sounds heard this tick on the receiver's floor: (kind, x, y) in
+    /// sub-pixels (`sound::*`), at most `MAX_SOUNDS`.
+    Sound { sounds: Vec<(u8, i32, i32)> },
     /// Closed doors (locked toilet stalls, elevator doors) on the receiver's
     /// floor: solid for the simulation. Plus the elevator: the floor it is at
     /// and where it is heading (`NO_FLOOR` = standing). Sent on change and

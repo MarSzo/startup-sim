@@ -21,9 +21,12 @@ impl Server {
         }
         let speaker = self.cashier.unwrap_or(pid);
         self.says.push(Say::addressed(speaker, shop::lines::ALARM, pid));
+        self.sound(crate::protocol::sound::GATE_ALARM, pid);
         match self.npcs.iter_mut().find(|n| n.role == npc::Role::Guard && n.chasing().is_none()) {
             Some(g) => {
                 g.chase(pid);
+                let at = (g.body.floor, g.body.pos);
+                self.sounds.push((crate::protocol::sound::WHISTLE, at.0, at.1));
                 self.says.push(Say::addressed(g.id, npc::lines::GUARD_STOP, pid));
             }
             None => {

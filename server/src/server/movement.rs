@@ -80,7 +80,7 @@ impl Server {
                 self.says.push(Say::new(p.id, coffee::lines::COLD));
                 steps.cold_cups.push(p.id);
             }
-            tick_needs(p, needs_speed, tick, &mut self.says);
+            tick_needs(p, needs_speed, tick, &mut self.says, &mut self.sounds);
             if matches!(p.rest, Some((Rest::Smoking { .. }, _, _))) {
                 steps.puffs.push(((p.body.floor, p.room), p.id, p.body.pos));
             }
@@ -176,7 +176,8 @@ fn left_bathroom(building: &Building, floor: u8, from: u16, to: u16) -> bool {
 
 /// Needs: moving ends a rest; `speed` needs ticks at once (dev); the
 /// warnings they raise are said aloud.
-fn tick_needs(p: &mut Player, speed: u32, tick: u32, says: &mut Vec<Say>) {
+fn tick_needs(p: &mut Player, speed: u32, tick: u32, says: &mut Vec<Say>, sounds: &mut Vec<(u8, u8, Pos)>) {
+    let was_toilet = matches!(p.rest, Some((Rest::Toilet, _, _)));
     if let Some((_, floor, pos)) = p.rest {
         if (floor, pos) != (p.body.floor, p.body.pos) {
             p.rest = None;
@@ -195,6 +196,9 @@ fn tick_needs(p: &mut Player, speed: u32, tick: u32, says: &mut Vec<Say>) {
         }
     }
     p.rest = rest.map(|r| (r, p.body.floor, p.body.pos));
+    if was_toilet && !matches!(p.rest, Some((Rest::Toilet, _, _))) {
+        sounds.push((proto::sound::FLUSH, p.body.floor, p.body.pos));
+    }
 }
 
 /// Weather under the open sky; returns whether the umbrella is open.

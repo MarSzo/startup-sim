@@ -129,6 +129,7 @@ impl Server {
                     refresh(p);
                     let (floor, pos) = (p.body.floor, p.body.pos);
                     self.drop_at(floor, pos, item);
+                    self.sounds.push((crate::protocol::sound::DROP, floor, pos));
                 }
             }
             proto::item_action::GIVE => self.give_to_nearest(id),
@@ -187,6 +188,19 @@ impl Server {
         let tick = self.tick;
         let Some(p) = self.players.get_mut(&id) else { return };
         let Some(held) = &p.inventory.hands else { return };
+        let snd = match held.kind {
+            item_kind::COFFEE | item_kind::LATTE => Some(crate::protocol::sound::DRINK),
+            item_kind::FRUIT if !p.needs.is_full() => Some(crate::protocol::sound::EAT),
+            item_kind::CIGARETTES if !held.unpaid => Some(crate::protocol::sound::LIGHTER),
+            item_kind::WATER | item_kind::ENERGY_DRINK | item_kind::JUICE | item_kind::BEER | item_kind::WINE | item_kind::MILK if !held.unpaid => {
+                Some(crate::protocol::sound::DRINK)
+            }
+            k if !held.unpaid && k != item_kind::UMBRELLA => crate::shop::product(k).map(|_| crate::protocol::sound::EAT),
+            _ => None,
+        };
+        if let Some(s) = snd {
+            self.sounds.push((s, p.body.floor, p.body.pos));
+        }
         let line = match held.kind {
             item_kind::COFFEE | item_kind::LATTE => {
                 let latte = held.kind == item_kind::LATTE;
@@ -255,6 +269,7 @@ impl Server {
         match p.inventory.add(d.item) {
             Ok(()) => {
                 refresh(p);
+                self.sounds.push((crate::protocol::sound::PICKUP, body.floor, body.pos));
                 Some(format!("Podniesione: {}.", name.to_lowercase()))
             }
             Err(item) => {

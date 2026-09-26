@@ -55,6 +55,7 @@ var views := {}          # floor -> MapView (only the current floor is visible)
 var tick_hz := 20
 var nick := ""
 var world := Node2D.new()
+var sounds := preload("res://audio/game_sounds.gd").new()
 var me := PlayerView.new()
 var camera := Camera2D.new()
 var overlay := DebugOverlay.new()
@@ -163,6 +164,11 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 		goto_legs = args["goto"].split(";")
 	goto_delay = float(args.get("goto-delay", "3"))
 	net.packet_received.connect(_on_packet)
+	sounds.game = self
+	add_child(sounds)
+	var audio = preload("res://audio/audio.gd").inst
+	if audio:
+		audio.world = world
 
 	var map0 = building.get_floor(0)
 	for f in building.floors.size():
@@ -299,6 +305,7 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 	weather_layer.layer = 6  # over the world and the smoke, under the HUD
 	add_child(weather_layer)
 	weather_layer.add_child(weather_fx)
+	weather_fx.lightning.connect(func(): sounds.on_lightning(weather_fx.outdoors))
 	status_layer.add_child(shelf_window)
 	status_layer.add_child(fridge_window)
 	fridge_window.action.connect(func(act: int, arg: int): if net.is_playing(): net.send(Protocol.encode_fridge_action(net.token, act, arg)))
@@ -661,7 +668,10 @@ func _on_packet(p: Dictionary) -> void:
 			dialog.on_dialog(p)
 		Protocol.T_CHAT:
 			screen.on_chat(p)
+		Protocol.T_SOUND:
+			sounds.on_sound(p)
 		Protocol.T_SAY:
+			sounds.on_say(p.id, remotes[p.id].position if remotes.has(p.id) else me.position, p.id == net.player_id)
 			var who: String = nicks.get(p.id, "?")
 			if p.id == net.player_id:
 				who = nick

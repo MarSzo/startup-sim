@@ -67,6 +67,9 @@ server/                 crate Rusta (lib `game` + binarki)
   tests/server_e2e.rs   prawdziwy serwer na losowym porcie + surowe klienty UDP
   tests/golden/         packets.json, movement_vectors.json
 client/                 projekt Godota 4.7
+  audio/audio.gd        dźwięk: szyny SFX / Ambient / Music, efekty płaskie i w świecie, pętle otoczenia, muzyka
+  audio/game_sounds.gd  kroki wg podłoża, pakiety Sound, blipy mowy, otoczenie, syreny, grzmoty
+  sounds/               pliki WAV z tools/sounds/gen_sounds.py (syntetyzowane)
   icons/                ikona gry (icon.svg — źródło; icon.icns / icon.ico do eksportu) i ekran startowy splash.png
   maps/building.json    lista pięter (piętro 2 zablokowane)
   maps/floor0.json      parter + teren zewnętrzny
@@ -334,6 +337,10 @@ parking / stojak / krawężnik / przystanek), gracz jest `Working` z `riding`
 Na przystanku `VehicleEvent::Arrived` → wysiada, efekty na potrzeby,
 spóźnienie po 9:00. Auto i rower zostają zaparkowane do wieczora (znikają
 przy `go_home`), taksówka i tramwaj odjeżdżają (`Gone`).
+Dźwięki (`Server::sounds`): zdarzenia dopisują `(rodzaj, piętro, pozycja)`
+(`sound()` dla miejsca gracza); `queue_sounds` wysyła `Sound` każdemu na tym
+piętrze w promieniu `HEAR_RADIUS`. Resztę (kroki, otoczenie, muzykę) klient
+wylicza sam.
 Powrót przed 22:00 (`server/leave.rs`): E przy własnym pojeździe
 (`Vehicle::depart` — odjazd ulicą) lub w `commute::home_spot` dla trybu,
 dwa naciśnięcia w `CONFIRM_TICKS` → `go_home` (wypłata). Gdy wszyscy gracze
