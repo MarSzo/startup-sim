@@ -3,7 +3,7 @@
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 4
+const VERSION := 5
 const MAX_PACKET := 1200
 const MAX_NICK_BYTES := 16
 const MAX_SAY_BYTES := 240
@@ -30,6 +30,11 @@ const T_RECRUIT_RESULT := 16
 
 const KIND_PLAYER := 0
 const KIND_NPC := 1
+
+# Activity bits: Snapshot.self_status bits 0..1 = entity flags bits 6..7.
+const STATUS_HOLDING_COFFEE := 1
+const STATUS_BREWING := 2
+const STATUS_FLAGS_SHIFT := 6
 
 const DISCONNECT_QUIT := 0
 const DISCONNECT_TIMEOUT := 1
@@ -199,6 +204,7 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			p.self_lock = r.u8()
 			p.self_prev_input = r.u8()
 			p.self_access = r.u8()
+			p.self_status = r.u8()
 			var n := r.u8()
 			var ents := []
 			for i in n:

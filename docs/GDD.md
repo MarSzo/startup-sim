@@ -390,6 +390,14 @@ postacie naraz.
 - Przy okazji: portiera widać z holu wejściowego przez drzwi portierni
   (pokoje mogą „widzieć” inne pokoje — ustawienie w mapie).
 
+### 10.10 Ekspres do kawy (chill room)
+
+Ustalenie 2026-09-26: ekspres działa jako **czynność**, bez wpływu na
+statystyki — co daje kawa (energia, stres, koszt), zostaje otwartą kwestią
+ekonomii (sekcja 7). Przy ekspresie: „[E] Zrób kawę” → „Parzę kawę…” (3 s,
+ekspres zajęty dla innych: „Ekspres zajęty — chwilka.”) → „Kawa gotowa!” →
+kubek w ręce przez 90 s, widoczny dla innych → „Kawa wypita.”
+
 ### 10.6 Stan implementacji
 
 *Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie,
@@ -421,18 +429,20 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
   2 poprawne), ponawianie ekranu przy stratach UDP, przydział do działu z
   umową w HR, dział przy nicku; protokół v4.
 - **Grafika**: proceduralny pixel art otoczenia, mebli i postaci (10.9).
+- **Ekspres do kawy**: parzenie, kubek w ręce widoczny dla innych, jedna
+  osoba naraz (10.10); protokół v5.
 - **Boty** (`cargo run --release --bin bots`): 50 domyślnie, chodzą po BFS po
   całym budynku (schodami), część zbiera się w wybranym pokoju (domyślnie
   Chill room na piętrze 1).
 - **Sieć mobilna**: serwer dual-stack IPv4/IPv6; gracz identyfikowany tokenem
   (zmiana adresu w trakcie gry przenosi sesję); klient przepina gniazdo po
   ciszy/powrocie z tła i sam łączy się ponownie po utracie sesji.
-- **Testy**: 47 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
+- **Testy**: 51 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
   zależna od uprawnień, bramki, ruch/kolizje, schody, winda, nawigacja,
-  portier, recepcja, HR, rekrutacja, protokół), 2 golden, 8 e2e serwera
+  portier, recepcja, HR, rekrutacja, ekspres, protokół), 2 golden, 9 e2e serwera
   (m.in. portal: odrzucenie → przyjęcie → spawn; całe wdrożenie aż do karty;
   niewidoczność między piętrami; zgodność stanu serwera z predykcją) —
-  łącznie 57; 112 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
+  łącznie 62 (w tym e2e ekspresu); 113 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
   adresów).
 
 #### Pomiary (MacBook, wszystko lokalnie)

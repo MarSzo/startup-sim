@@ -1,4 +1,4 @@
-# Protokół sieciowy (wersja 4)
+# Protokół sieciowy (wersja 5)
 
 Własny binarny protokół na UDP. Implementacje:
 - serwer: `server/src/protocol.rs` (źródło prawdy),
@@ -23,7 +23,7 @@ przez `cargo test` i czytane przez `client/tests/run_tests.gd`.
 | pole    | typ | wartość |
 |---------|-----|---------|
 | magic   | u16 | `0x5354` (bajty `54 53`, „TS”) |
-| version | u8  | `4` |
+| version | u8  | `5` |
 | type    | u8  | typ pakietu (niżej) |
 
 ## Jednostki
@@ -94,6 +94,7 @@ aplikuje max 6 (średnio 3 = 60/20). Kolejka ponad 30 jest przycinana od najstar
 | self_lock      | u8 — blokada schodów odbiorcy (`sim::Body::lock`: 0 brak, 1 trzymane, 2 zwolnione) |
 | self_prev_input| u8 — poprzedni input odbiorcy (`sim::Body::prev_input`, do akcji „na wciśnięcie”) |
 | self_access    | u8 — uprawnienia odbiorcy (`map::access`: 1 przepustka gościa, 2 karta pracownika, 4 obsługa) |
+| self_status    | u8 — czynność odbiorcy (nie symulowana): bit 0 trzyma kawę, bit 1 parzy kawę |
 | n              | u8 |
 | entities       | n × 12 B |
 
@@ -101,7 +102,7 @@ Encja (12 B): `id u16 | kind u8 | x i32 | y i32 | flags u8`.
 - `kind`: 0 gracz, 1 NPC. Id NPC zaczynają się od `0xF000` (61440); gracze mają 1..61439.
 - `flags`: bity 0–1 kierunek (0 dół, 1 góra, 2 lewo, 3 prawo), bit 2 „w ruchu”,
   bity 3–5 wygląd (0 gracz, 1 portier — mundur z czapką, 2 pracownik biurowy —
-  koszula z krawatem), bity 6–7 zarezerwowane.
+  koszula z krawatem), bity 6–7 czynność (jak `self_status`: 6 trzyma kawę, 7 parzy).
 
 **Interest management**: lista zawiera tylko encje z tym samym `(floor, room)` co
 odbiorca (bez niego samego). Snapshot jest pełny (nie delta) — zgubienie
@@ -113,8 +114,8 @@ niepotwierdzone inputy dokładnie od tego stanu, także przez schody i windę.
 Uprawnienia zmienia tylko serwer (np. portier daje przepustkę); klient poznaje
 je ze snapshotu i od razu uwzględnia w predykcji kolizji z bramkami.
 
-**Fragmentacja**: stała część snapshotu ma 29 B, więc mieści się 97 encji
-(29 + 97·12 = 1193 B). Więcej encji → kilka fragmentów z tym samym `tick`,
+**Fragmentacja**: stała część snapshotu ma 30 B, więc mieści się 97 encji
+(30 + 97·12 = 1194 B). Więcej encji → kilka fragmentów z tym samym `tick`,
 każdy z pełnymi polami `self_*`. Pusty pokój → 1 fragment z `n = 0`.
 
 ### 6 `PlayerInfo` (S→C)
@@ -153,7 +154,7 @@ sesja wygasła albo serwer był restartowany).
 ### 11 `Say` (S→C)
 | pole | typ |
 |------|-----|
-| id   | u16 — kto mówi (NPC) |
+| id   | u16 — kto mówi (NPC albo gracz — np. „Parzę kawę…” nad własną głową) |
 | text | u16 len + UTF-8 (max 240 B, ucinane na granicy znaku) |
 
 Wypowiedź pokazywana w dymku nad postacią i w logu na dole ekranu. Trafia do
@@ -239,6 +240,7 @@ szyfrowaniem.
 
 ## Historia wersji
 
+- **5** — `self_status` w snapshocie, bity czynności 6–7 we `flags` encji; `Say` także od graczy.
 - **4** — portal i rekrutacja (typy 12–16); `department` w `PlayerInfo`.
 - **3** — snapshot: `self_access`; pakiet `Say`; encje NPC (`kind` 1) z imionami w
   `PlayerInfo`; wygląd w bitach 3–5 `flags` (dodany bez zmiany formatu).

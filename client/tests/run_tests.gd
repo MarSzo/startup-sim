@@ -59,6 +59,7 @@ func test_protocol(path: String) -> void:
 	var s := Protocol.decode(golden["snapshot"].hex_decode())
 	expect(s.get("tick") == 1234 and s.last_input_seq == 99 and s.frag_cnt == 1 and s.self_x == 10000 and s.self_y == -5
 		and s.floor == 1 and s.room == 6 and s.self_lock == 2 and s.self_prev_input == 17 and s.self_access == 5
+		and s.self_status == 1
 		and s.entities.size() == 2,
 		"decode snapshot %s" % s)
 	if s.has("entities") and s.entities.size() == 2:

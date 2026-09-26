@@ -2,6 +2,7 @@
 
 pub mod args;
 pub mod building;
+pub mod coffee;
 pub mod map;
 pub mod nav;
 pub mod npc;

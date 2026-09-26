@@ -348,7 +348,10 @@ func _on_packet(p: Dictionary) -> void:
 			_on_snapshot(p)
 		Protocol.T_SAY:
 			var who: String = nicks.get(p.id, "?")
-			if remotes.has(p.id):
+			if p.id == net.player_id:
+				who = nick
+				me.say(p.text)
+			elif remotes.has(p.id):
 				remotes[p.id].say(p.text)
 			else:
 				_pending_say[p.id] = [Time.get_ticks_msec(), p.text]
@@ -395,6 +398,7 @@ func _on_snapshot(p: Dictionary) -> void:
 		else:
 			est_tick += (tick - est_tick) * 0.1
 		_reconcile(Movement.body(p.floor, Vector2i(p.self_x, p.self_y), p.self_prev_input, p.self_lock, p.self_access), p.last_input_seq)
+		me.set_status(p.self_status)
 	visible_count += p.entities.size()
 	var unknown := []
 	var now := Time.get_ticks_msec()
@@ -412,6 +416,7 @@ func _on_snapshot(p: Dictionary) -> void:
 					r.say(_pending_say[e.id][1])
 				_pending_say.erase(e.id)
 		r.push_sample(tick, Vector2(e.x, e.y) / float(Movement.SUBPIXELS), e.flags)
+		r.set_status((e.flags >> Protocol.STATUS_FLAGS_SHIFT) & 3)
 		kinds[e.id] = e.kind
 		if not nicks.has(e.id) and now - info_requested.get(e.id, -100000) > 500:
 			info_requested[e.id] = now
@@ -483,6 +488,23 @@ func _update_hint() -> void:
 					best_id = id
 		if best_id >= 0:
 			text = "[E] Porozmawiaj: %s" % nicks.get(best_id, "?")
+	if text == "" and map:
+		# Coffee machine within reach (same radius as the server: 1.5 tiles).
+		for dy in range(-2, 3):
+			for dx in range(-2, 3):
+				var tx: int = t.x + dx
+				var ty: int = t.y + dy
+				if tx < 0 or ty < 0 or tx >= map.width or ty >= map.height:
+					continue
+				if map.legend.get(map.tile_chars[ty * map.width + tx], {}).get("type") != "coffee_machine":
+					continue
+				if Movement.to_px(Movement.tile_center(tx, ty)).distance_to(Movement.to_px(pred.pos)) <= 24.0:
+					if me.status & Protocol.STATUS_HOLDING_COFFEE:
+						text = "Masz kawę w ręce"
+					elif me.status & Protocol.STATUS_BREWING:
+						text = "Parzenie kawy…"
+					else:
+						text = "[E] Zrób kawę"
 	if text == "" and map:
 		for dy in [-1, -2]:
 			for dx in [-1, 0, 1]:

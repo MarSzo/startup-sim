@@ -15,7 +15,7 @@ cd server && cargo run --release -- --start-with-card   # wariant dla botów: ws
 cd server && cargo run --release --bin bots -- --count 50 --room "Chill room" --all-in-room
 ```
 
-Sterowanie: WASD / strzałki, **E** — rozmowa z NPC / winda (stojąc w kabinie), **F3** — overlay debug.
+Sterowanie: WASD / strzałki, **E** — rozmowa z NPC / winda (stojąc w kabinie) / ekspres do kawy, **F3** — overlay debug.
 Po połączeniu widać **portal z ofertami pracy**: wybierz stanowisko i odpowiedz
 na 3 pytania (2 poprawne = przyjęcie; nie wyszło — spróbuj jeszcze raz).
 Przyjęty gracz startuje przed budynkiem bez przepustki: bramki w holu go nie wpuszczą,

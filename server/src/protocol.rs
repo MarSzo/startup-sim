@@ -5,7 +5,7 @@
 //! `tests/golden/packets.json`.
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 4;
+pub const VERSION: u8 = 5;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
 pub const MAX_PACKET: usize = 1200;
@@ -19,7 +19,7 @@ pub const MAX_OPTIONS: usize = 4;
 pub const MAX_INPUTS_PER_PACKET: usize = 8;
 
 /// Fixed part of a Snapshot packet (header + fields before the entity list).
-pub const SNAPSHOT_FIXED_LEN: usize = HEADER_LEN + 4 + 4 + 1 + 1 + (4 + 4 + 1 + 2 + 1 + 1 + 1) + 1;
+pub const SNAPSHOT_FIXED_LEN: usize = HEADER_LEN + 4 + 4 + 1 + 1 + (4 + 4 + 1 + 2 + 1 + 1 + 1 + 1) + 1;
 pub const ENTITY_LEN: usize = 12;
 /// Entities per snapshot fragment so a fragment never exceeds `MAX_PACKET`.
 pub const MAX_ENTITIES_PER_SNAPSHOT: usize = (MAX_PACKET - SNAPSHOT_FIXED_LEN) / ENTITY_LEN;
@@ -57,6 +57,15 @@ pub mod disconnect {
     /// Reply to a packet whose token matches no session (expired / server
     /// restarted). The client should start a fresh `Connect`.
     pub const SESSION_UNKNOWN: u8 = 4;
+}
+
+/// Activity bits: `Snapshot::self_status` bits 0..1, and the same two
+/// bits at 6..7 of every entity's `flags`.
+pub mod status {
+    pub const HOLDING_COFFEE: u8 = 1;
+    pub const BREWING: u8 = 2;
+    /// Shift of the status bits inside `EntityState::flags`.
+    pub const FLAGS_SHIFT: u8 = 6;
 }
 
 /// Entity kinds. Only players exist now; NPCs will use the same snapshot slot.
@@ -114,6 +123,8 @@ pub enum Packet {
         self_prev_input: u8,
         /// Receiver's rights (`map::access::*`): part of the simulated state.
         self_access: u8,
+        /// Receiver's activity bits (not simulated): see `status`.
+        self_status: u8,
         entities: Vec<EntityState>,
     },
     PlayerInfo { players: Vec<PlayerInfoEntry> },
@@ -288,6 +299,7 @@ impl Packet {
                 self_lock,
                 self_prev_input,
                 self_access,
+                self_status,
                 entities,
             } => {
                 w.u32(*tick);
@@ -301,6 +313,7 @@ impl Packet {
                 w.u8(*self_lock);
                 w.u8(*self_prev_input);
                 w.u8(*self_access);
+                w.u8(*self_status);
                 let n = entities.len().min(MAX_ENTITIES_PER_SNAPSHOT);
                 w.u8(n as u8);
                 for e in &entities[..n] {
@@ -426,6 +439,7 @@ impl Packet {
                 let self_lock = r.u8()?;
                 let self_prev_input = r.u8()?;
                 let self_access = r.u8()?;
+                let self_status = r.u8()?;
                 let n = r.u8()? as usize;
                 let mut entities = Vec::with_capacity(n);
                 for _ in 0..n {
@@ -443,6 +457,7 @@ impl Packet {
                     self_lock,
                     self_prev_input,
                     self_access,
+                    self_status,
                     entities,
                 }
             }
@@ -526,6 +541,7 @@ pub struct SelfState {
     pub lock: u8,
     pub prev_input: u8,
     pub access: u8,
+    pub status: u8,
 }
 
 /// Split a room's entity list into snapshot fragments that each fit in `MAX_PACKET`.
@@ -552,6 +568,7 @@ pub fn snapshot_fragments(tick: u32, last_input_seq: u32, me: SelfState, entitie
             self_lock: me.lock,
             self_prev_input: me.prev_input,
             self_access: me.access,
+            self_status: me.status,
             entities: c.to_vec(),
         })
         .collect()
@@ -581,6 +598,7 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
                 self_lock: 2,
                 self_prev_input: 17,
                 self_access: 5,
+                self_status: 1,
                 entities: vec![
                     EntityState { id: 3, kind: kind::PLAYER, x: 4096, y: 8192, flags: 0b101 },
                     EntityState { id: 65535, kind: kind::NPC, x: -1, y: 2_000_000, flags: 0 },

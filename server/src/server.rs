@@ -6,6 +6,7 @@ use std::net::SocketAddr;
 use std::time::{Duration, Instant};
 
 use crate::building::Building;
+use crate::coffee::{self, Cup, Machine};
 use crate::net::{canonical, LinkConditions, Net};
 use crate::npc::{self, Npc};
 use crate::protocol::{self as proto, EntityState, Packet, PlayerInfoEntry, SelfState};
@@ -58,6 +59,8 @@ struct Player {
     contract: bool,
     /// Recruitment attempts so far (numbers the attempts).
     attempts: u8,
+    /// Coffee in progress / in hand.
+    cup: Cup,
     token: u32,
     nonce: u32,
     addr: SocketAddr,
@@ -87,6 +90,7 @@ struct Stats {
 pub struct Server {
     building: Building,
     npcs: Vec<Npc>,
+    machines: Vec<Machine>,
     net: Net,
     cfg: Config,
     players: BTreeMap<u16, Player>,
@@ -108,6 +112,7 @@ impl Server {
         let net = Net::bind(cfg.bind, cfg.link)?;
         Ok(Server {
             npcs: Npc::spawn_all(&building),
+            machines: coffee::find_machines(&building),
             building,
             net,
             cfg,
@@ -294,6 +299,7 @@ impl Server {
             department: 0,
             contract: false,
             attempts: 0,
+            cup: Cup::None,
             token,
             nonce,
             addr,
@@ -442,6 +448,7 @@ impl Server {
 
     fn remove_player(&mut self, id: u16, why: &str) {
         if let Some(p) = self.players.remove(&id) {
+            coffee::release(&mut self.machines, &p.cup);
             self.by_token.remove(&p.token);
             if self.by_addr.get(&p.addr) == Some(&id) {
                 self.by_addr.remove(&p.addr);
@@ -472,6 +479,7 @@ impl Server {
 
         // 2. Simulation: apply queued inputs in sequence order.
         let mut talks: Vec<(u16, Body)> = Vec::new();
+        let mut coffee_says: Vec<(u16, String, Option<u16>)> = Vec::new();
         let mut portal_resend = Vec::new();
         for p in self.players.values_mut() {
             if !matches!(p.stage, Stage::Working) {
@@ -501,6 +509,10 @@ impl Server {
                 p.flags |= 0b100;
             }
             p.room = self.building.floor(p.body.floor).map_or(0, |m| m.room_at(p.body.pos.x, p.body.pos.y));
+            if let Some(line) = coffee::tick_cup(&mut p.cup, self.tick) {
+                coffee_says.push((p.id, line.to_string(), None));
+            }
+            p.flags = (p.flags & 0x3f) | status_bits(&p.cup) << proto::status::FLAGS_SHIFT;
         }
 
         for id in portal_resend {
@@ -521,6 +533,15 @@ impl Server {
                 .min_by_key(|n| (!n.is_idle(), (n.body.pos.x - body.pos.x).abs() + (n.body.pos.y - body.pos.y).abs()));
             if let Some(n) = nearest {
                 events.extend(n.interact(&self.building, pid, body.access, dept.as_deref()));
+            } else if let Some(i) = coffee::machine_in_reach(&self.machines, &body) {
+                let p = self.players.get_mut(&pid).unwrap();
+                let line = match coffee::use_machine(&mut self.machines, i, &mut p.cup, self.tick) {
+                    coffee::Outcome::Started => coffee::lines::BREWING,
+                    coffee::Outcome::Busy => coffee::lines::BUSY,
+                    coffee::Outcome::AlreadyHave => coffee::lines::ALREADY,
+                };
+                p.flags = (p.flags & 0x3f) | status_bits(&p.cup) << proto::status::FLAGS_SHIFT;
+                coffee_says.push((pid, line.to_string(), None));
             }
         }
         let bodies: HashMap<u16, Body> =
@@ -528,7 +549,7 @@ impl Server {
         for n in &mut self.npcs {
             events.extend(n.tick(&self.building, &bodies));
         }
-        let mut says: Vec<(u16, String, Option<u16>)> = Vec::new();
+        let mut says: Vec<(u16, String, Option<u16>)> = coffee_says;
         for e in events {
             match e {
                 npc::Event::Grant { player, access } => {
@@ -610,6 +631,7 @@ impl Server {
                 lock: p.body.lock,
                 prev_input: p.body.prev_input,
                 access: p.body.access,
+                status: status_bits(&p.cup),
             };
             for f in proto::snapshot_fragments(tick, p.last_processed_seq, me, &visible) {
                 outgoing.push((p.addr, id, f));
@@ -620,16 +642,20 @@ impl Server {
             let p = self.players.get_mut(&id).unwrap();
             p.known.extend(new_infos.iter().map(|e| e.id));
         }
-        // 6. Speech: to everyone in the speaker's room, plus the addressee.
+        // 6. Speech (NPCs, and players' own "thought" lines): to everyone in
+        //    the speaker's room, plus the addressee.
         for (npc_id, text, to) in says {
-            let Some(n) = self.npcs.iter().find(|n| n.id == npc_id) else { continue };
-            let (place, name) = ((n.body.floor, n.room), n.name.clone());
+            let speaker = match self.npcs.iter().find(|n| n.id == npc_id) {
+                Some(n) => Some(((n.body.floor, n.room), n.name.clone())),
+                None => self.players.get(&npc_id).map(|p| ((p.body.floor, p.room), p.nick.clone())),
+            };
+            let Some((place, name)) = speaker else { continue };
+            let info = self.info_of(npc_id).unwrap_or(PlayerInfoEntry { id: npc_id, nick: name, department: 0 });
             for p in self.players.values_mut() {
-                if (p.body.floor, p.room) == place || Some(p.id) == to {
+                if (p.body.floor, p.room) == place || Some(p.id) == to || p.id == npc_id {
                     // Name first, so the line isn't shown as "?".
-                    if p.known.insert(npc_id) {
-                        let info = vec![PlayerInfoEntry { id: npc_id, nick: name.clone(), department: 0 }];
-                        outgoing.push((p.addr, p.id, Packet::PlayerInfo { players: info }));
+                    if p.id != npc_id && p.known.insert(npc_id) {
+                        outgoing.push((p.addr, p.id, Packet::PlayerInfo { players: vec![info.clone()] }));
                     }
                     outgoing.push((p.addr, p.id, Packet::Say { id: npc_id, text: text.clone() }));
                 }
@@ -687,4 +713,8 @@ impl Server {
         self.net.dropped = 0;
         self.log(msg);
     }
+}
+
+fn status_bits(cup: &Cup) -> u8 {
+    (if cup.holding() { proto::status::HOLDING_COFFEE } else { 0 }) | (if cup.brewing() { proto::status::BREWING } else { 0 })
 }

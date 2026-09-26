@@ -52,7 +52,6 @@ pub mod dir {
 
 #[derive(Debug, Deserialize)]
 struct LegendEntry {
-    #[allow(dead_code)]
     #[serde(rename = "type")]
     kind: String,
     solid: bool,
@@ -175,6 +174,8 @@ pub struct Map {
     /// Rights that open the tile (0 = no requirement).
     need: Vec<u8>,
     free_dir: Vec<u8>,
+    /// Tile char -> legend type ("desk", "coffee_machine", ...).
+    types: HashMap<u8, String>,
     room: Vec<u16>,
     pub rooms: Vec<RoomDef>,
     pub links: Vec<Link>,
@@ -262,6 +263,7 @@ impl Map {
             tile_kind,
             need,
             free_dir,
+            types: file.legend.iter().filter_map(|(k, v)| k.bytes().next().map(|c| (c, v.kind.clone()))).collect(),
             room,
             rooms,
             links,
@@ -323,6 +325,11 @@ impl Map {
 
     pub fn tile_char(&self, tx: i32, ty: i32) -> Option<char> {
         self.idx(tx, ty).map(|i| self.tile_kind[i] as char)
+    }
+
+    /// Legend type of a tile ("desk", "coffee_machine", ...).
+    pub fn tile_type(&self, tx: i32, ty: i32) -> Option<&str> {
+        self.idx(tx, ty).and_then(|i| self.types.get(&self.tile_kind[i])).map(|s| s.as_str())
     }
 
     /// Rights that open a tile (0 = none needed).

@@ -26,6 +26,8 @@ const OUTLINE := Color(0.08, 0.08, 0.1)
 
 var look := LOOK_PLAYER
 var facing := FACING_DOWN
+## Activity (Protocol.STATUS_*): mug in hand / brewing at the machine.
+var status := 0
 ## White outline marks the local player.
 var highlight := false
 var skin := SKINS[0]
@@ -123,6 +125,12 @@ func _place_bubble() -> void:
 	bubble.position = Vector2(-sz.x / 2, HEAD_TOP - 28 / _zoom - sz.y)
 
 
+func set_status(s: int) -> void:
+	if s != status:
+		status = s
+		queue_redraw()
+
+
 func set_facing(f: int) -> void:
 	if f != facing:
 		facing = f
@@ -136,6 +144,8 @@ func _process(delta: float) -> void:
 			bubble.visible = false
 		else:
 			_place_bubble()
+	if status & 2:
+		queue_redraw()  # animated "brewing" dots
 	# Walk cycle from the distance travelled since the last frame.
 	if _last_pos != Vector2.INF:
 		var d := position.distance_to(_last_pos)
@@ -227,6 +237,7 @@ func _draw() -> void:
 		FACING_LEFT, FACING_RIGHT:
 			_r(dir * 1.5 - 0.5, top + 4, 1, 1, eye)
 			_r(dir * 3 - (1 if dir > 0 else 0), top + 5, 1, 1, skin.darkened(0.15))  # nose
+	_draw_status(top, ty, side, dir)
 	if look == LOOK_PORTER:
 		_r(-4, top - 1, 8, 3, Color("#1b2440"))           # cap
 		_r(-2, top, 4, 1, Color("#d4ac2b"))                # cap badge
@@ -234,6 +245,25 @@ func _draw() -> void:
 			_r(-4, top + 2, 8, 1, Color("#10162a"))        # visor
 		elif side:
 			_r(dir * 2 - (2 if dir < 0 else 0) + (1 if dir > 0 else -1), top + 2, 3, 1, Color("#10162a"))
+
+
+func _draw_status(top: float, ty: float, side: bool, dir: int) -> void:
+	if status & 1 and facing != FACING_UP:
+		# Mug in the right hand (+ a wisp of steam).
+		var mx := (dir * 4.0 - 1.0) if side else 3.0
+		_r(mx, ty + 4, 3, 3, Color("#f4f1ea"))
+		_r(mx, ty + 4, 3, 1, Color("#6b4a2e"))
+		_r(mx + 3, ty + 5, 1, 1, Color("#d9d4c8"))
+		var t := Time.get_ticks_msec() / 400
+		_r(mx + (t % 2), ty + 2, 1, 1, Color(1, 1, 1, 0.7))
+		_r(mx + 1 - (t % 2), ty + 1, 1, 1, Color(1, 1, 1, 0.45))
+		if t % 3 == 0:
+			queue_redraw()
+	if status & 2:
+		# "Brewing…" dots above the head.
+		var n := (Time.get_ticks_msec() / 300) % 4
+		for i in n:
+			_r(-4 + i * 3, top - 5, 2, 2, Color(1, 1, 1, 0.9))
 
 
 func _draw_hair(top: float, side: bool, dir: int) -> void:

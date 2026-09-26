@@ -448,3 +448,63 @@ fn job_portal_rejects_then_hires_and_spawns() {
     let (floor, room, access) = spawned.expect("snapshots after hiring");
     assert_eq!((floor, b.floor(0).unwrap().room_name(room), access), (0, "Na zewnątrz", 0));
 }
+
+#[test]
+fn coffee_machine_brews_one_cup_at_a_time() {
+    use game::coffee::lines as coffee_lines;
+    use game::protocol::status;
+    let (addr, _) = start_server_with(access::CARD);
+    let b = building();
+    let (mut a, _) = Client::connect(addr, "Kawosz");
+    let (mut c, _) = Client::connect(addr, "Drugi");
+    let spawn = |i: usize| {
+        let s = b.spawns()[i];
+        Body { access: access::CARD, ..Body::at(s.0, Pos::tile_center(s.1.x, s.1.y)) }
+    };
+    // Both walk up to the chill room, in front of the machine (36,26).
+    let at_a = a.walk_to(&b, spawn(0), (1, Tile { x: 36, y: 27 }), &[&c]);
+    let at_c = c.walk_to(&b, spawn(1), (1, Tile { x: 35, y: 27 }), &[&a]);
+
+    // A presses E: brewing starts; A's own bubble says so.
+    a.press_e(&b, at_a);
+    let seen = a.wait_for_line(coffee_lines::BREWING, Duration::from_millis(500));
+    assert!(seen.is_some(), "A starts brewing");
+    // C tries meanwhile: the machine is busy.
+    c.press_e(&b, at_c);
+    assert!(c.wait_for_line(coffee_lines::BUSY, Duration::from_millis(500)).is_some(), "one at a time");
+
+    // After ~3 s A holds a coffee: in A's own status and in A's flags for C.
+    let deadline = Instant::now() + Duration::from_secs(4);
+    let mut ready = false;
+    while Instant::now() < deadline && !ready {
+        c.ping(); // keep C's session alive while we wait (test timeout is 0.6 s)
+        a.ping();
+        while let Some(p) = a.recv() {
+            if let Packet::Say { text, .. } = p {
+                ready |= text == coffee_lines::READY;
+            }
+        }
+        while c.recv().is_some() {}
+    }
+    assert!(ready, "coffee ready");
+    let deadline = Instant::now() + Duration::from_millis(500);
+    let (mut self_holding, mut others_see) = (false, false);
+    while Instant::now() < deadline && !(self_holding && others_see) {
+        a.ping();
+        c.ping();
+        while let Some(p) = a.recv() {
+            if let Packet::Snapshot { self_status, .. } = p {
+                self_holding |= self_status & status::HOLDING_COFFEE != 0;
+            }
+        }
+        while let Some(p) = c.recv() {
+            if let Packet::Snapshot { entities, .. } = p {
+                others_see |= entities
+                    .iter()
+                    .any(|e| e.id == a.id && (e.flags >> status::FLAGS_SHIFT) & status::HOLDING_COFFEE != 0);
+            }
+        }
+    }
+    assert!(self_holding, "A's snapshot says: holding coffee");
+    assert!(others_see, "C sees A with a mug");
+}

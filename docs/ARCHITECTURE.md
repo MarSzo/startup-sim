@@ -28,6 +28,7 @@ server/                 crate Rusta (lib `game` + binarki)
   src/nav.rs            podążanie ścieżką (boty, NPC)
   src/npc.rs            NPC po stronie serwera (portier, recepcja, HR)
   src/recruitment.rs    portal z ofertami i quiz rekrutacyjny
+  src/coffee.rs         ekspresy do kawy (parzenie, kubek w ręce)
   data/recruitment.json oferty i pule pytań (pierwsza odpowiedź = poprawna)
   src/protocol.rs       pakiety: encode/decode, fragmentacja snapshotów
   src/net.rs            UdpSocket + symulator opóźnienia/jittera/strat
@@ -117,6 +118,12 @@ przepustki); osobę z kartą tylko wita. **HR** stoi za biurkiem: gościowi
 „podpisuje umowę” — `Grant CARD` + `Revoke GUEST`; bez przepustki odsyła na
 portiernię. Role (`npc::Role`) i ich kwestie są w `npc.rs`; wygląd idzie w
 bitach 3–5 flag encji.
+
+**Ekspresy** (`coffee.rs`, znalezione w mapie po typie `coffee_machine`): E
+w zasięgu 1,5 kafla (gdy nie ma NPC w zasięgu rozmowy) → parzenie 3 s (ekspres
+zajęty dla innych) → kubek w ręce przez 90 s. Stan idzie w `self_status` i w
+bitach 6–7 flag encji; komunikaty to `Say` od samego gracza (dymek nad jego
+głową, widoczny dla innych w pokoju).
 
 **Etapy gracza** (`Stage`): `Portal` (po połączeniu — portal z ofertami i
 quiz; poza światem: brak snapshotów, inputy ignorowane, ekran ponawiany co
@@ -297,5 +304,5 @@ połączeni, liczba w docelowym pokoju, RTT, odbierany transfer, widoczni.
 
 | polecenie | co sprawdza |
 |-----------|-------------|
-| `cd server && cargo test` | 46 testów jednostkowych (budynek i mapy wg GDD, osiągalność zależna od uprawnień, bramki, ruch/kolizje, schody, winda, nawigacja, portier, recepcja, HR, rekrutacja: zaliczenie/oblanie, ignorowanie nieaktualnych odpowiedzi, losowanie i tasowanie; protokół), 2 golden, 8 e2e (m.in. portal: odrzucenie → przyjęcie → spawn; całe wdrożenie aż do karty; widoczność między piętrami; stan serwera = predykcja) |
+| `cd server && cargo test` | 51 testów jednostkowych (budynek i mapy wg GDD, osiągalność zależna od uprawnień, bramki, ruch/kolizje, schody, winda, nawigacja, portier, recepcja, HR, rekrutacja: zaliczenie/oblanie, ignorowanie nieaktualnych odpowiedzi, losowanie i tasowanie; ekspres; protokół), 2 golden, 9 e2e (m.in. ekspres: parzenie, zajętość, kubek widoczny dla innych; portal: odrzucenie → przyjęcie → spawn; całe wdrożenie aż do karty; widoczność między piętrami; stan serwera = predykcja) |
 | `godot --headless --path client -s tests/run_tests.gd` | parytet protokołu (bajt w bajt) i ruchu — z bramkami, uprawnieniami i przejściami między piętrami — z Rustem, zgodność CRC budynku, parsowanie adresów |
