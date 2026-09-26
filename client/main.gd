@@ -2,6 +2,8 @@
 ##   --nick=Ala --server=127.0.0.1:7777 --autoconnect --debug --autowalk
 ##   --screenshot=/path.png [--screenshot-delay=5]  (dev: save a frame and quit;
 ##     several delays "5,12,20" save path_1.png, path_2.png, ... and quit after the last)
+##   --record=/dir [--record-start=2 --record-length=6 --record-fps=30]  (dev:
+##     JPG frames for a trailer, see dev_recorder.gd; quits when done)
 ##   --commute=3  (dev: pick this way to work every morning; 1 foot .. 5 tram)
 ##   --auto-recruit=1 [--auto-recruit-delay=2]  (dev: apply for offer 1, answer
 ##     at random until hired, waiting N s before each click)
@@ -111,6 +113,13 @@ func _ready() -> void:
 			_on_connect_pressed(start.nick_edit.text.strip_edges(), start.profile(), start.addr_edit.text)
 		else:
 			start.set_status(err, true)
+	if args.has("record"):
+		var rec := preload("res://dev_recorder.gd").new()
+		rec.dir = args["record"]
+		rec.start = float(args.get("record-start", "2"))
+		rec.length = float(args.get("record-length", "6"))
+		rec.fps = float(args.get("record-fps", "30"))
+		add_child(rec)
 	if args.has("screenshot"):
 		_take_screenshots(args["screenshot"], args.get("screenshot-delay", "5").split(","))
 

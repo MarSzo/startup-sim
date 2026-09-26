@@ -29,6 +29,7 @@ OPTIONS:
   --room <name>         room some bots gather in        [default: Chill room]
   --room-share <0..1>   fraction of bots in that room   [default: 0.5]
   --all-in-room         same as --room-share 1
+  --nicks <a,b,...>     nicks to use in turn (e.g. for a trailer) [default: bot_00...]
   --duration <secs>     stop after N seconds (0 = run forever) [default: 0]
   --map <path>          building JSON (must match the server)
 
@@ -94,6 +95,7 @@ fn main() {
         .unwrap_or_else(|| panic!("no room named '{room_name}'"));
     let share: f64 = if args.flag("all-in-room") { 1.0 } else { args.get("room-share", 0.5) };
     let duration: u64 = args.get("duration", 0);
+    let nicks: Vec<String> = args.get::<String>("nicks", String::new()).split(',').filter(|s| !s.is_empty()).map(str::to_string).collect();
     let n_room = ((count as f64) * share).round() as usize;
 
     // Goal pools; link tiles (stairs flights, elevator cabins) excluded.
@@ -113,7 +115,7 @@ fn main() {
             sock.connect(server).expect("connect");
             sock.set_nonblocking(true).unwrap();
             Bot {
-                nick: format!("bot_{i:02}"),
+                nick: if nicks.is_empty() { format!("bot_{i:02}") } else { nicks[i % nicks.len()].clone() },
                 sock,
                 state: State::Connecting { nonce: rng.u32(..), next_send: start + Duration::from_millis(20 * i as u64) },
                 id: 0,
