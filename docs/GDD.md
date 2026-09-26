@@ -213,8 +213,8 @@ gracze).
 - Papierosa można zapalić wszędzie; w środku dym rozchodzi się po pokoju, w
   części pomieszczeń czujka → alarm, straż pożarna, ewakuacja, kara —
   *zrobione (10.31)*.
-- Interfejs w pikselowym stylu gry: HUD (ekwipunek, statystyki), komputer,
-  portal z ofertami — pikselowa czcionka i ramki — *zrobione (10.32)*.
+- Interfejs w stylu gry: HUD (ekwipunek, statystyki), komputer, portal z
+  ofertami — *zrobione (10.32, styl „papier i atrament”)*.
 
 **Model biznesowy (przyszłość)**
 - Gra **darmowa** dla graczy.
@@ -857,24 +857,33 @@ Zastępuje prosty portal z 10.8. Po połączeniu gracz widzi pulpit komputera
   Administracja budynku pisze na #ogólny, gdzie i o której był alarm i kto
   palił. Gdy strażak wróci do wozu — koniec alarmu.
 
-### 10.32 Pikselowy interfejs
+### 10.32 Wygląd „papier i atrament” (w duchu Don't Starve)
 
-- Cały interfejs w stylu pixel artu gry: czcionka **Pixelify Sans** (licencja
-  SIL OFL, `client/fonts/`), bez wygładzania, w kilku stałych rozmiarach
-  (16/20/24/32), z polskimi znakami.
-- Wspólny zestaw (`ui/pixel_ui.gd`): ramki 9-slice rysowane w kodzie (obrys,
-  jasna i ciemna krawędź, ścięte rogi; 1 piksel grafiki = 2 piksele ekranu),
-  przyciski z wciśnięciem, pola tekstowe „wgłębione”, paski przewijania,
-  segmentowe paski potrzeb, pikselowe koło (słońce, księżyc).
-- **HUD**: ciemne granatowe panele (zegar, portfel i potrzeby, ekwipunek ze
-  slotami i złotą ramką na rzeczy w rękach), dymki i nicki pikselową czcionką.
-- **Komputer w biurze**: pikselowy monitor — ciemna ramka, jasny ekran, niebieski
-  pasek tytułu, zakładki jako przyciski.
-- **Pulpit i portal**: pikselowa tapeta (wieczorne niebo w pasach, gwiazdy,
-  miasto z oknami), ikony 12×12 w pixel arcie, okna jak papier z niebieskim
-  paskiem, karty ofert, pasek zadań.
-- Okna rozmowy z NPC, półki sklepowej, plansze dnia i ekran tworzenia postaci w
-  tym samym stylu.
+Pierwsza wersja (pikselowa czcionka i ramki) była nieczytelna, zwłaszcza na
+pełnym ekranie — zastąpiona stylem inspirowanym Don't Starve:
+
+- **Skalowanie**: cały obraz (świat i interfejs) skaluje się z oknem (tryb
+  `canvas_items`, podstawa 1280×720) — na dużym ekranie wszystko rośnie.
+- **Czcionka** odręczna, czytelna: **Patrick Hand** (SIL OFL, `client/fonts/`),
+  z polskimi znakami, zawsze nie mniejsza niż 18 px.
+- **Panele** jak z papieru: pergamin (okna) i ciemne drewno (HUD) z nierównym
+  konturem tuszu, postrzępionymi krawędziami, fakturą i cieniem; przyciski
+  pergaminowe albo bordowe; pola tekstowe jak kartka.
+- **Statystyki**: okrągłe tarcze w prawym górnym rogu — w każdej „płyn” w kolorze
+  potrzeby (głód, energia, stres, toaleta, higiena), który opada, gdy jest
+  gorzej, z falującą powierzchnią i ikoną; liczba po najechaniu myszą, a przy
+  stanie krytycznym tarcza pulsuje na czerwono i pokazuje liczbę. Portfel jako
+  złota moneta z kwotą. Ostrzeżenia (brudne ręce, żołądek) na karteczce pod
+  tarczami.
+- **Ekwipunek**: drewniany pasek na dole pośrodku — ręce (większy slot, złota
+  ramka, gdy coś trzymasz) i 3 kieszenie z numerami klawiszy; nazwa trzymanej
+  rzeczy nad paskiem, skróty pod nim.
+- **Świat**: efekt na cały obraz gry — kontury tuszu tam, gdzie zmienia się
+  kolor, ciepłe, lekko przygaszone barwy, faktura papieru i winieta. Napisy w
+  świecie (nicki, dymki, nazwy pomieszczeń) są nad efektem, więc zostają ostre.
+  Postacie mają większe głowy i cieńsze nogi. (`--no-mood` wyłącza efekt.)
+- Komputer w biurze: ciemna drewniana ramka monitora, bordowy pasek tytułu,
+  pergaminowy ekran; pulpit: miękka tapeta z miastem o zmierzchu.
 
 ### 10.6 Stan implementacji
 
@@ -912,8 +921,9 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Ekwipunek**: kieszenie i ręce, przedmioty (przepustka, karta, laptop,
   kawa), upuszczanie / podnoszenie / podawanie, dostęp z przedmiotów (10.13);
   protokół v8.
-- **Pikselowy interfejs**: czcionka Pixelify Sans, pikselowe ramki, przyciski,
-  paski i ikony w całym UI — HUD, komputer, pulpit z portalem, okna (10.32).
+- **Wygląd „papier i atrament”**: skalowanie z oknem, odręczna czcionka,
+  papierowe panele, tarcze statystyk, pasek ekwipunku, efekt tuszu i papieru na
+  świecie, postacie z większymi głowami (10.32).
 - **Palenie, dym i straż**: papieros wszędzie, dym w pomieszczeniach
   przenikający przez drzwi, czujki, alarm z ewakuacją, strażak i kara (10.31);
   protokół v26.

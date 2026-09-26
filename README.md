@@ -59,9 +59,10 @@ w Rust i GDScript. Po celowej zmianie: `UPDATE_GOLDEN=1 cargo test --test golden
 
 ## Czcionka
 
-Interfejs używa pikselowej czcionki **Pixelify Sans** (© The Pixelify Sans
-Project Authors), na licencji SIL Open Font License 1.1 — plik i licencja w
-`client/fonts/` (`PixelifySans.ttf`, `OFL.txt`).
+Interfejs używa odręcznej czcionki **Patrick Hand** (© Patrick Wagesreiter), na
+licencji SIL Open Font License 1.1 — plik i licencja w `client/fonts/`
+(`PatrickHand-Regular.ttf`, `OFL-PatrickHand.txt`). Klient: `--no-mood` wyłącza
+efekt „tuszu i papieru” na świecie.
 
 ## Mapy
 

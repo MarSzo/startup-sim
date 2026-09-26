@@ -2,18 +2,27 @@
 ## plus faint room-name labels.
 extends Node2D
 
+const Ink = preload("res://ui/ink_ui.gd")
+
 
 const MapArt = preload("res://map/map_art.gd")
 
 
 ## `floor_names`: floor index -> name, for "where do these stairs go" labels.
+## Room names and stair signs; the game moves this node to a layer above
+## the world's ink effect (and shows it with the floor).
+var labels := Node2D.new()
+
+
 func build(map, zoom: float, floor_names := {}) -> void:
+	add_child(labels)
 	var t0 := Time.get_ticks_msec()
 	var tp: int = map.tile_px
 	var img: Image = MapArt.new().build(map)
 	print("map art floor %d: %d ms" % [map.floor_index, Time.get_ticks_msec() - t0])
 	var sprite := Sprite2D.new()
 	sprite.texture = ImageTexture.create_from_image(img)
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST  # crisp tiles
 	sprite.centered = false
 	add_child(sprite)
 	# Room labels at each room's centroid.
@@ -46,17 +55,18 @@ func build(map, zoom: float, floor_names := {}) -> void:
 		var l := Label.new()
 		l.text = map.room_name(rid)
 		var ls := LabelSettings.new()
-		ls.font_size = 22
-		ls.font_color = Color(1, 1, 1, 0.28)
-		ls.outline_size = 6
-		ls.outline_color = Color(0, 0, 0, 0.25)
+		ls.font = Ink.font()
+		ls.font_size = 28
+		ls.font_color = Color(Ink.PAPER_HI, 0.6)
+		ls.outline_size = 8
+		ls.outline_color = Color(Ink.INK, 0.55)
 		l.label_settings = ls
 		l.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		l.scale = Vector2.ONE / zoom
 		l.size = Vector2(400, 40)
 		l.position = center - Vector2(200, 20) / zoom
-		add_child(l)
+		labels.add_child(l)
 	# Stairs: where they lead.
 	for link in map.links:
 		if link.kind != "stairs" or not floor_names.has(link.to_floor):
@@ -65,10 +75,11 @@ func build(map, zoom: float, floor_names := {}) -> void:
 		var sl := Label.new()
 		sl.text = "▸ " + floor_names[link.to_floor]
 		var ls2 := LabelSettings.new()
-		ls2.font_size = 18
-		ls2.font_color = Color(1, 1, 1, 0.85)
-		ls2.outline_size = 6
-		ls2.outline_color = Color(0, 0, 0, 0.6)
+		ls2.font = Ink.font()
+		ls2.font_size = 22
+		ls2.font_color = Ink.PAPER_HI
+		ls2.outline_size = 7
+		ls2.outline_color = Ink.INK
 		sl.label_settings = ls2
 		sl.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		sl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -76,4 +87,4 @@ func build(map, zoom: float, floor_names := {}) -> void:
 		sl.size = Vector2(300, 30)
 		var c2 := (Vector2(a.position) + Vector2(a.size) / 2.0) * tp
 		sl.position = c2 - Vector2(150, 15) / zoom
-		add_child(sl)
+		labels.add_child(sl)

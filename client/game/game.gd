@@ -27,7 +27,7 @@ const WeatherFx = preload("res://ui/weather_fx.gd")
 const DialogWindow = preload("res://ui/dialog_window.gd")
 const TrayView = preload("res://game/tray_view.gd")
 const SmokeView = preload("res://game/smoke_view.gd")
-const PixelUI = preload("res://ui/pixel_ui.gd")
+const Ink = preload("res://ui/ink_ui.gd")
 
 const ZOOM := 3.0
 ## Remote players are rendered this far in the past (2 snapshots at 20 Hz).
@@ -86,6 +86,11 @@ var smoke_view := SmokeView.new()
 var fire_alarm := false
 var alarm_tint := ColorRect.new()
 var alarm_label := Label.new()
+## The world's paper-and-ink look (post-process over the world).
+var mood_layer := CanvasLayer.new()
+var mood := ColorRect.new()
+## Text in the world (nicks, bubbles, room names) above the ink effect.
+var label_layer := CanvasLayer.new()
 var weather_layer := CanvasLayer.new()
 var dialog := DialogWindow.new()
 var shelf_window := ShelfWindow.new()
@@ -135,6 +140,10 @@ var _goto_floor := -1   # floor the current path was planned on
 
 
 func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Dictionary) -> void:
+	label_layer.layer = 6
+	label_layer.follow_viewport_enabled = true
+	add_child(label_layer)
+	PlayerView.label_root = label_layer
 	net = p_net
 	building = p_building
 	nick = p_nick
@@ -157,6 +166,9 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 		view.build(m, ZOOM, names)
 		view.visible = false
 		add_child(view)
+		view.remove_child(view.labels)
+		label_layer.add_child(view.labels)
+		view.labels.visible = false
 		views[f] = view
 	world.y_sort_enabled = true
 	add_child(ride_mask)  # between the map and the people
@@ -215,7 +227,7 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 	status_label.visible = false
 	status_layer.add_child(status_label)
 	hint_label.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
-	hint_label.position = Vector2(-250, -64)
+	hint_label.position = Vector2(-250, -214)  # above the inventory bar
 	hint_label.size = Vector2(500, 36)
 	hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hint_label.add_theme_font_size_override("font_size", 20)
@@ -225,7 +237,7 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 	status_layer.add_child(hint_label)
 	log_label.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
 	log_label.position = Vector2(16, -140)
-	log_label.size = Vector2(700, 124)
+	log_label.size = Vector2(430, 124)
 	log_label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 	log_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	log_label.add_theme_font_size_override("font_size", 16)
@@ -236,12 +248,21 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 	status_layer.add_child(hud)
 	hud.slot_clicked.connect(_pocket_key)
 	status_layer.add_child(stats_hud)
-	var cp := PixelUI.panel("hud")
+	var cp := Ink.panel("hud")
 	cp.position = Vector2(16, 16)
-	PixelUI.style_label(clock_label, 20, PixelUI.TEXT)
+	Ink.style_label(clock_label, 20, Ink.TEXT)
 	cp.add_child(clock_label)
 	status_layer.add_child(cp)
 	add_child(daylight)
+	mood_layer.layer = 4  # over the world, under the weather and the HUD
+	add_child(mood_layer)
+	mood.set_anchors_preset(Control.PRESET_FULL_RECT)
+	mood.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://game/mood.gdshader")
+	mood.material = mat
+	mood.visible = not args.has("no-mood")
+	mood_layer.add_child(mood)
 	alarm_tint.set_anchors_preset(Control.PRESET_FULL_RECT)
 	alarm_tint.color = Color(0.9, 0.05, 0.05, 0.0)
 	alarm_tint.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -284,6 +305,7 @@ func _show_floor(f: int) -> void:
 	smoke_view.set_floor(f)
 	for k in views:
 		views[k].visible = (k == f)
+		views[k].labels.visible = (k == f)
 	for k in stall_doors:
 		for dv in stall_doors[k]:
 			dv.visible = (k == f)

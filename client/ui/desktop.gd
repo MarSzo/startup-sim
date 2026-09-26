@@ -4,7 +4,7 @@
 ## re-sends our last action when the server's state shows it got lost.
 extends Control
 
-const PixelUI = preload("res://ui/pixel_ui.gd")
+const Ink = preload("res://ui/ink_ui.gd")
 
 const Protocol = preload("res://net/protocol.gd")
 const PlayerView = preload("res://game/player_view.gd")
@@ -121,11 +121,11 @@ func _build_desktop() -> void:
 	_root.add_child(icons)
 	icons.add_child(_icon("Przeglądarka", "browser", func(): _open_window("browser")))
 	var mail_icon := _icon("Poczta", "mail", func(): _open_window("mail"))
-	PixelUI.style_label(_mail_icon_badge, 16, Color.WHITE)
+	Ink.style_label(_mail_icon_badge, 16, Color.WHITE)
 	var badge_bg := StyleBoxFlat.new()
-	badge_bg.bg_color = PixelUI.RED
-	badge_bg.border_color = PixelUI.INK
-	badge_bg.set_border_width_all(PixelUI.PX)
+	badge_bg.bg_color = Ink.RED
+	badge_bg.border_color = Ink.INK
+	badge_bg.set_border_width_all(Ink.LINE)
 	badge_bg.content_margin_left = 6
 	badge_bg.content_margin_right = 6
 	_mail_icon_badge.add_theme_stylebox_override("normal", badge_bg)
@@ -137,7 +137,7 @@ func _build_desktop() -> void:
 
 	# Taskbar.
 	var bar := PanelContainer.new()
-	bar.add_theme_stylebox_override("panel", PixelUI.box("hud"))
+	bar.add_theme_stylebox_override("panel", Ink.box("hud"))
 	bar.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	bar.offset_top = -52
 	_root.add_child(bar)
@@ -156,46 +156,47 @@ func _build_desktop() -> void:
 	_toast.position = Vector2(-380, 16)
 	_toast.size = Vector2(360, 0)
 	_toast.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	PixelUI.style_label(_toast, 16, PixelUI.TEXT)
-	_toast.add_theme_stylebox_override("normal", PixelUI.box("hud"))
+	Ink.style_label(_toast, 16, Ink.TEXT)
+	_toast.add_theme_stylebox_override("normal", Ink.box("hud"))
 	_toast.visible = false
 	_root.add_child(_toast)
 
 
 ## A pixel-art wallpaper: evening sky in bands, stars, a city skyline with
 ## lit windows (drawn small, scaled up with nearest filtering).
+## The desktop wallpaper: a soft dusk sky, a few stars and a dark city
+## skyline with lit windows (drawn small, smoothly scaled up).
 func _wallpaper() -> Texture2D:
-	var w := 160
-	var h := 90
+	var w := 320
+	var h := 180
 	var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
-	var bands := [Color("#1a1c3a"), Color("#232552"), Color("#2e2d66"), Color("#403579"), Color("#5a3f85"), Color("#7a4a86"), Color("#a15a7f")]
+	var top := Color("#1f1a2e")
+	var mid := Color("#4a3552")
+	var low := Color("#b0706a")
 	for y in h:
 		var t := float(y) / h
-		var i := mini(int(t * bands.size()), bands.size() - 1)
+		var c := top.lerp(mid, t / 0.6) if t < 0.6 else mid.lerp(low, (t - 0.6) / 0.4)
 		for x in w:
-			var c: Color = bands[i]
-			# Dither the band edges.
-			if i + 1 < bands.size() and fmod(t * bands.size(), 1.0) > 0.75 and (x + y) % 2 == 0:
-				c = bands[i + 1]
 			img.set_pixel(x, y, c)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
-	for k in 40:
-		img.set_pixel(rng.randi_range(0, w - 1), rng.randi_range(0, h / 2), Color(1, 1, 1, rng.randf_range(0.4, 0.9)))
+	for k in 60:
+		img.set_pixel(rng.randi_range(0, w - 1), rng.randi_range(0, h / 2), Color(1, 0.95, 0.85, rng.randf_range(0.3, 0.8)))
 	var x := 0
 	while x < w:
-		var bw := rng.randi_range(8, 18)
-		var bh := rng.randi_range(14, 40)
-		var shade := Color("#12132a").lightened(rng.randf_range(0.0, 0.08))
+		var bw := rng.randi_range(14, 34)
+		var bh := rng.randi_range(28, 80)
+		var shade := Color("#17121c").lightened(rng.randf_range(0.0, 0.06))
 		for yy in range(h - bh, h):
 			for xx in range(x, mini(x + bw, w)):
 				img.set_pixel(xx, yy, shade)
-		for wy in range(h - bh + 3, h - 2, 4):
-			for wx in range(x + 2, mini(x + bw - 1, w), 3):
-				if rng.randf() < 0.35:
-					img.set_pixel(wx, wy, Color("#f7d774"))
-		x += bw + rng.randi_range(0, 3)
-	img.resize(w * 4, h * 4, Image.INTERPOLATE_NEAREST)
+		for wy in range(h - bh + 5, h - 3, 7):
+			for wx in range(x + 3, mini(x + bw - 3, w), 5):
+				if rng.randf() < 0.3:
+					for dy in 3:
+						for dx in 2:
+							img.set_pixel(mini(wx + dx, w - 1), mini(wy + dy, h - 1), Color("#e8b85a"))
+		x += bw + rng.randi_range(0, 4)
 	return ImageTexture.create_from_image(img)
 
 func _icon(caption: String, kind: String, on_open: Callable) -> Control:
@@ -295,18 +296,18 @@ const TITLES := {"browser": "Przeglądarka — praca.example", "mail": "Poczta �
 
 func _open_window(name: String) -> void:
 	if not _windows.has(name):
-		var win := PixelUI.panel("paper")
+		var win := Ink.panel("paper")
 		var col := VBoxContainer.new()
 		col.add_theme_constant_override("separation", 0)
 		win.add_child(col)
 		var title_bar := PanelContainer.new()
-		title_bar.add_theme_stylebox_override("panel", PixelUI.box("title"))
+		title_bar.add_theme_stylebox_override("panel", Ink.box("title"))
 		var trow := HBoxContainer.new()
 		title_bar.add_child(trow)
 		var tl := _label(TITLES[name] % [profile.get("email", "")] if name == "mail" else TITLES[name], 16, Color.WHITE)
 		tl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		trow.add_child(tl)
-		var close := PixelUI.button("X", false, true)
+		var close := Ink.button("X", false, true)
 		close.pressed.connect(func(): _close_window(name))
 		trow.add_child(close)
 		title_bar.gui_input.connect(func(ev): _drag(win, ev))
@@ -332,7 +333,7 @@ func _open_window(name: String) -> void:
 		_root.add_child(win)
 		_windows[name] = win
 		_body[name] = body
-		var tbtn := PixelUI.button({"browser": "Przeglądarka", "mail": "Poczta", "interview": "Rozmowa"}[name])
+		var tbtn := Ink.button({"browser": "Przeglądarka", "mail": "Poczta", "interview": "Rozmowa"}[name])
 		tbtn.pressed.connect(func(): _focus(name))
 		tbtn.name = "task_" + name
 		_taskbar.add_child(tbtn)
@@ -548,8 +549,8 @@ func _video_tile(parent: Container, who: String, look: int, appearance: Dictiona
 	var tile := PanelContainer.new()
 	var s := StyleBoxFlat.new()
 	s.bg_color = Color("#20242e")
-	s.border_color = PixelUI.INK
-	s.set_border_width_all(PixelUI.PX)
+	s.border_color = Ink.INK
+	s.set_border_width_all(Ink.LINE)
 	tile.add_theme_stylebox_override("panel", s)
 	tile.custom_minimum_size = Vector2(230, 170)
 	var stage := Control.new()
@@ -774,8 +775,8 @@ func _toast_msg(text: String) -> void:
 	get_tree().create_timer(4.0).timeout.connect(func(): if _toast.text == my: _toast.visible = false)
 
 
-func _label(text: String, size: int, color := PixelUI.TEXT_INK, wrap := true) -> Label:
-	return PixelUI.label(text, size, color, wrap)
+func _label(text: String, size: int, color := Ink.TEXT_INK, wrap := true) -> Label:
+	return Ink.label(text, size, color, wrap)
 
 
 func _card(parent: Container) -> VBoxContainer:
@@ -783,7 +784,7 @@ func _card(parent: Container) -> VBoxContainer:
 
 
 func _card_in(parent: Container) -> VBoxContainer:
-	var panel := PixelUI.panel("card")
+	var panel := Ink.panel("card")
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 8)
 	panel.add_child(box)
@@ -792,6 +793,6 @@ func _card_in(parent: Container) -> VBoxContainer:
 
 
 func _button(text: String, primary := true) -> Button:
-	var b := PixelUI.button(text, primary)
+	var b := Ink.button(text, primary)
 	b.custom_minimum_size = Vector2(0, 36)
 	return b

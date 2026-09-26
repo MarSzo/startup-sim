@@ -2,7 +2,7 @@
 ## 1-9) takes one - unpaid until you pay at the till.
 extends Control
 
-const PixelUI = preload("res://ui/pixel_ui.gd")
+const Ink = preload("res://ui/ink_ui.gd")
 
 const ItemArt = preload("res://game/item_art.gd")
 
@@ -18,18 +18,18 @@ var _list := VBoxContainer.new()
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	visible = false
-	_panel.add_theme_stylebox_override("panel", PixelUI.box("paper"))
+	_panel.add_theme_stylebox_override("panel", Ink.box("paper"))
 	add_child(_panel)
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 8)
 	_panel.add_child(col)
-	PixelUI.style_label(_title, 20, PixelUI.TEXT_INK)
+	Ink.style_label(_title, 20, Ink.TEXT_INK)
 	col.add_child(_title)
 	_list.add_theme_constant_override("separation", 6)
 	col.add_child(_list)
 	var hint := Label.new()
 	hint.text = "1–9 weź · Esc zamknij · płaci się przy kasie"
-	PixelUI.style_label(hint, 16, PixelUI.TEXT_MUTED)
+	Ink.style_label(hint, 16, Ink.TEXT_MUTED)
 	col.add_child(hint)
 	_panel.resized.connect(_place)
 	get_viewport().size_changed.connect(_place)
@@ -64,17 +64,17 @@ func show_shelf(p: Dictionary) -> void:
 		var name := Label.new()
 		name.text = "%d. %s" % [i + 1, g.name]
 		name.custom_minimum_size = Vector2(200, 0)
-		PixelUI.style_label(name, 16, PixelUI.TEXT_INK)
+		Ink.style_label(name, 16, Ink.TEXT_INK)
 		name.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(name)
 		var price := Label.new()
 		price.text = zl(g.price)
 		price.custom_minimum_size = Vector2(80, 0)
 		price.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-		PixelUI.style_label(price, 16, Color("#8f5a1a"))
+		Ink.style_label(price, 16, Color("#8f5a1a"))
 		price.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		row.add_child(price)
-		var b := PixelUI.button("Weź", true)
+		var b := Ink.button("Weź", true)
 		b.focus_mode = Control.FOCUS_NONE
 		b.pressed.connect(func(): take.emit(shelf, kind))
 		row.add_child(b)

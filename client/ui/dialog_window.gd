@@ -2,7 +2,7 @@
 ## as buttons (or keys 1-3). The server drives it; id 0 closes it.
 extends Control
 
-const PixelUI = preload("res://ui/pixel_ui.gd")
+const Ink = preload("res://ui/ink_ui.gd")
 
 signal answer(id: int, choice: int)
 
@@ -20,15 +20,15 @@ var _answered_at := 0
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	visible = false
-	_panel.add_theme_stylebox_override("panel", PixelUI.box("paper"))
+	_panel.add_theme_stylebox_override("panel", Ink.box("paper"))
 	_panel.custom_minimum_size = Vector2(560, 0)
 	add_child(_panel)
 	var col := VBoxContainer.new()
 	col.add_theme_constant_override("separation", 10)
 	_panel.add_child(col)
-	PixelUI.style_label(_who, 16, PixelUI.BLUE)
+	Ink.style_label(_who, 16, Ink.ACCENT)
 	col.add_child(_who)
-	PixelUI.style_label(_text, 20, PixelUI.TEXT_INK)
+	Ink.style_label(_text, 20, Ink.TEXT_INK)
 	_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_text.custom_minimum_size = Vector2(528, 0)  # wrap width (else it measures as a tall column)
 	col.add_child(_text)
@@ -62,7 +62,7 @@ func on_dialog(p: Dictionary) -> void:
 	for c in _opts.get_children():
 		c.queue_free()
 	for i in p.options.size():
-		var b := PixelUI.button("%d. %s" % [i + 1, p.options[i]])
+		var b := Ink.button("%d. %s" % [i + 1, p.options[i]])
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		b.focus_mode = Control.FOCUS_NONE
 		var choice: int = i

@@ -6,7 +6,7 @@ extends Control
 
 const Protocol = preload("res://net/protocol.gd")
 const ItemArt = preload("res://game/item_art.gd")
-const PixelUI = preload("res://ui/pixel_ui.gd")
+const Ink = preload("res://ui/ink_ui.gd")
 
 ## ComputerAction to send: action, conversation, argument, text.
 signal action(action: int, conv: int, arg: int, text: String)
@@ -275,11 +275,11 @@ func _build() -> void:
 	_dim.mouse_filter = Control.MOUSE_FILTER_STOP
 	add_child(_dim)
 	# A pixel monitor: dark bezel, light screen, blue title bar.
-	_frame.add_theme_stylebox_override("panel", PixelUI.box("screen"))
+	_frame.add_theme_stylebox_override("panel", Ink.box("screen"))
 	add_child(_frame)
 	var screen_bg := PanelContainer.new()
 	var ssb := StyleBoxFlat.new()
-	ssb.bg_color = PixelUI.PAPER
+	ssb.bg_color = Ink.PAPER
 	screen_bg.add_theme_stylebox_override("panel", ssb)
 	_frame.add_child(screen_bg)
 	_screen.add_theme_constant_override("separation", 0)
@@ -287,7 +287,7 @@ func _build() -> void:
 
 	# Top bar: app name, whose account, lock / take / close.
 	var bar := PanelContainer.new()
-	bar.add_theme_stylebox_override("panel", PixelUI.box("title"))
+	bar.add_theme_stylebox_override("panel", Ink.box("title"))
 	_screen.add_child(bar)
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
@@ -327,7 +327,7 @@ func _build() -> void:
 	_chat_view.add_child(_body)
 	var side := PanelContainer.new()
 	var sdb := StyleBoxFlat.new()
-	sdb.bg_color = PixelUI.NAVY
+	sdb.bg_color = Ink.DARK
 	sdb.set_content_margin_all(10)
 	side.add_theme_stylebox_override("panel", sdb)
 	side.custom_minimum_size = Vector2(230, 0)
@@ -371,8 +371,8 @@ func _build() -> void:
 	_entry.custom_minimum_size = Vector2(0, 40)
 	_entry.max_length = 200
 	_entry.add_theme_font_size_override("font_size", 16)
-	_entry.add_theme_stylebox_override("normal", PixelUI.box("input"))
-	_entry.add_theme_stylebox_override("focus", PixelUI.box("input_focus"))
+	_entry.add_theme_stylebox_override("normal", Ink.box("input"))
+	_entry.add_theme_stylebox_override("focus", Ink.box("input_focus"))
 	_entry.add_theme_color_override("font_color", Color("#1c2430"))
 	_entry.add_theme_color_override("font_placeholder_color", Color("#8a93a3"))
 	_entry.add_theme_color_override("caret_color", Color("#1c2430"))
@@ -395,7 +395,7 @@ func _build() -> void:
 	_style_label(ch, 20, Color("#1c2430"))
 	ch.text = "Kalendarz zarządu — spotkania na dziś"
 	_cal_view.add_child(ch)
-	_style_label(_cal_mine, 15, Color("#3d5a86"))
+	_style_label(_cal_mine, 15, Ink.ACCENT)
 	_cal_view.add_child(_cal_mine)
 	var trow := HBoxContainer.new()
 	trow.add_theme_constant_override("separation", 10)
@@ -429,7 +429,7 @@ func _build() -> void:
 	_style_label(lh, 20, Color("#1c2430"))
 	lh.text = "Obiady do biura — dostawa na recepcję (piętro 1)"
 	_lunch_view.add_child(lh)
-	_style_label(_lunch_status, 15, Color("#3d5a86"))
+	_style_label(_lunch_status, 15, Ink.ACCENT)
 	_lunch_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_lunch_status.custom_minimum_size = Vector2(600, 0)
 	_lunch_view.add_child(_lunch_status)
@@ -506,6 +506,7 @@ func _render() -> void:
 	_tab_cal.modulate = Color(1, 1, 1, 1.0 if tab == "calendar" else 0.6)
 	_lock_view.visible = state.locked
 	_lock_btn.visible = not state.locked
+	_fit.call_deferred()  # views were hidden / shown: back to the screen size
 	if state.locked:
 		_lock_owner.text = "%s — zablokowany" % owner_name
 		_lock_hint.text = "Przyłóż palec do czytnika, żeby odblokować." if mine else "Tylko %s może go odblokować. Laptop możesz najwyżej zabrać." % owner_name
@@ -575,8 +576,8 @@ func _co_edit(key: String, value: String, max_len: int, width: int) -> LineEdit:
 	e.add_theme_font_size_override("font_size", 14)
 	e.add_theme_color_override("font_color", Color("#1c2430"))
 	e.add_theme_color_override("font_placeholder_color", Color("#8a93a3"))
-	e.add_theme_stylebox_override("normal", PixelUI.box("input"))
-	e.add_theme_stylebox_override("focus", PixelUI.box("input_focus"))
+	e.add_theme_stylebox_override("normal", Ink.box("input"))
+	e.add_theme_stylebox_override("focus", Ink.box("input_focus"))
 	e.text_changed.connect(func(t: String): _co_drafts[key] = t)
 	return e
 
@@ -612,7 +613,7 @@ func _render_company() -> void:
 		company_action.emit(Protocol.CO_RENAME, 0, 0, name_edit.text.strip_edges()))
 	row.add_child(rename)
 
-	_co_view.add_child(_co_label("Ogłoszenia na portalu", 18, Color("#3d5a86")))
+	_co_view.add_child(_co_label("Ogłoszenia na portalu", 18, Ink.ACCENT))
 	for o in company_offers.offers:
 		var id: int = o.id
 		var places: int = o.places
@@ -645,7 +646,7 @@ func _render_company() -> void:
 			company_action.emit(Protocol.CO_SET_DESCRIPTION, id, 0, desc.text.strip_edges()))
 		row.add_child(save)
 
-	_co_view.add_child(_co_label("Kandydaci po rozmowie", 18, Color("#3d5a86")))
+	_co_view.add_child(_co_label("Kandydaci po rozmowie", 18, Ink.ACCENT))
 	var cands: Array = company_people.get("candidates", [])
 	if cands.is_empty():
 		_co_view.add_child(_co_label("Nikt nie czeka. Kandydaci, o których nie zdecydujesz w 30 min, są zatrudniani automatycznie.", 14, Color("#8a93a3"), true))
@@ -658,11 +659,11 @@ func _render_company() -> void:
 		var hire := _button("Zatrudnij", true)
 		hire.pressed.connect(func(): company_action.emit(Protocol.CO_HIRE, pid, 0, ""))
 		row.add_child(hire)
-		var rej := PixelUI.button("Odrzuć", false, true)
+		var rej := Ink.button("Odrzuć", false, true)
 		rej.pressed.connect(func(): company_action.emit(Protocol.CO_REJECT, pid, 0, ""))
 		row.add_child(rej)
 
-	_co_view.add_child(_co_label("Zespół", 18, Color("#3d5a86")))
+	_co_view.add_child(_co_label("Zespół", 18, Ink.ACCENT))
 	var staff: Array = company_people.get("staff", [])
 	if staff.is_empty():
 		_co_view.add_child(_co_label("Na razie tylko Ty.", 14, Color("#8a93a3")))
@@ -675,7 +676,7 @@ func _render_company() -> void:
 		if pid == my_id:
 			row.add_child(_co_label("(Ty)", 14, Color("#8a93a3")))
 			continue
-		var fire := PixelUI.button("Zwolnij", false, true)
+		var fire := Ink.button("Zwolnij", false, true)
 		fire.pressed.connect(func(): company_action.emit(Protocol.CO_FIRE, pid, 0, ""))
 		row.add_child(fire)
 
@@ -791,7 +792,7 @@ func _render_calendar() -> void:
 				st.text = "zajęte"
 				row.add_child(st)
 			Protocol.SLOT_MINE:
-				_style_label(st, 15, Color("#2e6bd9"))
+				_style_label(st, 15, Ink.ACCENT)
 				st.text = "Twoje spotkanie"
 				row.add_child(st)
 				var b2 := _button("Odwołaj", true)
@@ -832,9 +833,9 @@ func _render_sidebar() -> void:
 		var sb := StyleBoxFlat.new()
 		sb.set_content_margin_all(6)
 		sb.content_margin_left = 10
-		sb.bg_color = Color("#3d5a86") if c.conv == current else Color(0, 0, 0, 0)
+		sb.bg_color = Ink.ACCENT if c.conv == current else Color(0, 0, 0, 0)
 		var hover := sb.duplicate()
-		hover.bg_color = Color("#46618c") if c.conv == current else Color(1, 1, 1, 0.08)
+		hover.bg_color = Ink.ACCENT_HI if c.conv == current else Color(1, 1, 1, 0.08)
 		for st in ["normal", "focus"]:
 			b.add_theme_stylebox_override(st, sb)
 		b.add_theme_stylebox_override("hover", hover)
@@ -890,8 +891,8 @@ func _render_input() -> void:
 
 
 func _style_label(l: Label, size: int, color: Color) -> void:
-	PixelUI.style_label(l, size, color)
+	Ink.style_label(l, size, color)
 
 
 func _button(text: String, primary: bool) -> Button:
-	return PixelUI.button(text, primary)
+	return Ink.button(text, primary)

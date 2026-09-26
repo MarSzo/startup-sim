@@ -192,13 +192,15 @@ dodaje `Vehicle::police` (parkuje przy wejściu) i `PoliceCall`; `tick_police`
 wypuszcza policjanta (`Npc::police`, id od `NPC_ID_BASE + 0xF00`), a gdy ten
 wróci do auta — usuwa NPC i odsyła radiowóz (`Vehicle::leave`).
 
-**Pikselowy interfejs** (klient, `ui/pixel_ui.gd`): czcionka (FontFile z
-`fonts/PixelifySans.ttf`, bez antyaliasingu i ligatur), `fs()` przyciąga
-rozmiary do 16/20/24/32, `box(kind)` buduje `StyleBoxTexture` z obrazka
-rysowanego w kodzie i powiększanego ×`PX` (najbliższy sąsiad), `button()`,
-`label()`, `draw_bar()`. `main.gd` ustawia czcionkę i motyw globalnie
-(`ThemeDB.fallback_font`, domyślny motyw + motyw okna), więc także
-`draw_string` i kontrolki bez własnego stylu są pikselowe.
+**Wygląd** (klient): `ui/ink_ui.gd` — czcionka (FontFile z
+`fonts/PatrickHand-Regular.ttf`), `fs()` powiększa rozmiary (min. 18), `box(kind)`
+buduje `StyleBoxTexture` 9-slice z obrazka 64×64 rysowanego w kodzie (ziarno,
+falujący kontur tuszu, postrzępione krawędzie, cień; krawędzie kafelkowane),
+`button()`, `label()`, `draw_bar()`, `draw_disc()`. `main.gd` ustawia czcionkę i
+motyw globalnie. Świat: `game/mood.gdshader` na `CanvasLayer` 4 (Sobel na
+jasności = tusz, gradacja kolorów, ziarno, winieta); teksty świata na
+`CanvasLayer` 6 z `follow_viewport_enabled` (`PlayerView.label_root`,
+`MapView.labels`). Okno skaluje się w trybie `canvas_items`.
 
 **Dym i straż** (`fire.rs`): `Smoke` trzyma ilość dymu na (piętro, pokój);
 stężenie = ilość / liczba kafli pokoju. `puff` (każdy tick palenia w środku),

@@ -4,7 +4,7 @@
 ## - a short "Dzień N" card whenever the personal day number goes up.
 extends Control
 
-const PixelUI = preload("res://ui/pixel_ui.gd")
+const Ink = preload("res://ui/ink_ui.gd")
 
 const Protocol = preload("res://net/protocol.gd")
 
@@ -43,7 +43,7 @@ func _ready() -> void:
 		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		l.add_theme_color_override("font_color", Color.WHITE)
 		l.add_theme_constant_override("outline_size", 8)
-		l.add_theme_color_override("font_outline_color", PixelUI.INK)
+		l.add_theme_color_override("font_outline_color", Ink.INK)
 		col.add_child(l)
 	_title.add_theme_font_size_override("font_size", 64)
 	_sub.add_theme_font_size_override("font_size", 24)
@@ -112,7 +112,7 @@ func _render_modes() -> void:
 		b.disabled = m[2] > clock.money
 		var chosen: bool = id == clock.mode
 		for st in ["normal", "hover", "pressed", "disabled"]:
-			b.add_theme_stylebox_override(st, PixelUI.button_box(st, chosen) if chosen else PixelUI.box("hud"))
+			b.add_theme_stylebox_override(st, Ink.button_box(st, chosen) if chosen else Ink.box("hud"))
 		var fc := Color.WHITE
 		for k in ["font_color", "font_hover_color", "font_pressed_color"]:
 			b.add_theme_color_override(k, fc)
@@ -167,10 +167,10 @@ func _draw_sky() -> void:
 	var c := Vector2(size.x / 2, size.y * 0.22)
 	match clock.get("place", -1):
 		Protocol.PLACE_HOME:
-			PixelUI.draw_pixel_circle(_sky, c, 36, Color("#f4f1c9"))
-			PixelUI.draw_pixel_circle(_sky, c + Vector2(14, -8), 32, Color("#0d1330"))
+			Ink.draw_disc(_sky, c, 36, Color("#f4f1c9"))
+			Ink.draw_disc(_sky, c + Vector2(14, -8), 32, Color("#0d1330"))
 			for i in 24:
 				var sp := Vector2(fmod(i * 197.0, size.x), fmod(i * 83.0, size.y * 0.5))
 				_sky.draw_rect(Rect2(sp, Vector2(2, 2)), Color(1, 1, 1, 0.3 + 0.5 * fmod(i * 0.37, 1.0)))
 		Protocol.PLACE_COMMUTING:
-			PixelUI.draw_pixel_circle(_sky, c + Vector2(0, 30), 44, Color("#ffd166"))
+			Ink.draw_disc(_sky, c + Vector2(0, 30), 44, Color("#ffd166"))

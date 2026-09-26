@@ -5,7 +5,7 @@
 ## the movement for both the local player and interpolated remote ones.
 extends Node2D
 
-const PixelUI = preload("res://ui/pixel_ui.gd")
+const Ink = preload("res://ui/ink_ui.gd")
 const ItemArt = preload("res://game/item_art.gd")
 
 const FACING_DOWN := 0
@@ -14,6 +14,10 @@ const FACING_LEFT := 2
 const FACING_RIGHT := 3
 const BUBBLE_WIDTH := 260.0
 const HEAD_TOP := -21.0  # sprite top relative to the feet
+## Don't Starve-ish proportions: the head (with hair, face, caps) is drawn
+## this much bigger, around the neck; so it reaches this much higher.
+const HEAD_SCALE := 1.4
+const HEAD_RISE := 8.0 * (HEAD_SCALE - 1.0)
 
 ## Appearance (entity flags bits 3..5): 0 player, 1 porter (uniform + cap),
 ## 2 office staff (shirt + tie).
@@ -57,6 +61,10 @@ var pants := PANTS[0]
 var tie := Color("#c0392b")
 
 var nick_label := Label.new()
+## Nick and speech bubble live in `_tag`, which follows this view from a
+## layer above the world's ink effect (`label_root`) so text stays sharp.
+static var label_root: Node = null
+var _tag := Node2D.new()
 var bubble := PanelContainer.new()
 var bubble_label := Label.new()
 var _bubble_time := 0.0
@@ -71,19 +79,21 @@ func setup(seed_id: int, nick: String, zoom: float) -> void:
 	set_seed(seed_id)
 	nick_label.text = nick
 	var ls := LabelSettings.new()
-	ls.font = PixelUI.font()
-	ls.font_size = 16
-	ls.outline_size = 4
-	ls.outline_color = PixelUI.INK
+	ls.font = Ink.font()
+	ls.font_size = 20
+	ls.font_color = Ink.PAPER_HI
+	ls.outline_size = 6
+	ls.outline_color = Ink.INK
 	nick_label.label_settings = ls
 	nick_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	nick_label.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	nick_label.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	# Render the label at screen resolution regardless of camera zoom.
 	nick_label.scale = Vector2.ONE / zoom
 	nick_label.size = Vector2(200, 24)
-	nick_label.position = Vector2(-100 / zoom, HEAD_TOP - 24 / zoom)
+	nick_label.position = Vector2(-100 / zoom, HEAD_TOP - HEAD_RISE - 24 / zoom)
 	if nick_label.get_parent() == null:
-		add_child(nick_label)
+		add_child(_tag)
+		_tag.add_child(nick_label)
 		_build_bubble()
 	queue_redraw()
 
@@ -133,16 +143,16 @@ func set_seed(seed_id: int) -> void:
 
 
 func _build_bubble() -> void:
-	bubble.add_theme_stylebox_override("panel", PixelUI.box("bubble"))
+	bubble.add_theme_stylebox_override("panel", Ink.box("bubble"))
 	bubble_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	bubble_label.custom_minimum_size = Vector2(BUBBLE_WIDTH, 0)
-	PixelUI.style_label(bubble_label, 16, PixelUI.TEXT_INK)
+	Ink.style_label(bubble_label, 16, Ink.TEXT_INK)
 	bubble.add_child(bubble_label)
-	bubble.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	bubble.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	bubble.scale = Vector2.ONE / _zoom
 	bubble.visible = false
 	bubble.z_index = 10
-	add_child(bubble)
+	_tag.add_child(bubble)
 
 
 func set_nick(nick: String) -> void:
@@ -160,7 +170,7 @@ func say(text: String) -> void:
 
 func _place_bubble() -> void:
 	var sz := bubble.get_combined_minimum_size() / _zoom
-	bubble.position = Vector2(-sz.x / 2, HEAD_TOP - 28 / _zoom - sz.y)
+	bubble.position = Vector2(-sz.x / 2, HEAD_TOP - HEAD_RISE - 28 / _zoom - sz.y)
 
 
 func set_held(k: int) -> void:
@@ -198,6 +208,14 @@ func set_facing(f: int) -> void:
 
 
 func _process(delta: float) -> void:
+	# In the game world (not e.g. a video call tile): move the text up.
+	if _tag.get_parent() == self and label_root and is_instance_valid(label_root) \
+			and label_root.get_parent() and label_root.get_parent().is_ancestor_of(self):
+		_tag.reparent(label_root, false)
+		tree_exiting.connect(func(): if is_instance_valid(_tag): _tag.queue_free())
+	if _tag.get_parent() != self:
+		_tag.global_position = global_position
+		_tag.visible = is_visible_in_tree()
 	if bubble.visible:
 		_bubble_time -= delta
 		if _bubble_time <= 0.0:
@@ -246,9 +264,8 @@ func _draw() -> void:
 	var top := HEAD_TOP + bob + (3 if sit else 0)  # head top
 	# Outline silhouette first (1px bigger), then the parts.
 	var ol := OUTLINE if not highlight else Color(1, 1, 1, 0.95)
-	_r(-4, top - 1, 8, 9, ol)           # head
 	_r(-5, top + 7, 10, 9, ol)          # torso + arms
-	_r(-4, top + 15, 8, (3 if sit else 6) - bob, ol)    # legs
+	_r(-3.5, top + 15, 7, (3 if sit else 6) - bob, ol)  # legs (thin)
 
 	# Legs + shoes.
 	var leg_y := top + 15
@@ -260,8 +277,8 @@ func _draw() -> void:
 	else:
 		var l_lift := 1 if step > 0 else 0
 		var r_lift := 1 if step < 0 else 0
-		_r(-3, leg_y, 3, leg_h - l_lift, pants)
-		_r(0, leg_y, 3, leg_h - r_lift, pants.darkened(0.12))
+		_r(-2.5, leg_y, 2, leg_h - l_lift, pants)
+		_r(0.5, leg_y, 2, leg_h - r_lift, pants.darkened(0.12))
 		_r(-3, leg_y + leg_h - 1 - l_lift, 3, 1, Color("#1c1c1c"))
 		_r(0, leg_y + leg_h - 1 - r_lift, 3, 1, Color("#1c1c1c"))
 
@@ -304,7 +321,10 @@ func _draw() -> void:
 		_r(-5, ty + 6 + maxi(swing, 0), 2, 1, skin)
 		_r(3, ty + 6 + maxi(-swing, 0), 2, 1, skin)
 
-	# Head.
+	# Head: big, drawn around the neck.
+	var neck := Vector2(0, top + 8)
+	draw_set_transform(neck * (1.0 - HEAD_SCALE), 0.0, Vector2(HEAD_SCALE, HEAD_SCALE))
+	_r(-4, top - 1, 8, 9, ol)
 	_r(-3, top, 6, 8, skin)
 	_r(-3, top + 7, 6, 1, skin.darkened(0.12))
 	_draw_hair(top, side, dir)
@@ -318,7 +338,6 @@ func _draw() -> void:
 		FACING_LEFT, FACING_RIGHT:
 			_r(dir * 1.5 - 0.5, top + 4, 1, 1, eye)
 			_r(dir * 3 - (1 if dir > 0 else 0), top + 5, 1, 1, skin.darkened(0.15))  # nose
-	_draw_status(top, ty, side, dir)
 	if look == LOOK_FIREFIGHTER:
 		_r(-4, top - 2, 8, 4, Color("#d62f2f"))           # helmet
 		_r(-5, top + 1, 10, 1, Color("#a31f1f"))          # brim
@@ -337,6 +356,8 @@ func _draw() -> void:
 			_r(-4, top + 2, 8, 1, Color("#10162a"))        # visor
 		elif side:
 			_r(dir * 2 - (2 if dir < 0 else 0) + (1 if dir > 0 else -1), top + 2, 3, 1, Color("#10162a"))
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	_draw_status(top - HEAD_RISE, ty, side, dir)
 
 
 func _draw_status(top: float, ty: float, side: bool, dir: int) -> void:
