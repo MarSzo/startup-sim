@@ -1,4 +1,4 @@
-# Protokół sieciowy (wersja 7)
+# Protokół sieciowy (wersja 8)
 
 Własny binarny protokół na UDP. Implementacje:
 - serwer: `server/src/protocol.rs` (źródło prawdy),
@@ -23,7 +23,7 @@ przez `cargo test` i czytane przez `client/tests/run_tests.gd`.
 | pole    | typ | wartość |
 |---------|-----|---------|
 | magic   | u16 | `0x5354` (bajty `54 53`, „TS”) |
-| version | u8  | `7` |
+| version | u8  | `8` |
 | type    | u8  | typ pakietu (niżej) |
 
 ## Jednostki
@@ -101,15 +101,18 @@ aplikuje max 6 (średnio 3 = 60/20). Kolejka ponad 30 jest przycinana od najstar
 | self_lock      | u8 — blokada schodów odbiorcy (`sim::Body::lock`: 0 brak, 1 trzymane, 2 zwolnione) |
 | self_prev_input| u8 — poprzedni input odbiorcy (`sim::Body::prev_input`, do akcji „na wciśnięcie”) |
 | self_access    | u8 — uprawnienia odbiorcy (`map::access`: 1 przepustka gościa, 2 karta pracownika, 4 obsługa) |
-| self_status    | u8 — czynność odbiorcy (nie symulowana): bit 0 trzyma kawę, bit 1 parzy kawę |
+| self_status    | u8 — czynność odbiorcy (nie symulowana): bit 1 parzy kawę (bit 0 zarezerwowany; kubek to teraz przedmiot) |
 | n              | u8 |
 | entities       | n × 12 B |
 
-Encja (12 B): `id u16 | kind u8 | x i32 | y i32 | flags u8`.
-- `kind`: 0 gracz, 1 NPC. Id NPC zaczynają się od `0xF000` (61440); gracze mają 1..61439.
+Encja (13 B): `id u16 | kind u8 | x i32 | y i32 | flags u8 | held u8`.
+- `kind`: 0 gracz, 1 NPC, 2 przedmiot na podłodze. Id: gracze 1..0xDFFF,
+  przedmioty na podłodze od `0xE000`, NPC od `0xF000`.
+- `held`: przedmiot w rękach (0 brak, 1 przepustka gościa, 2 karta
+  pracownika, 3 laptop, 4 kawa); dla `kind` 2 — sam przedmiot.
 - `flags`: bity 0–1 kierunek (0 dół, 1 góra, 2 lewo, 3 prawo), bit 2 „w ruchu”,
   bity 3–5 wygląd (0 gracz, 1 portier — mundur z czapką, 2 pracownik biurowy —
-  koszula z krawatem), bity 6–7 czynność (jak `self_status`: 6 trzyma kawę, 7 parzy).
+  koszula z krawatem), bit 7 parzy kawę (bit 6 zarezerwowany).
 
 **Interest management**: lista zawiera tylko encje z tym samym `(floor, room)` co
 odbiorca (bez niego samego). Snapshot jest pełny (nie delta) — zgubienie
@@ -121,8 +124,8 @@ niepotwierdzone inputy dokładnie od tego stanu, także przez schody i windę.
 Uprawnienia zmienia tylko serwer (np. portier daje przepustkę); klient poznaje
 je ze snapshotu i od razu uwzględnia w predykcji kolizji z bramkami.
 
-**Fragmentacja**: stała część snapshotu ma 30 B, więc mieści się 97 encji
-(30 + 97·12 = 1194 B). Więcej encji → kilka fragmentów z tym samym `tick`,
+**Fragmentacja**: stała część snapshotu ma 30 B, więc mieści się 90 encji
+(30 + 90·13 = 1200 B). Więcej encji → kilka fragmentów z tym samym `tick`,
 każdy z pełnymi polami `self_*`. Pusty pokój → 1 fragment z `n = 0`.
 
 ### 6 `PlayerInfo` (S→C)
@@ -197,6 +200,19 @@ gracz pojawia się przed budynkiem. Inne firmy odpowiadają `Mail` z odmową
 Zasady (`server/data/recruitment.json`): 3 losowe pytania z puli stanowiska, 2
 poprawne = przyjęcie. Poprawne odpowiedzi zna tylko serwer.
 
+### 19 `Inventory` (S→C), 20 `ItemAction` (C→S)
+
+`Inventory`: n u8 (= 4), n × {`kind u8`, `id u32`, `label` str16} — najpierw
+ręce, potem 3 kieszenie; wysyłany po każdej zmianie i co 2 s.
+`ItemAction`: token u32, action u8, slot u8 — 1 wyjmij kieszeń `slot` do rąk
+(zamiana z małym przedmiotem w rękach), 2 schowaj z rąk do wolnej kieszeni,
+3 upuść z rąk na podłogę, 4 podaj z rąk najbliższemu graczowi (≤ 2 kafle),
+5 użyj (kawa: wypij; karta/przepustka: pokaż). Podniesienie przedmiotu z
+podłogi to E (jak rozmowa). Odmowy wracają jako `Say` od samego gracza.
+
+Uprawnienia (`self_access`) wynikają z noszonych przedmiotów: przepustka →
+gość, karta → pracownik — niezależnie od tego, czyja jest.
+
 ## Połączenie i timeouty
 
 ```
@@ -255,6 +271,7 @@ szyfrowaniem.
 
 ## Historia wersji
 
+- **8** — ekwipunek: `held` w encji (13 B), encje przedmiotów na podłodze, `Inventory`, `ItemAction`; kubek kawy jako przedmiot.
 - **7** — pulpit: firmy i flaga `applied` w `JobOffers` (dzielonych na pakiety), `motivation` w `Apply`, `Mail`, `PortalAction`.
 - **6** — profil postaci w `Connect` (płeć, wiek, wygląd, miejscowość, e-mail); płeć i wygląd w `PlayerInfo`; `Reject(4)`.
 - **5** — `self_status` w snapshocie, bity czynności 6–7 we `flags` encji; `Say` także od graczy.

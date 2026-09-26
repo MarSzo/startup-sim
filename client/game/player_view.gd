@@ -5,6 +5,8 @@
 ## the movement for both the local player and interpolated remote ones.
 extends Node2D
 
+const ItemArt = preload("res://game/item_art.gd")
+
 const FACING_DOWN := 0
 const FACING_UP := 1
 const FACING_LEFT := 2
@@ -26,8 +28,10 @@ const OUTLINE := Color(0.08, 0.08, 0.1)
 
 var look := LOOK_PLAYER
 var facing := FACING_DOWN
-## Activity (Protocol.STATUS_*): mug in hand / brewing at the machine.
+## Activity (Protocol.STATUS_*): brewing at the machine.
 var status := 0
+## Item in hands (ItemArt kinds), visible to everyone.
+var held := 0
 ## White outline marks the local player.
 var highlight := false
 var skin := SKINS[0]
@@ -136,6 +140,12 @@ func say(text: String) -> void:
 func _place_bubble() -> void:
 	var sz := bubble.get_combined_minimum_size() / _zoom
 	bubble.position = Vector2(-sz.x / 2, HEAD_TOP - 28 / _zoom - sz.y)
+
+
+func set_held(k: int) -> void:
+	if k != held:
+		held = k
+		queue_redraw()
 
 
 func set_status(s: int) -> void:
@@ -261,17 +271,29 @@ func _draw() -> void:
 
 
 func _draw_status(top: float, ty: float, side: bool, dir: int) -> void:
-	if status & 1 and facing != FACING_UP:
-		# Mug in the right hand (+ a wisp of steam).
+	if held != 0 and facing != FACING_UP:
 		var mx := (dir * 4.0 - 1.0) if side else 3.0
-		_r(mx, ty + 4, 3, 3, Color("#f4f1ea"))
-		_r(mx, ty + 4, 3, 1, Color("#6b4a2e"))
-		_r(mx + 3, ty + 5, 1, 1, Color("#d9d4c8"))
-		var t := Time.get_ticks_msec() / 400
-		_r(mx + (t % 2), ty + 2, 1, 1, Color(1, 1, 1, 0.7))
-		_r(mx + 1 - (t % 2), ty + 1, 1, 1, Color(1, 1, 1, 0.45))
-		if t % 3 == 0:
-			queue_redraw()
+		match held:
+			ItemArt.COFFEE:
+				# Mug in the right hand (+ a wisp of steam).
+				_r(mx, ty + 4, 3, 3, Color("#f4f1ea"))
+				_r(mx, ty + 4, 3, 1, Color("#6b4a2e"))
+				_r(mx + 3, ty + 5, 1, 1, Color("#d9d4c8"))
+				var t := Time.get_ticks_msec() / 400
+				_r(mx + (t % 2), ty + 2, 1, 1, Color(1, 1, 1, 0.7))
+				_r(mx + 1 - (t % 2), ty + 1, 1, 1, Color(1, 1, 1, 0.45))
+				if t % 3 == 0:
+					queue_redraw()
+			ItemArt.LAPTOP:
+				# Laptop carried in front / under the arm.
+				var lx := (dir * 2.0 - 3.0) if side else -4.0
+				_r(lx, ty + 3, 8, 5, Color("#5c6570"))
+				_r(lx, ty + 3, 8, 1, Color("#8a939c"))
+			ItemArt.EMPLOYEE_CARD:
+				_r(mx, ty + 5, 3, 2, Color("#f4f6f8"))
+				_r(mx, ty + 5, 3, 1, Color("#2e6bd9"))
+			ItemArt.GUEST_PASS:
+				_r(mx, ty + 5, 3, 2, Color("#f1c40f"))
 	if status & 2:
 		# "Brewing…" dots above the head.
 		var n := (Time.get_ticks_msec() / 300) % 4

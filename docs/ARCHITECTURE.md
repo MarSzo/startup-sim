@@ -28,7 +28,8 @@ server/                 crate Rusta (lib `game` + binarki)
   src/nav.rs            podążanie ścieżką (boty, NPC)
   src/npc.rs            NPC po stronie serwera (portier, recepcja, HR)
   src/recruitment.rs    portal z ofertami i quiz rekrutacyjny
-  src/coffee.rs         ekspresy do kawy (parzenie, kubek w ręce)
+  src/coffee.rs         ekspresy do kawy (parzenie → kawa jako przedmiot)
+  src/inventory.rs      przedmioty, kieszenie i ręce, uprawnienia z przedmiotów
   data/recruitment.json oferty i pule pytań (pierwsza odpowiedź = poprawna)
   src/protocol.rs       pakiety: encode/decode, fragmentacja snapshotów
   src/net.rs            UdpSocket + symulator opóźnienia/jittera/strat
@@ -52,7 +53,10 @@ client/                 projekt Godota 4.7
   map/map_art.gd        proceduralny pixel art piętra (podłogi, ściany 3/4, meble)
   map/map_view.gd       tekstura piętra + podpisy pomieszczeń
   game/game.gd          logika sieciowa gry po stronie klienta
-  game/player_view.gd   pixel-artowa postać z animacją chodu + nick + dymek
+  game/player_view.gd   pixel-artowa postać z animacją chodu, przedmiotem w rękach, nickiem, dymkiem
+  game/item_art.gd      ikony przedmiotów (rysowane prostokątami)
+  game/item_view.gd     przedmiot leżący na podłodze
+  ui/inventory_hud.gd   pasek ekwipunku (ręce + 3 kieszenie)
   game/remote_player.gd bufor snapshotów + interpolacja
   ui/character_screen.gd tworzenie postaci (dane + wygląd z podglądem)
   ui/desktop.gd         pulpit komputera: przeglądarka (portal, formularz), poczta, rozmowa online
@@ -119,10 +123,20 @@ przepustki); osobę z kartą tylko wita. **HR** stoi za biurkiem: gościowi
 portiernię. Role (`npc::Role`) i ich kwestie są w `npc.rs`; wygląd idzie w
 bitach 3–5 flag encji.
 
+**Ekwipunek** (`inventory.rs`): 3 kieszenie na małe przedmioty (przepustka,
+karta) i ręce na jeden dowolny (laptop i kawa tylko w rękach). `Body::access`
+jest przeliczany z noszonych przedmiotów po każdej zmianie (`refresh`), więc
+karta przekazana innemu graczowi przenosi dostęp. Portier daje przepustkę
+(`npc::Event::Give`), przy rezygnacji ją zabiera (`Take`); HR zabiera
+przepustkę i daje kartę (podpisaną imieniem i działem) oraz laptop — wymaga
+wolnych rąk. Przedmioty na podłodze (`Dropped`) są encjami `kind` 2 w
+snapshotach; E podnosi najbliższy w zasięgu 1,25 kafla (po NPC i ekspresie).
+Gdy przedmiot się nie mieści, ląduje na podłodze pod nogami.
+
 **Ekspresy** (`coffee.rs`, znalezione w mapie po typie `coffee_machine`): E
-w zasięgu 1,5 kafla (gdy nie ma NPC w zasięgu rozmowy) → parzenie 3 s (ekspres
-zajęty dla innych) → kubek w ręce przez 90 s. Stan idzie w `self_status` i w
-bitach 6–7 flag encji; komunikaty to `Say` od samego gracza (dymek nad jego
+w zasięgu 1,5 kafla (gdy nie ma NPC w zasięgu rozmowy, wolne ręce) → parzenie
+3 s (ekspres zajęty dla innych; bit „parzy” w `self_status` / fladze 7) →
+kawa jako przedmiot w rękach (stygnie po 90 s, F = wypij); komunikaty to `Say` od samego gracza (dymek nad jego
 głową, widoczny dla innych w pokoju).
 
 **Profil postaci** (`Connect`): imię, płeć, wiek, miejscowość, e-mail i

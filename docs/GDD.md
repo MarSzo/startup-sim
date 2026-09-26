@@ -456,6 +456,19 @@ Zastępuje prosty portal z 10.8. Po połączeniu gracz widzi pulpit komputera
   zaproszenie na dzień próbny z przyciskiem „Idę do biura” albo podziękowanie
   (można aplikować ponownie).
 
+### 10.13 Ekwipunek (etap 3 z 9a)
+
+- **Kieszenie (3)** na małe przedmioty i **ręce** na jeden dowolny (duże —
+  laptop, kawa — tylko w rękach). Pasek ekwipunku w prawym dolnym rogu.
+- Przedmioty: **przepustka gościa** (portier), **karta pracownika** z imieniem
+  i działem oraz **laptop** (HR — wymaga wolnych rąk), **kawa** (ekspres).
+- Klawisze: **1–3** wyjmij / schowaj, **Q** upuść, **G** podaj osobie obok,
+  **F** użyj (wypij kawę, pokaż kartę), **E** podnieś z podłogi.
+- **Dostęp wynika z tego, co masz przy sobie**: kartę można upuścić, podnieść
+  lub komuś dać — dostęp idzie razem z nią. Przedmiot w rękach i leżący na
+  podłodze widzą wszyscy.
+- Laptop można na razie tylko nosić — kładzenie na biurku i używanie to etap 4.
+
 ### 10.6 Stan implementacji
 
 *Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie,
@@ -489,6 +502,9 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
   nicku (10.12); protokół v7.
 - **Grafika**: proceduralny pixel art otoczenia, mebli i postaci (10.9).
 - **Tworzenie postaci**: dane postaci i edytor wyglądu (10.11); protokół v6.
+- **Ekwipunek**: kieszenie i ręce, przedmioty (przepustka, karta, laptop,
+  kawa), upuszczanie / podnoszenie / podawanie, dostęp z przedmiotów (10.13);
+  protokół v8.
 - **Ekspres do kawy**: parzenie, kubek w ręce widoczny dla innych, jedna
   osoba naraz (10.10); protokół v5.
 - **Boty** (`cargo run --release --bin bots`): 50 domyślnie, chodzą po BFS po
@@ -497,12 +513,12 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Sieć mobilna**: serwer dual-stack IPv4/IPv6; gracz identyfikowany tokenem
   (zmiana adresu w trakcie gry przenosi sesję); klient przepina gniazdo po
   ciszy/powrocie z tła i sam łączy się ponownie po utracie sesji.
-- **Testy**: 53 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
+- **Testy**: 57 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
   zależna od uprawnień, bramki, ruch/kolizje, schody, winda, nawigacja,
-  portier, recepcja, HR, rekrutacja, ekspres, protokół), 2 golden, 10 e2e serwera
+  portier, recepcja, HR, rekrutacja, ekspres, protokół), 2 golden, 11 e2e serwera
   (m.in. portal: odrzucenie → przyjęcie → spawn; całe wdrożenie aż do karty;
   niewidoczność między piętrami; zgodność stanu serwera z predykcją) —
-  łącznie 65 (w tym e2e ekspresu, profilu postaci i pulpitu: odmowa innej firmy, rozmowa, zaproszenie, biuro); 115 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
+  łącznie 70 (w tym e2e ekspresu, profilu postaci, pulpitu i przekazywania karty); 119 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
   adresów).
 
 #### Pomiary (MacBook, wszystko lokalnie)

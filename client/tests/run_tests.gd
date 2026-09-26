@@ -48,6 +48,7 @@ func test_protocol(path: String) -> void:
 		"ping": Protocol.encode_ping(0x01020304, 777000),
 		"apply": Protocol.encode_apply(0x01020304, 2, "Lubię kawę i wyzwania."),
 		"portal_action": Protocol.encode_portal_action(0x01020304, Protocol.PORTAL_GO_TO_OFFICE, 0),
+		"item_action": Protocol.encode_item_action(0x01020304, Protocol.ITEM_TAKE_OUT, 2),
 		"answer": Protocol.encode_answer(0x01020304, 3, 1, 2),
 	}
 	for name in enc:
@@ -67,7 +68,7 @@ func test_protocol(path: String) -> void:
 	if s.has("entities") and s.entities.size() == 2:
 		var e0: Dictionary = s.entities[0]
 		var e1: Dictionary = s.entities[1]
-		expect(e0.id == 3 and e0.kind == 0 and e0.x == 4096 and e0.y == 8192 and e0.flags == 5, "entity 0 %s" % e0)
+		expect(e0.id == 3 and e0.kind == 0 and e0.x == 4096 and e0.y == 8192 and e0.flags == 5 and e0.held == 3, "entity 0 %s" % e0)
 		expect(e1.id == 65535 and e1.kind == 1 and e1.x == -1 and e1.y == 2000000, "entity 1 %s" % e1)
 	var pi := Protocol.decode(golden["player_info"].hex_decode())
 	expect(pi.get("players", []).size() == 2 and pi.players[0].nick == "Ala" and pi.players[0].department == 1
@@ -77,6 +78,9 @@ func test_protocol(path: String) -> void:
 	expect(jo.get("offers", []).size() == 2 and jo.offers[1].title == "Dostawca/Dostawczyni" and jo.offers[1].department == 0
 		and jo.offers[1].company == "Pizzeria u Stefana" and jo.offers[0].applied == true and jo.offers[1].applied == false
 		and jo.offers[0].description == "Owocowe czwartki.", "decode job_offers %s" % jo)
+	var inv := Protocol.decode(golden["inventory"].hex_decode())
+	expect(inv.get("slots", []).size() == 4 and inv.slots[0].kind == 3 and inv.slots[0].label == "Laptop: Ola"
+		and inv.slots[1].id == 76 and inv.slots[2].kind == 0, "decode inventory %s" % inv)
 	var ml := Protocol.decode(golden["mail"].hex_decode())
 	expect(ml.get("id") == 2 and ml.from == "Startup Sim — Rekrutacja" and ml.subject == "Zaproszenie na rozmowę"
 		and ml.action == Protocol.PORTAL_JOIN_INTERVIEW and ml.arg == 1 and ml.body.begins_with("Cześć Ola"), "decode mail %s" % ml)

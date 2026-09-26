@@ -12,6 +12,9 @@ const PlayerView = preload("res://game/player_view.gd")
 const RemotePlayer = preload("res://game/remote_player.gd")
 const DebugOverlay = preload("res://ui/debug_overlay.gd")
 const MapData = preload("res://map/map_data.gd")
+const ItemArt = preload("res://game/item_art.gd")
+const ItemView = preload("res://game/item_view.gd")
+const InventoryHud = preload("res://ui/inventory_hud.gd")
 
 const ZOOM := 3.0
 ## Remote players are rendered this far in the past (2 snapshots at 20 Hz).
@@ -45,6 +48,9 @@ var hint_label := Label.new()
 var log_label := Label.new()
 var _log: Array = []  # [msec, text]
 var kinds := {}          # id -> entity kind (player / NPC)
+var floor_items := {}    # entity id -> ItemView (items lying on the floor)
+var inventory: Array = [] # hands + pockets (from the server)
+var hud := InventoryHud.new()
 var depts := {}          # id -> department (after the contract)
 var appearances := {}    # id -> appearance dict (from PlayerInfo)
 var own_appearance := {}
@@ -157,6 +163,8 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 	log_label.add_theme_constant_override("outline_size", 5)
 	log_label.add_theme_color_override("font_outline_color", Color.BLACK)
 	status_layer.add_child(log_label)
+	status_layer.add_child(hud)
+	hud.slot_clicked.connect(_pocket_key)
 	_show_floor(0)
 
 
@@ -180,6 +188,12 @@ func reset_session(welcome: Dictionary) -> void:
 	remotes.clear()
 	nicks.clear()
 	kinds.clear()
+	for iv in floor_items.values():
+		iv.queue_free()
+	floor_items.clear()
+	inventory = []
+	hud.update_slots([])
+	me.set_held(0)
 	appearances.clear()
 	depts.clear()
 	info_requested.clear()
@@ -259,6 +273,16 @@ func _goto_input(delta: float) -> int:
 		if leg.begins_with("wait:"):
 			goto_delay = float(leg.substr(5))
 			return 0
+		if leg.begins_with("item:"):  # item:take0..2 / put / drop / give / use
+			var a := leg.substr(5)
+			match a:
+				"put": _item_action(Protocol.ITEM_PUT_AWAY, 0)
+				"drop": _item_action(Protocol.ITEM_DROP, 0)
+				"give": _item_action(Protocol.ITEM_GIVE, 0)
+				"use": _item_action(Protocol.ITEM_USE, 0)
+				_: _item_action(Protocol.ITEM_TAKE_OUT, int(a.substr(4)))
+			goto_delay = 0.4
+			return 0
 		_goto_path = _plan_path(leg)
 		goto_delay = 0.3
 	while not _goto_path.is_empty():
@@ -334,6 +358,10 @@ func _process(delta: float) -> void:
 		_update_hint()
 		if not _log.is_empty():
 			_refresh_log()
+	for id in floor_items.keys():
+		if latest_tick - floor_items[id].last_seen_tick > REMOTE_TIMEOUT_TICKS:
+			floor_items[id].queue_free()
+			floor_items.erase(id)
 	if have_time:
 		est_tick += delta * tick_hz
 		var render_tick := est_tick - INTERP_DELAY_SEC * tick_hz
@@ -356,6 +384,10 @@ func _on_packet(p: Dictionary) -> void:
 	match p.type:
 		Protocol.T_SNAPSHOT:
 			_on_snapshot(p)
+		Protocol.T_INVENTORY:
+			inventory = p.slots
+			hud.update_slots(inventory)
+			me.set_held(inventory[0].kind if not inventory.is_empty() else 0)
 		Protocol.T_SAY:
 			var who: String = nicks.get(p.id, "?")
 			if p.id == net.player_id:
@@ -394,6 +426,9 @@ func _on_snapshot(p: Dictionary) -> void:
 			for r in remotes.values():
 				r.queue_free()
 			remotes.clear()
+			for iv in floor_items.values():
+				iv.queue_free()
+			floor_items.clear()
 		elif p.room != room_id and p.frag_cnt == 1:
 			# Another room: drop whoever isn't in the new (complete) set right
 			# away; people visible from both rooms (e.g. the porter) stay.
@@ -417,6 +452,16 @@ func _on_snapshot(p: Dictionary) -> void:
 	var unknown := []
 	var now := Time.get_ticks_msec()
 	for e in p.entities:
+		if e.kind == Protocol.KIND_ITEM:
+			var iv = floor_items.get(e.id)
+			if iv == null:
+				iv = ItemView.new()
+				world.add_child(iv)
+				floor_items[e.id] = iv
+			iv.setup(e.held)
+			iv.position = Vector2(e.x, e.y) / float(Movement.SUBPIXELS)
+			iv.last_seen_tick = tick
+			continue
 		var r = remotes.get(e.id)
 		if r == null:
 			r = RemotePlayer.new()
@@ -433,6 +478,7 @@ func _on_snapshot(p: Dictionary) -> void:
 				_pending_say.erase(e.id)
 		r.push_sample(tick, Vector2(e.x, e.y) / float(Movement.SUBPIXELS), e.flags)
 		r.set_status((e.flags >> Protocol.STATUS_FLAGS_SHIFT) & 3)
+		r.set_held(e.held)
 		kinds[e.id] = e.kind
 		if not nicks.has(e.id) and now - info_requested.get(e.id, -100000) > 500:
 			info_requested[e.id] = now
@@ -478,6 +524,34 @@ func _reconcile(server_body: Dictionary, ack: int) -> void:
 		_refresh_own_label()
 
 
+func _unhandled_input(event: InputEvent) -> void:
+	if not (event is InputEventKey and event.pressed and not event.echo) or input_blocked or not have_state:
+		return
+	match event.physical_keycode:
+		KEY_1, KEY_2, KEY_3:
+			_pocket_key(event.physical_keycode - KEY_1)
+		KEY_Q:
+			_item_action(Protocol.ITEM_DROP, 0)
+		KEY_G:
+			_item_action(Protocol.ITEM_GIVE, 0)
+		KEY_F:
+			_item_action(Protocol.ITEM_USE, 0)
+
+
+## Pocket key: take it out, or put back what's in hands if that pocket is empty.
+func _pocket_key(pocket: int) -> void:
+	var slot: Dictionary = inventory[pocket + 1] if pocket + 1 < inventory.size() else {"kind": 0}
+	if slot.kind == 0 and me.held in ItemArt.SMALL:
+		_item_action(Protocol.ITEM_PUT_AWAY, 0)
+	else:
+		_item_action(Protocol.ITEM_TAKE_OUT, pocket)
+
+
+func _item_action(action: int, slot: int) -> void:
+	if net.is_playing():
+		net.send(Protocol.encode_item_action(net.token, action, slot))
+
+
 ## Context hint at the bottom of the screen: elevator, NPC to talk to, or a
 ## gate that needs a pass.
 func _update_hint() -> void:
@@ -515,12 +589,24 @@ func _update_hint() -> void:
 				if map.legend.get(map.tile_chars[ty * map.width + tx], {}).get("type") != "coffee_machine":
 					continue
 				if Movement.to_px(Movement.tile_center(tx, ty)).distance_to(Movement.to_px(pred.pos)) <= 24.0:
-					if me.status & Protocol.STATUS_HOLDING_COFFEE:
-						text = "Masz kawę w ręce"
+					if me.held != 0:
+						text = "Najpierw odłóż to, co trzymasz (1–3 / Q)"
 					elif me.status & Protocol.STATUS_BREWING:
 						text = "Parzenie kawy…"
 					else:
 						text = "[E] Zrób kawę"
+	if text == "":
+		var me_px2 := Movement.to_px(pred.pos)
+		for id in floor_items:
+			if floor_items[id].position.distance_to(me_px2) <= 20.0:
+				text = "[E] Podnieś: %s" % ItemArt.item_name(floor_items[id].kind)
+				break
+	if text == "" and me.held != 0:
+		var me_px3 := Movement.to_px(pred.pos)
+		for id in remotes:
+			if kinds.get(id) == Protocol.KIND_PLAYER and remotes[id].position.distance_to(me_px3) <= 32.0:
+				text = "[G] Podaj %s: %s" % [ItemArt.item_name(me.held).to_lower(), nicks.get(id, "?")]
+				break
 	if text == "" and map:
 		for dy in [-1, -2]:
 			for dx in [-1, 0, 1]:

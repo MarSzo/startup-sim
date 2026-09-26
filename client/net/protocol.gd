@@ -3,7 +3,7 @@
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 7
+const VERSION := 8
 const MAX_PACKET := 1200
 const MAX_NICK_BYTES := 16
 const MAX_SAY_BYTES := 240
@@ -29,6 +29,14 @@ const T_ANSWER := 15
 const T_RECRUIT_RESULT := 16
 const T_MAIL := 17
 const T_PORTAL_ACTION := 18
+const T_INVENTORY := 19
+const T_ITEM_ACTION := 20
+
+const ITEM_TAKE_OUT := 1
+const ITEM_PUT_AWAY := 2
+const ITEM_DROP := 3
+const ITEM_GIVE := 4
+const ITEM_USE := 5
 
 const PORTAL_NONE := 0
 const PORTAL_JOIN_INTERVIEW := 1
@@ -37,6 +45,7 @@ const MAX_MAIL_BYTES := 600
 
 const KIND_PLAYER := 0
 const KIND_NPC := 1
+const KIND_ITEM := 2
 
 # Activity bits: Snapshot.self_status bits 0..1 = entity flags bits 6..7.
 const STATUS_HOLDING_COFFEE := 1
@@ -155,6 +164,14 @@ static func encode_answer(token: int, attempt: int, index: int, choice: int) -> 
 	return b.data_array
 
 
+static func encode_item_action(token: int, action: int, slot: int) -> PackedByteArray:
+	var b := _writer(T_ITEM_ACTION)
+	b.put_u32(token)
+	b.put_u8(action)
+	b.put_u8(slot)
+	return b.data_array
+
+
 static func encode_disconnect(token: int, reason: int) -> PackedByteArray:
 	var b := _writer(T_DISCONNECT)
 	b.put_u32(token)
@@ -243,7 +260,7 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			var n := r.u8()
 			var ents := []
 			for i in n:
-				ents.append({"id": r.u16(), "kind": r.u8(), "x": r.i32(), "y": r.i32(), "flags": r.u8()})
+				ents.append({"id": r.u16(), "kind": r.u8(), "x": r.i32(), "y": r.i32(), "flags": r.u8(), "held": r.u8()})
 			p.entities = ents
 		T_PLAYER_INFO:
 			var n := r.u8()
@@ -292,6 +309,14 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			p.score = r.u8()
 			p.total = r.u8()
 			p.department = r.u8()
+		T_INVENTORY:
+			var n := r.u8()
+			if n > 8:
+				return {}
+			var slots := []
+			for i in n:
+				slots.append({"kind": r.u8(), "id": r.u32(), "label": r.str16(MAX_TEXT_BYTES)})
+			p.slots = slots
 		T_MAIL:
 			p.id = r.u8()
 			p.from = r.str16(MAX_TEXT_BYTES)

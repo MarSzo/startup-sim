@@ -402,6 +402,20 @@ fn onboarding_porter_reception_hr_card() {
     }
     assert!(access.is_some(), "HR signed the contract");
     assert_eq!(latest, Some(access::CARD), "employee card, guest pass gone");
+    // The card is in a pocket and the laptop in hands.
+    let deadline = Instant::now() + Duration::from_secs(3);
+    let mut inv = None;
+    while Instant::now() < deadline && inv.is_none() {
+        g.ping();
+        if let Some(Packet::Inventory { slots }) = g.recv() {
+            inv = Some(slots);
+        }
+    }
+    let slots = inv.expect("inventory");
+    use game::inventory::kind as item_kind;
+    assert_eq!(slots[0].kind, item_kind::LAPTOP, "laptop in hands");
+    assert!(slots[1..].iter().any(|s| s.kind == item_kind::EMPLOYEE_CARD), "card in a pocket");
+    assert!(!slots.iter().any(|s| s.kind == item_kind::GUEST_PASS), "guest pass taken back");
 }
 
 #[test]
@@ -491,7 +505,7 @@ fn desktop_portal_mail_interview_and_office() {
 #[test]
 fn coffee_machine_brews_one_cup_at_a_time() {
     use game::coffee::lines as coffee_lines;
-    use game::protocol::status;
+    use game::inventory::kind as item_kind;
     let (addr, _) = start_server_with(access::CARD);
     let b = building();
     let (mut a, _) = Client::connect(addr, "Kawosz");
@@ -532,19 +546,19 @@ fn coffee_machine_brews_one_cup_at_a_time() {
         a.ping();
         c.ping();
         while let Some(p) = a.recv() {
-            if let Packet::Snapshot { self_status, .. } = p {
-                self_holding |= self_status & status::HOLDING_COFFEE != 0;
+            if let Packet::Inventory { slots } = p {
+                self_holding |= slots[0].kind == item_kind::COFFEE; // slot 0 = hands
             }
         }
         while let Some(p) = c.recv() {
             if let Packet::Snapshot { entities, .. } = p {
                 others_see |= entities
                     .iter()
-                    .any(|e| e.id == a.id && (e.flags >> status::FLAGS_SHIFT) & status::HOLDING_COFFEE != 0);
+                    .any(|e| e.id == a.id && e.held == item_kind::COFFEE);
             }
         }
     }
-    assert!(self_holding, "A's snapshot says: holding coffee");
+    assert!(self_holding, "A's inventory: coffee in hands");
     assert!(others_see, "C sees A with a mug");
 }
 
@@ -576,4 +590,66 @@ fn profile_is_checked_and_appearance_shared() {
     assert_eq!(info.nick, "Ola");
     assert_eq!(info.gender, proto::gender::FEMALE);
     assert_eq!(info.appearance, test_profile().appearance);
+}
+
+#[test]
+fn access_card_can_be_dropped_picked_up_and_handed_over() {
+    use game::inventory::kind as item_kind;
+    use proto::item_action as act;
+    let (addr, _) = start_server_with(access::CARD); // everyone starts with a card
+    let b = building();
+    let (a, _) = Client::connect(addr, "Ola");
+    let (mut c, _) = Client::connect(addr, "Kuba");
+
+    // Latest (access, hands, pockets) of a client, keeping both sessions alive.
+    let state = |me: &Client, other: &Client, wait: Duration| {
+        let deadline = Instant::now() + wait;
+        let (mut acc, mut inv) = (None, None);
+        while Instant::now() < deadline {
+            me.ping();
+            other.ping();
+            while let Some(p) = me.recv() {
+                match p {
+                    Packet::Snapshot { self_access, .. } => acc = Some(self_access),
+                    Packet::Inventory { slots } => inv = Some(slots),
+                    _ => {}
+                }
+            }
+            while other.recv().is_some() {}
+        }
+        (acc.unwrap_or(0), inv.unwrap_or_default())
+    };
+    let item_action = |who: &Client, action: u8, slot: u8| {
+        who.sock.send(&Packet::ItemAction { token: who.token, action, slot }.encode()).unwrap();
+    };
+
+    let (acc, inv) = state(&a, &c, Duration::from_millis(300));
+    assert_eq!(acc, access::CARD);
+    let card_slot = inv.iter().position(|s| s.kind == item_kind::EMPLOYEE_CARD).expect("card in pockets") - 1;
+
+    // Ola takes the card out and drops it on the sidewalk: no access any more.
+    item_action(&a, act::TAKE_OUT, card_slot as u8);
+    std::thread::sleep(Duration::from_millis(120));
+    item_action(&a, act::DROP, 0);
+    let (acc, inv) = state(&a, &c, Duration::from_millis(300));
+    assert_eq!(acc, 0, "no card, no access");
+    assert!(inv.iter().all(|s| s.kind == item_kind::NONE));
+
+    // Kuba (with his own card) sees it on the floor, walks there and picks it up (E).
+    let spot = b.spawns()[0];
+    let kuba = Body { access: access::CARD, ..Body::at(0, Pos::tile_center(b.spawns()[1].1.x, b.spawns()[1].1.y)) };
+    let at = c.walk_to(&b, kuba, spot, &[&a]);
+    c.press_e(&b, at);
+    let (acc, inv) = state(&c, &a, Duration::from_millis(400));
+    assert_eq!(acc, access::CARD);
+    assert_eq!(inv.iter().filter(|s| s.kind == item_kind::EMPLOYEE_CARD).count(), 2, "Kuba now carries two cards");
+
+    // Kuba hands one back to Ola (G): she is standing right there.
+    let slot = inv[1..].iter().position(|s| s.kind == item_kind::EMPLOYEE_CARD).unwrap();
+    item_action(&c, act::TAKE_OUT, slot as u8);
+    std::thread::sleep(Duration::from_millis(120));
+    item_action(&c, act::GIVE, 0);
+    let (acc, inv) = state(&a, &c, Duration::from_millis(400));
+    assert_eq!(acc, access::CARD, "access came back with the card");
+    assert_eq!(inv.iter().filter(|s| s.kind == item_kind::EMPLOYEE_CARD).count(), 1);
 }

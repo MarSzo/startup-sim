@@ -11,6 +11,7 @@
 use std::collections::HashMap;
 
 use crate::building::{Building, Place};
+use crate::inventory::kind as item;
 use crate::map::{access, NpcDef};
 use crate::nav::Walker;
 use crate::sim::{self, Body, Pos, SUBPIXELS};
@@ -55,11 +56,12 @@ pub mod lines {
     pub const RECEPTION_HAS_CARD: &str = "Dzień dobry! Miłego dnia w pracy.";
     pub const NO_PASS: &str = "Najpierw proszę zgłosić się na portierni.";
     // HR
-    pub const HR_SIGNED: &str = "Umowa podpisana — witamy w firmie! Oto karta pracownika.";
+    pub const HR_SIGNED: &str = "Umowa podpisana — witamy w firmie! Oto karta pracownika i Twój laptop.";
     pub fn hr_signed_in(department: &str) -> String {
-        format!("Umowa podpisana — witamy w dziale {department}! Oto karta pracownika.")
+        format!("Umowa podpisana — witamy w dziale {department}! Oto karta pracownika i Twój laptop.")
     }
     pub const HR_HAS_CARD: &str = "Umowa już podpisana, karta działa. Powodzenia!";
+    pub const HR_HANDS_FULL: &str = "Proszę odłożyć to, co masz w rękach — zaraz dostaniesz laptopa.";
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -109,8 +111,10 @@ const RECEPTION_ESCORT: EscortLines = EscortLines {
 pub enum Event {
     /// Speech bubble; `to` is the player addressed (also gets it if in another room).
     Say { npc: u16, text: String, to: Option<u16> },
-    Grant { player: u16, access: u8 },
-    Revoke { player: u16, access: u8 },
+    /// Hand an item (`inventory::kind`) to a player; the server labels it.
+    Give { player: u16, item: u8 },
+    /// Take back an item of this kind from a player (if they still have it).
+    Take { player: u16, item: u8 },
     /// Employment contract signed (HR): the department becomes official.
     Contract { player: u16 },
 }
@@ -189,20 +193,30 @@ impl Npc {
 
     /// A player pressed E next to this NPC. `department`: the position the
     /// player was recruited for (HR puts it on the contract).
-    pub fn interact(&mut self, b: &Building, player: u16, player_access: u8, department: Option<&str>) -> Vec<Event> {
+    pub fn interact(
+        &mut self,
+        b: &Building,
+        player: u16,
+        player_access: u8,
+        department: Option<&str>,
+        hands_free: bool,
+    ) -> Vec<Event> {
         let say = |text: &str| Event::Say { npc: self.id, text: text.to_string(), to: Some(player) };
         let has_card = player_access & access::CARD != 0;
         let has_pass = player_access & access::GUEST != 0;
         if self.role == Role::Hr {
             return if has_card {
                 vec![say(lines::HR_HAS_CARD)]
+            } else if has_pass && !hands_free {
+                vec![say(lines::HR_HANDS_FULL)]
             } else if has_pass {
-                // Contract signed: the card replaces the guest pass.
+                // Contract signed: card + laptop; the card replaces the guest pass.
                 let line = department.map_or_else(|| lines::HR_SIGNED.to_string(), lines::hr_signed_in);
                 vec![
                     Event::Say { npc: self.id, text: line, to: Some(player) },
-                    Event::Grant { player, access: access::CARD },
-                    Event::Revoke { player, access: access::GUEST },
+                    Event::Take { player, item: item::GUEST_PASS },
+                    Event::Give { player, item: item::EMPLOYEE_CARD },
+                    Event::Give { player, item: item::LAPTOP },
                     Event::Contract { player },
                 ]
             } else {
@@ -214,17 +228,17 @@ impl Npc {
             State::Idle => {
                 let (welcome, grant) = match self.role {
                     Role::Porter if has_card || has_pass => return vec![say(lines::HAS_PASS)],
-                    Role::Porter => (lines::WELCOME_ESCORT, Some(access::GUEST)),
+                    Role::Porter => (lines::WELCOME_ESCORT, true),
                     Role::Receptionist if has_card => return vec![say(lines::RECEPTION_HAS_CARD)],
                     Role::Receptionist if !has_pass => return vec![say(lines::NO_PASS)],
-                    _ => (lines::RECEPTION_WELCOME, None),
+                    _ => (lines::RECEPTION_WELCOME, false),
                 };
                 let Some(goal) = self.escort_to else { return vec![] };
                 let Some(walker) = Walker::to(b, &self.body, goal) else { return vec![] };
                 self.state = State::Escorting { guest: player, walker, waited: 0 };
                 let mut ev = vec![say(welcome)];
-                if let Some(a) = grant {
-                    ev.push(Event::Grant { player, access: a });
+                if grant {
+                    ev.push(Event::Give { player, item: item::GUEST_PASS });
                 }
                 ev
             }
@@ -263,7 +277,7 @@ impl Npc {
                             if *waited >= GIVE_UP_TICKS {
                                 events.push(Event::Say { npc: self.id, text: l.gave_up.into(), to: Some(guest) });
                                 if role == Role::Porter {
-                                    events.push(Event::Revoke { player: guest, access: access::GUEST });
+                                    events.push(Event::Take { player: guest, item: item::GUEST_PASS });
                                 }
                                 self.go_home(b);
                             } else if *waited % NAG_TICKS == 0 {
@@ -362,9 +376,9 @@ mod tests {
     fn escorts_a_newcomer_to_reception_and_returns() {
         let (b, mut porter) = setup();
         let home = porter.body;
-        let ev = porter.interact(&b, 7, 0, None);
+        let ev = porter.interact(&b, 7, 0, None, true);
         assert_eq!(says(&ev), vec![lines::WELCOME_ESCORT]);
-        assert!(ev.contains(&Event::Grant { player: 7, access: access::GUEST }));
+        assert!(ev.contains(&Event::Give { player: 7, item: item::GUEST_PASS }));
         assert_eq!(porter.escorting(), Some(7));
 
         // The guest sticks to the porter (same floor, same spot).
@@ -396,7 +410,7 @@ mod tests {
     #[test]
     fn keeps_walking_when_the_guest_runs_ahead() {
         let (b, mut porter) = setup();
-        porter.interact(&b, 7, 0, None);
+        porter.interact(&b, 7, 0, None, true);
         // Guest already waiting at the reception (in a corner, off his route).
         let ahead = Body::at(1, Pos::tile_center(21, 15));
         let players = HashMap::from([(7u16, ahead)]);
@@ -407,7 +421,7 @@ mod tests {
     #[test]
     fn waits_for_a_lagging_guest_then_gives_up() {
         let (b, mut porter) = setup();
-        porter.interact(&b, 7, 0, None);
+        porter.interact(&b, 7, 0, None, true);
         let far_away = Body::at(0, Pos::tile_center(33, 35)); // stays outside
         let players = HashMap::from([(7u16, far_away)]);
         let start = porter.body.pos;
@@ -417,7 +431,7 @@ mod tests {
             let ev = porter.tick(&b, &players);
             nags += says(&ev).iter().filter(|t| **t == lines::FOLLOW_ME).count();
             if says(&ev).contains(&lines::GAVE_UP) {
-                assert!(ev.contains(&Event::Revoke { player: 7, access: access::GUEST }));
+                assert!(ev.contains(&Event::Take { player: 7, item: item::GUEST_PASS }));
                 gave_up = true;
             }
         }
@@ -429,20 +443,20 @@ mod tests {
     #[test]
     fn busy_porter_and_visitors_with_a_pass() {
         let (b, mut porter) = setup();
-        assert_eq!(says(&porter.interact(&b, 1, access::CARD, None)), vec![lines::HAS_PASS]);
+        assert_eq!(says(&porter.interact(&b, 1, access::CARD, None, true)), vec![lines::HAS_PASS]);
         assert!(porter.is_idle());
-        porter.interact(&b, 1, 0, None);
-        assert_eq!(says(&porter.interact(&b, 2, 0, None)), vec![lines::BUSY]);
-        assert_eq!(says(&porter.interact(&b, 1, access::GUEST, None)), vec![lines::ON_THE_WAY]);
+        porter.interact(&b, 1, 0, None, true);
+        assert_eq!(says(&porter.interact(&b, 2, 0, None, true)), vec![lines::BUSY]);
+        assert_eq!(says(&porter.interact(&b, 1, access::GUEST, None, true)), vec![lines::ON_THE_WAY]);
     }
 
     #[test]
     fn guest_leaving_the_game_sends_porter_home() {
         let (b, mut porter) = setup();
-        porter.interact(&b, 7, 0, None);
+        porter.interact(&b, 7, 0, None, true);
         porter.tick(&b, &HashMap::new()); // guest gone
         assert_eq!(porter.escorting(), None);
-        assert_eq!(says(&porter.interact(&b, 8, 0, None)), vec![lines::BACK_SOON]);
+        assert_eq!(says(&porter.interact(&b, 8, 0, None, true)), vec![lines::BACK_SOON]);
     }
 
     #[test]
@@ -481,9 +495,9 @@ mod tests {
     fn receptionist_escorts_guests_to_hr() {
         let (b, mut npcs) = everyone();
         let r = by_role(&mut npcs, Role::Receptionist);
-        assert_eq!(says(&r.interact(&b, 1, 0, None)), vec![lines::NO_PASS]);
-        assert_eq!(says(&r.interact(&b, 1, access::CARD, None)), vec![lines::RECEPTION_HAS_CARD]);
-        let ev = r.interact(&b, 1, access::GUEST, None);
+        assert_eq!(says(&r.interact(&b, 1, 0, None, true)), vec![lines::NO_PASS]);
+        assert_eq!(says(&r.interact(&b, 1, access::CARD, None, true)), vec![lines::RECEPTION_HAS_CARD]);
+        let ev = r.interact(&b, 1, access::GUEST, None, true);
         assert_eq!(ev, vec![Event::Say { npc: r.id, text: lines::RECEPTION_WELCOME.into(), to: Some(1) }], "no pass changes");
         let arrived = (0..2000).any(|_| {
             let players = HashMap::from([(1u16, r.body)]);
@@ -498,24 +512,26 @@ mod tests {
     fn receptionist_giving_up_keeps_the_pass() {
         let (b, mut npcs) = everyone();
         let r = by_role(&mut npcs, Role::Receptionist);
-        r.interact(&b, 1, access::GUEST, None);
+        r.interact(&b, 1, access::GUEST, None, true);
         let players = HashMap::from([(1u16, Body::at(0, Pos::tile_center(33, 35)))]);
         let ev: Vec<Event> = (0..GIVE_UP_TICKS).flat_map(|_| r.tick(&b, &players)).collect();
         assert!(says(&ev).contains(&lines::RECEPTION_GAVE_UP));
-        assert!(!ev.iter().any(|e| matches!(e, Event::Revoke { .. })));
+        assert!(!ev.iter().any(|e| matches!(e, Event::Take { .. })));
     }
 
     #[test]
     fn hr_swaps_the_guest_pass_for_a_card() {
         let (b, mut npcs) = everyone();
         let hr = by_role(&mut npcs, Role::Hr);
-        assert_eq!(says(&hr.interact(&b, 1, 0, None)), vec![lines::NO_PASS]);
-        let ev = hr.interact(&b, 1, access::GUEST, Some("IT / Produkt"));
-        assert_eq!(says(&ev), vec!["Umowa podpisana — witamy w dziale IT / Produkt! Oto karta pracownika."]);
+        assert_eq!(says(&hr.interact(&b, 1, 0, None, true)), vec![lines::NO_PASS]);
+        assert_eq!(says(&hr.interact(&b, 1, access::GUEST, None, false)), vec![lines::HR_HANDS_FULL], "laptop needs free hands");
+        let ev = hr.interact(&b, 1, access::GUEST, Some("IT / Produkt"), true);
+        assert_eq!(says(&ev), vec!["Umowa podpisana — witamy w dziale IT / Produkt! Oto karta pracownika i Twój laptop."]);
         assert!(ev.contains(&Event::Contract { player: 1 }));
-        assert!(ev.contains(&Event::Grant { player: 1, access: access::CARD }));
-        assert!(ev.contains(&Event::Revoke { player: 1, access: access::GUEST }));
-        assert_eq!(says(&hr.interact(&b, 1, access::CARD, None)), vec![lines::HR_HAS_CARD]);
+        assert!(ev.contains(&Event::Give { player: 1, item: item::EMPLOYEE_CARD }));
+        assert!(ev.contains(&Event::Give { player: 1, item: item::LAPTOP }));
+        assert!(ev.contains(&Event::Take { player: 1, item: item::GUEST_PASS }));
+        assert_eq!(says(&hr.interact(&b, 1, access::CARD, None, true)), vec![lines::HR_HAS_CARD]);
         assert!(hr.is_idle(), "HR stays at the desk");
     }
 }

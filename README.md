@@ -15,7 +15,7 @@ cd server && cargo run --release -- --start-with-card   # wariant dla botów: ws
 cd server && cargo run --release --bin bots -- --count 50 --room "Chill room" --all-in-room
 ```
 
-Sterowanie: WASD / strzałki, **E** — rozmowa z NPC / winda (stojąc w kabinie) / ekspres do kawy, **F3** — overlay debug.
+Sterowanie: WASD / strzałki, **E** — rozmowa z NPC / winda (stojąc w kabinie) / ekspres do kawy / podniesienie przedmiotu, **1–3** — wyjmij / schowaj przedmiot z kieszeni, **Q** — upuść, **G** — podaj osobie obok, **F** — użyj (wypij kawę, pokaż kartę), **F3** — overlay debug.
 Na starcie tworzysz postać (imię, płeć, wiek, miejscowość, e-mail postaci,
 wygląd z podglądem; zapamiętywana lokalnie). Po połączeniu siedzisz w domu przy komputerze: w **przeglądarce** jest portal z
 ogłoszeniami (kilka firm; zatrudnia tylko nasz startup), wypełniasz formularz,

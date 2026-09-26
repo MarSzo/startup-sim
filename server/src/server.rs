@@ -7,6 +7,7 @@ use std::time::{Duration, Instant};
 
 use crate::building::Building;
 use crate::coffee::{self, Cup, Machine};
+use crate::inventory::{self, kind as item_kind, Inventory, Item};
 use crate::net::{canonical, LinkConditions, Net};
 use crate::npc::{self, Npc};
 use crate::protocol::{self as proto, EntityState, Packet, PlayerInfoEntry, Profile, SelfState};
@@ -86,6 +87,22 @@ impl Desk {
 
 const RECRUITER: &str = "Startup Sim — Rekrutacja";
 
+/// An item lying on the floor; `handle` is its entity id in snapshots.
+struct Dropped {
+    handle: u16,
+    item: Item,
+    floor: u8,
+    pos: Pos,
+}
+
+/// Entity ids of items on the floor (players below, NPCs from 0xF000).
+const DROP_HANDLE_BASE: u16 = 0xE000;
+/// Reach for picking up / handing over items.
+const PICKUP_RADIUS: i32 = sim::TILE_UNITS * 5 / 4;
+const GIVE_RADIUS: i32 = sim::TILE_UNITS * 2;
+/// Resend the inventory this often (ticks).
+const INVENTORY_RESEND_TICKS: u32 = 40;
+
 /// Resend the current portal screen this often (ticks) - UDP may drop it.
 const PORTAL_RESEND_TICKS: u32 = 20;
 
@@ -100,8 +117,12 @@ struct Player {
     contract: bool,
     /// Recruitment attempts so far (numbers the attempts).
     attempts: u8,
-    /// Coffee in progress / in hand.
+    /// Coffee being brewed.
     cup: Cup,
+    /// Pockets and hands.
+    inventory: Inventory,
+    /// Inventory changed: send it to the owner this tick.
+    inv_dirty: bool,
     token: u32,
     nonce: u32,
     addr: SocketAddr,
@@ -132,6 +153,12 @@ pub struct Server {
     building: Building,
     npcs: Vec<Npc>,
     machines: Vec<Machine>,
+    /// Items lying on the floor.
+    dropped: Vec<Dropped>,
+    next_item_id: u32,
+    next_drop_handle: u16,
+    /// Lines players "say" to themselves outside the tick (item actions).
+    pending_says: Vec<(u16, String, Option<u16>)>,
     net: Net,
     cfg: Config,
     players: BTreeMap<u16, Player>,
@@ -154,6 +181,10 @@ impl Server {
         Ok(Server {
             npcs: Npc::spawn_all(&building),
             machines: coffee::find_machines(&building),
+            dropped: Vec::new(),
+            next_item_id: 1,
+            next_drop_handle: DROP_HANDLE_BASE,
+            pending_says: Vec::new(),
             building,
             net,
             cfg,
@@ -244,7 +275,8 @@ impl Server {
             | Packet::Disconnect { token, .. }
             | Packet::Apply { token, .. }
             | Packet::Answer { token, .. }
-            | Packet::PortalAction { token, .. } => *token,
+            | Packet::PortalAction { token, .. }
+            | Packet::ItemAction { token, .. } => *token,
             _ => return,
         };
         let Some(&id) = self.by_token.get(&token) else {
@@ -300,6 +332,7 @@ impl Server {
             }
             Packet::Apply { offer, .. } => self.handle_apply(id, offer),
             Packet::PortalAction { action, arg, .. } => self.handle_portal_action(id, action, arg),
+            Packet::ItemAction { action, slot, .. } => self.handle_item_action(id, action, slot),
             Packet::Answer { attempt, index, choice, .. } => self.handle_answer(id, attempt, index, choice),
             _ => {}
         }
@@ -348,11 +381,13 @@ impl Server {
             contract: false,
             attempts: 0,
             cup: Cup::None,
+            inventory: Inventory::default(),
+            inv_dirty: true,
             token,
             nonce,
             addr,
             nick,
-            body: Body { access: self.cfg.start_access, ..Body::at(spawn_floor, pos) },
+            body: Body::at(spawn_floor, pos),
             room: self.room_of(spawn_floor, pos),
             flags: 0,
             last_heard: now,
@@ -365,6 +400,9 @@ impl Server {
         self.log(format!("+ player {} '{}' from {} ({} online)", id, player.nick, canonical(addr), self.players.len() + 1));
         self.players.insert(id, player);
         self.by_addr.insert(addr, id);
+        if skip && self.cfg.start_access & crate::map::access::CARD != 0 {
+            self.give_new(id, item_kind::EMPLOYEE_CARD); // load tests: straight in with a card
+        }
         self.by_token.insert(token, id);
         let welcome = self.welcome(id);
         self.send(addr, &welcome);
@@ -493,6 +531,9 @@ impl Server {
                     self.cfg.recruitment.department_name(dept).unwrap_or("?")
                 );
                 self.log(msg);
+                if self.cfg.start_access & crate::map::access::CARD != 0 {
+                    self.give_new(id, item_kind::EMPLOYEE_CARD); // load tests: straight in with a card
+                }
             }
             _ => {}
         }
@@ -614,6 +655,152 @@ impl Server {
         self.log(format!("~ player {id} moved {} -> {}", canonical(old), canonical(addr)));
     }
 
+    // ------------------------------------------------------------- items
+
+    fn label_for(&self, pid: u16, k: u8) -> String {
+        let Some(p) = self.players.get(&pid) else { return String::new() };
+        let dept = self.cfg.recruitment.department_name(p.department).unwrap_or("");
+        match k {
+            item_kind::GUEST_PASS => format!("Dzień próbny: {}", p.nick),
+            item_kind::EMPLOYEE_CARD if !dept.is_empty() => format!("{} · {dept}", p.nick),
+            item_kind::EMPLOYEE_CARD => p.nick.clone(),
+            item_kind::LAPTOP => format!("Laptop: {}", p.nick),
+            item_kind::COFFEE => "Gorąca, z ekspresu".into(),
+            _ => String::new(),
+        }
+    }
+
+    /// Create a new item for `pid` (labelled for them) and hand it over.
+    fn give_new(&mut self, pid: u16, k: u8) {
+        let label = self.label_for(pid, k);
+        let expires = (k == item_kind::COFFEE).then_some(self.tick + coffee::DRINK_TICKS);
+        let item = Item { id: self.next_item_id, kind: k, label, expires };
+        self.next_item_id += 1;
+        self.give(pid, item);
+    }
+
+    /// Put an item into a player's inventory; if it doesn't fit, it lands on
+    /// the floor at their feet.
+    fn give(&mut self, pid: u16, item: Item) {
+        let Some(p) = self.players.get_mut(&pid) else { return };
+        match p.inventory.add(item) {
+            Ok(()) => refresh(p),
+            Err(item) => {
+                let (floor, pos) = (p.body.floor, p.body.pos);
+                self.drop_at(floor, pos, item);
+            }
+        }
+    }
+
+    fn drop_at(&mut self, floor: u8, pos: Pos, item: Item) {
+        let mut handle = self.next_drop_handle;
+        while self.dropped.iter().any(|d| d.handle == handle) {
+            handle = if handle + 1 >= npc::NPC_ID_BASE { DROP_HANDLE_BASE } else { handle + 1 };
+        }
+        self.next_drop_handle = if handle + 1 >= npc::NPC_ID_BASE { DROP_HANDLE_BASE } else { handle + 1 };
+        self.dropped.push(Dropped { handle, item, floor, pos });
+    }
+
+    fn handle_item_action(&mut self, id: u16, action: u8, slot: u8) {
+        let Some(p) = self.players.get_mut(&id) else { return };
+        if !matches!(p.stage, Stage::Working) {
+            return;
+        }
+        let say = |line: &str| (id, line.to_string(), None);
+        match action {
+            proto::item_action::TAKE_OUT => match p.inventory.take_out(slot as usize) {
+                Ok(()) => refresh(p),
+                Err(r) => self.pending_says.push(say(r.line())),
+            },
+            proto::item_action::PUT_AWAY => match p.inventory.put_away() {
+                Ok(()) => refresh(p),
+                Err(r) => self.pending_says.push(say(r.line())),
+            },
+            proto::item_action::DROP => {
+                if let Some(item) = p.inventory.take_hands() {
+                    refresh(p);
+                    let (floor, pos) = (p.body.floor, p.body.pos);
+                    self.drop_at(floor, pos, item);
+                }
+            }
+            proto::item_action::GIVE => {
+                let (floor, pos) = (p.body.floor, p.body.pos);
+                if p.inventory.hands_free() {
+                    return;
+                }
+                let target = self
+                    .players
+                    .values()
+                    .filter(|o| o.id != id && matches!(o.stage, Stage::Working) && o.body.floor == floor)
+                    .map(|o| (o.id, dist2(o.body.pos, pos)))
+                    .filter(|&(_, d)| d <= GIVE_RADIUS * GIVE_RADIUS)
+                    .min_by_key(|&(_, d)| d)
+                    .map(|(t, _)| t);
+                let Some(target) = target else {
+                    self.pending_says.push(say("Nie ma nikogo obok."));
+                    return;
+                };
+                let item = self.players.get_mut(&id).unwrap().inventory.take_hands().unwrap();
+                let name = inventory::display_name(item.kind);
+                let to = self.players.get_mut(&target).unwrap();
+                let to_nick = to.nick.clone();
+                match to.inventory.add(item) {
+                    Ok(()) => {
+                        refresh(to);
+                        refresh(self.players.get_mut(&id).unwrap());
+                        let from_nick = self.players[&id].nick.clone();
+                        self.pending_says.push((id, format!("Proszę, {to_nick} — {}.", name.to_lowercase()), Some(target)));
+                        self.log(format!("* item: {from_nick} gave {name} to {to_nick}"));
+                    }
+                    Err(item) => {
+                        self.players.get_mut(&id).unwrap().inventory.hands = Some(item); // give it back
+                        self.pending_says.push(say(&format!("{to_nick} nie ma już wolnych rąk ani kieszeni.")));
+                    }
+                }
+            }
+            proto::item_action::USE => {
+                let Some(held) = &p.inventory.hands else { return };
+                let line = match held.kind {
+                    item_kind::COFFEE => {
+                        p.inventory.take_hands();
+                        refresh(p);
+                        coffee::lines::DRUNK.to_string()
+                    }
+                    item_kind::EMPLOYEE_CARD => format!("Karta pracownika: {}.", held.label),
+                    item_kind::GUEST_PASS => "Przepustka gościa — ważna do końca dnia.".into(),
+                    item_kind::LAPTOP => "Laptop — trzeba go położyć na biurku (wkrótce).".into(),
+                    _ => return,
+                };
+                self.pending_says.push(say(&line));
+            }
+            _ => {}
+        }
+    }
+
+    /// Pick up the nearest item on the floor within reach, if any.
+    fn try_pickup(&mut self, pid: u16, body: &Body) -> Option<String> {
+        let i = self
+            .dropped
+            .iter()
+            .enumerate()
+            .filter(|(_, d)| d.floor == body.floor && dist2(d.pos, body.pos) <= PICKUP_RADIUS * PICKUP_RADIUS)
+            .min_by_key(|(_, d)| dist2(d.pos, body.pos))
+            .map(|(i, _)| i)?;
+        let p = self.players.get_mut(&pid)?;
+        let d = self.dropped.remove(i);
+        let name = inventory::display_name(d.item.kind);
+        match p.inventory.add(d.item) {
+            Ok(()) => {
+                refresh(p);
+                Some(format!("Podniesione: {}.", name.to_lowercase()))
+            }
+            Err(item) => {
+                self.dropped.insert(i, Dropped { item, ..d });
+                Some(inventory::Refusal::HandsFull.line().to_string())
+            }
+        }
+    }
+
     fn remove_player(&mut self, id: u16, why: &str) {
         if let Some(p) = self.players.remove(&id) {
             coffee::release(&mut self.machines, &p.cup);
@@ -647,7 +834,8 @@ impl Server {
 
         // 2. Simulation: apply queued inputs in sequence order.
         let mut talks: Vec<(u16, Body)> = Vec::new();
-        let mut coffee_says: Vec<(u16, String, Option<u16>)> = Vec::new();
+        let mut coffee_says: Vec<(u16, String, Option<u16>)> = std::mem::take(&mut self.pending_says);
+        let mut coffee_ready = Vec::new();
         let mut portal_resend = Vec::new();
         for p in self.players.values_mut() {
             if !matches!(p.stage, Stage::Working) {
@@ -675,10 +863,19 @@ impl Server {
                 p.flags |= 0b100;
             }
             p.room = self.building.floor(p.body.floor).map_or(0, |m| m.room_at(p.body.pos.x, p.body.pos.y));
-            if let Some(line) = coffee::tick_cup(&mut p.cup, self.tick) {
-                coffee_says.push((p.id, line.to_string(), None));
+            if coffee::tick_cup(&mut p.cup, self.tick) {
+                coffee_ready.push(p.id);
+            }
+            if !p.inventory.expire(self.tick).is_empty() {
+                refresh(p);
+                coffee_says.push((p.id, coffee::lines::COLD.to_string(), None));
             }
             p.flags = (p.flags & 0x3f) | status_bits(&p.cup) << proto::status::FLAGS_SHIFT;
+        }
+        for pid in coffee_ready {
+            let free = self.players[&pid].inventory.hands_free();
+            coffee_says.push((pid, if free { coffee::lines::READY } else { coffee::lines::WAITING }.to_string(), None));
+            self.give_new(pid, item_kind::COFFEE); // no free hands: it waits on the floor
         }
 
         for id in portal_resend {
@@ -700,17 +897,20 @@ impl Server {
                 // NPCs at their post first (a porter still standing next to
                 // the guest he just brought mustn't shadow the receptionist).
                 .min_by_key(|n| (!n.is_idle(), (n.body.pos.x - body.pos.x).abs() + (n.body.pos.y - body.pos.y).abs()));
+            let hands_free = p.inventory.hands_free();
             if let Some(n) = nearest {
-                events.extend(n.interact(&self.building, pid, body.access, dept.as_deref()));
+                events.extend(n.interact(&self.building, pid, body.access, dept.as_deref(), hands_free));
             } else if let Some(i) = coffee::machine_in_reach(&self.machines, &body) {
                 let p = self.players.get_mut(&pid).unwrap();
-                let line = match coffee::use_machine(&mut self.machines, i, &mut p.cup, self.tick) {
+                let line = match coffee::use_machine(&mut self.machines, i, &mut p.cup, hands_free, self.tick) {
                     coffee::Outcome::Started => coffee::lines::BREWING,
                     coffee::Outcome::Busy => coffee::lines::BUSY,
-                    coffee::Outcome::AlreadyHave => coffee::lines::ALREADY,
+                    coffee::Outcome::HandsFull => coffee::lines::HANDS_FULL,
                 };
                 p.flags = (p.flags & 0x3f) | status_bits(&p.cup) << proto::status::FLAGS_SHIFT;
                 coffee_says.push((pid, line.to_string(), None));
+            } else if let Some(line) = self.try_pickup(pid, &body) {
+                coffee_says.push((pid, line, None));
             }
         }
         let bodies: HashMap<u16, Body> =
@@ -721,14 +921,12 @@ impl Server {
         let mut says: Vec<(u16, String, Option<u16>)> = coffee_says;
         for e in events {
             match e {
-                npc::Event::Grant { player, access } => {
+                npc::Event::Give { player, item } => self.give_new(player, item),
+                npc::Event::Take { player, item } => {
                     if let Some(p) = self.players.get_mut(&player) {
-                        p.body.access |= access;
-                    }
-                }
-                npc::Event::Revoke { player, access } => {
-                    if let Some(p) = self.players.get_mut(&player) {
-                        p.body.access &= !access;
+                        if p.inventory.remove_kind(item).is_some() {
+                            refresh(p);
+                        }
                     }
                 }
                 npc::Event::Say { npc, text, to } => says.push((npc, text, to)),
@@ -759,6 +957,7 @@ impl Server {
                 x: p.body.pos.x,
                 y: p.body.pos.y,
                 flags: p.flags,
+                held: p.inventory.held_kind(),
             });
         }
         for n in &self.npcs {
@@ -768,6 +967,18 @@ impl Server {
                 x: n.body.pos.x,
                 y: n.body.pos.y,
                 flags: n.flags,
+                held: 0,
+            });
+        }
+        for d in &self.dropped {
+            let room = self.building.floor(d.floor).map_or(0, |m| m.room_at(d.pos.x, d.pos.y));
+            groups.entry((d.floor, room)).or_default().push(EntityState {
+                id: d.handle,
+                kind: proto::kind::ITEM,
+                x: d.pos.x,
+                y: d.pos.y,
+                flags: 0,
+                held: d.item.kind,
             });
         }
 
@@ -805,11 +1016,15 @@ impl Server {
             for f in proto::snapshot_fragments(tick, p.last_processed_seq, me, &visible) {
                 outgoing.push((p.addr, id, f));
             }
+            if p.inv_dirty || tick % INVENTORY_RESEND_TICKS == 0 {
+                outgoing.push((p.addr, id, inventory_packet(&p.inventory)));
+            }
             for chunk in new_infos.chunks(INFO_PER_PACKET) {
                 outgoing.push((p.addr, id, Packet::PlayerInfo { players: chunk.to_vec() }));
             }
             let p = self.players.get_mut(&id).unwrap();
             p.known.extend(new_infos.iter().map(|e| e.id));
+            p.inv_dirty = false;
         }
         // 6. Speech (NPCs, and players' own "thought" lines): to everyone in
         //    the speaker's room, plus the addressee.
@@ -891,7 +1106,32 @@ impl Server {
 }
 
 fn status_bits(cup: &Cup) -> u8 {
-    (if cup.holding() { proto::status::HOLDING_COFFEE } else { 0 }) | (if cup.brewing() { proto::status::BREWING } else { 0 })
+    if cup.brewing() {
+        proto::status::BREWING
+    } else {
+        0
+    }
+}
+
+/// After an inventory change: access follows the carried items.
+fn refresh(p: &mut Player) {
+    p.body.access = p.inventory.access();
+    p.inv_dirty = true;
+}
+
+fn dist2(a: Pos, b: Pos) -> i32 {
+    let (dx, dy) = (a.x - b.x, a.y - b.y);
+    dx.saturating_mul(dx).saturating_add(dy.saturating_mul(dy))
+}
+
+fn inventory_packet(inv: &Inventory) -> Packet {
+    let slot = |it: &Option<Item>| match it {
+        Some(i) => proto::SlotInfo { kind: i.kind, id: i.id, label: i.label.clone() },
+        None => proto::SlotInfo::default(),
+    };
+    let mut slots = vec![slot(&inv.hands)];
+    slots.extend(inv.pockets.iter().map(slot));
+    Packet::Inventory { slots }
 }
 
 /// Check and normalise a character profile. `None` = reject.

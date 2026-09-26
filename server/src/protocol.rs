@@ -5,7 +5,7 @@
 //! `tests/golden/packets.json`.
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 7;
+pub const VERSION: u8 = 8;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
 pub const MAX_PACKET: usize = 1200;
@@ -22,7 +22,7 @@ pub const MAX_INPUTS_PER_PACKET: usize = 8;
 
 /// Fixed part of a Snapshot packet (header + fields before the entity list).
 pub const SNAPSHOT_FIXED_LEN: usize = HEADER_LEN + 4 + 4 + 1 + 1 + (4 + 4 + 1 + 2 + 1 + 1 + 1 + 1) + 1;
-pub const ENTITY_LEN: usize = 12;
+pub const ENTITY_LEN: usize = 13;
 /// Entities per snapshot fragment so a fragment never exceeds `MAX_PACKET`.
 pub const MAX_ENTITIES_PER_SNAPSHOT: usize = (MAX_PACKET - SNAPSHOT_FIXED_LEN) / ENTITY_LEN;
 
@@ -45,6 +45,22 @@ pub mod ty {
     pub const RECRUIT_RESULT: u8 = 16;
     pub const MAIL: u8 = 17;
     pub const PORTAL_ACTION: u8 = 18;
+    pub const INVENTORY: u8 = 19;
+    pub const ITEM_ACTION: u8 = 20;
+}
+
+/// `ItemAction::action`.
+pub mod item_action {
+    /// Pocket `slot` -> hands.
+    pub const TAKE_OUT: u8 = 1;
+    /// Hands -> a free pocket.
+    pub const PUT_AWAY: u8 = 2;
+    /// Put what's in hands on the floor.
+    pub const DROP: u8 = 3;
+    /// Hand it to the nearest player (within reach).
+    pub const GIVE: u8 = 4;
+    /// Use what's in hands (drink coffee, show the card...).
+    pub const USE: u8 = 5;
 }
 
 /// `Mail::action` / `PortalAction::action`.
@@ -133,6 +149,8 @@ pub mod status {
 pub mod kind {
     pub const PLAYER: u8 = 0;
     pub const NPC: u8 = 1;
+    /// An item lying on the floor (`EntityState::held` = item kind).
+    pub const ITEM: u8 = 2;
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -141,8 +159,19 @@ pub struct EntityState {
     pub kind: u8,
     pub x: i32,
     pub y: i32,
-    /// Bit 0-1: facing (0 down, 1 up, 2 left, 3 right); bit 2: moving. Rest reserved.
+    /// Bit 0-1: facing (0 down, 1 up, 2 left, 3 right); bit 2: moving;
+    /// bits 3-5 look; bits 6-7 status (see `status`).
     pub flags: u8,
+    /// Item kind in hands (`inventory::kind`), or the item itself for `kind::ITEM`.
+    pub held: u8,
+}
+
+/// One inventory slot as sent to its owner.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct SlotInfo {
+    pub kind: u8,
+    pub id: u32,
+    pub label: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -214,6 +243,11 @@ pub enum Packet {
     Mail { id: u8, from: String, subject: String, body: String, action: u8, arg: u8 },
     /// Desktop button pressed (join interview / go to the office).
     PortalAction { token: u32, action: u8, arg: u8 },
+    /// Owner's inventory: hands first, then the pockets (sent on change and
+    /// every 2 s).
+    Inventory { slots: Vec<SlotInfo> },
+    /// Do something with an item (`item_action::*`).
+    ItemAction { token: u32, action: u8, slot: u8 },
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -335,6 +369,8 @@ impl Packet {
             Packet::RecruitResult { .. } => ty::RECRUIT_RESULT,
             Packet::Mail { .. } => ty::MAIL,
             Packet::PortalAction { .. } => ty::PORTAL_ACTION,
+            Packet::Inventory { .. } => ty::INVENTORY,
+            Packet::ItemAction { .. } => ty::ITEM_ACTION,
         }
     }
 
@@ -408,6 +444,7 @@ impl Packet {
                     w.i32(e.x);
                     w.i32(e.y);
                     w.u8(e.flags);
+                    w.u8(e.held);
                 }
             }
             Packet::PlayerInfo { players } => {
@@ -495,6 +532,19 @@ impl Packet {
                 w.u8(*action);
                 w.u8(*arg);
             }
+            Packet::Inventory { slots } => {
+                w.u8(slots.len().min(8) as u8);
+                for sl in slots.iter().take(8) {
+                    w.u8(sl.kind);
+                    w.u32(sl.id);
+                    w.str16(&sl.label, MAX_TEXT_BYTES);
+                }
+            }
+            Packet::ItemAction { token, action, slot } => {
+                w.u32(*token);
+                w.u8(*action);
+                w.u8(*slot);
+            }
         }
         w.0
     }
@@ -553,7 +603,7 @@ impl Packet {
                 let n = r.u8()? as usize;
                 let mut entities = Vec::with_capacity(n);
                 for _ in 0..n {
-                    entities.push(EntityState { id: r.u16()?, kind: r.u8()?, x: r.i32()?, y: r.i32()?, flags: r.u8()? });
+                    entities.push(EntityState { id: r.u16()?, kind: r.u8()?, x: r.i32()?, y: r.i32()?, flags: r.u8()?, held: r.u8()? });
                 }
                 Packet::Snapshot {
                     tick,
@@ -649,6 +699,18 @@ impl Packet {
                 arg: r.u8()?,
             },
             ty::PORTAL_ACTION => Packet::PortalAction { token: r.u32()?, action: r.u8()?, arg: r.u8()? },
+            ty::INVENTORY => {
+                let n = r.u8()? as usize;
+                if n > 8 {
+                    return Err(DecodeError::Invalid("too many slots"));
+                }
+                let mut slots = Vec::with_capacity(n);
+                for _ in 0..n {
+                    slots.push(SlotInfo { kind: r.u8()?, id: r.u32()?, label: r.str16(MAX_TEXT_BYTES)? });
+                }
+                Packet::Inventory { slots }
+            }
+            ty::ITEM_ACTION => Packet::ItemAction { token: r.u32()?, action: r.u8()?, slot: r.u8()? },
             other => return Err(DecodeError::UnknownType(other)),
         };
         if r.pos != b.len() {
@@ -740,8 +802,8 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
                 self_access: 5,
                 self_status: 1,
                 entities: vec![
-                    EntityState { id: 3, kind: kind::PLAYER, x: 4096, y: 8192, flags: 0b101 },
-                    EntityState { id: 65535, kind: kind::NPC, x: -1, y: 2_000_000, flags: 0 },
+                    EntityState { id: 3, kind: kind::PLAYER, x: 4096, y: 8192, flags: 0b101, held: 3 },
+                    EntityState { id: 65535, kind: kind::NPC, x: -1, y: 2_000_000, flags: 0, held: 0 },
                 ],
             },
         ),
@@ -813,6 +875,18 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
             },
         ),
         ("portal_action", Packet::PortalAction { token: 0x01020304, action: portal_action::GO_TO_OFFICE, arg: 0 }),
+        (
+            "inventory",
+            Packet::Inventory {
+                slots: vec![
+                    SlotInfo { kind: 3, id: 77, label: "Laptop: Ola".into() },
+                    SlotInfo { kind: 2, id: 76, label: "Ola · IT / Produkt".into() },
+                    SlotInfo::default(),
+                    SlotInfo::default(),
+                ],
+            },
+        ),
+        ("item_action", Packet::ItemAction { token: 0x01020304, action: item_action::TAKE_OUT, slot: 2 }),
     ]
 }
 
@@ -870,7 +944,7 @@ mod tests {
                 b[0] = 0x54;
                 b[1] = 0x53;
                 b[2] = VERSION;
-                b[3] = rng.u8(1..=18);
+                b[3] = rng.u8(1..=20);
             }
             let _ = Packet::decode(&b);
         }
@@ -899,7 +973,7 @@ mod tests {
     #[test]
     fn snapshot_fragments_fit_mtu() {
         let ents: Vec<EntityState> = (0..250)
-            .map(|i| EntityState { id: i, kind: kind::PLAYER, x: i as i32 * 100, y: -(i as i32), flags: 0 })
+            .map(|i| EntityState { id: i, kind: kind::PLAYER, x: i as i32 * 100, y: -(i as i32), flags: 0, held: 0 })
             .collect();
         let frags = snapshot_fragments(5, 6, SelfState { x: 1, y: 2, room: 3, ..Default::default() }, &ents);
         assert_eq!(frags.len(), 3);
