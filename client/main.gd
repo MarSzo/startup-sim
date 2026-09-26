@@ -1,6 +1,7 @@
 ## Entry point: character creation <-> game. User args (after `--`):
 ##   --nick=Ala --server=127.0.0.1:7777 --autoconnect --debug --autowalk
-##   --screenshot=/path.png [--screenshot-delay=5]  (dev: save a frame and quit)
+##   --screenshot=/path.png [--screenshot-delay=5]  (dev: save a frame and quit;
+##     several delays "5,12,20" save path_1.png, path_2.png, ... and quit after the last)
 ##   --auto-recruit=1 [--auto-recruit-delay=2]  (dev: apply for offer 1, answer
 ##     at random until hired, waiting N s before each click)
 extends Node
@@ -64,14 +65,19 @@ func _ready() -> void:
 		else:
 			start.set_status(err, true)
 	if args.has("screenshot"):
-		_take_screenshot(args["screenshot"], float(args.get("screenshot-delay", "5")))
+		_take_screenshots(args["screenshot"], args.get("screenshot-delay", "5").split(","))
 
 
-func _take_screenshot(path: String, delay: float) -> void:
-	await get_tree().create_timer(delay).timeout
-	await RenderingServer.frame_post_draw
-	get_viewport().get_texture().get_image().save_png(path)
-	print("screenshot saved: ", path)
+func _take_screenshots(path: String, delays: PackedStringArray) -> void:
+	var elapsed := 0.0
+	for i in delays.size():
+		var at := float(delays[i])
+		await get_tree().create_timer(maxf(at - elapsed, 0.0)).timeout
+		elapsed = at
+		await RenderingServer.frame_post_draw
+		var out := path if delays.size() == 1 else "%s_%d.png" % [path.get_basename(), i + 1]
+		get_viewport().get_texture().get_image().save_png(out)
+		print("screenshot saved: ", out)
 	if game:
 		print(game.debug_text())
 	net.close()

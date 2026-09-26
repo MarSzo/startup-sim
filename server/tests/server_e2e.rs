@@ -39,6 +39,10 @@ fn start_server_with(start_access: u8) -> (SocketAddr, u32) {
 
 /// Full control: `skip_recruitment = false` puts new players on the job portal.
 fn start_server_full(start_access: u8, skip_recruitment: bool) -> (SocketAddr, u32) {
+    start_server_cfg(start_access, skip_recruitment, false)
+}
+
+fn start_server_cfg(start_access: u8, skip_recruitment: bool, start_employed: bool) -> (SocketAddr, u32) {
     let map = building();
     let crc = map.crc;
     let cfg = Config {
@@ -54,6 +58,7 @@ fn start_server_full(start_access: u8, skip_recruitment: bool) -> (SocketAddr, u
             r
         },
         skip_recruitment,
+        start_employed,
     };
     let mut server = Server::new(map, cfg).unwrap();
     let port = server.local_addr().port();
@@ -528,20 +533,23 @@ fn coffee_machine_brews_one_cup_at_a_time() {
 
     // After ~3 s A holds a coffee: in A's own status and in A's flags for C.
     let deadline = Instant::now() + Duration::from_secs(4);
-    let mut ready = false;
+    let (mut ready, mut self_holding) = (false, false);
     while Instant::now() < deadline && !ready {
         c.ping(); // keep C's session alive while we wait (test timeout is 0.6 s)
         a.ping();
         while let Some(p) = a.recv() {
-            if let Packet::Say { text, .. } = p {
-                ready |= text == coffee_lines::READY;
+            match p {
+                Packet::Say { text, .. } => ready |= text == coffee_lines::READY,
+                // Sent in the same tick as the line: don't miss it.
+                Packet::Inventory { slots } => self_holding |= slots[0].kind == item_kind::COFFEE,
+                _ => {}
             }
         }
         while c.recv().is_some() {}
     }
     assert!(ready, "coffee ready");
     let deadline = Instant::now() + Duration::from_millis(500);
-    let (mut self_holding, mut others_see) = (false, false);
+    let mut others_see = false;
     while Instant::now() < deadline && !(self_holding && others_see) {
         a.ping();
         c.ping();
@@ -652,4 +660,135 @@ fn access_card_can_be_dropped_picked_up_and_handed_over() {
     let (acc, inv) = state(&a, &c, Duration::from_millis(400));
     assert_eq!(acc, access::CARD, "access came back with the card");
     assert_eq!(inv.iter().filter(|s| s.kind == item_kind::EMPLOYEE_CARD).count(), 1);
+}
+
+/// Wait (pinging `keep` too) for a packet matching `f`.
+fn wait_for<T>(me: &Client, keep: &[&Client], wait: Duration, mut f: impl FnMut(&Packet) -> Option<T>) -> Option<T> {
+    let deadline = Instant::now() + wait;
+    while Instant::now() < deadline {
+        me.ping();
+        for k in keep {
+            k.ping();
+            while k.recv().is_some() {}
+        }
+        while let Some(p) = me.recv() {
+            if let Some(t) = f(&p) {
+                return Some(t);
+            }
+        }
+    }
+    None
+}
+
+#[test]
+fn laptop_on_desk_messenger_lock_and_take() {
+    use game::computer::{conv, lines as pc};
+    use game::inventory::kind as item_kind;
+    use proto::computer_action as ca;
+    let (addr, _) = start_server_cfg(0, true, true); // hired: card + laptop, at a desk
+    let b = building();
+    let (mut ola, _) = Client::connect(addr, "Ola"); // id 1: IT
+    let (mut kuba, _) = Client::connect(addr, "Kuba"); // id 2: Biznes
+    let (mut ewa, _) = Client::connect(addr, "Ewa"); // id 3: IT, next desk
+    assert_eq!((ola.id, kuba.id, ewa.id), (1, 2, 3));
+    let action = |who: &Client, action: u8, conv: u16, arg: u32, text: &str| {
+        let p = Packet::ComputerAction { token: who.token, action, conv, arg, text: text.into() };
+        who.sock.send(&p.encode()).unwrap();
+    };
+    let said = |line: &'static str| move |p: &Packet| matches!(p, Packet::Say { text, .. } if text == line).then_some(());
+    let screen = |p: &Packet| match p {
+        Packet::Computer { owner, locked, convs, .. } => Some((*owner, *locked, convs.clone())),
+        _ => None,
+    };
+    let status = |p: &Packet| match p {
+        Packet::Snapshot { self_status, .. } => Some(*self_status),
+        _ => None,
+    };
+    let at_computer = |c: &Client, keep: &[&Client], want: bool| {
+        wait_for(c, keep, Duration::from_millis(800), |p| {
+            status(p).filter(|s| (s & proto::status::AT_COMPUTER != 0) == want)
+        })
+        .is_some()
+    };
+    let wait = Duration::from_millis(800);
+    let nobody = Body::at(1, Pos::tile_center(0, 0)); // E doesn't move anyone
+
+    // Ola and Kuba put their laptops down (E) and sit at them (E again).
+    ola.press_e(&b, nobody);
+    assert!(wait_for(&ola, &[&kuba, &ewa], wait, said(pc::PLACED)).is_some());
+    kuba.press_e(&b, nobody);
+    assert!(wait_for(&kuba, &[&ola, &ewa], wait, said(pc::PLACED)).is_some());
+    ola.press_e(&b, nobody);
+    let (owner, locked, convs) = wait_for(&ola, &[&kuba, &ewa], wait, screen).expect("Ola's screen");
+    assert_eq!((owner, locked), (ola.id, false));
+    let titles: Vec<&str> = convs.iter().map(|c| c.title.as_str()).collect();
+    assert_eq!(titles, ["#ogólny", "#it-produkt", "Ewa", "Kuba"]);
+    assert!(at_computer(&ola, &[&kuba, &ewa], true));
+
+    // Ola says hi on #ogólny (the message comes back to her screen) and walks off
+    // without locking: she just closes the screen.
+    action(&ola, ca::SEND, conv::GENERAL, 1, "Cześć wszystkim!");
+    let echo = wait_for(&ola, &[&kuba, &ewa], wait, |p| match p {
+        Packet::Chat { conv: c, messages } if *c == conv::GENERAL => messages.first().cloned(),
+        _ => None,
+    });
+    assert_eq!(echo.map(|m| (m.from, m.text)), Some((ola.id, "Cześć wszystkim!".to_string())));
+    action(&ola, ca::CLOSE, 0, 0, "");
+    assert!(at_computer(&ola, &[&kuba, &ewa], false));
+
+    // Ewa sneaks to Ola's desk: the computer is logged in as Ola, so her DM to
+    // Kuba goes out in Ola's name.
+    let seat = |id: u16| -> Body {
+        let ws = game::computer::find_workstations(&b);
+        let it: Vec<_> = ws.iter().filter(|w| w.room_name == "IT / Produkt").collect();
+        let w = it[(id as usize - 1) / 2];
+        Body { access: access::CARD, ..Body::at(w.floor, Pos::tile_center(w.tile.x, w.tile.y + 1)) }
+    };
+    let (ola_seat, ewa_seat) = (seat(1), seat(3));
+    let at = ewa.walk_to(&b, ewa_seat, (1, Tile { x: ola_seat.pos.tile().0, y: ola_seat.pos.tile().1 }), &[&ola, &kuba]);
+    ewa.press_e(&b, at);
+    let (owner, locked, _) = wait_for(&ewa, &[&ola, &kuba], wait, screen).expect("Ola's screen for Ewa");
+    assert_eq!((owner, locked), (ola.id, false));
+    action(&ewa, ca::SEND, conv::DM | kuba.id, 7, "Stawiam wszystkim pizzę!");
+    std::thread::sleep(Duration::from_millis(100));
+
+    // Kuba opens his computer: one unread DM from "Ola".
+    kuba.press_e(&b, nobody);
+    let convs = wait_for(&kuba, &[&ola, &ewa], wait, |p| screen(p).map(|s| s.2)).expect("Kuba's screen");
+    let dm = convs.iter().find(|c| c.conv == conv::DM | ola.id).expect("DM with Ola");
+    assert_eq!(dm.unread, 1);
+    assert!(convs.iter().any(|c| c.title == "#biznes") && !convs.iter().any(|c| c.title == "#it-produkt"));
+    action(&kuba, ca::SYNC, conv::DM | ola.id, 0, "");
+    let got = wait_for(&kuba, &[&ola, &ewa], wait, |p| match p {
+        Packet::Chat { messages, .. } => messages.first().cloned(),
+        _ => None,
+    });
+    assert_eq!(got.map(|m| (m.from, m.nick, m.text)), Some((ola.id, "Ola".into(), "Stawiam wszystkim pizzę!".into())));
+
+    // Ewa locks it (anyone may), then can't unlock it, but can take the laptop.
+    action(&ewa, ca::LOCK, 0, 0, "");
+    assert!(at_computer(&ewa, &[&ola, &kuba], false));
+    ewa.press_e(&b, at);
+    let (_, locked, convs) = wait_for(&ewa, &[&ola, &kuba], wait, screen).expect("lock screen");
+    assert!(locked && convs.is_empty(), "a locked screen shows nothing");
+    action(&ewa, ca::UNLOCK, 0, 0, "");
+    assert!(wait_for(&ewa, &[&ola, &kuba], wait, said(pc::LOCKED)).is_some());
+    // Her own laptop is still in her hands: she has to put it away first... she can't
+    // (too big), so she drops it and takes Ola's.
+    action(&ewa, ca::TAKE, 0, 0, "");
+    assert!(wait_for(&ewa, &[&ola, &kuba], wait, said(pc::HANDS_FULL)).is_some());
+    ewa.sock.send(&Packet::ItemAction { token: ewa.token, action: proto::item_action::DROP, slot: 0 }.encode()).unwrap();
+    std::thread::sleep(Duration::from_millis(100));
+    action(&ewa, ca::TAKE, 0, 0, "");
+    let hands = wait_for(&ewa, &[&ola, &kuba], wait, |p| match p {
+        Packet::Inventory { slots } if slots[0].kind == item_kind::LAPTOP && slots[0].label.contains("Ola") => Some(()),
+        _ => None,
+    });
+    assert!(hands.is_some(), "Ewa carries Ola's laptop");
+    // The desk is empty now: no computer entity left in Ola's view.
+    let computers = wait_for(&ola, &[&kuba, &ewa], wait, |p| match p {
+        Packet::Snapshot { entities, .. } => Some(entities.iter().filter(|e| e.kind == proto::kind::COMPUTER).count()),
+        _ => None,
+    });
+    assert_eq!(computers, Some(0), "Kuba's computer is in Biznes, Ola's is gone");
 }

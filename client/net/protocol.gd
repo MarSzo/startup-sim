@@ -3,7 +3,7 @@
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 8
+const VERSION := 9
 const MAX_PACKET := 1200
 const MAX_NICK_BYTES := 16
 const MAX_SAY_BYTES := 240
@@ -31,6 +31,25 @@ const T_MAIL := 17
 const T_PORTAL_ACTION := 18
 const T_INVENTORY := 19
 const T_ITEM_ACTION := 20
+const T_COMPUTER := 21
+const T_COMPUTER_ACTION := 22
+const T_CHAT := 23
+
+const PC_CLOSE := 1
+const PC_LOCK := 2
+const PC_UNLOCK := 3
+const PC_TAKE := 4
+const PC_SYNC := 5
+const PC_SEND := 6
+const MAX_CHAT_BYTES := 400
+const MAX_CONVS := 40
+# Messenger conversation ids (see server/src/computer.rs).
+const CONV_GENERAL := 1
+const CONV_DEPARTMENT_BASE := 16
+const CONV_DM := 0x8000
+# Computer entity flags.
+const PC_FLAG_LOCKED := 1
+const PC_FLAG_IN_USE := 2
 
 const ITEM_TAKE_OUT := 1
 const ITEM_PUT_AWAY := 2
@@ -46,9 +65,10 @@ const MAX_MAIL_BYTES := 600
 const KIND_PLAYER := 0
 const KIND_NPC := 1
 const KIND_ITEM := 2
+const KIND_COMPUTER := 3
 
 # Activity bits: Snapshot.self_status bits 0..1 = entity flags bits 6..7.
-const STATUS_HOLDING_COFFEE := 1
+const STATUS_AT_COMPUTER := 1
 const STATUS_BREWING := 2
 const STATUS_FLAGS_SHIFT := 6
 
@@ -169,6 +189,16 @@ static func encode_item_action(token: int, action: int, slot: int) -> PackedByte
 	b.put_u32(token)
 	b.put_u8(action)
 	b.put_u8(slot)
+	return b.data_array
+
+
+static func encode_computer_action(token: int, action: int, conv: int, arg: int, text: String) -> PackedByteArray:
+	var b := _writer(T_COMPUTER_ACTION)
+	b.put_u32(token)
+	b.put_u8(action)
+	b.put_u16(conv)
+	b.put_u32(arg)
+	_put_str16(b, text, MAX_CHAT_BYTES)
 	return b.data_array
 
 
@@ -317,6 +347,24 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			for i in n:
 				slots.append({"kind": r.u8(), "id": r.u32(), "label": r.str16(MAX_TEXT_BYTES)})
 			p.slots = slots
+		T_COMPUTER:
+			p.handle = r.u16()
+			p.owner = r.u16()
+			p.locked = r.u8() != 0
+			var n := r.u8()
+			if n > MAX_CONVS:
+				return {}
+			var convs := []
+			for i in n:
+				convs.append({"conv": r.u16(), "unread": r.u8(), "title": r.str16(MAX_NICK_BYTES + 8)})
+			p.convs = convs
+		T_CHAT:
+			p.conv = r.u16()
+			var n := r.u8()
+			var msgs := []
+			for i in n:
+				msgs.append({"id": r.u32(), "from": r.u16(), "nick": r.str16(MAX_NICK_BYTES), "text": r.str16(MAX_CHAT_BYTES)})
+			p.messages = msgs
 		T_MAIL:
 			p.id = r.u8()
 			p.from = r.str16(MAX_TEXT_BYTES)

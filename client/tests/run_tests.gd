@@ -49,6 +49,7 @@ func test_protocol(path: String) -> void:
 		"apply": Protocol.encode_apply(0x01020304, 2, "Lubię kawę i wyzwania."),
 		"portal_action": Protocol.encode_portal_action(0x01020304, Protocol.PORTAL_GO_TO_OFFICE, 0),
 		"item_action": Protocol.encode_item_action(0x01020304, Protocol.ITEM_TAKE_OUT, 2),
+		"computer_action": Protocol.encode_computer_action(0x01020304, Protocol.PC_SEND, 17, 42, "Kto zjadł mój jogurt?"),
 		"answer": Protocol.encode_answer(0x01020304, 3, 1, 2),
 	}
 	for name in enc:
@@ -81,6 +82,13 @@ func test_protocol(path: String) -> void:
 	var inv := Protocol.decode(golden["inventory"].hex_decode())
 	expect(inv.get("slots", []).size() == 4 and inv.slots[0].kind == 3 and inv.slots[0].label == "Laptop: Ola"
 		and inv.slots[1].id == 76 and inv.slots[2].kind == 0, "decode inventory %s" % inv)
+	var pc := Protocol.decode(golden["computer"].hex_decode())
+	expect(pc.get("type") == Protocol.T_COMPUTER and pc.handle == 0xE001 and pc.owner == 3 and not pc.locked
+		and pc.convs.size() == 3 and pc.convs[0].title == "#ogólny" and pc.convs[1].unread == 2
+		and pc.convs[2].conv == Protocol.CONV_DM | 4, "decode computer %s" % pc)
+	var ch := Protocol.decode(golden["chat"].hex_decode())
+	expect(ch.get("type") == Protocol.T_CHAT and ch.conv == 17 and ch.messages.size() == 2
+		and ch.messages[1].nick == "Kuba" and ch.messages[0].text == "Deploy w piątek?" and ch.messages[1].id == 6, "decode chat %s" % ch)
 	var ml := Protocol.decode(golden["mail"].hex_decode())
 	expect(ml.get("id") == 2 and ml.from == "Startup Sim — Rekrutacja" and ml.subject == "Zaproszenie na rozmowę"
 		and ml.action == Protocol.PORTAL_JOIN_INTERVIEW and ml.arg == 1 and ml.body.begins_with("Cześć Ola"), "decode mail %s" % ml)

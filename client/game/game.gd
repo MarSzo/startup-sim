@@ -15,6 +15,8 @@ const MapData = preload("res://map/map_data.gd")
 const ItemArt = preload("res://game/item_art.gd")
 const ItemView = preload("res://game/item_view.gd")
 const InventoryHud = preload("res://ui/inventory_hud.gd")
+const ComputerView = preload("res://game/computer_view.gd")
+const ComputerScreen = preload("res://ui/computer_screen.gd")
 
 const ZOOM := 3.0
 ## Remote players are rendered this far in the past (2 snapshots at 20 Hz).
@@ -51,6 +53,9 @@ var kinds := {}          # id -> entity kind (player / NPC)
 var floor_items := {}    # entity id -> ItemView (items lying on the floor)
 var inventory: Array = [] # hands + pockets (from the server)
 var hud := InventoryHud.new()
+var computers := {}      # entity id -> ComputerView (laptops on desks)
+var screen := ComputerScreen.new()
+var screen_layer := CanvasLayer.new()
 var depts := {}          # id -> department (after the contract)
 var appearances := {}    # id -> appearance dict (from PlayerInfo)
 var own_appearance := {}
@@ -165,6 +170,12 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 	status_layer.add_child(log_label)
 	status_layer.add_child(hud)
 	hud.slot_clicked.connect(_pocket_key)
+	screen_layer.layer = 12
+	add_child(screen_layer)
+	screen.my_id = net.player_id
+	screen.name_of = func(id: int) -> String: return nick if id == net.player_id else nicks.get(id, "?")
+	screen.action.connect(_computer_action)
+	screen_layer.add_child(screen)
 	_show_floor(0)
 
 
@@ -191,6 +202,12 @@ func reset_session(welcome: Dictionary) -> void:
 	for iv in floor_items.values():
 		iv.queue_free()
 	floor_items.clear()
+	for cv in computers.values():
+		cv.queue_free()
+	computers.clear()
+	screen.set_seated(false)
+	screen.chats.clear()
+	screen.my_id = net.player_id
 	inventory = []
 	hud.update_slots([])
 	me.set_held(0)
@@ -237,7 +254,10 @@ func _sample_input(delta: float) -> int:
 	if input_blocked:
 		return 0
 	if not goto_legs.is_empty() or not _goto_path.is_empty():
-		return _goto_input(delta)
+		var g := _goto_input(delta)  # dev script also drives the computer screen
+		return 0 if screen.visible else g
+	if screen.visible:
+		return 0
 	if autowalk:
 		_autowalk_timer -= delta
 		if _autowalk_timer <= 0.0:
@@ -272,6 +292,10 @@ func _goto_input(delta: float) -> int:
 			return Movement.IN_INTERACT
 		if leg.begins_with("wait:"):
 			goto_delay = float(leg.substr(5))
+			return 0
+		if leg.begins_with("pc:"):  # computer screen, see ComputerScreen.dev_command
+			screen.dev_command(leg.substr(3))
+			goto_delay = 0.6
 			return 0
 		if leg.begins_with("item:"):  # item:take0..2 / put / drop / give / use
 			var a := leg.substr(5)
@@ -362,6 +386,10 @@ func _process(delta: float) -> void:
 		if latest_tick - floor_items[id].last_seen_tick > REMOTE_TIMEOUT_TICKS:
 			floor_items[id].queue_free()
 			floor_items.erase(id)
+	for id in computers.keys():
+		if latest_tick - computers[id].last_seen_tick > REMOTE_TIMEOUT_TICKS:
+			computers[id].queue_free()
+			computers.erase(id)
 	if have_time:
 		est_tick += delta * tick_hz
 		var render_tick := est_tick - INTERP_DELAY_SEC * tick_hz
@@ -388,6 +416,10 @@ func _on_packet(p: Dictionary) -> void:
 			inventory = p.slots
 			hud.update_slots(inventory)
 			me.set_held(inventory[0].kind if not inventory.is_empty() else 0)
+		Protocol.T_COMPUTER:
+			screen.on_computer(p)
+		Protocol.T_CHAT:
+			screen.on_chat(p)
 		Protocol.T_SAY:
 			var who: String = nicks.get(p.id, "?")
 			if p.id == net.player_id:
@@ -429,6 +461,9 @@ func _on_snapshot(p: Dictionary) -> void:
 			for iv in floor_items.values():
 				iv.queue_free()
 			floor_items.clear()
+			for cv in computers.values():
+				cv.queue_free()
+			computers.clear()
 		elif p.room != room_id and p.frag_cnt == 1:
 			# Another room: drop whoever isn't in the new (complete) set right
 			# away; people visible from both rooms (e.g. the porter) stay.
@@ -448,6 +483,7 @@ func _on_snapshot(p: Dictionary) -> void:
 			est_tick += (tick - est_tick) * 0.1
 		_reconcile(Movement.body(p.floor, Vector2i(p.self_x, p.self_y), p.self_prev_input, p.self_lock, p.self_access), p.last_input_seq)
 		me.set_status(p.self_status)
+		screen.set_seated((p.self_status & Protocol.STATUS_AT_COMPUTER) != 0)
 	visible_count += p.entities.size()
 	var unknown := []
 	var now := Time.get_ticks_msec()
@@ -461,6 +497,17 @@ func _on_snapshot(p: Dictionary) -> void:
 			iv.setup(e.held)
 			iv.position = Vector2(e.x, e.y) / float(Movement.SUBPIXELS)
 			iv.last_seen_tick = tick
+			continue
+		if e.kind == Protocol.KIND_COMPUTER:
+			var cv = computers.get(e.id)
+			if cv == null:
+				cv = ComputerView.new()
+				world.add_child(cv)
+				computers[e.id] = cv
+			cv.set_flags(e.flags)
+			cv.position = Vector2(e.x, e.y) / float(Movement.SUBPIXELS)
+			cv.last_seen_tick = tick
+			kinds[e.id] = e.kind
 			continue
 		var r = remotes.get(e.id)
 		if r == null:
@@ -525,7 +572,7 @@ func _reconcile(server_body: Dictionary, ack: int) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if not (event is InputEventKey and event.pressed and not event.echo) or input_blocked or not have_state:
+	if not (event is InputEventKey and event.pressed and not event.echo) or input_blocked or screen.visible or not have_state:
 		return
 	match event.physical_keycode:
 		KEY_1, KEY_2, KEY_3:
@@ -545,6 +592,11 @@ func _pocket_key(pocket: int) -> void:
 		_item_action(Protocol.ITEM_PUT_AWAY, 0)
 	else:
 		_item_action(Protocol.ITEM_TAKE_OUT, pocket)
+
+
+func _computer_action(action: int, conv: int, arg: int, text: String) -> void:
+	if net.is_playing():
+		net.send(Protocol.encode_computer_action(net.token, action, conv, arg, text))
 
 
 func _item_action(action: int, slot: int) -> void:
@@ -595,6 +647,8 @@ func _update_hint() -> void:
 						text = "Parzenie kawy…"
 					else:
 						text = "[E] Zrób kawę"
+	if text == "" and map:
+		text = _desk_hint(map)
 	if text == "":
 		var me_px2 := Movement.to_px(pred.pos)
 		for id in floor_items:
@@ -615,6 +669,41 @@ func _update_hint() -> void:
 					text = "Bramka wymaga przepustki — porozmawiaj z portierem (portiernia)" if (need & MapData.ACCESS_GUEST) else "Wstęp tylko dla obsługi"
 	hint_label.text = text
 	hint_label.visible = text != ""
+
+
+## Desk within reach (same rule as the server: nearest desk tile, 1.25 tiles).
+func _desk_hint(map) -> String:
+	var me_px := Movement.to_px(pred.pos)
+	var t := Movement.tile_of_pos(pred.pos)
+	var best := Vector2i(-1, -1)
+	var best_d := 20.0
+	for dy in range(-2, 3):
+		for dx in range(-2, 3):
+			var tx: int = t.x + dx
+			var ty: int = t.y + dy
+			if tx < 0 or ty < 0 or tx >= map.width or ty >= map.height:
+				continue
+			if map.legend.get(map.tile_chars[ty * map.width + tx], {}).get("type") != "desk":
+				continue
+			if map.room_types.get(map.room_at_tile(tx, ty), "") != "department":
+				continue
+			var d := Movement.to_px(Movement.tile_center(tx, ty)).distance_to(me_px)
+			if d <= best_d:
+				best_d = d
+				best = Vector2i(tx, ty)
+	if best.x < 0:
+		return ""
+	var center := Movement.to_px(Movement.tile_center(best.x, best.y))
+	for id in computers:
+		if computers[id].position.distance_to(center) < 2.0:
+			var f: int = computers[id].flags
+			var whose: String = nicks.get(id, "?")
+			if f & Protocol.PC_FLAG_IN_USE:
+				return "Komputer: %s — ktoś przy nim siedzi" % whose
+			return "[E] Komputer: %s%s" % [whose, " (zablokowany)" if f & Protocol.PC_FLAG_LOCKED else ""]
+	if me.held == ItemArt.LAPTOP:
+		return "[E] Połóż laptop na biurku"
+	return ""
 
 
 func _refresh_log() -> void:

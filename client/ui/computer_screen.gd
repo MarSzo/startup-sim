@@ -1,0 +1,508 @@
+## The screen of a computer on a desk (GDD 9a, step 4): the company messenger
+## (#ogólny, the department channel, private messages) or the lock screen.
+## Shown while the server says we sit at a computer (self_status bit); the
+## computer is logged in as its owner, whoever sits at it.
+extends Control
+
+const Protocol = preload("res://net/protocol.gd")
+
+## ComputerAction to send: action, conversation, argument, text.
+signal action(action: int, conv: int, arg: int, text: String)
+
+const SYNC_MSEC := 1000
+const RESEND_MSEC := 800
+const MAX_TRIES := 5
+const NICK_COLORS := [Color("#2e6bd9"), Color("#c0392b"), Color("#16a085"), Color("#8e44ad"), Color("#d35400"), Color("#2c3e50"), Color("#b7950b")]
+
+var my_id := 0
+## Name of a player id (the game's PlayerInfo cache).
+var name_of: Callable = func(_id: int) -> String: return "?"
+
+var seated := false
+var state := {}              # last Computer packet
+var chats := {}              # "owner:conv" -> Array of messages, by id
+var current := Protocol.CONV_GENERAL
+var _pending := {}           # message being sent: nonce, conv, text, msec, tries
+var _last_sync := 0
+var _sig := ""               # sidebar currently shown (re-render on change)
+var _msg_sig := ""           # messages currently shown
+
+var _dim := ColorRect.new()
+var _frame := PanelContainer.new()
+var _screen := VBoxContainer.new()
+var _title := Label.new()
+var _as_owner := Label.new()
+var _lock_btn: Button
+var _take_btn: Button
+var _body := HBoxContainer.new()
+var _sidebar := VBoxContainer.new()
+var _conv_title := Label.new()
+var _scroll := ScrollContainer.new()
+var _messages := VBoxContainer.new()
+var _entry := LineEdit.new()
+var _send_btn: Button
+var _lock_view := VBoxContainer.new()
+var _lock_owner := Label.new()
+var _lock_hint := Label.new()
+var _unlock_btn: Button
+var _chat_view := VBoxContainer.new()
+
+
+func _ready() -> void:
+	mouse_filter = Control.MOUSE_FILTER_STOP
+	visible = false
+	get_viewport().size_changed.connect(_fit)
+	_build()
+	_fit()
+
+
+func _fit() -> void:
+	position = Vector2.ZERO
+	size = get_viewport_rect().size
+	_dim.size = size
+	var fs := Vector2(minf(1040, size.x - 60), minf(660, size.y - 60))
+	_frame.size = fs
+	_frame.position = (size - fs) / 2
+
+
+# ------------------------------------------------------------------- state
+
+func on_computer(p: Dictionary) -> void:
+	state = p
+	var ids: Array = p.convs.map(func(c): return c.conv)
+	if not ids.is_empty() and not ids.has(current):
+		current = Protocol.CONV_GENERAL
+	_show()
+
+
+func on_chat(p: Dictionary) -> void:
+	if state.is_empty():
+		return
+	var key := _key(p.conv)
+	var list: Array = chats.get(key, [])
+	var known := {}
+	for m in list:
+		known[m.id] = true
+	for m in p.messages:
+		if not known.has(m.id):
+			list.append(m)
+		if not _pending.is_empty() and m.from == state.owner and m.text == _pending.text:
+			_pending = {}
+	list.sort_custom(func(a, b): return a.id < b.id)
+	while list.size() > 100:
+		list.pop_front()
+	chats[key] = list
+	if p.conv == current:
+		_render_messages()
+
+
+## Server's AT_COMPUTER status bit (every snapshot).
+func set_seated(on: bool) -> void:
+	if on == seated:
+		return
+	seated = on
+	if not on:
+		state = {}
+		_pending = {}
+		_sig = ""
+		_msg_sig = ""
+	_show()
+
+
+func _show() -> void:
+	var was := visible
+	visible = seated and not state.is_empty()
+	if not visible:
+		return
+	_render()
+	if not was:
+		_last_sync = 0
+		if not state.locked:
+			_entry.grab_focus.call_deferred()
+
+
+func _key(conv: int) -> String:
+	return "%d:%d" % [state.get("owner", 0), conv]
+
+
+func _conv(conv: int) -> Dictionary:
+	for c in state.get("convs", []):
+		if c.conv == conv:
+			return c
+	return {}
+
+
+func _process(_d: float) -> void:
+	if not visible or state.is_empty() or state.locked:
+		return
+	var now := Time.get_ticks_msec()
+	if now - _last_sync >= SYNC_MSEC:
+		_last_sync = now
+		action.emit(Protocol.PC_SYNC, current, _last_id(current), "")
+	if not _pending.is_empty() and now - _pending.msec >= RESEND_MSEC:
+		if _pending.tries >= MAX_TRIES:
+			_pending = {}
+			_render_input()
+		else:
+			_pending.tries += 1
+			_pending.msec = now
+			action.emit(Protocol.PC_SEND, _pending.conv, _pending.nonce, _pending.text)
+
+
+func _last_id(conv: int) -> int:
+	var list: Array = chats.get(_key(conv), [])
+	return list[-1].id if not list.is_empty() else 0
+
+
+func _input(event: InputEvent) -> void:
+	if visible and event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE:
+		action.emit(Protocol.PC_CLOSE, 0, 0, "")
+		get_viewport().set_input_as_handled()
+
+
+# ------------------------------------------------------------------ actions
+
+func _select(conv: int) -> void:
+	current = conv
+	_render()
+	action.emit(Protocol.PC_SYNC, conv, _last_id(conv), "")
+	_entry.grab_focus.call_deferred()
+
+
+func _send() -> void:
+	var text := _entry.text.strip_edges()
+	if text == "" or not _pending.is_empty():
+		return
+	_pending = {"nonce": randi_range(1, 0x7fffffff), "conv": current, "text": text, "msec": Time.get_ticks_msec(), "tries": 1}
+	action.emit(Protocol.PC_SEND, current, _pending.nonce, text)
+	_entry.text = ""
+	_render_input()
+
+
+## Dev (--goto): pc:say:<conv>:<text>, pc:open:<conv>, pc:lock, pc:unlock,
+## pc:take, pc:close; <conv> = general / dept / dm:<nick>.
+func dev_command(cmd: String) -> void:
+	var parts := cmd.split(":")
+	if parts.size() > 2 and parts[1] == "dm":  # dm:<nick> is one token
+		parts[1] = "dm:" + parts[2]
+		parts.remove_at(2)
+	if parts.size() > 3:  # the text may contain ':'
+		parts[2] = ":".join(parts.slice(2))
+		parts.resize(3)
+	match parts[0]:
+		"lock": action.emit(Protocol.PC_LOCK, 0, 0, "")
+		"unlock": action.emit(Protocol.PC_UNLOCK, 0, 0, "")
+		"take": action.emit(Protocol.PC_TAKE, 0, 0, "")
+		"close": action.emit(Protocol.PC_CLOSE, 0, 0, "")
+		"open", "say":
+			if parts.size() < 2 or state.is_empty():
+				return
+			var conv := _conv_by_token(parts[1])
+			if conv < 0:
+				return
+			_select(conv)
+			if parts[0] == "say" and parts.size() > 2:
+				_entry.text = parts[2]
+				_send()
+
+
+func _conv_by_token(tok: String) -> int:
+	if tok == "general":
+		return Protocol.CONV_GENERAL
+	for c in state.convs:
+		if tok == "dept" and c.conv >= Protocol.CONV_DEPARTMENT_BASE and c.conv < Protocol.CONV_DM:
+			return c.conv
+		if tok.begins_with("dm:") and c.conv & Protocol.CONV_DM and c.title == tok.substr(3):
+			return c.conv
+	return -1
+
+
+# ------------------------------------------------------------------ layout
+
+func _build() -> void:
+	_dim.color = Color(0.02, 0.03, 0.06, 0.6)
+	_dim.mouse_filter = Control.MOUSE_FILTER_STOP
+	add_child(_dim)
+	var fsb := StyleBoxFlat.new()
+	fsb.bg_color = Color("#1c1f26")
+	fsb.set_corner_radius_all(16)
+	fsb.set_content_margin_all(14)
+	fsb.shadow_color = Color(0, 0, 0, 0.5)
+	fsb.shadow_size = 18
+	_frame.add_theme_stylebox_override("panel", fsb)
+	add_child(_frame)
+	var screen_bg := PanelContainer.new()
+	var ssb := StyleBoxFlat.new()
+	ssb.bg_color = Color("#eef1f6")
+	ssb.set_corner_radius_all(6)
+	screen_bg.add_theme_stylebox_override("panel", ssb)
+	_frame.add_child(screen_bg)
+	_screen.add_theme_constant_override("separation", 0)
+	screen_bg.add_child(_screen)
+
+	# Top bar: app name, whose account, lock / take / close.
+	var bar := PanelContainer.new()
+	var bsb := StyleBoxFlat.new()
+	bsb.bg_color = Color("#1f3a5f")
+	bsb.corner_radius_top_left = 6
+	bsb.corner_radius_top_right = 6
+	bsb.set_content_margin_all(8)
+	bsb.content_margin_left = 14
+	bar.add_theme_stylebox_override("panel", bsb)
+	_screen.add_child(bar)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	bar.add_child(row)
+	_style_label(_title, 16, Color.WHITE)
+	row.add_child(_title)
+	_style_label(_as_owner, 14, Color("#ffcf6e"))
+	_as_owner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(_as_owner)
+	_lock_btn = _button("Zablokuj", false)
+	_lock_btn.pressed.connect(func(): action.emit(Protocol.PC_LOCK, 0, 0, ""))
+	row.add_child(_lock_btn)
+	_take_btn = _button("Zabierz laptop", false)
+	_take_btn.pressed.connect(func(): action.emit(Protocol.PC_TAKE, 0, 0, ""))
+	row.add_child(_take_btn)
+	var close := _button("Zamknij (Esc)", false)
+	close.pressed.connect(func(): action.emit(Protocol.PC_CLOSE, 0, 0, ""))
+	row.add_child(close)
+
+	# Messenger.
+	_chat_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_screen.add_child(_chat_view)
+	_body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_body.add_theme_constant_override("separation", 0)
+	_chat_view.add_child(_body)
+	var side := PanelContainer.new()
+	var sdb := StyleBoxFlat.new()
+	sdb.bg_color = Color("#2a3342")
+	sdb.corner_radius_bottom_left = 6
+	sdb.set_content_margin_all(10)
+	side.add_theme_stylebox_override("panel", sdb)
+	side.custom_minimum_size = Vector2(230, 0)
+	_body.add_child(side)
+	var side_scroll := ScrollContainer.new()
+	side_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	side.add_child(side_scroll)
+	_sidebar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_sidebar.add_theme_constant_override("separation", 2)
+	side_scroll.add_child(_sidebar)
+	var main := VBoxContainer.new()
+	main.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	main.add_theme_constant_override("separation", 0)
+	_body.add_child(main)
+	var head := MarginContainer.new()
+	for s in ["left", "right", "top", "bottom"]:
+		head.add_theme_constant_override("margin_" + s, 12)
+	_style_label(_conv_title, 18, Color("#1c2430"))
+	head.add_child(_conv_title)
+	main.add_child(head)
+	main.add_child(HSeparator.new())
+	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	main.add_child(_scroll)
+	var pad := MarginContainer.new()
+	pad.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	for s in ["left", "right", "top", "bottom"]:
+		pad.add_theme_constant_override("margin_" + s, 14)
+	_scroll.add_child(pad)
+	_messages.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_messages.add_theme_constant_override("separation", 10)
+	pad.add_child(_messages)
+	var in_row := HBoxContainer.new()
+	in_row.add_theme_constant_override("separation", 8)
+	var in_pad := MarginContainer.new()
+	for s in ["left", "right", "top", "bottom"]:
+		in_pad.add_theme_constant_override("margin_" + s, 10)
+	in_pad.add_child(in_row)
+	main.add_child(in_pad)
+	_entry.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_entry.custom_minimum_size = Vector2(0, 40)
+	_entry.max_length = 200
+	_entry.add_theme_font_size_override("font_size", 16)
+	var esb := StyleBoxFlat.new()
+	esb.bg_color = Color.WHITE
+	esb.border_color = Color("#c9d2df")
+	esb.set_border_width_all(1)
+	esb.set_corner_radius_all(6)
+	esb.content_margin_left = 10
+	var efocus := esb.duplicate()
+	efocus.border_color = Color("#2e6bd9")
+	_entry.add_theme_stylebox_override("normal", esb)
+	_entry.add_theme_stylebox_override("focus", efocus)
+	_entry.add_theme_color_override("font_color", Color("#1c2430"))
+	_entry.add_theme_color_override("font_placeholder_color", Color("#8a93a3"))
+	_entry.add_theme_color_override("caret_color", Color("#1c2430"))
+	_entry.text_submitted.connect(func(_t): _send())
+	in_row.add_child(_entry)
+	_send_btn = _button("Wyślij", true)
+	_send_btn.pressed.connect(_send)
+	in_row.add_child(_send_btn)
+
+	# Lock screen.
+	_lock_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_lock_view.alignment = BoxContainer.ALIGNMENT_CENTER
+	_lock_view.add_theme_constant_override("separation", 14)
+	_screen.add_child(_lock_view)
+	var icon := Control.new()
+	icon.custom_minimum_size = Vector2(0, 72)
+	icon.draw.connect(func(): _draw_lock(icon))
+	_lock_view.add_child(icon)
+	_style_label(_lock_owner, 26, Color("#1c2430"))
+	_lock_owner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_lock_view.add_child(_lock_owner)
+	_style_label(_lock_hint, 16, Color("#5a6475"))
+	_lock_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_lock_view.add_child(_lock_hint)
+	var brow := HBoxContainer.new()
+	brow.alignment = BoxContainer.ALIGNMENT_CENTER
+	_unlock_btn = _button("Odblokuj (odcisk palca)", true)
+	_unlock_btn.pressed.connect(func(): action.emit(Protocol.PC_UNLOCK, 0, 0, ""))
+	brow.add_child(_unlock_btn)
+	_lock_view.add_child(brow)
+
+
+func _draw_lock(c: Control) -> void:
+	var cx := c.size.x / 2
+	c.draw_arc(Vector2(cx, 30), 14, PI, TAU, 16, Color("#5a6475"), 6)
+	c.draw_line(Vector2(cx - 14, 30), Vector2(cx - 14, 38), Color("#5a6475"), 6)
+	c.draw_line(Vector2(cx + 14, 30), Vector2(cx + 14, 38), Color("#5a6475"), 6)
+	c.draw_rect(Rect2(cx - 24, 36, 48, 34), Color("#e0a82e"))
+	c.draw_rect(Rect2(cx - 3, 46, 6, 12), Color("#7a5a10"))
+
+
+func _render() -> void:
+	if state.is_empty():
+		return
+	var owner_name: String = name_of.call(state.owner)
+	var mine: bool = state.owner == my_id
+	_title.text = "Komunikator firmowy — konto: %s" % owner_name
+	_as_owner.text = "" if mine else "Uwaga: piszesz jako %s!" % owner_name
+	_chat_view.visible = not state.locked
+	_lock_view.visible = state.locked
+	_lock_btn.visible = not state.locked
+	if state.locked:
+		_lock_owner.text = "%s — zablokowany" % owner_name
+		_lock_hint.text = "Przyłóż palec do czytnika, żeby odblokować." if mine else "Tylko %s może go odblokować. Laptop możesz najwyżej zabrać." % owner_name
+		_unlock_btn.visible = mine
+		return
+	_render_sidebar()
+	var c := _conv(current)
+	_conv_title.text = c.get("title", "")
+	_render_messages()
+	_render_input()
+
+
+func _render_sidebar() -> void:
+	var sig := JSON.stringify([state.convs, current])
+	if sig == _sig:
+		return
+	_sig = sig
+	for ch in _sidebar.get_children():
+		ch.queue_free()
+	var header := func(text: String):
+		var l := Label.new()
+		_style_label(l, 12, Color(1, 1, 1, 0.45))
+		l.text = text
+		_sidebar.add_child(l)
+	header.call("KANAŁY")
+	var dm_header := false
+	for c in state.convs:
+		if c.conv & Protocol.CONV_DM and not dm_header:
+			dm_header = true
+			var gap := Control.new()
+			gap.custom_minimum_size = Vector2(0, 10)
+			_sidebar.add_child(gap)
+			header.call("WIADOMOŚCI PRYWATNE")
+		var b := Button.new()
+		b.text = c.title + ("   (%d)" % c.unread if c.unread > 0 and c.conv != current else "")
+		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		b.add_theme_font_size_override("font_size", 15)
+		var sb := StyleBoxFlat.new()
+		sb.set_corner_radius_all(6)
+		sb.set_content_margin_all(6)
+		sb.content_margin_left = 10
+		sb.bg_color = Color("#3d5a86") if c.conv == current else Color(0, 0, 0, 0)
+		var hover := sb.duplicate()
+		hover.bg_color = Color("#46618c") if c.conv == current else Color(1, 1, 1, 0.08)
+		for st in ["normal", "focus"]:
+			b.add_theme_stylebox_override(st, sb)
+		b.add_theme_stylebox_override("hover", hover)
+		b.add_theme_stylebox_override("pressed", hover)
+		var bold: bool = c.unread > 0 and c.conv != current
+		var fc := Color.WHITE if bold or c.conv == current else Color(1, 1, 1, 0.72)
+		for k in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+			b.add_theme_color_override(k, fc)
+		var conv: int = c.conv
+		b.pressed.connect(func(): _select(conv))
+		_sidebar.add_child(b)
+
+
+func _render_messages() -> void:
+	var list: Array = chats.get(_key(current), [])
+	var sig := "%s/%d/%d" % [_key(current), list.size(), list[-1].id if not list.is_empty() else 0]
+	if sig == _msg_sig:
+		return
+	_msg_sig = sig
+	for ch in _messages.get_children():
+		ch.queue_free()
+	if list.is_empty():
+		var l := Label.new()
+		_style_label(l, 15, Color("#8a93a3"))
+		l.text = "Jeszcze nic tu nie ma. Napisz coś jako pierwszy!"
+		_messages.add_child(l)
+	for m in list:
+		var box := VBoxContainer.new()
+		box.add_theme_constant_override("separation", 1)
+		var who := Label.new()
+		_style_label(who, 14, NICK_COLORS[m.from % NICK_COLORS.size()])
+		who.text = m.nick + ("  (Ty)" if m.from == my_id else "")
+		box.add_child(who)
+		var text := Label.new()
+		_style_label(text, 16, Color("#1c2430"))
+		text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		text.text = m.text
+		box.add_child(text)
+		_messages.add_child(box)
+	_scroll_to_end.call_deferred()
+
+
+func _scroll_to_end() -> void:
+	await get_tree().process_frame
+	_scroll.scroll_vertical = int(_scroll.get_v_scroll_bar().max_value)
+
+
+func _render_input() -> void:
+	var sending := not _pending.is_empty()
+	_send_btn.disabled = sending
+	_send_btn.text = "Wysyłanie…" if sending else "Wyślij"
+	_entry.placeholder_text = "Napisz na %s…" % _conv(current).get("title", "")
+
+
+func _style_label(l: Label, size: int, color: Color) -> void:
+	l.add_theme_font_size_override("font_size", size)
+	l.add_theme_color_override("font_color", color)
+
+
+func _button(text: String, primary: bool) -> Button:
+	var b := Button.new()
+	b.text = text
+	b.add_theme_font_size_override("font_size", 14)
+	var sb := StyleBoxFlat.new()
+	sb.set_corner_radius_all(6)
+	sb.content_margin_left = 12
+	sb.content_margin_right = 12
+	sb.content_margin_top = 6
+	sb.content_margin_bottom = 6
+	sb.bg_color = Color("#2e6bd9") if primary else Color(1, 1, 1, 0.14)
+	var hover := sb.duplicate()
+	hover.bg_color = Color("#3b7bef") if primary else Color(1, 1, 1, 0.24)
+	for st in ["normal", "focus", "disabled"]:
+		b.add_theme_stylebox_override(st, sb)
+	b.add_theme_stylebox_override("hover", hover)
+	b.add_theme_stylebox_override("pressed", hover)
+	for c in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+		b.add_theme_color_override(c, Color.WHITE)
+	b.add_theme_color_override("font_disabled_color", Color(1, 1, 1, 0.6))
+	return b

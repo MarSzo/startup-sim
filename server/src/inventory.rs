@@ -41,6 +41,8 @@ pub struct Item {
     pub label: String,
     /// Tick after which the item disappears (coffee goes cold).
     pub expires: Option<u32>,
+    /// Player it belongs to (laptop: whose account it logs into); 0 = nobody.
+    pub owner: u16,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -148,6 +150,19 @@ impl Inventory {
         self.pockets.iter_mut().find(|s| s.as_ref().is_some_and(|it| it.kind == k)).and_then(|s| s.take())
     }
 
+    /// Remove everything belonging to player `owner`.
+    pub fn remove_owned_by(&mut self, owner: u16) {
+        let mine = |s: &Option<Item>| s.as_ref().is_some_and(|i| i.owner == owner);
+        if mine(&self.hands) {
+            self.hands = None;
+        }
+        for s in self.pockets.iter_mut() {
+            if mine(s) {
+                *s = None;
+            }
+        }
+    }
+
     /// Drop expired items (cold coffee); returns what was removed.
     pub fn expire(&mut self, tick: u32) -> Vec<Item> {
         let mut gone = Vec::new();
@@ -169,7 +184,7 @@ mod tests {
     use super::*;
 
     fn item(id: u32, k: u8) -> Item {
-        Item { id, kind: k, label: String::new(), expires: None }
+        Item { id, kind: k, label: String::new(), expires: None, owner: 0 }
     }
 
     #[test]
@@ -224,7 +239,7 @@ mod tests {
     #[test]
     fn coffee_goes_cold() {
         let mut inv = Inventory::default();
-        inv.add(Item { id: 1, kind: kind::COFFEE, label: String::new(), expires: Some(100) }).unwrap();
+        inv.add(Item { id: 1, kind: kind::COFFEE, label: String::new(), expires: Some(100), owner: 0 }).unwrap();
         assert!(inv.expire(99).is_empty());
         assert_eq!(inv.expire(100).len(), 1);
         assert!(inv.hands_free());

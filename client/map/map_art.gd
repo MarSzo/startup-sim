@@ -43,6 +43,10 @@ func _is_wall(x: int, y: int) -> bool:
 	return _ch(x, y) == "#"
 
 
+func _room_type(x: int, y: int) -> String:
+	return map.room_types.get(map.room_at_tile(x, y), "")
+
+
 func _hash(x: int, y: int, salt := 0) -> int:
 	var h := (x * 73856093) ^ (y * 19349663) ^ (salt * 83492791)
 	return absi(h)
@@ -463,11 +467,16 @@ func _desks(tr: Rect2i, r: Rect2i, index: int) -> void:
 		var tx := tr.position.x + i
 		var px := tx * TP
 		var py := r.position.y
-		# Monitor (dark bezel, coloured screen), keyboard, the odd mug.
-		_rect(Rect2i(px + 3, py + 2, 10, 6), Color("#23262e"))
-		_rect(Rect2i(px + 4, py + 3, 8, 4), screens[(_hash(tx, tr.position.y, index)) % screens.size()])
-		_rect(Rect2i(px + 7, py + 8, 2, 1), Color("#23262e"))
-		_rect(Rect2i(px + 4, py + 10, 8, 2), Color("#d9dbe0"))
+		# Department desks are hot desks: the computer is the laptop an employee
+		# puts there (a separate entity), so only a desk mat. Other desks (HR)
+		# have a monitor and keyboard.
+		if _room_type(tx, tr.position.y) == "department":
+			_rect(Rect2i(px + 3, py + 4, 10, 7), Color("#8c6844"))
+		else:
+			_rect(Rect2i(px + 3, py + 2, 10, 6), Color("#23262e"))
+			_rect(Rect2i(px + 4, py + 3, 8, 4), screens[(_hash(tx, tr.position.y, index)) % screens.size()])
+			_rect(Rect2i(px + 7, py + 8, 2, 1), Color("#23262e"))
+			_rect(Rect2i(px + 4, py + 10, 8, 2), Color("#d9dbe0"))
 		if _hash(tx, tr.position.y, 5) % 4 == 0:
 			_rect(Rect2i(px + 13, py + 9, 2, 3), Color("#e8e2d8"))
 		# Office chair on the floor tile below, if there is one.

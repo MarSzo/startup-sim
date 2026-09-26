@@ -15,7 +15,7 @@ cd server && cargo run --release -- --start-with-card   # wariant dla botów: ws
 cd server && cargo run --release --bin bots -- --count 50 --room "Chill room" --all-in-room
 ```
 
-Sterowanie: WASD / strzałki, **E** — rozmowa z NPC / winda (stojąc w kabinie) / ekspres do kawy / podniesienie przedmiotu, **1–3** — wyjmij / schowaj przedmiot z kieszeni, **Q** — upuść, **G** — podaj osobie obok, **F** — użyj (wypij kawę, pokaż kartę), **F3** — overlay debug.
+Sterowanie: WASD / strzałki, **E** — rozmowa z NPC / winda (stojąc w kabinie) / ekspres do kawy / podniesienie przedmiotu / biurko (połóż laptop, usiądź do komputera; Esc — wstań), **1–3** — wyjmij / schowaj przedmiot z kieszeni, **Q** — upuść, **G** — podaj osobie obok, **F** — użyj (wypij kawę, pokaż kartę), **F3** — overlay debug.
 Na starcie tworzysz postać (imię, płeć, wiek, miejscowość, e-mail postaci,
 wygląd z podglądem; zapamiętywana lokalnie). Po połączeniu siedzisz w domu przy komputerze: w **przeglądarce** jest portal z
 ogłoszeniami (kilka firm; zatrudnia tylko nasz startup), wypełniasz formularz,
@@ -28,7 +28,8 @@ do HR, a HR (E) podpisze umowę i wyda kartę pracownika.
 
 ### Serwer — opcje
 `--bind`, `--map`, `--max-players`, `--stats-secs`, `--start-with-card` (każdy gracz z kartą — do testów z botami),
-`--skip-recruitment` (bez portalu, od razu do świata), `--recruitment <plik>` (oferty i pytania,
+`--skip-recruitment` (bez portalu, od razu do świata), `--start-employed` (od razu zatrudniony:
+umowa, karta i laptop, start przy biurku działu — nieparzyste id IT, parzyste Biznes), `--recruitment <plik>` (oferty i pytania,
 domyślnie `server/data/recruitment.json`), oraz symulacja sieci:
 `--lag-ms <ms>` (opóźnienie w jedną stronę, RTT rośnie 2×), `--jitter-ms <ms>`, `--loss <0..1>`.
 Np. RTT ~100 ms i 2% strat: `cargo run --release -- --lag-ms 50 --jitter-ms 10 --loss 0.02`.
@@ -38,8 +39,11 @@ Np. RTT ~100 ms i 2% strat: `cargo run --release -- --lag-ms 50 --jitter-ms 10 -
 (sam aplikuje na ofertę 1 i zgaduje odpowiedzi do skutku), (adres może być też IPv6: `--server=[::1]:7777`) (F3 od startu),
 `--autowalk` (losowy ruch), `--goto="27,29;E;wait:2;34,6;Recepcja"` (kolejne
 kroki: kafel / pokój na bieżącym piętrze, `E` = wciśnij E, `wait:N` = czekaj —
-tu: rozmowa z portierem, potem schodami do recepcji),
-`--screenshot=/tmp/x.png --screenshot-delay=5` (zapis klatki i wyjście).
+tu: rozmowa z portierem, potem schodami do recepcji; też `item:take0|put|drop|give|use` i
+ekran komputera: `pc:say:general|dept|dm:<imię>:<tekst>`, `pc:open:…`, `pc:lock`, `pc:unlock`,
+`pc:take`, `pc:close`),
+`--screenshot=/tmp/x.png --screenshot-delay=5` (zapis klatki i wyjście; kilka czasów
+`--screenshot-delay=5,12,20` zapisuje `x_1.png`, `x_2.png`, … i wychodzi po ostatnim).
 
 ## Testy
 

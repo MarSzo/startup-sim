@@ -3,6 +3,7 @@
 pub mod args;
 pub mod building;
 pub mod coffee;
+pub mod computer;
 pub mod inventory;
 pub mod map;
 pub mod nav;

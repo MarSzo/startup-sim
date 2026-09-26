@@ -30,6 +30,7 @@ server/                 crate Rusta (lib `game` + binarki)
   src/recruitment.rs    portal z ofertami i quiz rekrutacyjny
   src/coffee.rs         ekspresy do kawy (parzenie → kawa jako przedmiot)
   src/inventory.rs      przedmioty, kieszenie i ręce, uprawnienia z przedmiotów
+  src/computer.rs       stanowiska (biurka działów), laptopy na biurkach, komunikator
   data/recruitment.json oferty i pule pytań (pierwsza odpowiedź = poprawna)
   src/protocol.rs       pakiety: encode/decode, fragmentacja snapshotów
   src/net.rs            UdpSocket + symulator opóźnienia/jittera/strat
@@ -57,6 +58,8 @@ client/                 projekt Godota 4.7
   game/item_art.gd      ikony przedmiotów (rysowane prostokątami)
   game/item_view.gd     przedmiot leżący na podłodze
   ui/inventory_hud.gd   pasek ekwipunku (ręce + 3 kieszenie)
+  ui/computer_screen.gd ekran komputera: komunikator i ekran blokady
+  game/computer_view.gd laptop na biurku (ekran: niebieski / czat / zablokowany)
   game/remote_player.gd bufor snapshotów + interpolacja
   ui/character_screen.gd tworzenie postaci (dane + wygląd z podglądem)
   ui/desktop.gd         pulpit komputera: przeglądarka (portal, formularz), poczta, rozmowa online
@@ -132,6 +135,20 @@ przepustkę i daje kartę (podpisaną imieniem i działem) oraz laptop — wymag
 wolnych rąk. Przedmioty na podłodze (`Dropped`) są encjami `kind` 2 w
 snapshotach; E podnosi najbliższy w zasięgu 1,25 kafla (po NPC i ekspresie).
 Gdy przedmiot się nie mieści, ląduje na podłodze pod nogami.
+
+**Komputery** (`computer.rs`): stanowiska to kafle typu `desk` w pokojach typu
+`department` (nazwa pokoju = nazwa działu). E z laptopem w rękach przy
+najbliższym wolnym stanowisku swojego działu (≤ 1,25 kafla) kładzie go
+(`Computer` z `station`, `handle` z puli przedmiotów); E przy stanowisku z
+laptopem otwiera sesję (`Player::at_computer`, `Computer::user` — jedna osoba
+naraz), która kończy się po oddaleniu > 2 kafle, zamknięciu, blokadzie albo
+zabraniu laptopa. Konto komputera = `Item::owner` laptopa; `Messenger` trzyma
+kanały i rozmowy prywatne w pamięci, liczy nieprzeczytane per (konto, rozmowa)
+i wskazuje odbiorców powiadomień (`audience`). Serwer loguje, kto faktycznie
+pisał z cudzego komputera (bez treści). Gdy właściciel wychodzi z gry, jego
+przedmioty (laptop, karta u kogoś, rzeczy na podłodze) znikają, a cudze
+przedmioty, które niósł, zostają na podłodze. Klient pokazuje ekran, dopóki
+w snapshocie jest bit „przy komputerze”, i blokuje wtedy ruch.
 
 **Ekspresy** (`coffee.rs`, znalezione w mapie po typie `coffee_machine`): E
 w zasięgu 1,5 kafla (gdy nie ma NPC w zasięgu rozmowy, wolne ręce) → parzenie

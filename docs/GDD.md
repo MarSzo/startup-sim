@@ -469,6 +469,25 @@ Zastępuje prosty portal z 10.8. Po połączeniu gracz widzi pulpit komputera
   podłodze widzą wszyscy.
 - Laptop można na razie tylko nosić — kładzenie na biurku i używanie to etap 4.
 
+### 10.14 Komputer i komunikator (etap 4 z 9a)
+
+- **Hot-desking**: laptop od HR kładziesz (E, laptop w rękach) na dowolnym
+  wolnym biurku **w pokoju swojego działu**; biurka działów nie mają już
+  stałych monitorów. E przy biurku z laptopem otwiera jego ekran (jedna osoba
+  naraz; odejście od biurka zamyka ekran).
+- Komputer jest **zawsze zalogowany na właściciela**: przy cudzym odblokowanym
+  komputerze piszesz w jego imieniu (ekran ostrzega „Uwaga: piszesz jako …”).
+- **Blokada tylko ręczna** — przycisk „Zablokuj” (może nacisnąć każdy);
+  odblokować może tylko właściciel („odcisk palca”). Kto zapomni, ryzykuje
+  żart kolegów.
+- **Laptop może zabrać każdy**, także zablokowany (z ekranu: „Zabierz laptop”,
+  potrzebne wolne ręce) — używać go i tak nie da się bez właściciela.
+- **Komunikator**: #ogólny, kanał własnego działu (#it-produkt / #biznes —
+  widzi tylko dział) i wiadomości prywatne do każdego pracownika; licznik
+  nieprzeczytanych. Wiadomości czyta się tylko przy komputerze.
+- Bez trwałych kont: laptop i rozmowy prywatne gracza znikają, gdy wyjdzie z
+  gry; historia kanałów trwa do restartu serwera.
+
 ### 10.6 Stan implementacji
 
 *Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie,
@@ -505,6 +524,9 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Ekwipunek**: kieszenie i ręce, przedmioty (przepustka, karta, laptop,
   kawa), upuszczanie / podnoszenie / podawanie, dostęp z przedmiotów (10.13);
   protokół v8.
+- **Komputer i komunikator**: laptop na biurku działu, ekran komputera z
+  komunikatorem (kanały, prywatne, nieprzeczytane), blokada, pisanie z cudzego
+  komputera w imieniu właściciela, zabieranie laptopa (10.14); protokół v9.
 - **Ekspres do kawy**: parzenie, kubek w ręce widoczny dla innych, jedna
   osoba naraz (10.10); protokół v5.
 - **Boty** (`cargo run --release --bin bots`): 50 domyślnie, chodzą po BFS po
@@ -513,12 +535,12 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Sieć mobilna**: serwer dual-stack IPv4/IPv6; gracz identyfikowany tokenem
   (zmiana adresu w trakcie gry przenosi sesję); klient przepina gniazdo po
   ciszy/powrocie z tła i sam łączy się ponownie po utracie sesji.
-- **Testy**: 57 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
+- **Testy**: 61 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
   zależna od uprawnień, bramki, ruch/kolizje, schody, winda, nawigacja,
-  portier, recepcja, HR, rekrutacja, ekspres, protokół), 2 golden, 11 e2e serwera
+  portier, recepcja, HR, rekrutacja, ekspres, komunikator, protokół), 2 golden, 12 e2e serwera
   (m.in. portal: odrzucenie → przyjęcie → spawn; całe wdrożenie aż do karty;
   niewidoczność między piętrami; zgodność stanu serwera z predykcją) —
-  łącznie 70 (w tym e2e ekspresu, profilu postaci, pulpitu i przekazywania karty); 119 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
+  łącznie 75 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty i komputera z komunikatorem); 122 sprawdzenia w Godocie (parytet protokołu i ruchu, parsowanie
   adresów).
 
 #### Pomiary (MacBook, wszystko lokalnie)

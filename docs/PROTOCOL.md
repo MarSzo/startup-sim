@@ -1,4 +1,4 @@
-# Protokół sieciowy (wersja 8)
+# Protokół sieciowy (wersja 9)
 
 Własny binarny protokół na UDP. Implementacje:
 - serwer: `server/src/protocol.rs` (źródło prawdy),
@@ -23,7 +23,7 @@ przez `cargo test` i czytane przez `client/tests/run_tests.gd`.
 | pole    | typ | wartość |
 |---------|-----|---------|
 | magic   | u16 | `0x5354` (bajty `54 53`, „TS”) |
-| version | u8  | `8` |
+| version | u8  | `9` |
 | type    | u8  | typ pakietu (niżej) |
 
 ## Jednostki
@@ -101,18 +101,21 @@ aplikuje max 6 (średnio 3 = 60/20). Kolejka ponad 30 jest przycinana od najstar
 | self_lock      | u8 — blokada schodów odbiorcy (`sim::Body::lock`: 0 brak, 1 trzymane, 2 zwolnione) |
 | self_prev_input| u8 — poprzedni input odbiorcy (`sim::Body::prev_input`, do akcji „na wciśnięcie”) |
 | self_access    | u8 — uprawnienia odbiorcy (`map::access`: 1 przepustka gościa, 2 karta pracownika, 4 obsługa) |
-| self_status    | u8 — czynność odbiorcy (nie symulowana): bit 1 parzy kawę (bit 0 zarezerwowany; kubek to teraz przedmiot) |
+| self_status    | u8 — czynność odbiorcy (nie symulowana): bit 0 siedzi przy komputerze (klient pokazuje jego ekran, dopóki bit jest ustawiony), bit 1 parzy kawę |
 | n              | u8 |
-| entities       | n × 12 B |
+| entities       | n × 13 B |
 
 Encja (13 B): `id u16 | kind u8 | x i32 | y i32 | flags u8 | held u8`.
-- `kind`: 0 gracz, 1 NPC, 2 przedmiot na podłodze. Id: gracze 1..0xDFFF,
-  przedmioty na podłodze od `0xE000`, NPC od `0xF000`.
+- `kind`: 0 gracz, 1 NPC, 2 przedmiot na podłodze, 3 laptop na biurku.
+  Id: gracze 1..0xDFFF, przedmioty na podłodze i laptopy na biurkach od
+  `0xE000` (wspólna pula), NPC od `0xF000`. `PlayerInfo` laptopa niesie imię
+  i dział jego właściciela.
 - `held`: przedmiot w rękach (0 brak, 1 przepustka gościa, 2 karta
-  pracownika, 3 laptop, 4 kawa); dla `kind` 2 — sam przedmiot.
+  pracownika, 3 laptop, 4 kawa); dla `kind` 2 i 3 — sam przedmiot.
 - `flags`: bity 0–1 kierunek (0 dół, 1 góra, 2 lewo, 3 prawo), bit 2 „w ruchu”,
   bity 3–5 wygląd (0 gracz, 1 portier — mundur z czapką, 2 pracownik biurowy —
-  koszula z krawatem), bit 7 parzy kawę (bit 6 zarezerwowany).
+  koszula z krawatem), bit 6 siedzi przy komputerze, bit 7 parzy kawę.
+  Dla laptopa (`kind` 3): bit 0 zablokowany, bit 1 ktoś przy nim siedzi.
 
 **Interest management**: lista zawiera tylko encje z tym samym `(floor, room)` co
 odbiorca (bez niego samego). Snapshot jest pełny (nie delta) — zgubienie
@@ -213,6 +216,37 @@ podłogi to E (jak rozmowa). Odmowy wracają jako `Say` od samego gracza.
 Uprawnienia (`self_access`) wynikają z noszonych przedmiotów: przepustka →
 gość, karta → pracownik — niezależnie od tego, czyja jest.
 
+### 21 `Computer` (S→C), 22 `ComputerAction` (C→S), 23 `Chat` (S→C)
+
+Komputer to laptop położony na biurku; zawsze jest zalogowany na **właściciela**
+— kto siedzi przy cudzym odblokowanym komputerze, pisze w jego imieniu.
+
+`Computer` — ekran komputera, przy którym siedzi odbiorca (po E przy biurku,
+po każdej zmianie i co 1 s): handle u16 (id encji laptopa), owner u16 (id
+właściciela), locked u8, n u8 (≤ 40), n × {`conv u16`, `unread u8`, `title`
+str16 (≤ 24 B)}. Zablokowany komputer nie pokazuje rozmów (n = 0).
+
+Rozmowy (`conv`, z perspektywy konta właściciela): 1 = #ogólny, 16 + id działu
+= kanał działu (tylko ten dział), `0x8000 | id gracza` = wiadomości prywatne.
+`unread` = wiadomości innych nowsze niż ostatnio przeczytana.
+
+`ComputerAction`: token u32, action u8, conv u16, arg u32, text str16 (≤ 400 B):
+1 zamknij ekran, 2 zablokuj (i zamknij; może każdy), 3 odblokuj (tylko
+właściciel — inaczej `Say` z odmową), 4 zabierz laptop (wymaga wolnych rąk; może
+każdy, także zablokowany), 5 synchronizuj `conv` — odpowiedź `Chat` z
+wiadomościami o id > `arg` (najnowsze 30; oznacza je jako przeczytane),
+6 wyślij `text` do `conv`; `arg` = nonce klienta (ponowienia z tym samym
+nonce są ignorowane; limit 1 wiadomość / 0,5 s, max 200 znaków).
+
+`Chat`: conv u16, n u8, n × {`id u32`, `from u16`, `nick` str16, `text` str16}
+— odpowiedź na synchronizację albo natychmiastowe powiadomienie wszystkich,
+którzy właśnie patrzą na ekran konta z tej rozmowy. Dzielony na kilka pakietów,
+żeby każdy mieścił się w 1200 B. Klient synchronizuje otwartą rozmowę co 1 s,
+więc zgubiony pakiet nie gubi wiadomości.
+
+Historia jest tylko w pamięci serwera (60 wiadomości na rozmowę); wiadomości
+prywatne gracza, który wyszedł, są usuwane (jego id może dostać ktoś inny).
+
 ## Połączenie i timeouty
 
 ```
@@ -271,6 +305,7 @@ szyfrowaniem.
 
 ## Historia wersji
 
+- **9** — komputer i komunikator: encja laptopa (`kind` 3), bit „przy komputerze” (`self_status` 0 / flaga 6, w miejsce „trzyma kawę”), `Computer`, `ComputerAction`, `Chat`.
 - **8** — ekwipunek: `held` w encji (13 B), encje przedmiotów na podłodze, `Inventory`, `ItemAction`; kubek kawy jako przedmiot.
 - **7** — pulpit: firmy i flaga `applied` w `JobOffers` (dzielonych na pakiety), `motivation` w `Apply`, `Mail`, `PortalAction`.
 - **6** — profil postaci w `Connect` (płeć, wiek, wygląd, miejscowość, e-mail); płeć i wygląd w `PlayerInfo`; `Reject(4)`.

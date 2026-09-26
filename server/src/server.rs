@@ -7,6 +7,7 @@ use std::time::{Duration, Instant};
 
 use crate::building::Building;
 use crate::coffee::{self, Cup, Machine};
+use crate::computer::{self, Account, Computer, Messenger, Workstation};
 use crate::inventory::{self, kind as item_kind, Inventory, Item};
 use crate::net::{canonical, LinkConditions, Net};
 use crate::npc::{self, Npc};
@@ -38,6 +39,9 @@ pub struct Config {
     pub recruitment: Recruitment,
     /// Spawn straight into the world (dev / tests), no job portal.
     pub skip_recruitment: bool,
+    /// Also already hired (contract, card, laptop) and spawned at a desk of
+    /// the department (odd player ids IT, even Biznes). Dev / tests.
+    pub start_employed: bool,
 }
 
 /// Where a connected player is in the game.
@@ -103,6 +107,9 @@ const GIVE_RADIUS: i32 = sim::TILE_UNITS * 2;
 /// Resend the inventory this often (ticks).
 const INVENTORY_RESEND_TICKS: u32 = 40;
 
+/// Resend the computer screen state this often (ticks).
+const COMPUTER_RESEND_TICKS: u32 = 20;
+
 /// Resend the current portal screen this often (ticks) - UDP may drop it.
 const PORTAL_RESEND_TICKS: u32 = 20;
 
@@ -123,6 +130,11 @@ struct Player {
     inventory: Inventory,
     /// Inventory changed: send it to the owner this tick.
     inv_dirty: bool,
+    /// Handle of the computer whose screen the player is looking at.
+    at_computer: Option<u16>,
+    /// Messenger spam guard / retry dedupe.
+    last_chat_tick: Option<u32>,
+    last_chat_nonce: u32,
     token: u32,
     nonce: u32,
     addr: SocketAddr,
@@ -155,6 +167,10 @@ pub struct Server {
     machines: Vec<Machine>,
     /// Items lying on the floor.
     dropped: Vec<Dropped>,
+    /// Desks where a laptop can stand, and the laptops standing on them.
+    workstations: Vec<Workstation>,
+    computers: Vec<Computer>,
+    messenger: Messenger,
     next_item_id: u32,
     next_drop_handle: u16,
     /// Lines players "say" to themselves outside the tick (item actions).
@@ -182,6 +198,9 @@ impl Server {
             npcs: Npc::spawn_all(&building),
             machines: coffee::find_machines(&building),
             dropped: Vec::new(),
+            workstations: computer::find_workstations(&building),
+            computers: Vec::new(),
+            messenger: Messenger::default(),
             next_item_id: 1,
             next_drop_handle: DROP_HANDLE_BASE,
             pending_says: Vec::new(),
@@ -276,7 +295,8 @@ impl Server {
             | Packet::Apply { token, .. }
             | Packet::Answer { token, .. }
             | Packet::PortalAction { token, .. }
-            | Packet::ItemAction { token, .. } => *token,
+            | Packet::ItemAction { token, .. }
+            | Packet::ComputerAction { token, .. } => *token,
             _ => return,
         };
         let Some(&id) = self.by_token.get(&token) else {
@@ -333,6 +353,7 @@ impl Server {
             Packet::Apply { offer, .. } => self.handle_apply(id, offer),
             Packet::PortalAction { action, arg, .. } => self.handle_portal_action(id, action, arg),
             Packet::ItemAction { action, slot, .. } => self.handle_item_action(id, action, slot),
+            Packet::ComputerAction { action, conv, arg, text, .. } => self.handle_computer_action(id, action, conv, arg, &text),
             Packet::Answer { attempt, index, choice, .. } => self.handle_answer(id, attempt, index, choice),
             _ => {}
         }
@@ -383,6 +404,9 @@ impl Server {
             cup: Cup::None,
             inventory: Inventory::default(),
             inv_dirty: true,
+            at_computer: None,
+            last_chat_tick: None,
+            last_chat_nonce: 0,
             token,
             nonce,
             addr,
@@ -400,7 +424,9 @@ impl Server {
         self.log(format!("+ player {} '{}' from {} ({} online)", id, player.nick, canonical(addr), self.players.len() + 1));
         self.players.insert(id, player);
         self.by_addr.insert(addr, id);
-        if skip && self.cfg.start_access & crate::map::access::CARD != 0 {
+        if self.cfg.start_employed {
+            self.employ(id);
+        } else if skip && self.cfg.start_access & crate::map::access::CARD != 0 {
             self.give_new(id, item_kind::EMPLOYEE_CARD); // load tests: straight in with a card
         }
         self.by_token.insert(token, id);
@@ -607,6 +633,11 @@ impl Server {
                 gender: p.profile.gender,
                 appearance: p.profile.appearance,
             }),
+            // A computer is introduced by its owner's name.
+            None if self.computers.iter().any(|c| c.handle == id) => {
+                let owner = self.computers.iter().find(|c| c.handle == id)?.owner();
+                self.info_of(owner).map(|e| PlayerInfoEntry { id, ..e })
+            }
             None => self.npcs.iter().find(|n| n.id == id).map(|n| PlayerInfoEntry {
                 id,
                 nick: n.name.clone(),
@@ -674,7 +705,8 @@ impl Server {
     fn give_new(&mut self, pid: u16, k: u8) {
         let label = self.label_for(pid, k);
         let expires = (k == item_kind::COFFEE).then_some(self.tick + coffee::DRINK_TICKS);
-        let item = Item { id: self.next_item_id, kind: k, label, expires };
+        let owner = if k == item_kind::COFFEE { 0 } else { pid };
+        let item = Item { id: self.next_item_id, kind: k, label, expires, owner };
         self.next_item_id += 1;
         self.give(pid, item);
     }
@@ -693,12 +725,19 @@ impl Server {
     }
 
     fn drop_at(&mut self, floor: u8, pos: Pos, item: Item) {
-        let mut handle = self.next_drop_handle;
-        while self.dropped.iter().any(|d| d.handle == handle) {
-            handle = if handle + 1 >= npc::NPC_ID_BASE { DROP_HANDLE_BASE } else { handle + 1 };
-        }
-        self.next_drop_handle = if handle + 1 >= npc::NPC_ID_BASE { DROP_HANDLE_BASE } else { handle + 1 };
+        let handle = self.alloc_handle();
         self.dropped.push(Dropped { handle, item, floor, pos });
+    }
+
+    /// Entity id for an item on the floor or a computer on a desk.
+    fn alloc_handle(&mut self) -> u16 {
+        let next = |h: u16| if h + 1 >= npc::NPC_ID_BASE { DROP_HANDLE_BASE } else { h + 1 };
+        let mut handle = self.next_drop_handle;
+        while self.dropped.iter().any(|d| d.handle == handle) || self.computers.iter().any(|c| c.handle == handle) {
+            handle = next(handle);
+        }
+        self.next_drop_handle = next(handle);
+        handle
     }
 
     fn handle_item_action(&mut self, id: u16, action: u8, slot: u8) {
@@ -768,7 +807,7 @@ impl Server {
                     }
                     item_kind::EMPLOYEE_CARD => format!("Karta pracownika: {}.", held.label),
                     item_kind::GUEST_PASS => "Przepustka gościa — ważna do końca dnia.".into(),
-                    item_kind::LAPTOP => "Laptop — trzeba go położyć na biurku (wkrótce).".into(),
+                    item_kind::LAPTOP => format!("{} — położę go na wolnym biurku w swoim dziale (E).", held.label),
                     _ => return,
                 };
                 self.pending_says.push(say(&line));
@@ -801,9 +840,249 @@ impl Server {
         }
     }
 
+    // --------------------------------------------------------- computers
+
+    /// `--start-employed`: contract, department, card and laptop, and a spot
+    /// in front of a desk of the department.
+    fn employ(&mut self, id: u16) {
+        let dept = if id % 2 == 1 { 1 } else { 2 };
+        let Some(dept_name) = self.cfg.recruitment.department_name(dept).map(str::to_string) else { return };
+        let seat = {
+            let n = self.players.values().filter(|p| p.contract && p.department == dept).count();
+            let desks: Vec<&Workstation> = self.workstations.iter().filter(|w| w.room_name == dept_name).collect();
+            desks.get(n % desks.len().max(1)).and_then(|w| {
+                let m = self.building.floor(w.floor)?;
+                [1, -1].iter().map(|dy| (w.tile.x, w.tile.y + dy)).find(|&(x, y)| !m.is_blocked(x, y)).map(|(x, y)| (w.floor, x, y))
+            })
+        };
+        let Some(p) = self.players.get_mut(&id) else { return };
+        p.department = dept;
+        p.contract = true;
+        if let Some((floor, x, y)) = seat {
+            p.body = Body::at(floor, Pos::tile_center(x, y));
+            p.room = self.building.floor(floor).map_or(0, |m| m.room_at_tile(x, y));
+        }
+        self.give_new(id, item_kind::EMPLOYEE_CARD);
+        self.give_new(id, item_kind::LAPTOP);
+    }
+
+    /// Hired employees = messenger accounts.
+    fn accounts(&self) -> Vec<Account> {
+        self.players
+            .values()
+            .filter(|p| p.contract && matches!(p.stage, Stage::Working))
+            .map(|p| Account { id: p.id, nick: p.nick.clone(), department: p.department })
+            .collect()
+    }
+
+    /// E at a desk: open the computer on it, or put the laptop in hands down.
+    /// `None` = no desk in reach (the E goes on to picking things up);
+    /// `Some(line)` = handled, with an optional speech line.
+    fn use_desk(&mut self, pid: u16, body: &Body) -> Option<Option<String>> {
+        let ws = computer::workstation_in_reach(&self.workstations, body)?;
+        if let Some(c) = self.computers.iter_mut().find(|c| c.station == ws) {
+            if c.user.is_some_and(|u| u != pid) {
+                return Some(Some(computer::lines::BUSY.into()));
+            }
+            c.user = Some(pid);
+            let handle = c.handle;
+            self.players.get_mut(&pid)?.at_computer = Some(handle);
+            self.send_computer(pid);
+            return Some(None);
+        }
+        let p = self.players.get(&pid)?;
+        if p.inventory.held_kind() != item_kind::LAPTOP {
+            return None;
+        }
+        let dept = self.cfg.recruitment.department_name(p.department).unwrap_or("");
+        if !p.contract || dept.is_empty() {
+            return Some(Some(computer::lines::NO_DEPARTMENT.into()));
+        }
+        if self.workstations[ws].room_name != dept {
+            return Some(Some(computer::lines::NOT_MY_DEPARTMENT.into()));
+        }
+        let handle = self.alloc_handle();
+        let p = self.players.get_mut(&pid)?;
+        let item = p.inventory.take_hands()?;
+        refresh(p);
+        self.computers.push(Computer { handle, station: ws, item, locked: false, user: None });
+        Some(Some(computer::lines::PLACED.into()))
+    }
+
+    /// Stop looking at the screen (the client closes it when the
+    /// AT_COMPUTER status bit clears).
+    fn end_session(&mut self, pid: u16) {
+        let Some(p) = self.players.get_mut(&pid) else { return };
+        if let Some(h) = p.at_computer.take() {
+            if let Some(c) = self.computers.iter_mut().find(|c| c.handle == h && c.user == Some(pid)) {
+                c.user = None;
+            }
+        }
+    }
+
+    /// Users who walked away (or whose computer is gone) leave the screen.
+    fn check_computer_sessions(&mut self) {
+        let mut gone = Vec::new();
+        for p in self.players.values() {
+            let Some(h) = p.at_computer else { continue };
+            let ok = self.computers.iter().find(|c| c.handle == h).is_some_and(|c| {
+                c.user == Some(p.id) && computer::in_leave_range(&self.workstations[c.station], &p.body)
+            });
+            if !ok {
+                gone.push(p.id);
+            }
+        }
+        for pid in gone {
+            self.end_session(pid);
+        }
+    }
+
+    fn computer_packet(&self, pid: u16) -> Option<Packet> {
+        let h = self.players.get(&pid)?.at_computer?;
+        let c = self.computers.iter().find(|c| c.handle == h)?;
+        let accounts = self.accounts();
+        let convs = match accounts.iter().find(|a| a.id == c.owner()) {
+            Some(acc) if !c.locked => self
+                .messenger
+                .conversations(acc, &accounts, |d| self.cfg.recruitment.department_name(d).map(str::to_string))
+                .into_iter()
+                .map(|i| proto::ConvEntry { conv: i.conv, unread: i.unread, title: i.title })
+                .collect(),
+            _ => Vec::new(),
+        };
+        Some(Packet::Computer { handle: h, owner: c.owner(), locked: c.locked, convs })
+    }
+
+    fn send_computer(&mut self, pid: u16) {
+        if let Some(pk) = self.computer_packet(pid) {
+            let addr = self.players[&pid].addr;
+            self.send(addr, &pk);
+        }
+    }
+
+    /// Send messages, split so each datagram fits.
+    fn send_chat(&mut self, addr: SocketAddr, conv: u16, msgs: &[computer::Msg]) {
+        let mut chunk: Vec<proto::ChatEntry> = Vec::new();
+        let mut size = proto::HEADER_LEN + 3;
+        for m in msgs {
+            let len = 4 + 2 + 2 + m.nick.len().min(proto::MAX_NICK_BYTES) + 2 + m.text.len().min(proto::MAX_CHAT_BYTES);
+            if size + len > proto::MAX_PACKET && !chunk.is_empty() {
+                self.send(addr, &Packet::Chat { conv, messages: std::mem::take(&mut chunk) });
+                size = proto::HEADER_LEN + 3;
+            }
+            size += len;
+            chunk.push(proto::ChatEntry { id: m.id, from: m.from, nick: m.nick.clone(), text: m.text.clone() });
+        }
+        self.send(addr, &Packet::Chat { conv, messages: chunk });
+    }
+
+    fn handle_computer_action(&mut self, pid: u16, action: u8, conv: u16, arg: u32, text: &str) {
+        use proto::computer_action as a;
+        let Some(h) = self.players.get(&pid).and_then(|p| p.at_computer) else { return };
+        let Some(ci) = self.computers.iter().position(|c| c.handle == h && c.user == Some(pid)) else { return };
+        let say = |line: &str| (pid, line.to_string(), None);
+        let owner = self.computers[ci].owner();
+        match action {
+            a::CLOSE => self.end_session(pid),
+            a::LOCK => {
+                self.computers[ci].locked = true;
+                self.end_session(pid);
+            }
+            a::UNLOCK => {
+                if pid == owner {
+                    self.computers[ci].locked = false;
+                    self.send_computer(pid);
+                } else {
+                    self.pending_says.push(say(computer::lines::LOCKED));
+                }
+            }
+            a::TAKE => {
+                if !self.players[&pid].inventory.hands_free() {
+                    self.pending_says.push(say(computer::lines::HANDS_FULL));
+                    return;
+                }
+                self.end_session(pid);
+                let c = self.computers.remove(ci);
+                if owner != pid {
+                    let (who, whose) = (self.players[&pid].nick.clone(), c.item.label.clone());
+                    self.log(format!("* computer: {who} took {whose}"));
+                }
+                self.give(pid, c.item);
+                self.pending_says.push(say(computer::lines::TAKEN));
+            }
+            a::SYNC | a::SEND => {
+                if self.computers[ci].locked {
+                    return;
+                }
+                let accounts = self.accounts();
+                let Some(acc) = accounts.iter().find(|x| x.id == owner).cloned() else { return };
+                let addr = self.players[&pid].addr;
+                if action == a::SYNC {
+                    if let Some(msgs) = self.messenger.sync(&acc, conv, arg, &accounts) {
+                        self.send_chat(addr, conv, &msgs);
+                    }
+                    return;
+                }
+                let tick = self.tick;
+                let p = self.players.get_mut(&pid).unwrap();
+                if arg == p.last_chat_nonce || p.last_chat_tick.is_some_and(|t| tick.wrapping_sub(t) < computer::SEND_COOLDOWN_TICKS) {
+                    return; // retry of a message already posted, or spam
+                }
+                let Some(msg) = self.messenger.post(&acc, conv, text, &accounts) else { return };
+                let p = self.players.get_mut(&pid).unwrap();
+                p.last_chat_nonce = arg;
+                p.last_chat_tick = Some(tick);
+                let typed_by = p.nick.clone();
+                if pid == owner {
+                    self.log(format!("* chat: {} -> conv {conv}", acc.nick));
+                } else {
+                    self.log(format!("* chat: {typed_by} as {} -> conv {conv}", acc.nick));
+                }
+                // Live push to everyone looking at a screen of an account in
+                // the audience (the others get it from SYNC / unread counts).
+                let mut pushes = Vec::new();
+                for (account, seen_as) in self.messenger.audience(&acc, conv, &accounts) {
+                    for viewer in self.players.values() {
+                        let Some(vh) = viewer.at_computer else { continue };
+                        if self.computers.iter().any(|c| c.handle == vh && c.owner() == account && !c.locked) {
+                            pushes.push((viewer.addr, viewer.id, seen_as));
+                        }
+                    }
+                }
+                for (addr, vid, seen_as) in pushes {
+                    self.send_chat(addr, seen_as, std::slice::from_ref(&msg));
+                    self.send_computer(vid);
+                }
+            }
+            _ => {}
+        }
+    }
+
     fn remove_player(&mut self, id: u16, why: &str) {
-        if let Some(p) = self.players.remove(&id) {
+        if let Some(mut p) = self.players.remove(&id) {
             coffee::release(&mut self.machines, &p.cup);
+            for c in &mut self.computers {
+                if c.user == Some(id) {
+                    c.user = None;
+                }
+            }
+            // Other people's things they carried stay in the building...
+            let carried: Vec<Item> = std::mem::take(&mut p.inventory).items().cloned().collect();
+            for item in carried.into_iter().filter(|i| i.owner != 0 && i.owner != id) {
+                self.drop_at(p.body.floor, p.body.pos, item);
+            }
+            // ...their own go with them (no persistent accounts yet): laptop on
+            // a desk, card lent to someone, anything on the floor.
+            self.computers.retain(|c| c.owner() != id);
+            self.dropped.retain(|d| d.item.owner != id);
+            for other in self.players.values_mut() {
+                let before = other.inventory.clone();
+                other.inventory.remove_owned_by(id);
+                if other.inventory != before {
+                    refresh(other);
+                }
+            }
+            self.messenger.forget(id);
             self.by_token.remove(&p.token);
             if self.by_addr.get(&p.addr) == Some(&id) {
                 self.by_addr.remove(&p.addr);
@@ -870,7 +1149,7 @@ impl Server {
                 refresh(p);
                 coffee_says.push((p.id, coffee::lines::COLD.to_string(), None));
             }
-            p.flags = (p.flags & 0x3f) | status_bits(&p.cup) << proto::status::FLAGS_SHIFT;
+            p.flags = (p.flags & 0x3f) | status_bits(p) << proto::status::FLAGS_SHIFT;
         }
         for pid in coffee_ready {
             let free = self.players[&pid].inventory.hands_free();
@@ -907,12 +1186,16 @@ impl Server {
                     coffee::Outcome::Busy => coffee::lines::BUSY,
                     coffee::Outcome::HandsFull => coffee::lines::HANDS_FULL,
                 };
-                p.flags = (p.flags & 0x3f) | status_bits(&p.cup) << proto::status::FLAGS_SHIFT;
+                p.flags = (p.flags & 0x3f) | status_bits(p) << proto::status::FLAGS_SHIFT;
                 coffee_says.push((pid, line.to_string(), None));
+            } else if let Some(said) = self.use_desk(pid, &body) {
+                coffee_says.extend(said.map(|line| (pid, line, None)));
             } else if let Some(line) = self.try_pickup(pid, &body) {
                 coffee_says.push((pid, line, None));
             }
         }
+        self.check_computer_sessions();
+
         let bodies: HashMap<u16, Body> =
             self.players.values().filter(|p| matches!(p.stage, Stage::Working)).map(|p| (p.id, p.body)).collect();
         for n in &mut self.npcs {
@@ -970,6 +1253,19 @@ impl Server {
                 held: 0,
             });
         }
+        for c in &self.computers {
+            let w = &self.workstations[c.station];
+            let pos = Pos::tile_center(w.tile.x, w.tile.y);
+            let room = self.building.floor(w.floor).map_or(0, |m| m.room_at(pos.x, pos.y));
+            groups.entry((w.floor, room)).or_default().push(EntityState {
+                id: c.handle,
+                kind: proto::kind::COMPUTER,
+                x: pos.x,
+                y: pos.y,
+                flags: computer::entity_flags(c),
+                held: c.item.kind,
+            });
+        }
         for d in &self.dropped {
             let room = self.building.floor(d.floor).map_or(0, |m| m.room_at(d.pos.x, d.pos.y));
             groups.entry((d.floor, room)).or_default().push(EntityState {
@@ -1011,13 +1307,18 @@ impl Server {
                 lock: p.body.lock,
                 prev_input: p.body.prev_input,
                 access: p.body.access,
-                status: status_bits(&p.cup),
+                status: status_bits(p),
             };
             for f in proto::snapshot_fragments(tick, p.last_processed_seq, me, &visible) {
                 outgoing.push((p.addr, id, f));
             }
             if p.inv_dirty || tick % INVENTORY_RESEND_TICKS == 0 {
                 outgoing.push((p.addr, id, inventory_packet(&p.inventory)));
+            }
+            if tick % COMPUTER_RESEND_TICKS == 0 {
+                if let Some(pk) = self.computer_packet(id) {
+                    outgoing.push((p.addr, id, pk));
+                }
             }
             for chunk in new_infos.chunks(INFO_PER_PACKET) {
                 outgoing.push((p.addr, id, Packet::PlayerInfo { players: chunk.to_vec() }));
@@ -1105,12 +1406,9 @@ impl Server {
     }
 }
 
-fn status_bits(cup: &Cup) -> u8 {
-    if cup.brewing() {
-        proto::status::BREWING
-    } else {
-        0
-    }
+fn status_bits(p: &Player) -> u8 {
+    (if p.cup.brewing() { proto::status::BREWING } else { 0 })
+        | (if p.at_computer.is_some() { proto::status::AT_COMPUTER } else { 0 })
 }
 
 /// After an inventory change: access follows the carried items.

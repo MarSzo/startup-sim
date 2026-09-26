@@ -23,6 +23,8 @@ OPTIONS:
   --loss <p>            simulated packet loss per direction, e.g. 0.02
   --start-with-card     every player starts with an employee card (load tests / bots)
   --skip-recruitment    spawn straight into the building, no job portal (dev)
+  --start-employed      like --skip-recruitment, but already hired: contract, card and
+                        laptop, spawned at a desk (departments alternate by player id)
   --recruitment <path>  recruitment JSON  [default: data/recruitment.json]
 ";
 
@@ -55,7 +57,8 @@ fn main() {
         client_timeout: DEFAULT_CLIENT_TIMEOUT,
         start_access: if args.flag("start-with-card") { game::map::access::CARD } else { 0 },
         recruitment,
-        skip_recruitment: args.flag("skip-recruitment"),
+        skip_recruitment: args.flag("skip-recruitment") || args.flag("start-employed"),
+        start_employed: args.flag("start-employed"),
     };
     let mut cfg = cfg;
     if args.str("bind").is_none() && game::net::bind_udp(cfg.bind).is_err() {

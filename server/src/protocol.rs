@@ -5,7 +5,7 @@
 //! `tests/golden/packets.json`.
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 8;
+pub const VERSION: u8 = 9;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
 pub const MAX_PACKET: usize = 1200;
@@ -17,6 +17,10 @@ pub const MAX_SAY_BYTES: usize = MAX_TEXT_BYTES;
 pub const MAX_MAIL_BYTES: usize = 600;
 /// Max answer options of a recruitment question.
 pub const MAX_OPTIONS: usize = 4;
+/// Messenger message text (a 200-char message of 2-byte letters fits whole).
+pub const MAX_CHAT_BYTES: usize = 400;
+/// Conversations in one `Computer` packet (2+1+2+24 B each -> < 1200 B).
+pub const MAX_CONVS: usize = 40;
 /// Max inputs carried in one Input packet.
 pub const MAX_INPUTS_PER_PACKET: usize = 8;
 
@@ -47,6 +51,9 @@ pub mod ty {
     pub const PORTAL_ACTION: u8 = 18;
     pub const INVENTORY: u8 = 19;
     pub const ITEM_ACTION: u8 = 20;
+    pub const COMPUTER: u8 = 21;
+    pub const COMPUTER_ACTION: u8 = 22;
+    pub const CHAT: u8 = 23;
 }
 
 /// `ItemAction::action`.
@@ -64,6 +71,22 @@ pub mod item_action {
 }
 
 /// `Mail::action` / `PortalAction::action`.
+/// `ComputerAction::action`.
+pub mod computer_action {
+    /// Leave the screen.
+    pub const CLOSE: u8 = 1;
+    /// Lock the computer (and leave). Anyone may.
+    pub const LOCK: u8 = 2;
+    /// Unlock (owner only).
+    pub const UNLOCK: u8 = 3;
+    /// Take the laptop off the desk (needs free hands). Anyone may.
+    pub const TAKE: u8 = 4;
+    /// Send messages of `conv` newer than `arg` (`Chat` reply).
+    pub const SYNC: u8 = 5;
+    /// Post `text` to `conv`; `arg` = client nonce (retries are deduped).
+    pub const SEND: u8 = 6;
+}
+
 pub mod portal_action {
     pub const NONE: u8 = 0;
     /// Join the online interview for offer `arg`.
@@ -139,7 +162,8 @@ pub mod disconnect {
 /// Activity bits: `Snapshot::self_status` bits 0..1, and the same two
 /// bits at 6..7 of every entity's `flags`.
 pub mod status {
-    pub const HOLDING_COFFEE: u8 = 1;
+    /// Sitting at a computer (the client shows its screen while set).
+    pub const AT_COMPUTER: u8 = 1;
     pub const BREWING: u8 = 2;
     /// Shift of the status bits inside `EntityState::flags`.
     pub const FLAGS_SHIFT: u8 = 6;
@@ -151,6 +175,26 @@ pub mod kind {
     pub const NPC: u8 = 1;
     /// An item lying on the floor (`EntityState::held` = item kind).
     pub const ITEM: u8 = 2;
+    /// A laptop on a desk (`flags`: bit 0 locked, bit 1 in use; the owner's
+    /// name comes as its `PlayerInfo`).
+    pub const COMPUTER: u8 = 3;
+}
+
+/// One conversation in the messenger sidebar.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConvEntry {
+    pub conv: u16,
+    pub unread: u8,
+    pub title: String,
+}
+
+/// One messenger message.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ChatEntry {
+    pub id: u32,
+    pub from: u16,
+    pub nick: String,
+    pub text: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -248,6 +292,11 @@ pub enum Packet {
     Inventory { slots: Vec<SlotInfo> },
     /// Do something with an item (`item_action::*`).
     ItemAction { token: u32, action: u8, slot: u8 },
+    /// Screen of the computer the receiver sits at (resent while seated).
+    Computer { handle: u16, owner: u16, locked: bool, convs: Vec<ConvEntry> },
+    ComputerAction { token: u32, action: u8, conv: u16, arg: u32, text: String },
+    /// Messages of a conversation (sync reply or live push).
+    Chat { conv: u16, messages: Vec<ChatEntry> },
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -371,6 +420,9 @@ impl Packet {
             Packet::PortalAction { .. } => ty::PORTAL_ACTION,
             Packet::Inventory { .. } => ty::INVENTORY,
             Packet::ItemAction { .. } => ty::ITEM_ACTION,
+            Packet::Computer { .. } => ty::COMPUTER,
+            Packet::ComputerAction { .. } => ty::COMPUTER_ACTION,
+            Packet::Chat { .. } => ty::CHAT,
         }
     }
 
@@ -545,6 +597,34 @@ impl Packet {
                 w.u8(*action);
                 w.u8(*slot);
             }
+            Packet::Computer { handle, owner, locked, convs } => {
+                w.u16(*handle);
+                w.u16(*owner);
+                w.u8(*locked as u8);
+                w.u8(convs.len().min(MAX_CONVS) as u8);
+                for c in convs.iter().take(MAX_CONVS) {
+                    w.u16(c.conv);
+                    w.u8(c.unread);
+                    w.str16(&c.title, MAX_NICK_BYTES + 8);
+                }
+            }
+            Packet::ComputerAction { token, action, conv, arg, text } => {
+                w.u32(*token);
+                w.u8(*action);
+                w.u16(*conv);
+                w.u32(*arg);
+                w.str16(text, MAX_CHAT_BYTES);
+            }
+            Packet::Chat { conv, messages } => {
+                w.u16(*conv);
+                w.u8(messages.len().min(255) as u8);
+                for m in messages.iter().take(255) {
+                    w.u32(m.id);
+                    w.u16(m.from);
+                    w.str16(&m.nick, MAX_NICK_BYTES);
+                    w.str16(&m.text, MAX_CHAT_BYTES);
+                }
+            }
         }
         w.0
     }
@@ -711,6 +791,39 @@ impl Packet {
                 Packet::Inventory { slots }
             }
             ty::ITEM_ACTION => Packet::ItemAction { token: r.u32()?, action: r.u8()?, slot: r.u8()? },
+            ty::COMPUTER => {
+                let (handle, owner, locked) = (r.u16()?, r.u16()?, r.u8()? != 0);
+                let n = r.u8()? as usize;
+                if n > MAX_CONVS {
+                    return Err(DecodeError::Invalid("too many conversations"));
+                }
+                let mut convs = Vec::with_capacity(n);
+                for _ in 0..n {
+                    convs.push(ConvEntry { conv: r.u16()?, unread: r.u8()?, title: r.str16(MAX_NICK_BYTES + 8)? });
+                }
+                Packet::Computer { handle, owner, locked, convs }
+            }
+            ty::COMPUTER_ACTION => Packet::ComputerAction {
+                token: r.u32()?,
+                action: r.u8()?,
+                conv: r.u16()?,
+                arg: r.u32()?,
+                text: r.str16(MAX_CHAT_BYTES)?,
+            },
+            ty::CHAT => {
+                let conv = r.u16()?;
+                let n = r.u8()? as usize;
+                let mut messages = Vec::with_capacity(n.min(64));
+                for _ in 0..n {
+                    messages.push(ChatEntry {
+                        id: r.u32()?,
+                        from: r.u16()?,
+                        nick: r.str16(MAX_NICK_BYTES)?,
+                        text: r.str16(MAX_CHAT_BYTES)?,
+                    });
+                }
+                Packet::Chat { conv, messages }
+            }
             other => return Err(DecodeError::UnknownType(other)),
         };
         if r.pos != b.len() {
@@ -887,6 +1000,33 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
             },
         ),
         ("item_action", Packet::ItemAction { token: 0x01020304, action: item_action::TAKE_OUT, slot: 2 }),
+        (
+            "computer",
+            Packet::Computer {
+                handle: 0xE001,
+                owner: 3,
+                locked: false,
+                convs: vec![
+                    ConvEntry { conv: 1, unread: 0, title: "#ogólny".into() },
+                    ConvEntry { conv: 17, unread: 2, title: "#it-produkt".into() },
+                    ConvEntry { conv: 0x8004, unread: 1, title: "Kuba".into() },
+                ],
+            },
+        ),
+        (
+            "computer_action",
+            Packet::ComputerAction { token: 0x01020304, action: computer_action::SEND, conv: 17, arg: 42, text: "Kto zjadł mój jogurt?".into() },
+        ),
+        (
+            "chat",
+            Packet::Chat {
+                conv: 17,
+                messages: vec![
+                    ChatEntry { id: 5, from: 3, nick: "Ola".into(), text: "Deploy w piątek?".into() },
+                    ChatEntry { id: 6, from: 4, nick: "Kuba".into(), text: "Nigdy w życiu.".into() },
+                ],
+            },
+        ),
     ]
 }
 
@@ -917,7 +1057,7 @@ mod tests {
     fn rejects_garbage() {
         assert_eq!(Packet::decode(&[]), Err(DecodeError::TooShort));
         assert_eq!(Packet::decode(&[0, 0, 1, 1]), Err(DecodeError::BadMagic));
-        assert_eq!(Packet::decode(&[0x54, 0x53, 9, 1]), Err(DecodeError::BadVersion(9)));
+        assert_eq!(Packet::decode(&[0x54, 0x53, 99, 1]), Err(DecodeError::BadVersion(99)));
         assert_eq!(Packet::decode(&[0x54, 0x53, VERSION, 200]), Err(DecodeError::UnknownType(200)));
         let mut b = Packet::Ping { token: 1, client_time: 2 }.encode();
         b.push(0);
@@ -944,7 +1084,7 @@ mod tests {
                 b[0] = 0x54;
                 b[1] = 0x53;
                 b[2] = VERSION;
-                b[3] = rng.u8(1..=20);
+                b[3] = rng.u8(1..=23);
             }
             let _ = Packet::decode(&b);
         }
