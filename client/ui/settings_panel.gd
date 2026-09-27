@@ -58,6 +58,27 @@ func _ready() -> void:
 	_volume("Efekty", Settings.vol_sfx, func(v: float): Settings.vol_sfx = v)
 	_volume("Otoczenie", Settings.vol_ambient, func(v: float): Settings.vol_ambient = v)
 	_volume("Muzyka", Settings.vol_music, func(v: float): Settings.vol_music = v)
+	_volume("Głosy graczy", Settings.vol_voice, func(v: float): Settings.vol_voice = v)
+	var mr := HBoxContainer.new()
+	mr.add_theme_constant_override("separation", 12)
+	var ml := Ink.label("Mikrofon:", 18, Ink.TEXT_INK)
+	ml.custom_minimum_size = Vector2(210, 0)
+	mr.add_child(ml)
+	var mic := OptionButton.new()
+	mic.custom_minimum_size = Vector2(220, 0)
+	mic.clip_text = true
+	for d in AudioServer.get_input_device_list():
+		mic.add_item("Domyślny systemu" if d == "Default" else d)
+		mic.set_item_metadata(mic.item_count - 1, d)
+		if d == Settings.mic_device:
+			mic.select(mic.item_count - 1)
+	mic.item_selected.connect(func(i: int):
+		Settings.mic_device = mic.get_item_metadata(i)
+		Settings.apply_audio()
+		_save())
+	mr.add_child(mic)
+	add_child(mr)
+	add_child(Ink.label("Czat głosowy: trzymaj V — mówisz do pomieszczenia, B — szept do osoby obok.", 16, Ink.TEXT_MUTED))
 	var b := Ink.button("Wróć")
 	b.pressed.connect(func(): back.emit())
 	add_child(b)

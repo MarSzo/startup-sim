@@ -67,6 +67,9 @@ var _zoom := 1.0
 var _last_pos := Vector2.INF
 var _walk := 0.0      # distance-driven walk phase
 var _idle := 1.0      # seconds since the last movement
+## Voice chat: sound waves next to the nick while talking (whisper = soft).
+var _talk := Node2D.new()
+var _talk_whisper := false
 
 
 func setup(seed_id: int, nick: String, zoom: float) -> void:
@@ -90,7 +93,33 @@ func setup(seed_id: int, nick: String, zoom: float) -> void:
 		add_child(_tag)
 		_tag.add_child(nick_label)
 		_build_bubble()
+		_talk.visible = false
+		_talk.position = Vector2(0, HEAD_TOP - 30 / zoom)
+		_talk.scale = Vector2.ONE / zoom
+		_talk.draw.connect(_draw_talk)
+		_tag.add_child(_talk)
 	queue_redraw()
+
+
+## Talking (voice chat) — shown while frames keep coming.
+func set_talking(on: bool, whisper := false) -> void:
+	if _talk.visible != on or _talk_whisper != whisper:
+		_talk.visible = on
+		_talk_whisper = whisper
+		_talk.queue_redraw()
+
+
+func _draw_talk() -> void:
+	# A little mouth-and-waves glyph above the nick, inked like the rest.
+	var ink := Ink.INK
+	var fill := Color("#9fd0c0") if not _talk_whisper else Color("#d9c7a0")
+	_talk.draw_circle(Vector2.ZERO, 9.0, ink)
+	_talk.draw_circle(Vector2.ZERO, 7.0, fill)
+	_talk.draw_rect(Rect2(-3, -1.5, 6, 3), ink)
+	for k in (1 if _talk_whisper else 2):
+		var r := 13.0 + k * 5.0
+		_talk.draw_arc(Vector2.ZERO, r, -0.6, 0.6, 8, ink, 2.5, true)
+		_talk.draw_arc(Vector2.ZERO, r, PI - 0.6, PI + 0.6, 8, ink, 2.5, true)
 
 
 const HAIR_STYLE_NAMES := ["krótkie", "długie", "kok", "jeżyk", "kucyk", "łysa głowa"]

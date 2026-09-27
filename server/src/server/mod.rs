@@ -37,6 +37,7 @@ mod items;
 mod kitchen;
 mod leave;
 mod office;
+mod voice;
 mod lunch;
 mod movement;
 mod player;

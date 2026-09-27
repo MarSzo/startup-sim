@@ -359,6 +359,16 @@ Dym papierosowy na piętrze odbiorcy (co 1 s, tylko w budynku): `floor u8`, n
 u8 (≤ 64) × {`room u16`, `level u8` 1–255}. Pokoi spoza listy nie ma dymu.
 Czujki dymu są w danych mapy (`room_defs.*.detector`), klient rysuje je sam.
 
+### 52 `Voice` (C→S), 53 `VoiceFrom` (S→C)
+
+`Voice`: token u32, seq u16, whisper u8 (0 pokój, 1 szept), n u16 (≤ 800) ×
+bajt ramki. `VoiceFrom`: speaker u16, seq u16, whisper u8, n u16 + ramka.
+Ramka = 40 ms mowy, 16 kHz mono, IMA ADPCM: predyktor i16 LE, indeks kroku
+u8, potem po 2 próbki na bajt (najpierw młodszy półbajt) — 640 próbek = 323
+B. Serwer nie zagląda do środka: przekazuje ramkę wszystkim w tym samym
+(piętro, pokój) albo — szept — tylko najbliższej osobie w promieniu 1,5
+kafla. Limit: ~30 ramek/s na gracza (nadmiar przepada).
+
 ### 46 `TaskAction` (C→S), 47 `TaskBoard`, 48 `TaskDetail` (S→C)
 
 Tablica zadań działu właściciela komputera (tylko przy odblokowanym
@@ -485,6 +495,7 @@ szyfrowaniem.
 
 ## Historia wersji
 
+- **32** — czat głosowy: `Voice` (52, C→S), `VoiceFrom` (53, S→C).
 - **31** — firmowy komputer: `TaskAction` (46, C→S), `TaskBoard` (47), `TaskDetail` (48), `MailAction` (49, C→S), `WorkMail` (50), `MailState` (51).
 - **30** — dźwięki: `Sound` (45, S→C): n u8 (≤ 64) × {kind u8, x i32, y i32} — zdarzenia słyszalne na piętrze odbiorcy w promieniu 28 kafli (1 ekspres, 2 kasa, 3 bramka sklepu, 4 winda, 5 zamek kabiny, 6 włącznik, 7 spłuczka, 8 kran, 9 zapalniczka, 10 zmywarka, 11 lodówka, 12 szafka, 13 podniesienie, 14 upuszczenie, 15 jedzenie, 16 picie, 17 gwizdek).
 - **29** — `SkipWait` (44, C→S: token u32) — „Pomiń czekanie” w domu; `Clock` + `skip` u8 (0 nie, 1 poproszono, 2 czas pędzi); aktywność 8 = zatrzymany (ochrona / policja).

@@ -23,7 +23,7 @@ pub use golden::{golden_samples, to_hex};
 pub use snapshot::{snapshot_fragments, SelfState};
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 31;
+pub const VERSION: u8 = 32;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
 pub const MAX_PACKET: usize = 1200;
@@ -100,6 +100,8 @@ pub mod ty {
     pub const MAIL_ACTION: u8 = 49;
     pub const WORK_MAIL: u8 = 50;
     pub const MAIL_STATE: u8 = 51;
+    pub const VOICE: u8 = 52;
+    pub const VOICE_FROM: u8 = 53;
 }
 
 /// `ItemAction::action`.
@@ -287,6 +289,9 @@ pub const MAIL_BODY_MAX: usize = 400;
 /// Board members / mail ids in one packet at most.
 pub const MAX_MEMBERS: usize = 24;
 pub const MAX_MAIL_IDS: usize = 64;
+
+/// Bytes of one voice frame at most.
+pub const MAX_VOICE_BYTES: usize = 800;
 
 /// Most sounds in one `Sound` packet.
 pub const MAX_SOUNDS: usize = 64;
@@ -590,6 +595,12 @@ pub enum Packet {
     /// Answer to every MailAction: the last applied nonce, the ids in the
     /// inbox and which of them are in the trash.
     MailState { done: u16, ids: Vec<u16>, trashed: Vec<u16> },
+    /// Push-to-talk: one voice frame (opaque to the server: 16 kHz IMA
+    /// ADPCM, see PROTOCOL.md) to the room, or whispered to the nearest
+    /// person within reach (`whisper` = 1).
+    Voice { token: u32, seq: u16, whisper: u8, data: Vec<u8> },
+    /// A voice frame relayed from `speaker`.
+    VoiceFrom { speaker: u16, seq: u16, whisper: u8, data: Vec<u8> },
     /// Closed doors (locked toilet stalls, elevator doors) on the receiver's
     /// floor: solid for the simulation. Plus the elevator: the floor it is at
     /// and where it is heading (`NO_FLOOR` = standing). Sent on change and

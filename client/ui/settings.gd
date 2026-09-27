@@ -10,6 +10,8 @@ static var zoom := 1.0
 static var vol_sfx := 0.8
 static var vol_ambient := 0.6
 static var vol_music := 0.5
+static var vol_voice := 0.9
+static var mic_device := "Default"
 static var _loaded := false
 
 
@@ -26,6 +28,8 @@ static func load_once() -> void:
 	vol_sfx = clampf(float(cfg.get_value("audio", "sfx", 0.8)), 0.0, 1.0)
 	vol_ambient = clampf(float(cfg.get_value("audio", "ambient", 0.6)), 0.0, 1.0)
 	vol_music = clampf(float(cfg.get_value("audio", "music", 0.5)), 0.0, 1.0)
+	vol_voice = clampf(float(cfg.get_value("audio", "voice", 0.9)), 0.0, 1.0)
+	mic_device = str(cfg.get_value("audio", "mic", "Default"))
 
 
 static func save() -> void:
@@ -36,6 +40,8 @@ static func save() -> void:
 	cfg.set_value("audio", "sfx", vol_sfx)
 	cfg.set_value("audio", "ambient", vol_ambient)
 	cfg.set_value("audio", "music", vol_music)
+	cfg.set_value("audio", "voice", vol_voice)
+	cfg.set_value("audio", "mic", mic_device)
 	cfg.save(PATH)
 
 
@@ -43,6 +49,12 @@ static func apply_audio() -> void:
 	var a = preload("res://audio/audio.gd").inst
 	if a:
 		a.set_volumes(vol_sfx, vol_ambient, vol_music)
+	var vb := AudioServer.get_bus_index("Voice")
+	if vb >= 0:
+		AudioServer.set_bus_volume_db(vb, linear_to_db(maxf(vol_voice, 0.0001)))
+		AudioServer.set_bus_mute(vb, vol_voice <= 0.001)
+	var list := AudioServer.get_input_device_list()
+	AudioServer.input_device = mic_device if list.has(mic_device) else "Default"
 
 
 static func apply_window() -> void:

@@ -68,6 +68,8 @@ server/                 crate Rusta (lib `game` + binarki)
   tests/golden/         packets.json, movement_vectors.json
 client/                 projekt Godota 4.7
   audio/audio.gd        dźwięk: szyny SFX / Ambient / Music, efekty płaskie i w świecie, pętle otoczenia, muzyka
+  audio/voice.gd        czat głosowy: push-to-talk (V / B), mikrofon → 16 kHz → ADPCM, odtwarzanie przy postaci (AudioStreamGenerator), znaczek mówienia
+  audio/adpcm.gd        kodek IMA ADPCM (4 bity / próbkę)
   audio/game_sounds.gd  kroki wg podłoża, pakiety Sound, blipy mowy, otoczenie, syreny, grzmoty
   sounds/               pliki WAV z tools/sounds/gen_sounds.py (syntetyzowane)
   ui/office/            aplikacje firmowego komputera: okno (os_window), tablica kanban, poczta (mail_box = dane, mail_view = skrzynka / kosz)
@@ -344,6 +346,10 @@ jako właściciel odblokowanego komputera, przy którym siedzi gracz. Akcje maj�
 nonce (ostatni zastosowany w `Player::task_nonce` / `mail_nonce`), a każda
 odpowiedź niesie pełny stan — klient ponawia, dopóki nie zobaczy swojego
 nonce. `office_mail` wysyła maile systemowe (HR, kalendarz, obiady, tablica).
+Głos (`server/voice.rs`): `Voice` jest przekazywany od razu jako `VoiceFrom`
+— do graczy w tym samym (piętro, pokój) albo, szeptem, do jednej
+najbliższej osoby w `WHISPER_RADIUS`; limit ramek per gracz (wiaderko
+tokenów w tickach). Serwer nie dekoduje ani nie zapisuje głosu.
 Dźwięki (`Server::sounds`): zdarzenia dopisują `(rodzaj, piętro, pozycja)`
 (`sound()` dla miejsca gracza); `queue_sounds` wysyła `Sound` każdemu na tym
 piętrze w promieniu `HEAR_RADIUS`. Resztę (kroki, otoczenie, muzykę) klient

@@ -243,6 +243,8 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
         ("mail_action", Packet::MailAction { token: 0x01020304, nonce: 4, action: 1, id: 0, to: "Kuba".into(), subject: "Kawa?".into(), body: "O 12 w kuchni.".into() }),
         ("work_mail", Packet::WorkMail { id: 5, from: "HR".into(), to: "Kuba".into(), subject: "Witamy!".into(), body: "Miłego pierwszego dnia.".into(), day: 2, minute: 540 }),
         ("mail_state", Packet::MailState { done: 4, ids: vec![1, 2, 5], trashed: vec![2] }),
+        ("voice", Packet::Voice { token: 0x01020304, seq: 9, whisper: 1, data: vec![0x10, 0x00, 0x05, 0x7f, 0x80] }),
+        ("voice_from", Packet::VoiceFrom { speaker: 3, seq: 9, whisper: 0, data: vec![0x10, 0x00, 0x05, 0x7f, 0x80] }),
         ("sound", Packet::Sound { sounds: vec![(1, 12_288, -256), (17, 0, 65_536)] }),
         (
             "chat",

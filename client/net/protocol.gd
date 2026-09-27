@@ -3,7 +3,7 @@
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 31
+const VERSION := 32
 const MAX_PACKET := 1200
 const MAX_NICK_BYTES := 16
 const MAX_SAY_BYTES := 240
@@ -62,6 +62,9 @@ const T_TASK_DETAIL := 48
 const T_MAIL_ACTION := 49
 const T_WORK_MAIL := 50
 const T_MAIL_STATE := 51
+const T_VOICE := 52
+const T_VOICE_FROM := 53
+const MAX_VOICE_BYTES := 800
 # TaskAction.action / MailAction.action (server/src/protocol/mod.rs)
 const TA_SYNC := 0
 const TA_CREATE := 1
@@ -370,6 +373,17 @@ static func encode_mail_action(token: int, nonce: int, action: int, id: int, to:
 	return b.data_array
 
 
+static func encode_voice(token: int, seq: int, whisper: bool, data: PackedByteArray) -> PackedByteArray:
+	var b := _writer(T_VOICE)
+	b.put_u32(token)
+	b.put_u16(seq & 0xffff)
+	b.put_u8(1 if whisper else 0)
+	var n := mini(data.size(), MAX_VOICE_BYTES)
+	b.put_u16(n)
+	b.put_data(data.slice(0, n))
+	return b.data_array
+
+
 static func encode_skip_wait(token: int) -> PackedByteArray:
 	var b := _writer(T_SKIP_WAIT)
 	b.put_u32(token)
@@ -454,6 +468,13 @@ class Reader:
 			return ""
 		var res: Array = b.get_data(n)
 		return (res[1] as PackedByteArray).get_string_from_utf8()
+
+	func bytes(n: int) -> PackedByteArray:
+		if not _has(n):
+			ok = false
+			return PackedByteArray()
+		var res: Array = b.get_data(n)
+		return res[1]
 
 	func at_end() -> bool:
 		return b.get_available_bytes() == 0
@@ -643,6 +664,14 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 				for i in n:
 					list.append(r.u16())
 				p[key] = list
+		T_VOICE_FROM:
+			p.speaker = r.u16()
+			p.seq = r.u16()
+			p.whisper = r.u8() != 0
+			var n := r.u16()
+			if n > MAX_VOICE_BYTES:
+				return {}
+			p.data = r.bytes(n)
 		T_SOUND:
 			var n := r.u8()
 			if n > 64:

@@ -128,6 +128,9 @@ pub(super) struct Player {
     /// Last applied TaskAction / MailAction nonces (retries are ignored).
     pub(super) task_nonce: u16,
     pub(super) mail_nonce: u16,
+    /// Voice rate limit: allowance (1/20 frame units) and when refilled.
+    pub(super) voice_allowance: u32,
+    pub(super) voice_tick: u32,
     /// Salary, grosze per game hour (raises from the CEO).
     pub(super) pay_rate: i64,
     /// World day of the last raise request (cooldown).
@@ -199,6 +202,8 @@ impl Player {
             skip_wait: false,
             task_nonce: 0,
             mail_nonce: 0,
+            voice_allowance: 200,
+            voice_tick: 0,
             pay_rate: clock::PAY_PER_MIN * 60,
             last_raise_day: None,
             talk: None,

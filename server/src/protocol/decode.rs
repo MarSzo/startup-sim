@@ -329,6 +329,14 @@ impl Packet {
                 let [ids, trashed] = lists;
                 Packet::MailState { done, ids, trashed }
             }
+            ty::VOICE => {
+                let (token, seq, whisper) = (r.u32()?, r.u16()?, r.u8()?);
+                Packet::Voice { token, seq, whisper, data: r.voice()? }
+            }
+            ty::VOICE_FROM => {
+                let (speaker, seq, whisper) = (r.u16()?, r.u16()?, r.u8()?);
+                Packet::VoiceFrom { speaker, seq, whisper, data: r.voice()? }
+            }
             ty::SOUND => {
                 let n = r.u8()? as usize;
                 if n > MAX_SOUNDS {

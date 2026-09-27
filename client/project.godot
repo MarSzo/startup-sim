@@ -15,6 +15,10 @@ boot_splash/image="res://icons/splash.png"
 boot_splash/stretch_mode=1
 boot_splash/show_image=true
 
+[audio]
+
+driver/enable_input=true
+
 [display]
 
 window/size/viewport_width=1280

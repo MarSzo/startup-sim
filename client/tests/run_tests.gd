@@ -59,6 +59,7 @@ func test_protocol(path: String) -> void:
 		"fridge_action": Protocol.encode_fridge_action(0x01020304, Protocol.FRIDGE_PUT, 0),
 		"skip_wait": Protocol.encode_skip_wait(0x01020304),
 		"task_action": Protocol.encode_task_action(0x01020304, 7, Protocol.TA_CREATE, 0, 2, "Naprawić logowanie\nPo zmianie hasła."),
+		"voice": Protocol.encode_voice(0x01020304, 9, true, PackedByteArray([0x10, 0x00, 0x05, 0x7f, 0x80])),
 		"mail_action": Protocol.encode_mail_action(0x01020304, 4, Protocol.MA_SEND, 0, "Kuba", "Kawa?", "O 12 w kuchni."),
 		"computer_action": Protocol.encode_computer_action(0x01020304, Protocol.PC_SEND, 17, 42, "Kto zjadł mój jogurt?"),
 		"answer": Protocol.encode_answer(0x01020304, 3, 1, 2),
@@ -159,6 +160,23 @@ func test_protocol(path: String) -> void:
 	expect(wm.get("from") == "HR" and wm.subject == "Witamy!" and wm.minute == 540 and wm.day == 2, "decode work mail %s" % wm)
 	var ms := Protocol.decode(golden["mail_state"].hex_decode())
 	expect(ms.get("done") == 4 and ms.ids == [1, 2, 5] and ms.trashed == [2], "decode mail state %s" % ms)
+	var vf := Protocol.decode(golden["voice_from"].hex_decode())
+	expect(vf.get("speaker") == 3 and vf.seq == 9 and not vf.whisper and vf.data == PackedByteArray([0x10, 0x00, 0x05, 0x7f, 0x80]), "decode voice_from %s" % vf)
+	# ADPCM: a 440 Hz tone survives encoding (a rough SNR check).
+	var Adpcm = load("res://audio/adpcm.gd")
+	var adpcm_tone := PackedFloat32Array()
+	for i in 640:
+		adpcm_tone.append(0.5 * sin(TAU * 440.0 * i / 16000.0))
+	var adpcm_state := [0, 0]
+	var adpcm_enc: PackedByteArray = Adpcm.encode(adpcm_tone, adpcm_state)
+	var adpcm_dec: PackedFloat32Array = Adpcm.decode(adpcm_enc)
+	var adpcm_err := 0.0
+	var adpcm_sig := 0.0
+	for i in range(64, 640):  # after the step size adapts
+		adpcm_err += pow(adpcm_dec[i] - adpcm_tone[i], 2)
+		adpcm_sig += pow(adpcm_tone[i], 2)
+	expect(adpcm_enc.size() == 323 and adpcm_dec.size() == 640, "adpcm sizes %d %d" % [adpcm_enc.size(), adpcm_dec.size()])
+	expect(10.0 * log(adpcm_sig / maxf(adpcm_err, 1e-9)) / log(10.0) > 20.0, "adpcm SNR %.1f dB" % [10.0 * log(adpcm_sig / maxf(adpcm_err, 1e-9)) / log(10.0)])
 	var snd := Protocol.decode(golden["sound"].hex_decode())
 	expect(snd.get("type") == Protocol.T_SOUND and snd.sounds == [[1, 12288, -256], [17, 0, 65536]], "decode sound %s" % snd)
 	# Truncation must never decode.

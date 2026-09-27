@@ -55,6 +55,8 @@ impl Packet {
             Packet::MailAction { .. } => ty::MAIL_ACTION,
             Packet::WorkMail { .. } => ty::WORK_MAIL,
             Packet::MailState { .. } => ty::MAIL_STATE,
+            Packet::Voice { .. } => ty::VOICE,
+            Packet::VoiceFrom { .. } => ty::VOICE_FROM,
             Packet::Doors { .. } => ty::DOORS,
             Packet::DoorAction { .. } => ty::DOOR_ACTION,
         }
@@ -398,6 +400,22 @@ impl Packet {
                         w.u16(*id);
                     }
                 }
+            }
+            Packet::Voice { token, seq, whisper, data } => {
+                w.u32(*token);
+                w.u16(*seq);
+                w.u8(*whisper);
+                let n = data.len().min(MAX_VOICE_BYTES);
+                w.u16(n as u16);
+                w.0.extend_from_slice(&data[..n]);
+            }
+            Packet::VoiceFrom { speaker, seq, whisper, data } => {
+                w.u16(*speaker);
+                w.u16(*seq);
+                w.u8(*whisper);
+                let n = data.len().min(MAX_VOICE_BYTES);
+                w.u16(n as u16);
+                w.0.extend_from_slice(&data[..n]);
             }
             Packet::Sound { sounds } => {
                 w.u8(sounds.len().min(MAX_SOUNDS) as u8);

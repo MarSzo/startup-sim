@@ -1816,3 +1816,47 @@ fn task_board_per_department_and_work_mail() {
     });
     assert_eq!(state.map(|(ids, t)| (ids.contains(&mid), t)), Some((true, vec![mid])));
 }
+
+#[test]
+fn voice_reaches_the_room_and_whispers_only_the_one_next_to_you() {
+    let (addr, _) = start_server_cfg(0, true, true); // hired, standing at their desks
+    let b = building();
+    let (ola, _) = Client::connect(addr, "Ola"); // id 1: IT
+    let (kuba, _) = Client::connect(addr, "Kuba"); // id 2: Biznes (another room)
+    let (mut ewa, _) = Client::connect(addr, "Ewa"); // id 3: IT, the next desk
+    let say = |c: &Client, seq: u16, whisper: u8| {
+        c.sock.send(&Packet::Voice { token: c.token, seq, whisper, data: vec![1, 2, 3, 4] }.encode()).unwrap();
+    };
+    let heard = |c: &Client, keep: &[&Client], seq: u16| {
+        wait_for(c, keep, Duration::from_millis(400), |p| match p {
+            Packet::VoiceFrom { speaker, seq: s, whisper, data } if *s == seq => Some((*speaker, *whisper, data.clone())),
+            _ => None,
+        })
+    };
+    std::thread::sleep(Duration::from_millis(200));
+
+    // Ola talks: Ewa (same room) hears it, Kuba (Biznes) doesn't.
+    say(&ola, 1, 0);
+    assert_eq!(heard(&ewa, &[&ola, &kuba], 1), Some((ola.id, 0, vec![1, 2, 3, 4])));
+    say(&ola, 2, 0);
+    assert_eq!(heard(&kuba, &[&ola, &ewa], 2), None, "another room");
+
+    // Ewa sits at the next desk: a whisper reaches her (and only her).
+    say(&ola, 3, 1);
+    assert_eq!(heard(&ewa, &[&ola, &kuba], 3).map(|h| h.1), Some(1), "whispered to Ewa");
+    say(&ola, 4, 1);
+    assert_eq!(heard(&kuba, &[&ola, &ewa], 4), None);
+
+    // Ewa walks to the far end of the room: the room still hears Ola, a
+    // whisper doesn't reach anyone.
+    let ws = game::computer::find_workstations(&b);
+    let it: Vec<_> = ws.iter().filter(|w| w.room_name == "IT / Produkt").collect();
+    let seat = |i: usize| Body { access: access::CARD, ..Body::at(it[i].floor, Pos::tile_center(it[i].tile.x, it[i].tile.y + 1)) };
+    let far = it.last().unwrap();
+    ewa.walk_to(&b, seat(1), (1, Tile { x: far.tile.x, y: far.tile.y + 1 }), &[&ola, &kuba]);
+    std::thread::sleep(Duration::from_millis(200));
+    say(&ola, 5, 1);
+    assert_eq!(heard(&ewa, &[&ola, &kuba], 5), None, "too far for a whisper");
+    say(&ola, 6, 0);
+    assert_eq!(heard(&ewa, &[&ola, &kuba], 6).map(|h| h.1), Some(0), "the room still hears");
+}

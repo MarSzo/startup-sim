@@ -56,6 +56,7 @@ var tick_hz := 20
 var nick := ""
 var world := Node2D.new()
 var sounds := preload("res://audio/game_sounds.gd").new()
+var voice := preload("res://audio/voice.gd").new()
 var me := PlayerView.new()
 var camera := Camera2D.new()
 var overlay := DebugOverlay.new()
@@ -166,6 +167,12 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 	net.packet_received.connect(_on_packet)
 	sounds.game = self
 	add_child(sounds)
+	voice.game = self
+	voice.dev_tone = args.has("voice-tone")
+	add_child(voice)
+	voice.send.connect(func(s: int, w: bool, data: PackedByteArray):
+		if net.is_playing():
+			net.send(Protocol.encode_voice(net.token, s, w, data)))
 	var audio = preload("res://audio/audio.gd").inst
 	if audio:
 		audio.world = world
@@ -478,6 +485,10 @@ func _goto_input(delta: float) -> int:
 			Input.parse_input_event(ev)
 			goto_delay = 0.3
 			return 0
+		if leg.begins_with("talk:") or leg.begins_with("whisper:"):  # dev voice chat
+			voice.dev_talk(1 if leg.begins_with("talk:") else 2, float(leg.get_slice(":", 1)))
+			goto_delay = 0.2
+			return 0
 		if leg == "L":  # lock / unlock the stall
 			net.send(Protocol.encode_door_action(net.token))
 			goto_delay = 0.3
@@ -684,6 +695,8 @@ func _on_packet(p: Dictionary) -> void:
 			screen.on_mail_state(p)
 		Protocol.T_SOUND:
 			sounds.on_sound(p)
+		Protocol.T_VOICE_FROM:
+			voice.on_voice(p)
 		Protocol.T_SAY:
 			sounds.on_say(p.id, remotes[p.id].position if remotes.has(p.id) else me.position, p.id == net.player_id)
 			var who: String = nicks.get(p.id, "?")
@@ -945,6 +958,16 @@ func _update_hint() -> void:
 		hint_label.text = "Zatrzymano cię — chwilę stoisz w miejscu…"
 		hint_label.visible = true
 		return
+	if voice.talking != 0:
+		# Push-to-talk: who hears us.
+		if voice.talking == 1:
+			hint_label.text = "Mówisz do wszystkich w pomieszczeniu…"
+		elif voice.whisper_to >= 0:
+			hint_label.text = "Szepczesz do: %s" % nicks.get(voice.whisper_to, "?")
+		else:
+			hint_label.text = "Szept: nikogo obok — podejdź bliżej"
+		hint_label.visible = true
+		return
 	var map = building.get_floor(pred.floor)
 	var t := Movement.tile_of_pos(pred.pos)
 	var link: Dictionary = map.link_at(t.x, t.y) if map else {}
@@ -1068,6 +1091,8 @@ func _update_hint() -> void:
 						text = "Bramka wymaga przepustki — porozmawiaj z portierem (portiernia)"
 					else:
 						text = "Wstęp tylko dla obsługi"
+	if text == "" and voice.whisper_to >= 0:
+		text = "[V] mów · [B] szept: %s" % nicks.get(voice.whisper_to, "?")
 	hint_label.text = text
 	hint_label.visible = text != ""
 

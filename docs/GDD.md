@@ -1034,6 +1034,23 @@ pełnym ekranie — zastąpiona stylem inspirowanym Don't Starve:
   przypisane zadanie, komentarz do Twojego zadania. Plakietki z liczbą
   nieprzeczytanych na ikonach Poczty i Komunikatora, dźwięk nowej poczty.
 
+### 10.40 Czat głosowy
+
+- **Push-to-talk**: trzymasz **V** — słyszą Cię wszyscy w **tym samym
+  pomieszczeniu** (dźwięk przestrzenny: ciszej z daleka); trzymasz **B** —
+  **szept** tylko do najbliższej osoby w promieniu ~1,5 kafla (podpowiedź
+  pokazuje, do kogo; nikogo obok — nic nie leci).
+- Nad mówiącą postacią pojawia się znaczek z falami (szept — spokojniejszy).
+- Mikrofon włącza się przy pierwszym naciśnięciu (macOS pyta wtedy o
+  zgodę); w polu tekstowym (komunikator, formularze) V / B nie nadają.
+- Ustawienia: głośność głosów graczy, wybór mikrofonu.
+- Jakość: 16 kHz, IMA ADPCM (~64 kb/s), ramki po 40 ms. Serwer tylko
+  przekazuje ramki (nie dekoduje, nie zapisuje, nie loguje) i pilnuje, kto
+  słyszy: ten sam pokój albo — szept — jedna najbliższa osoba; limit ~30
+  ramek/s na gracza.
+- Eksport na macOS będzie potrzebował opisu uprawnienia mikrofonu
+  (`privacy/microphone_usage_description` w presecie eksportu).
+
 ### 10.6 Stan implementacji
 
 *Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie,
@@ -1133,10 +1150,10 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
   ciszy/powrocie z tła i sam łączy się ponownie po utracie sesji.
 - **Testy**: 103 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
   zależna od uprawnień, bramki, ruch/kolizje, schody, winda, nawigacja,
-  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, zegar, dojazd, pogoda, zarząd, słodycze, obiady, wakaty, firma, ochrona i policja, kubki, dym, balkon, tablica zadań, poczta służbowa, protokół), 2 golden, 31 e2e serwera
+  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, zegar, dojazd, pogoda, zarząd, słodycze, obiady, wakaty, firma, ochrona i policja, kubki, dym, balkon, tablica zadań, poczta służbowa, protokół), 2 golden, 32 e2e serwera
   (m.in. portal: odrzucenie → przyjęcie → spawn; całe wdrożenie aż do karty;
   niewidoczność między piętrami; zgodność stanu serwera z predykcją) —
-  łącznie 139 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 porannego dojazdu samochodem moknięcia w deszczu spotkania z Prezesem tacy ze słodyczami obiadu z odbiorem na recepcji, obsadzonego stanowiska, panelu założyciela kradzieży w sklepie z ochroną i policją , kubka zebranego przez sprzątaczkę oraz papierosa, który uruchamia alarm pożarowy, wcześniejszego powrotu do domu z przystanku i pomijania czekania, zatrzymania przez ochronę, dźwięku ekspresu słyszanego przez innych, tablicy zadań działu z przypisaniem i komentarzem oraz poczty z koszem); 157 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
+  łącznie 140 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 porannego dojazdu samochodem moknięcia w deszczu spotkania z Prezesem tacy ze słodyczami obiadu z odbiorem na recepcji, obsadzonego stanowiska, panelu założyciela kradzieży w sklepie z ochroną i policją , kubka zebranego przez sprzątaczkę oraz papierosa, który uruchamia alarm pożarowy, wcześniejszego powrotu do domu z przystanku i pomijania czekania, zatrzymania przez ochronę, dźwięku ekspresu słyszanego przez innych, tablicy zadań działu z przypisaniem i komentarzem oraz poczty z koszem, głosu słyszanego tylko w pokoju i szeptu do osoby obok); 161 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
   adresów).
 
 #### Pomiary (MacBook, wszystko lokalnie)

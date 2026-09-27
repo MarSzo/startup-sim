@@ -49,6 +49,15 @@ impl<'a> Reader<'a> {
         self.pos == self.b.len()
     }
 
+    /// A voice frame: u16 length + bytes (at most `MAX_VOICE_BYTES`).
+    pub(super) fn voice(&mut self) -> Result<Vec<u8>, DecodeError> {
+        let n = self.u16()? as usize;
+        if n > super::MAX_VOICE_BYTES {
+            return Err(DecodeError::Invalid("voice frame too big"));
+        }
+        Ok(self.take(n)?.to_vec())
+    }
+
     pub(super) fn take(&mut self, n: usize) -> Result<&'a [u8], DecodeError> {
         if self.pos + n > self.b.len() {
             return Err(DecodeError::TooShort);
