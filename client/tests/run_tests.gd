@@ -58,6 +58,8 @@ func test_protocol(path: String) -> void:
 		"company_action": Protocol.encode_company_action(0x01020304, Protocol.CO_SET_PLACES, 1, 2, ""),
 		"fridge_action": Protocol.encode_fridge_action(0x01020304, Protocol.FRIDGE_PUT, 0),
 		"skip_wait": Protocol.encode_skip_wait(0x01020304),
+		"task_action": Protocol.encode_task_action(0x01020304, 7, Protocol.TA_CREATE, 0, 2, "Naprawić logowanie\nPo zmianie hasła."),
+		"mail_action": Protocol.encode_mail_action(0x01020304, 4, Protocol.MA_SEND, 0, "Kuba", "Kawa?", "O 12 w kuchni."),
 		"computer_action": Protocol.encode_computer_action(0x01020304, Protocol.PC_SEND, 17, 42, "Kto zjadł mój jogurt?"),
 		"answer": Protocol.encode_answer(0x01020304, 3, 1, 2),
 	}
@@ -148,6 +150,15 @@ func test_protocol(path: String) -> void:
 	expect(d.get("reason") == 1 and d.token == 0x01020304, "decode disconnect")
 	var say := Protocol.decode(golden["say"].hex_decode())
 	expect(say.get("type") == Protocol.T_SAY and say.id == 61440 and say.text == "Dzień dobry! Proszę za mną.", "decode say %s" % say)
+	var tb := Protocol.decode(golden["task_board"].hex_decode())
+	expect(tb.get("type") == Protocol.T_TASK_BOARD and tb.done == 7 and tb.members == ["Ola", "Kuba"] and tb.tasks.size() == 1
+		and tb.tasks[0].title == "Naprawić logowanie" and tb.tasks[0].assignee == "Kuba" and tb.tasks[0].priority == 2, "decode task board %s" % tb)
+	var td := Protocol.decode(golden["task_detail"].hex_decode())
+	expect(td.get("id") == 3 and td.desc == "Po zmianie hasła." and td.comments == [["Kuba", "Zrobione"]], "decode task detail %s" % td)
+	var wm := Protocol.decode(golden["work_mail"].hex_decode())
+	expect(wm.get("from") == "HR" and wm.subject == "Witamy!" and wm.minute == 540 and wm.day == 2, "decode work mail %s" % wm)
+	var ms := Protocol.decode(golden["mail_state"].hex_decode())
+	expect(ms.get("done") == 4 and ms.ids == [1, 2, 5] and ms.trashed == [2], "decode mail state %s" % ms)
 	var snd := Protocol.decode(golden["sound"].hex_decode())
 	expect(snd.get("type") == Protocol.T_SOUND and snd.sounds == [[1, 12288, -256], [17, 0, 65536]], "decode sound %s" % snd)
 	# Truncation must never decode.

@@ -125,6 +125,9 @@ pub(super) struct Player {
     pub(super) held_until: u32,
     /// At home: asked to skip the waiting (`SkipWait`).
     pub(super) skip_wait: bool,
+    /// Last applied TaskAction / MailAction nonces (retries are ignored).
+    pub(super) task_nonce: u16,
+    pub(super) mail_nonce: u16,
     /// Salary, grosze per game hour (raises from the CEO).
     pub(super) pay_rate: i64,
     /// World day of the last raise request (cooldown).
@@ -194,6 +197,8 @@ impl Player {
             home_ask_until: 0,
             held_until: 0,
             skip_wait: false,
+            task_nonce: 0,
+            mail_nonce: 0,
             pay_rate: clock::PAY_PER_MIN * 60,
             last_raise_day: None,
             talk: None,

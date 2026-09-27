@@ -251,6 +251,84 @@ impl Packet {
                 Packet::Fridge { items, milk: r.u8()?, water: r.u8()?, juice: r.u8()? }
             }
             ty::SKIP_WAIT => Packet::SkipWait { token: r.u32()? },
+            ty::TASK_ACTION => Packet::TaskAction {
+                token: r.u32()?,
+                nonce: r.u16()?,
+                action: r.u8()?,
+                task: r.u16()?,
+                arg: r.u8()?,
+                text: r.str16(TASK_TEXT_MAX)?,
+            },
+            ty::TASK_BOARD => {
+                let (dept, done, part, parts) = (r.u8()?, r.u16()?, r.u8()?, r.u8()?);
+                let n = r.u8()? as usize;
+                if n > MAX_MEMBERS {
+                    return Err(DecodeError::Invalid("too many members"));
+                }
+                let mut members = Vec::with_capacity(n);
+                for _ in 0..n {
+                    members.push(r.str8()?);
+                }
+                let n = r.u8()? as usize;
+                let mut tasks = Vec::with_capacity(n);
+                for _ in 0..n {
+                    tasks.push(TaskCard {
+                        id: r.u16()?,
+                        column: r.u8()?,
+                        priority: r.u8()?,
+                        comments: r.u8()?,
+                        title: r.str16(TASK_TITLE_MAX)?,
+                        author: r.str8()?,
+                        assignee: r.str8()?,
+                    });
+                }
+                Packet::TaskBoard { dept, done, part, parts, members, tasks }
+            }
+            ty::TASK_DETAIL => {
+                let (id, desc) = (r.u16()?, r.str16(TASK_TEXT_MAX)?);
+                let n = r.u8()? as usize;
+                if n > DETAIL_COMMENTS {
+                    return Err(DecodeError::Invalid("too many comments"));
+                }
+                let mut comments = Vec::with_capacity(n);
+                for _ in 0..n {
+                    comments.push((r.str8()?, r.str16(TASK_COMMENT_MAX)?));
+                }
+                Packet::TaskDetail { id, desc, comments }
+            }
+            ty::MAIL_ACTION => Packet::MailAction {
+                token: r.u32()?,
+                nonce: r.u16()?,
+                action: r.u8()?,
+                id: r.u16()?,
+                to: r.str8()?,
+                subject: r.str16(MAIL_SUBJECT_MAX)?,
+                body: r.str16(MAIL_BODY_MAX)?,
+            },
+            ty::WORK_MAIL => Packet::WorkMail {
+                id: r.u16()?,
+                from: r.str8()?,
+                to: r.str8()?,
+                subject: r.str16(MAIL_SUBJECT_MAX)?,
+                body: r.str16(MAIL_BODY_MAX)?,
+                day: r.u16()?,
+                minute: r.u16()?,
+            },
+            ty::MAIL_STATE => {
+                let done = r.u16()?;
+                let mut lists = [Vec::new(), Vec::new()];
+                for list in &mut lists {
+                    let n = r.u8()? as usize;
+                    if n > MAX_MAIL_IDS {
+                        return Err(DecodeError::Invalid("too many mail ids"));
+                    }
+                    for _ in 0..n {
+                        list.push(r.u16()?);
+                    }
+                }
+                let [ids, trashed] = lists;
+                Packet::MailState { done, ids, trashed }
+            }
             ty::SOUND => {
                 let n = r.u8()? as usize;
                 if n > MAX_SOUNDS {

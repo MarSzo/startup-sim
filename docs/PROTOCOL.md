@@ -359,6 +359,31 @@ Dym papierosowy na piętrze odbiorcy (co 1 s, tylko w budynku): `floor u8`, n
 u8 (≤ 64) × {`room u16`, `level u8` 1–255}. Pokoi spoza listy nie ma dymu.
 Czujki dymu są w danych mapy (`room_defs.*.detector`), klient rysuje je sam.
 
+### 46 `TaskAction` (C→S), 47 `TaskBoard`, 48 `TaskDetail` (S→C)
+
+Tablica zadań działu właściciela komputera (tylko przy odblokowanym
+komputerze, jako właściciel). `TaskAction`: token u32, `nonce u16` (0 = bez
+skutków, tylko odpowiedź), `action u8` (0 SYNC, 1 CREATE, 2 MOVE, 3 ASSIGN,
+4 PRIORITY, 5 COMMENT, 6 DELETE, 7 EDIT), `task u16`, `arg u8` (kolumna 0–2 /
+priorytet 0–2), `text` str16 (≤ 400 B: tytuł + "\n" + opis, nick albo
+komentarz). Każda akcja (także SYNC) dostaje w odpowiedzi tablicę:
+`TaskBoard` dept u8, `done u16` (ostatni zastosowany nonce — klient ponawia
+akcję, dopóki go nie zobaczy), part u8, parts u8, members (u8 × str8, tylko
+część 0), n u8 × {id u16, column u8, priority u8, comments u8, title str16
+(≤ 80 B), author str8, assignee str8}. SYNC z `task` ≠ 0 (albo akcja na
+karcie) dodaje `TaskDetail`: id u16, desc str16, n u8 (≤ 6, najnowsze) ×
+{nick str8, text str16 (≤ 120 B)}.
+
+### 49 `MailAction` (C→S), 50 `WorkMail`, 51 `MailState` (S→C)
+
+Poczta służbowa właściciela komputera. `MailAction`: token u32, nonce u16,
+`action u8` (0 SYNC, 1 SEND, 2 TRASH, 3 RESTORE, 4 EMPTY_TRASH), `id u16`
+(SYNC: najnowszy znany; TRASH / RESTORE: który), `to` str8, `subject` str16
+(≤ 80 B), `body` str16 (≤ 400 B). SYNC odsyła do 6 nowszych maili jako
+`WorkMail` (id u16, from str8, to str8, subject, body, day u16, minute u16);
+każda akcja kończy się `MailState` (done u16, ids: u8 × u16, trashed: u8 ×
+u16). Skrzynki są w pamięci serwera (po nicku, do 40 maili).
+
 ### 45 `Sound` (S→C)
 
 n u8 (≤ 64) × {`kind u8`, `x i32`, `y i32`} (sub-piksele). Dźwięki zdarzeń z
@@ -460,6 +485,7 @@ szyfrowaniem.
 
 ## Historia wersji
 
+- **31** — firmowy komputer: `TaskAction` (46, C→S), `TaskBoard` (47), `TaskDetail` (48), `MailAction` (49, C→S), `WorkMail` (50), `MailState` (51).
 - **30** — dźwięki: `Sound` (45, S→C): n u8 (≤ 64) × {kind u8, x i32, y i32} — zdarzenia słyszalne na piętrze odbiorcy w promieniu 28 kafli (1 ekspres, 2 kasa, 3 bramka sklepu, 4 winda, 5 zamek kabiny, 6 włącznik, 7 spłuczka, 8 kran, 9 zapalniczka, 10 zmywarka, 11 lodówka, 12 szafka, 13 podniesienie, 14 upuszczenie, 15 jedzenie, 16 picie, 17 gwizdek).
 - **29** — `SkipWait` (44, C→S: token u32) — „Pomiń czekanie” w domu; `Clock` + `skip` u8 (0 nie, 1 poproszono, 2 czas pędzi); aktywność 8 = zatrzymany (ochrona / policja).
 - **28** — aneks kuchenny: `Fridge` (42), `FridgeAction` (43); przedmioty 35 kubek (czysty), 36 mleko (karton), 37 kawa z mlekiem; 34 = brudny kubek.

@@ -49,6 +49,12 @@ impl Packet {
             Packet::FridgeAction { .. } => ty::FRIDGE_ACTION,
             Packet::SkipWait { .. } => ty::SKIP_WAIT,
             Packet::Sound { .. } => ty::SOUND,
+            Packet::TaskAction { .. } => ty::TASK_ACTION,
+            Packet::TaskBoard { .. } => ty::TASK_BOARD,
+            Packet::TaskDetail { .. } => ty::TASK_DETAIL,
+            Packet::MailAction { .. } => ty::MAIL_ACTION,
+            Packet::WorkMail { .. } => ty::WORK_MAIL,
+            Packet::MailState { .. } => ty::MAIL_STATE,
             Packet::Doors { .. } => ty::DOORS,
             Packet::DoorAction { .. } => ty::DOOR_ACTION,
         }
@@ -329,6 +335,70 @@ impl Packet {
                 w.u8(*juice);
             }
             Packet::SkipWait { token } => w.u32(*token),
+            Packet::TaskAction { token, nonce, action, task, arg, text } => {
+                w.u32(*token);
+                w.u16(*nonce);
+                w.u8(*action);
+                w.u16(*task);
+                w.u8(*arg);
+                w.str16(text, TASK_TEXT_MAX);
+            }
+            Packet::TaskBoard { dept, done, part, parts, members, tasks } => {
+                w.u8(*dept);
+                w.u16(*done);
+                w.u8(*part);
+                w.u8(*parts);
+                w.u8(members.len().min(MAX_MEMBERS) as u8);
+                for m in members.iter().take(MAX_MEMBERS) {
+                    w.str8(m);
+                }
+                w.u8(tasks.len().min(255) as u8);
+                for t in tasks.iter().take(255) {
+                    w.u16(t.id);
+                    w.u8(t.column);
+                    w.u8(t.priority);
+                    w.u8(t.comments);
+                    w.str16(&t.title, TASK_TITLE_MAX);
+                    w.str8(&t.author);
+                    w.str8(&t.assignee);
+                }
+            }
+            Packet::TaskDetail { id, desc, comments } => {
+                w.u16(*id);
+                w.str16(desc, TASK_TEXT_MAX);
+                w.u8(comments.len().min(DETAIL_COMMENTS) as u8);
+                for (nick, text) in comments.iter().take(DETAIL_COMMENTS) {
+                    w.str8(nick);
+                    w.str16(text, TASK_COMMENT_MAX);
+                }
+            }
+            Packet::MailAction { token, nonce, action, id, to, subject, body } => {
+                w.u32(*token);
+                w.u16(*nonce);
+                w.u8(*action);
+                w.u16(*id);
+                w.str8(to);
+                w.str16(subject, MAIL_SUBJECT_MAX);
+                w.str16(body, MAIL_BODY_MAX);
+            }
+            Packet::WorkMail { id, from, to, subject, body, day, minute } => {
+                w.u16(*id);
+                w.str8(from);
+                w.str8(to);
+                w.str16(subject, MAIL_SUBJECT_MAX);
+                w.str16(body, MAIL_BODY_MAX);
+                w.u16(*day);
+                w.u16(*minute);
+            }
+            Packet::MailState { done, ids, trashed } => {
+                w.u16(*done);
+                for list in [ids, trashed] {
+                    w.u8(list.len().min(MAX_MAIL_IDS) as u8);
+                    for id in list.iter().take(MAX_MAIL_IDS) {
+                        w.u16(*id);
+                    }
+                }
+            }
             Packet::Sound { sounds } => {
                 w.u8(sounds.len().min(MAX_SOUNDS) as u8);
                 for (kind, x, y) in sounds.iter().take(MAX_SOUNDS) {

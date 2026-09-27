@@ -23,7 +23,7 @@ pub use golden::{golden_samples, to_hex};
 pub use snapshot::{snapshot_fragments, SelfState};
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 30;
+pub const VERSION: u8 = 31;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
 pub const MAX_PACKET: usize = 1200;
@@ -94,6 +94,12 @@ pub mod ty {
     pub const FRIDGE_ACTION: u8 = 43;
     pub const SKIP_WAIT: u8 = 44;
     pub const SOUND: u8 = 45;
+    pub const TASK_ACTION: u8 = 46;
+    pub const TASK_BOARD: u8 = 47;
+    pub const TASK_DETAIL: u8 = 48;
+    pub const MAIL_ACTION: u8 = 49;
+    pub const WORK_MAIL: u8 = 50;
+    pub const MAIL_STATE: u8 = 51;
 }
 
 /// `ItemAction::action`.
@@ -238,6 +244,49 @@ pub mod sound {
     pub const DRINK: u8 = 16;
     pub const WHISTLE: u8 = 17;
 }
+
+/// A card on the task board (without its description and comments).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TaskCard {
+    pub id: u16,
+    pub column: u8,
+    pub priority: u8,
+    pub comments: u8,
+    pub title: String,
+    pub author: String,
+    pub assignee: String,
+}
+
+pub mod task_action {
+    pub const SYNC: u8 = 0;
+    pub const CREATE: u8 = 1;
+    pub const MOVE: u8 = 2;
+    pub const ASSIGN: u8 = 3;
+    pub const PRIORITY: u8 = 4;
+    pub const COMMENT: u8 = 5;
+    pub const DELETE: u8 = 6;
+    pub const EDIT: u8 = 7;
+}
+
+pub mod mail_action {
+    pub const SYNC: u8 = 0;
+    pub const SEND: u8 = 1;
+    pub const TRASH: u8 = 2;
+    pub const RESTORE: u8 = 3;
+    pub const EMPTY_TRASH: u8 = 4;
+}
+
+/// Text limits (bytes) of the board and mail packets.
+pub const TASK_TITLE_MAX: usize = 80;
+pub const TASK_TEXT_MAX: usize = 400;
+pub const TASK_COMMENT_MAX: usize = 120;
+/// Comments in a TaskDetail.
+pub const DETAIL_COMMENTS: usize = 6;
+pub const MAIL_SUBJECT_MAX: usize = 80;
+pub const MAIL_BODY_MAX: usize = 400;
+/// Board members / mail ids in one packet at most.
+pub const MAX_MEMBERS: usize = 24;
+pub const MAX_MAIL_IDS: usize = 64;
 
 /// Most sounds in one `Sound` packet.
 pub const MAX_SOUNDS: usize = 64;
@@ -521,6 +570,26 @@ pub enum Packet {
     /// Sounds heard this tick on the receiver's floor: (kind, x, y) in
     /// sub-pixels (`sound::*`), at most `MAX_SOUNDS`.
     Sound { sounds: Vec<(u8, i32, i32)> },
+    /// The task board of the computer owner's department (`task_action`),
+    /// acting as the owner. `nonce` dedupes retries (0 = none); `task` = the
+    /// card (SYNC: whose details to send), `arg` = column / priority, `text`
+    /// = title + "\n" + description, a nick or a comment.
+    TaskAction { token: u32, nonce: u16, action: u8, task: u16, arg: u8, text: String },
+    /// The board (answer to every TaskAction), in parts of at most
+    /// `MAX_PACKET`: `done` = the last applied nonce; `members` (part 0) =
+    /// the department's employees.
+    TaskBoard { dept: u8, done: u16, part: u8, parts: u8, members: Vec<String>, tasks: Vec<TaskCard> },
+    /// One card's description and its latest comments (nick, text).
+    TaskDetail { id: u16, desc: String, comments: Vec<(String, String)> },
+    /// Work mail as the computer owner (`mail_action`): SYNC (`id` = the
+    /// newest one the client has), SEND (`to`, `subject`, `body`), TRASH /
+    /// RESTORE `id`, EMPTY_TRASH.
+    MailAction { token: u32, nonce: u16, action: u8, id: u16, to: String, subject: String, body: String },
+    /// One mail of the owner's inbox (sent after a SYNC for newer ids).
+    WorkMail { id: u16, from: String, to: String, subject: String, body: String, day: u16, minute: u16 },
+    /// Answer to every MailAction: the last applied nonce, the ids in the
+    /// inbox and which of them are in the trash.
+    MailState { done: u16, ids: Vec<u16>, trashed: Vec<u16> },
     /// Closed doors (locked toilet stalls, elevator doors) on the receiver's
     /// floor: solid for the simulation. Plus the elevator: the floor it is at
     /// and where it is heading (`NO_FLOOR` = standing). Sent on change and

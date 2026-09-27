@@ -1,5 +1,7 @@
-## The screen of a computer on a desk (GDD 9a, step 4): the company messenger
-## (#ogólny, the department channel, private messages) or the lock screen.
+## The screen of a computer on a desk: a desktop like the one at home (icons,
+## windows, a taskbar) with the company messenger, work mail (+ trash), the
+## browser (bookmarks: lunch ordering, the department's task board), the
+## calendar and — for the founder — the company panel; or the lock screen.
 ## Shown while the server says we sit at a computer (self_status bit); the
 ## computer is logged in as its owner, whoever sits at it.
 extends Control
@@ -7,6 +9,11 @@ extends Control
 const Protocol = preload("res://net/protocol.gd")
 const ItemArt = preload("res://game/item_art.gd")
 const Ink = preload("res://ui/ink_ui.gd")
+const Desktop = preload("res://ui/desktop.gd")
+const OsWindow = preload("res://ui/office/os_window.gd")
+const KanbanView = preload("res://ui/office/kanban_view.gd")
+const MailBox = preload("res://ui/office/mail_box.gd")
+const MailView = preload("res://ui/office/mail_view.gd")
 
 ## ComputerAction to send: action, conversation, argument, text.
 signal action(action: int, conv: int, arg: int, text: String)
@@ -16,6 +23,10 @@ signal book(start: int, topic: int)
 signal order(dish: int)
 ## Company panel (founder): CompanyAction.
 signal company_action(action: int, target: int, value: int, text: String)
+## Task board: TaskAction.
+signal task_action(nonce: int, action: int, task: int, arg: int, text: String)
+## Work mail: MailAction.
+signal mail_action(nonce: int, action: int, id: int, to: String, subject: String, body: String)
 
 const DEPARTMENTS := {1: "IT / Produkt", 2: "Biznes", 3: "Zarząd"}
 const SYNC_MSEC := 1000
@@ -41,8 +52,6 @@ var _frame := PanelContainer.new()
 var _screen := VBoxContainer.new()
 var _title := Label.new()
 var _as_owner := Label.new()
-var _lock_btn: Button
-var _take_btn: Button
 var _body := HBoxContainer.new()
 var _sidebar := VBoxContainer.new()
 var _conv_title := Label.new()
@@ -55,21 +64,18 @@ var _lock_owner := Label.new()
 var _lock_hint := Label.new()
 var _unlock_btn: Button
 var _chat_view := VBoxContainer.new()
-var tab := "chat"               # chat / calendar
+var tab := "chat"               # the last app opened by a dev command
 var calendar := {}              # last Calendar packet
 var _cal_view := VBoxContainer.new()
 var _cal_mine := Label.new()
 var _cal_topic := OptionButton.new()
 var _cal_list := VBoxContainer.new()
-var _tab_chat: Button
-var _tab_cal: Button
 var _cal_sig := ""
 var lunch := {}                 # last LunchMenu packet
 var _lunch_view := VBoxContainer.new()
 var _lunch_status := Label.new()
 var _lunch_list := VBoxContainer.new()
 var _lunch_sig := ""
-var _tab_lunch: Button
 ## Company panel: the server sends CompanyOffers / CompanyPeople only to the
 ## founder at their own computer; the tab shows while they keep coming.
 const COMPANY_FRESH_MSEC := 3000
@@ -79,7 +85,25 @@ var _company_msec := -COMPANY_FRESH_MSEC
 var _co_view := VBoxContainer.new()
 var _co_sig := ""
 var _co_drafts := {}            # text typed into the panel's fields, by key
-var _tab_company: Button
+# The desktop: icons, windows, the taskbar; apps open in windows.
+const WINDOW_TITLES := {"chat": "Komunikator", "mail": "Poczta", "trash": "Kosz", "browser": "Przeglądarka",
+	"calendar": "Kalendarz zarządu", "company": "Panel firmy"}
+var _desk := Control.new()
+var _win_layer := Control.new()
+var _windows := {}              # name -> OsWindow
+var _views := {}                # name -> Control shown in that window
+var _task_btns := HBoxContainer.new()
+var _icons := {}                # name -> icon Button
+var _badges := {}               # name -> Label
+var _browser := VBoxContainer.new()
+var _url := Label.new()
+var _pages := {}                # page -> Control
+var page := "home"              # browser page: home / lunch / tasks
+var kanban := KanbanView.new()
+var mailbox := MailBox.new()
+var _mail_view := MailView.new()
+var _trash_view := MailView.new()
+var _start := MenuButton.new()
 
 
 func _ready() -> void:
@@ -94,7 +118,7 @@ func _fit() -> void:
 	position = Vector2.ZERO
 	size = get_viewport_rect().size
 	_dim.size = size
-	var fs := Vector2(minf(1040, size.x - 60), minf(660, size.y - 60))
+	var fs := Vector2(minf(1200, size.x - 40), minf(740, size.y - 40))
 	_frame.size = fs
 	_frame.position = (size - fs) / 2
 
@@ -102,6 +126,10 @@ func _fit() -> void:
 # ------------------------------------------------------------------- state
 
 func on_computer(p: Dictionary) -> void:
+	if p.owner != mailbox.owner:
+		# Another account (computer): its own mail and board.
+		mailbox.reset(p.owner)
+		kanban.reset(name_of.call(p.owner))
 	state = p
 	var ids: Array = p.convs.map(func(c): return c.conv)
 	if not ids.is_empty() and not ids.has(current):
@@ -151,7 +179,7 @@ func _show() -> void:
 	_render()
 	if not was:
 		_last_sync = 0
-		if not state.locked:
+		if not state.locked and _windows.has("chat"):
 			_entry.grab_focus.call_deferred()
 
 
@@ -169,8 +197,11 @@ func _conv(conv: int) -> Dictionary:
 func _process(_d: float) -> void:
 	if not visible or state.is_empty() or state.locked:
 		return
+	mailbox.tick()
+	if _windows.has("browser") and page == "tasks":
+		kanban.tick()
 	var now := Time.get_ticks_msec()
-	if now - _last_sync >= SYNC_MSEC:
+	if now - _last_sync >= SYNC_MSEC and _windows.has("chat"):
 		_last_sync = now
 		action.emit(Protocol.PC_SYNC, current, _last_id(current), "")
 	if not _pending.is_empty() and now - _pending.msec >= RESEND_MSEC:
@@ -214,7 +245,11 @@ func _send() -> void:
 
 
 ## Dev (--goto): pc:say:<conv>:<text>, pc:open:<conv>, pc:lock, pc:unlock,
-## pc:take, pc:close; <conv> = general / dept / dm:<nick>.
+## pc:take, pc:close; <conv> = general / dept / dm:<nick>; pc:win:<app>
+## (chat / mail / trash / browser / calendar / company / lunch / tasks),
+## pc:task:<title> (a new card), pc:mail:<nick>:<subject> (send a mail),
+## pc:card:<n> (open the n-th card), pc:read:<n> (read the n-th mail),
+## pc:comment:<text> (on the open card), pc:take-card (assign it to me).
 func dev_command(cmd: String) -> void:
 	var parts := cmd.split(":")
 	if parts.size() > 2 and parts[1] == "dm":  # dm:<nick> is one token
@@ -224,6 +259,32 @@ func dev_command(cmd: String) -> void:
 		parts[2] = ":".join(parts.slice(2))
 		parts.resize(3)
 	match parts[0]:
+		"win":
+			if parts.size() > 1:
+				_set_tab(parts[1])
+		"task":
+			if parts.size() > 1:
+				_set_tab("tasks")
+				kanban._act(Protocol.TA_CREATE, 0, 2, cmd.substr(5) + "\nDodane z linii poleceń.")
+		"mail":
+			var mp := cmd.split(":", true, 2)
+			if mp.size() > 2:
+				_set_tab("mail")
+				mailbox.act(Protocol.MA_SEND, 0, mp[1], mp[2], "Wiadomość testowa.")
+		"card":
+			if parts.size() > 1 and int(parts[1]) < kanban.tasks.size():
+				kanban._open(kanban.tasks[int(parts[1])].id)
+		"comment":
+			kanban._p_comment.text = cmd.substr(8)
+			kanban._comment()
+		"take-card":
+			kanban._act(Protocol.TA_ASSIGN, kanban.open_id, 0, kanban.me)
+		"read":
+			var list: Array = mailbox.inbox()
+			if parts.size() > 1 and int(parts[1]) < list.size():
+				_mail_view._selected = list[int(parts[1])].id
+				mailbox.read[_mail_view._selected] = true
+				mailbox.changed.emit()
 		"lock": action.emit(Protocol.PC_LOCK, 0, 0, "")
 		"unlock": action.emit(Protocol.PC_UNLOCK, 0, 0, "")
 		"take": action.emit(Protocol.PC_TAKE, 0, 0, "")
@@ -285,43 +346,126 @@ func _build() -> void:
 	_screen.add_theme_constant_override("separation", 0)
 	screen_bg.add_child(_screen)
 
-	# Top bar: app name, whose account, lock / take / close.
+	# The desktop (wallpaper, icons, windows) over the taskbar.
+	_desk.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_desk.clip_contents = true
+	_screen.add_child(_desk)
+	var wall := TextureRect.new()
+	wall.set_anchors_preset(Control.PRESET_FULL_RECT)
+	wall.texture = Desktop.wallpaper()
+	wall.stretch_mode = TextureRect.STRETCH_SCALE
+	wall.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_desk.add_child(wall)
+	var icons := VBoxContainer.new()
+	icons.position = Vector2(14, 12)
+	icons.add_theme_constant_override("separation", 6)
+	_desk.add_child(icons)
+	for ic in [["mail", "Poczta", "mail"], ["browser", "Przeglądarka", "browser"], ["chat", "Komunikator", "chat"],
+			["calendar", "Kalendarz", "calendar"], ["company", "Firma", "company"], ["trash", "Kosz", "trash"]]:
+		var b := _desk_icon(ic[1], ic[2])
+		var name: String = ic[0]
+		b.pressed.connect(func(): _open(name))
+		icons.add_child(b)
+		_icons[name] = b
+	_win_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_win_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_desk.add_child(_win_layer)
+	# Taskbar: StartOS (lock / take the laptop / close), open windows, account.
 	var bar := PanelContainer.new()
-	bar.add_theme_stylebox_override("panel", Ink.box("title"))
+	bar.add_theme_stylebox_override("panel", Ink.box("hud"))
 	_screen.add_child(bar)
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 10)
+	row.add_theme_constant_override("separation", 8)
 	bar.add_child(row)
-	_style_label(_title, 16, Color.WHITE)
-	row.add_child(_title)
-	_tab_chat = _button("Komunikator", false)
-	_tab_chat.pressed.connect(func(): _set_tab("chat"))
-	row.add_child(_tab_chat)
-	_tab_cal = _button("Kalendarz", false)
-	_tab_cal.pressed.connect(func(): _set_tab("calendar"))
-	row.add_child(_tab_cal)
-	_tab_lunch = _button("Obiady", false)
-	_tab_lunch.pressed.connect(func(): _set_tab("lunch"))
-	row.add_child(_tab_lunch)
-	_tab_company = _button("Firma", false)
-	_tab_company.pressed.connect(func(): _set_tab("company"))
-	row.add_child(_tab_company)
+	_start.text = "◆ StartOS"
+	_start.flat = false
+	for st in ["normal", "hover", "pressed", "focus"]:
+		_start.add_theme_stylebox_override(st, Ink.button_box(st if st != "focus" else "normal", true))
+	for k in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+		_start.add_theme_color_override(k, Color.WHITE)
+	var pm := _start.get_popup()
+	pm.add_item("Zablokuj komputer", 1)
+	pm.add_item("Zabierz laptop", 2)
+	pm.add_separator()
+	pm.add_item("Zamknij (Esc)", 3)
+	pm.id_pressed.connect(_start_menu)
+	row.add_child(_start)
+	_task_btns.add_theme_constant_override("separation", 6)
+	_task_btns.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(_task_btns)
 	_style_label(_as_owner, 14, Color("#ffcf6e"))
-	_as_owner.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(_as_owner)
-	_lock_btn = _button("Zablokuj", false)
-	_lock_btn.pressed.connect(func(): action.emit(Protocol.PC_LOCK, 0, 0, ""))
-	row.add_child(_lock_btn)
-	_take_btn = _button("Zabierz laptop", false)
-	_take_btn.pressed.connect(func(): action.emit(Protocol.PC_TAKE, 0, 0, ""))
-	row.add_child(_take_btn)
-	var close := _button("Zamknij (Esc)", false)
-	close.pressed.connect(func(): action.emit(Protocol.PC_CLOSE, 0, 0, ""))
-	row.add_child(close)
+	_style_label(_title, 14, Color(1, 1, 1, 0.85))
+	row.add_child(_title)
+
+	# Browser: address, bookmarks, the page.
+	_browser.add_theme_constant_override("separation", 6)
+	var addr := PanelContainer.new()
+	addr.add_theme_stylebox_override("panel", Ink.box("input"))
+	_style_label(_url, 14, Color("#4a5566"))
+	addr.add_child(_url)
+	_browser.add_child(addr)
+	var marks := HBoxContainer.new()
+	marks.add_theme_constant_override("separation", 6)
+	marks.add_child(_mini_label("Ulubione:"))
+	for bm in [["home", "⌂ Start"], ["lunch", "★ Obiady do biura"], ["tasks", "★ Tablica zadań"]]:
+		var mb := Ink.button(bm[1])
+		mb.add_theme_font_size_override("font_size", 14)
+		var pg: String = bm[0]
+		mb.pressed.connect(func(): _go(pg))
+		marks.add_child(mb)
+	_browser.add_child(marks)
+	_browser.add_child(HSeparator.new())
+	var home := VBoxContainer.new()
+	home.add_theme_constant_override("separation", 12)
+	home.add_child(_mini_label("Strona startowa"))
+	var ht := Label.new()
+	_style_label(ht, 22, Color("#1c2430"))
+	ht.text = "Ulubione"
+	home.add_child(ht)
+	var tiles := HBoxContainer.new()
+	tiles.add_theme_constant_override("separation", 14)
+	for bm in [["lunch", "Obiady do biura", "lunchbox.example — dostawa na recepcję", "company"],
+			["tasks", "Tablica zadań", "tasks.startup — zadania działu (kanban)", "tasks"]]:
+		var tb := Button.new()
+		tb.custom_minimum_size = Vector2(260, 130)
+		for st in ["normal", "hover", "pressed", "focus"]:
+			tb.add_theme_stylebox_override(st, Ink.box("card_hover" if st == "hover" else "card"))
+		var pic := Control.new()
+		pic.position = Vector2(88, 6)
+		pic.size = Vector2(84, 52)
+		pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var kind: String = bm[3]
+		pic.draw.connect(func(): Desktop.draw_icon(pic, kind))
+		tb.add_child(pic)
+		var tl := Label.new()
+		_style_label(tl, 17, Color("#1c2430"))
+		tl.text = bm[1] + "\n" + bm[2]
+		tl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		tl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		tl.position = Vector2(8, 62)
+		tl.size = Vector2(244, 60)
+		tl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		tb.add_child(tl)
+		var pg: String = bm[0]
+		tb.pressed.connect(func(): _go(pg))
+		tiles.add_child(tb)
+	home.add_child(tiles)
+	_pages["home"] = home
+	_pages["tasks"] = kanban
+	kanban.send.connect(func(n: int, a: int, t: int, arg: int, text: String): task_action.emit(n, a, t, arg, text))
+	mailbox.send.connect(func(n: int, a: int, id: int, to: String, subj: String, body: String): mail_action.emit(n, a, id, to, subj, body))
+	mailbox.arrived.connect(_on_new_mail)
+	mailbox.changed.connect(_update_badges)
+	_mail_view.setup(mailbox, false)
+	_trash_view.setup(mailbox, true)
+	_views["mail"] = _mail_view
+	_views["trash"] = _trash_view
+	_views["browser"] = _browser
 
 	# Messenger.
 	_chat_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_screen.add_child(_chat_view)
+	_views["chat"] = _chat_view
 	_body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_body.add_theme_constant_override("separation", 0)
 	_chat_view.add_child(_body)
@@ -390,7 +534,7 @@ func _build() -> void:
 	for sd in ["left", "right", "top", "bottom"]:
 		cal_pad.add_theme_constant_override("margin_" + sd, 18)
 	cal_pad.add_child(_cal_view)
-	_screen.add_child(cal_pad)
+	_views["calendar"] = cal_pad
 	var ch := Label.new()
 	_style_label(ch, 20, Color("#1c2430"))
 	ch.text = "Kalendarz zarządu — spotkania na dziś"
@@ -424,7 +568,7 @@ func _build() -> void:
 	lunch_pad.name = "lunch_pad"
 	_lunch_view.add_theme_constant_override("separation", 10)
 	lunch_pad.add_child(_lunch_view)
-	_screen.add_child(lunch_pad)
+	_pages["lunch"] = lunch_pad
 	var lh := Label.new()
 	_style_label(lh, 20, Color("#1c2430"))
 	lh.text = "Obiady do biura — dostawa na recepcję (piętro 1)"
@@ -448,13 +592,25 @@ func _build() -> void:
 	_co_view.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_co_view.add_theme_constant_override("separation", 8)
 	co_scroll.add_child(_co_view)
-	_screen.add_child(co_pad)
+	_views["company"] = co_pad
 
-	# Lock screen.
-	_lock_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	# Browser pages under the bookmarks.
+	for pg in _pages:
+		_pages[pg].size_flags_vertical = Control.SIZE_EXPAND_FILL
+		_pages[pg].visible = pg == page
+		_browser.add_child(_pages[pg])
+
+	# Lock screen: over the whole desktop.
+	var lock_bg := PanelContainer.new()
+	var lsb := StyleBoxFlat.new()
+	lsb.bg_color = Ink.PAPER
+	lock_bg.add_theme_stylebox_override("panel", lsb)
+	lock_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	lock_bg.name = "lock_bg"
+	_desk.add_child(lock_bg)
 	_lock_view.alignment = BoxContainer.ALIGNMENT_CENTER
 	_lock_view.add_theme_constant_override("separation", 14)
-	_screen.add_child(_lock_view)
+	lock_bg.add_child(_lock_view)
 	var icon := Control.new()
 	icon.custom_minimum_size = Vector2(0, 72)
 	icon.draw.connect(func(): _draw_lock(icon))
@@ -487,53 +643,200 @@ func _render() -> void:
 		return
 	var owner_name: String = name_of.call(state.owner)
 	var mine: bool = state.owner == my_id
-	_title.text = "Komunikator firmowy — konto: %s" % owner_name
-	_as_owner.text = "" if mine else "Uwaga: piszesz jako %s!" % owner_name
-	_chat_view.visible = not state.locked and tab == "chat"
-	_screen.get_node("cal_pad").visible = not state.locked and tab == "calendar"
-	_screen.get_node("lunch_pad").visible = not state.locked and tab == "lunch"
-	_tab_lunch.visible = not state.locked
-	_tab_lunch.modulate = Color(1, 1, 1, 1.0 if tab == "lunch" else 0.6)
-	var founder := _company_fresh()
-	if tab == "company" and not founder:
-		tab = "chat"
-	_screen.get_node("company_pad").visible = not state.locked and tab == "company"
-	_tab_company.visible = not state.locked and founder
-	_tab_company.modulate = Color(1, 1, 1, 1.0 if tab == "company" else 0.6)
-	_tab_chat.visible = not state.locked
-	_tab_cal.visible = not state.locked
-	_tab_chat.modulate = Color(1, 1, 1, 1.0 if tab == "chat" else 0.6)
-	_tab_cal.modulate = Color(1, 1, 1, 1.0 if tab == "calendar" else 0.6)
-	_lock_view.visible = state.locked
-	_lock_btn.visible = not state.locked
-	_fit.call_deferred()  # views were hidden / shown: back to the screen size
+	_title.text = "Konto: %s" % owner_name
+	_as_owner.text = "" if mine else "Uwaga: działasz jako %s!" % owner_name
+	_desk.get_node("lock_bg").visible = state.locked
+	_start.disabled = false
+	_icons["company"].visible = _company_fresh()
+	if not _company_fresh() and _windows.has("company"):
+		_close("company")
+	_update_badges()
 	if state.locked:
 		_lock_owner.text = "%s — zablokowany" % owner_name
 		_lock_hint.text = "Przyłóż palec do czytnika, żeby odblokować." if mine else "Tylko %s może go odblokować. Laptop możesz najwyżej zabrać." % owner_name
 		_unlock_btn.visible = mine
 		return
-	if tab == "calendar":
+	if _windows.has("calendar"):
 		_render_calendar()
-		return
-	if tab == "lunch":
-		_render_lunch()
-		return
-	if tab == "company":
+	if _windows.has("company"):
 		_render_company()
+	if _windows.has("browser") and page == "lunch":
+		_render_lunch()
+	if _windows.has("chat"):
+		_render_sidebar()
+		var c := _conv(current)
+		_conv_title.text = c.get("title", "")
+		_render_messages()
+		_render_input()
+	# Colleagues to write to: the messenger's private conversations.
+	var who := []
+	for c in state.get("convs", []):
+		if c.conv & Protocol.CONV_DM:
+			who.append(c.title)
+	_mail_view.recipients = who
+
+
+## Open (or bring to the front) an app window.
+func _open(name: String) -> void:
+	if state.is_empty() or state.locked:
 		return
-	_render_sidebar()
-	var c := _conv(current)
-	_conv_title.text = c.get("title", "")
-	_render_messages()
-	_render_input()
+	if not _windows.has(name):
+		var w := OsWindow.new()
+		var view: Control = _views[name]
+		if view.get_parent():
+			view.get_parent().remove_child(view)
+		w.setup(WINDOW_TITLES[name], view, 10)
+		var k := _windows.size()
+		var ds := _desk.size
+		w.position = Vector2(118 + k * 22, 8 + k * 16)
+		w.size = Vector2(maxf(420, ds.x - 132 - k * 22), maxf(300, ds.y - 16 - k * 16))
+		w.closed.connect(func(): _close(name))
+		w.focused.connect(func(): _win_layer.move_child(w, -1))
+		_win_layer.add_child(w)
+		_windows[name] = w
+		var tb := Ink.button(WINDOW_TITLES[name])
+		tb.add_theme_font_size_override("font_size", 14)
+		tb.name = "task_" + name
+		tb.pressed.connect(func(): _open(name))
+		_task_btns.add_child(tb)
+		if name == "chat":
+			_select(current)
+		elif name == "calendar":
+			_cal_sig = ""
+		elif name == "company":
+			_co_sig = ""
+		elif name == "browser":
+			_go(page)
+	_win_layer.move_child(_windows[name], -1)
+	_render()
+
+
+func _close(name: String) -> void:
+	if not _windows.has(name):
+		return
+	var w: Control = _windows[name]
+	var view: Control = _views[name]
+	view.get_parent().remove_child(view)  # the app keeps its state
+	w.queue_free()
+	_windows.erase(name)
+	var t := _task_btns.get_node_or_null("task_" + name)
+	if t:
+		_task_btns.remove_child(t)
+		t.queue_free()
+
+
+## Browser: show a page (home / lunch / tasks).
+func _go(p: String) -> void:
+	page = p
+	for k in _pages:
+		_pages[k].visible = k == p
+	_url.text = {"home": "  🔒  start.os/ulubione", "lunch": "  🔒  https://lunchbox.example/biuro", "tasks": "  🔒  https://tasks.startup/tablica"}[p]
+	if _windows.has("browser"):
+		_windows["browser"].set_title("Przeglądarka — %s" % {"home": "Start", "lunch": "Obiady do biura", "tasks": "Tablica zadań"}[p])
+	_lunch_sig = ""
+	_render()
+
+
+func _desk_icon(caption: String, kind: String) -> Button:
+	var b := Button.new()
+	b.flat = true
+	b.focus_mode = Control.FOCUS_NONE
+	b.custom_minimum_size = Vector2(90, 74)
+	var pic := Control.new()
+	pic.position = Vector2(3, 0)
+	pic.size = Vector2(84, 50)
+	pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	pic.draw.connect(func(): Desktop.draw_icon(pic, kind))
+	b.add_child(pic)
+	var l := Label.new()
+	Ink.style_label(l, 15, Color.WHITE)
+	l.text = caption
+	l.position = Vector2(0, 50)
+	l.size = Vector2(90, 22)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.add_theme_constant_override("outline_size", 4)
+	l.add_theme_color_override("font_outline_color", Color(0, 0, 0, 0.6))
+	l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(l)
+	var badge := Label.new()
+	Ink.style_label(badge, 14, Color.WHITE)
+	var bs := StyleBoxFlat.new()
+	bs.bg_color = Ink.RED
+	bs.border_color = Ink.INK
+	bs.set_border_width_all(2)
+	bs.set_corner_radius_all(9)
+	bs.content_margin_left = 5
+	bs.content_margin_right = 5
+	badge.add_theme_stylebox_override("normal", bs)
+	badge.position = Vector2(58, -2)
+	badge.visible = false
+	badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	b.add_child(badge)
+	_badges[kind] = badge
+	return b
+
+
+## StartOS menu: lock / take the laptop / close.
+func _start_menu(id: int) -> void:
+	var what := {1: Protocol.PC_LOCK, 2: Protocol.PC_TAKE, 3: Protocol.PC_CLOSE}
+	if what.has(id):
+		action.emit(what[id], 0, 0, "")
+
+
+func _mini_label(text: String) -> Label:
+	var l := Label.new()
+	_style_label(l, 14, Color("#6a7383"))
+	l.text = text
+	return l
+
+
+## Unread mail / chat messages on the icons.
+func _update_badges() -> void:
+	var counts := {"mail": mailbox.unread(), "chat": 0, "trash": mailbox.trash().size()}
+	for c in state.get("convs", []):
+		counts.chat += c.unread
+	for k in counts:
+		if _badges.has(k):
+			_badges[k].text = str(counts[k])
+			_badges[k].visible = counts[k] > 0 and k != "trash"
+
+
+func _on_new_mail(m: Dictionary) -> void:
+	var audio = preload("res://audio/audio.gd").inst
+	if audio:
+		audio.play("notify", -4.0)
+	_update_badges()
+
+
+# ------------------------------------------------------------ office apps
+
+func on_task_board(p: Dictionary) -> void:
+	kanban.on_board(p)
+
+
+func on_task_detail(p: Dictionary) -> void:
+	kanban.on_detail(p)
+
+
+func on_work_mail(p: Dictionary) -> void:
+	mailbox.on_mail(p)
+
+
+func on_mail_state(p: Dictionary) -> void:
+	mailbox.on_state(p)
 
 
 func _set_tab(t: String) -> void:
 	tab = t
-	_cal_sig = ""
-	_lunch_sig = ""
-	_co_sig = ""
-	_render()
+	match t:
+		"lunch":
+			_open("browser")
+			_go("lunch")
+		"tasks":
+			_open("browser")
+			_go("tasks")
+		_:
+			_open(t)
 
 
 # ----------------------------------------------------------------- company
@@ -553,7 +856,7 @@ func on_company(p: Dictionary) -> void:
 		return
 	if not was:
 		_render()  # show the tab
-	elif tab == "company":
+	elif _windows.has("company"):
 		_render_company()
 
 
@@ -683,7 +986,7 @@ func _render_company() -> void:
 
 func on_lunch(p: Dictionary) -> void:
 	lunch = p
-	if visible and tab == "lunch":
+	if visible and _windows.has("browser") and page == "lunch":
 		_render_lunch()
 
 
@@ -745,7 +1048,7 @@ func _render_lunch() -> void:
 
 func on_calendar(p: Dictionary) -> void:
 	calendar = p
-	if visible and tab == "calendar":
+	if visible and _windows.has("calendar"):
 		_render_calendar()
 
 

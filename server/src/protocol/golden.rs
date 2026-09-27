@@ -227,6 +227,22 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
         ("fridge", Packet::Fridge { items: vec![(11, "Kanapka z szynką (Ola)".into())], milk: 7, water: 4, juice: 2 }),
         ("fridge_action", Packet::FridgeAction { token: 0x01020304, action: 2, arg: 0 }),
         ("skip_wait", Packet::SkipWait { token: 0x01020304 }),
+        ("task_action", Packet::TaskAction { token: 0x01020304, nonce: 7, action: 1, task: 0, arg: 2, text: "Naprawić logowanie\nPo zmianie hasła.".into() }),
+        (
+            "task_board",
+            Packet::TaskBoard {
+                dept: 1,
+                done: 7,
+                part: 0,
+                parts: 1,
+                members: vec!["Ola".into(), "Kuba".into()],
+                tasks: vec![TaskCard { id: 3, column: 1, priority: 2, comments: 1, title: "Naprawić logowanie".into(), author: "Ola".into(), assignee: "Kuba".into() }],
+            },
+        ),
+        ("task_detail", Packet::TaskDetail { id: 3, desc: "Po zmianie hasła.".into(), comments: vec![("Kuba".into(), "Zrobione".into())] }),
+        ("mail_action", Packet::MailAction { token: 0x01020304, nonce: 4, action: 1, id: 0, to: "Kuba".into(), subject: "Kawa?".into(), body: "O 12 w kuchni.".into() }),
+        ("work_mail", Packet::WorkMail { id: 5, from: "HR".into(), to: "Kuba".into(), subject: "Witamy!".into(), body: "Miłego pierwszego dnia.".into(), day: 2, minute: 540 }),
+        ("mail_state", Packet::MailState { done: 4, ids: vec![1, 2, 5], trashed: vec![2] }),
         ("sound", Packet::Sound { sounds: vec![(1, 12_288, -256), (17, 0, 65_536)] }),
         (
             "chat",

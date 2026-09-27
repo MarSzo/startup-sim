@@ -1013,6 +1013,27 @@ pełnym ekranie — zastąpiona stylem inspirowanym Don't Starve:
 - **Ustawienia**: suwaki Efekty / Otoczenie / Muzyka (szyny SFX, Ambient,
   Music), zapisywane w `user://settings.cfg`.
 
+### 10.39 Firmowy komputer: pulpit, poczta, tablica zadań
+
+- Komputer na biurku wygląda jak domowy pulpit (StartOS): tapeta z miastem,
+  ikony — **Poczta, Przeglądarka, Komunikator, Kalendarz, Firma** (tylko
+  założyciel), **Kosz** — okna do przeciągania i zamykania, pasek zadań
+  (menu StartOS: zablokuj, zabierz laptop, zamknij; konto, jako które
+  działasz). Jak dotąd wszystko dzieje się **jako właściciel komputera**.
+- **Przeglądarka** z ulubionymi: *Obiady do biura* (dawna zakładka) i
+  *Tablica zadań*.
+- **Tablica zadań (kanban) — osobna dla każdego działu**: kolumny Do
+  zrobienia / W toku / Zrobione, karty z priorytetem (niski / średni /
+  pilny — kolorowy pasek), przypisaniem („Biorę” albo wybór osoby z działu),
+  opisem i komentarzami; strzałki ← → przesuwają kartę, klik otwiera
+  szczegóły. Do 40 kart na dział.
+- **Poczta służbowa** (skrzynka właściciela komputera): lista, czytanie,
+  „Napisz” do osoby z firmy, „Odpowiedz”, „Do kosza”; **Kosz** — przywróć
+  albo opróżnij. Maile przychodzą też same: powitanie z HR po podpisaniu
+  umowy, potwierdzenie spotkania z zarządem, „obiad czeka na recepcji”,
+  przypisane zadanie, komentarz do Twojego zadania. Plakietki z liczbą
+  nieprzeczytanych na ikonach Poczty i Komunikatora, dźwięk nowej poczty.
+
 ### 10.6 Stan implementacji
 
 *Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie,
@@ -1112,10 +1133,10 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
   ciszy/powrocie z tła i sam łączy się ponownie po utracie sesji.
 - **Testy**: 103 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
   zależna od uprawnień, bramki, ruch/kolizje, schody, winda, nawigacja,
-  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, zegar, dojazd, pogoda, zarząd, słodycze, obiady, wakaty, firma, ochrona i policja, kubki, dym, balkon, protokół), 2 golden, 30 e2e serwera
+  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, zegar, dojazd, pogoda, zarząd, słodycze, obiady, wakaty, firma, ochrona i policja, kubki, dym, balkon, tablica zadań, poczta służbowa, protokół), 2 golden, 31 e2e serwera
   (m.in. portal: odrzucenie → przyjęcie → spawn; całe wdrożenie aż do karty;
   niewidoczność między piętrami; zgodność stanu serwera z predykcją) —
-  łącznie 135 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 porannego dojazdu samochodem moknięcia w deszczu spotkania z Prezesem tacy ze słodyczami obiadu z odbiorem na recepcji, obsadzonego stanowiska, panelu założyciela kradzieży w sklepie z ochroną i policją , kubka zebranego przez sprzątaczkę oraz papierosa, który uruchamia alarm pożarowy, wcześniejszego powrotu do domu z przystanku i pomijania czekania, zatrzymania przez ochronę, dźwięku ekspresu słyszanego przez innych); 151 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
+  łącznie 139 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 porannego dojazdu samochodem moknięcia w deszczu spotkania z Prezesem tacy ze słodyczami obiadu z odbiorem na recepcji, obsadzonego stanowiska, panelu założyciela kradzieży w sklepie z ochroną i policją , kubka zebranego przez sprzątaczkę oraz papierosa, który uruchamia alarm pożarowy, wcześniejszego powrotu do domu z przystanku i pomijania czekania, zatrzymania przez ochronę, dźwięku ekspresu słyszanego przez innych, tablicy zadań działu z przypisaniem i komentarzem oraz poczty z koszem); 157 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
   adresów).
 
 #### Pomiary (MacBook, wszystko lokalnie)

@@ -36,6 +36,7 @@ mod interact;
 mod items;
 mod kitchen;
 mod leave;
+mod office;
 mod lunch;
 mod movement;
 mod player;
@@ -241,6 +242,9 @@ pub struct Server {
     says: Vec<Say>,
     /// Sounds this tick: (kind, floor, position), sent with the updates.
     sounds: Vec<(u8, u8, Pos)>,
+    /// Task boards (per department) and work mail.
+    boards: crate::tasks::Boards,
+    post: crate::workmail::PostOffice,
     /// Packets queued this tick (kept to reuse the allocation).
     outbox: Vec<Outgoing>,
     net: Net,
@@ -316,6 +320,8 @@ impl Server {
             next_drop_handle: DROP_HANDLE_BASE,
             says: Vec::new(),
             sounds: Vec::new(),
+            boards: Default::default(),
+            post: Default::default(),
             outbox: Vec::new(),
             building,
             net,

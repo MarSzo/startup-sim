@@ -1726,3 +1726,93 @@ fn founder_founds_the_company_and_hires_from_the_panel() {
     assert!(fired.is_some(), "Bob fired");
     let _ = pc::CLOSE;
 }
+
+#[test]
+fn task_board_per_department_and_work_mail() {
+    use game::computer::lines as pc;
+    use proto::{mail_action as ma, task_action as ta};
+    let (addr, _) = start_server_cfg(0, true, true); // hired: card + laptop, at a desk
+    let b = building();
+    let (mut ola, _) = Client::connect(addr, "Ola"); // id 1: IT
+    let (mut kuba, _) = Client::connect(addr, "Kuba"); // id 2: Biznes
+    let (mut ewa, _) = Client::connect(addr, "Ewa"); // id 3: IT
+    let wait = Duration::from_millis(800);
+    let nobody = Body::at(1, Pos::tile_center(0, 0));
+    let said = |line: &'static str| move |p: &Packet| matches!(p, Packet::Say { text, .. } if text == line).then_some(());
+    // Everybody puts the laptop down and sits at it.
+    let sit = |me: &mut Client, others: [&Client; 2]| {
+        me.press_e(&b, nobody);
+        assert!(wait_for(me, &others, wait, said(pc::PLACED)).is_some());
+        me.press_e(&b, nobody);
+        assert!(wait_for(me, &others, wait, |p| matches!(p, Packet::Computer { .. }).then_some(())).is_some());
+    };
+    sit(&mut ola, [&kuba, &ewa]);
+    sit(&mut kuba, [&ola, &ewa]);
+    sit(&mut ewa, [&ola, &kuba]);
+    let task = |c: &Client, nonce: u16, action: u8, task: u16, arg: u8, text: &str| {
+        c.sock.send(&Packet::TaskAction { token: c.token, nonce, action, task, arg, text: text.into() }.encode()).unwrap();
+    };
+    let board = |c: &Client, keep: &[&Client], done: u16| {
+        wait_for(c, keep, Duration::from_millis(800), |p| match p {
+            Packet::TaskBoard { done: d, part: 0, members, tasks, .. } if *d == done => Some((members.clone(), tasks.clone())),
+            _ => None,
+        })
+    };
+
+    // Ola adds an urgent card; a retry with the same nonce adds nothing.
+    task(&ola, 1, ta::CREATE, 0, 2, "Naprawić logowanie\nPo zmianie hasła nie działa.");
+    task(&ola, 1, ta::CREATE, 0, 2, "Naprawić logowanie\nPo zmianie hasła nie działa.");
+    std::thread::sleep(Duration::from_millis(150));
+    task(&ola, 1, ta::SYNC, 0, 0, "");
+    let (members, cards) = board(&ola, &[&kuba, &ewa], 1).expect("Ola's board");
+    assert_eq!(members, ["Ewa", "Ola"], "the IT department");
+    assert_eq!(cards.len(), 1, "the retry was ignored");
+    let id = cards[0].id;
+    assert_eq!((cards[0].column, cards[0].priority, cards[0].author.as_str()), (0, 2, "Ola"));
+
+    // Ola assigns it to Ewa: Ewa gets an e-mail and moves the card on.
+    task(&ola, 2, ta::ASSIGN, id, 0, "Ewa");
+    let mail = |c: &Client, nonce: u16, action: u8, id: u16, to: &str, subject: &str, body: &str| {
+        let p = Packet::MailAction { token: c.token, nonce, action, id, to: to.into(), subject: subject.into(), body: body.into() };
+        c.sock.send(&p.encode()).unwrap();
+    };
+    std::thread::sleep(Duration::from_millis(150));
+    mail(&ewa, 0, ma::SYNC, 0, "", "", "");
+    let got = wait_for(&ewa, &[&ola, &kuba], wait, |p| match p {
+        Packet::WorkMail { from, subject, .. } if from == "Tablica zadań" => Some(subject.clone()),
+        _ => None,
+    });
+    assert_eq!(got.as_deref(), Some("Nowe zadanie: Naprawić logowanie"));
+    task(&ewa, 1, ta::MOVE, id, 1, "");
+    task(&ewa, 2, ta::COMMENT, id, 0, "Biorę się za to");
+    std::thread::sleep(Duration::from_millis(150));
+    task(&ola, 0, ta::SYNC, id, 0, "");
+    let (_, cards) = board(&ola, &[&kuba, &ewa], 2).expect("board again");
+    assert_eq!((cards[0].column, cards[0].assignee.as_str(), cards[0].comments), (1, "Ewa", 1));
+    let detail = wait_for(&ola, &[&kuba, &ewa], wait, |p| match p {
+        Packet::TaskDetail { id: i, desc, comments } if *i == id => Some((desc.clone(), comments.clone())),
+        _ => None,
+    });
+    assert_eq!(detail, Some(("Po zmianie hasła nie działa.".into(), vec![("Ewa".into(), "Biorę się za to".into())])));
+
+    // Biznes has its own (empty) board.
+    task(&kuba, 0, ta::SYNC, 0, 0, "");
+    let (members, cards) = board(&kuba, &[&ola, &ewa], 0).expect("Kuba's board");
+    assert_eq!((members, cards.len()), (vec!["Kuba".to_string()], 0));
+
+    // Ewa writes to Ola; Ola reads it and puts it in the trash.
+    mail(&ewa, 3, ma::SEND, 0, "Ola", "Kawa?", "O 12 w kuchni.");
+    assert!(wait_for(&ewa, &[&ola, &kuba], wait, said(game::workmail::lines::SENT)).is_some());
+    mail(&ola, 0, ma::SYNC, 0, "", "", "");
+    let mid = wait_for(&ola, &[&kuba, &ewa], wait, |p| match p {
+        Packet::WorkMail { id, from, body, .. } if from == "Ewa" && body == "O 12 w kuchni." => Some(*id),
+        _ => None,
+    })
+    .expect("Ola got the mail");
+    mail(&ola, 1, ma::TRASH, mid, "", "", "");
+    let state = wait_for(&ola, &[&kuba, &ewa], wait, |p| match p {
+        Packet::MailState { done: 1, ids, trashed } => Some((ids.clone(), trashed.clone())),
+        _ => None,
+    });
+    assert_eq!(state.map(|(ids, t)| (ids.contains(&mid), t)), Some((true, vec![mid])));
+}

@@ -270,7 +270,13 @@ impl Server {
         self.company.hired_on.entry(pid).or_insert(p.day);
         let dept = self.cfg.recruitment.department_name(p.department).unwrap_or("-");
         let msg = format!("* player {pid} '{}' signed a contract: {dept}", p.nick);
+        let (nick, dept) = (p.nick.clone(), dept.to_string());
         self.log(msg);
+        let company = self.company.name.clone();
+        let body = format!(
+            "Cześć {nick}!\nWitamy w {company}, dział: {dept}.\n\nNa pulpicie masz komunikator, pocztę i przeglądarkę — w ulubionych jest tablica zadań działu i zamawianie obiadów. Kubki są w szafce w aneksie kuchennym.\n\nPowodzenia!\nHR"
+        );
+        self.office_mail(&nick, "HR", &format!("Witamy w {company}!"), &body);
         // Everyone gets the updated PlayerInfo (department) again.
         for other in self.players.values_mut() {
             other.known.remove(&pid);

@@ -315,6 +315,12 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 	screen.my_id = net.player_id
 	screen.name_of = func(id: int) -> String: return nick if id == net.player_id else nicks.get(id, "?")
 	screen.action.connect(_computer_action)
+	screen.task_action.connect(func(n: int, act: int, task: int, arg: int, text: String):
+		if net.is_playing():
+			net.send(Protocol.encode_task_action(net.token, n, act, task, arg, text)))
+	screen.mail_action.connect(func(n: int, act: int, id: int, to: String, subj: String, body: String):
+		if net.is_playing():
+			net.send(Protocol.encode_mail_action(net.token, n, act, id, to, subj, body)))
 	screen.company_action.connect(func(act: int, target: int, value: int, text: String):
 		if net.is_playing():
 			net.send(Protocol.encode_company_action(net.token, act, target, value, text)))
@@ -668,6 +674,14 @@ func _on_packet(p: Dictionary) -> void:
 			dialog.on_dialog(p)
 		Protocol.T_CHAT:
 			screen.on_chat(p)
+		Protocol.T_TASK_BOARD:
+			screen.on_task_board(p)
+		Protocol.T_TASK_DETAIL:
+			screen.on_task_detail(p)
+		Protocol.T_WORK_MAIL:
+			screen.on_work_mail(p)
+		Protocol.T_MAIL_STATE:
+			screen.on_mail_state(p)
 		Protocol.T_SOUND:
 			sounds.on_sound(p)
 		Protocol.T_SAY:

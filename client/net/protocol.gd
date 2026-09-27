@@ -3,7 +3,7 @@
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 30
+const VERSION := 31
 const MAX_PACKET := 1200
 const MAX_NICK_BYTES := 16
 const MAX_SAY_BYTES := 240
@@ -56,6 +56,31 @@ const T_FRIDGE := 42
 const T_FRIDGE_ACTION := 43
 const T_SKIP_WAIT := 44
 const T_SOUND := 45
+const T_TASK_ACTION := 46
+const T_TASK_BOARD := 47
+const T_TASK_DETAIL := 48
+const T_MAIL_ACTION := 49
+const T_WORK_MAIL := 50
+const T_MAIL_STATE := 51
+# TaskAction.action / MailAction.action (server/src/protocol/mod.rs)
+const TA_SYNC := 0
+const TA_CREATE := 1
+const TA_MOVE := 2
+const TA_ASSIGN := 3
+const TA_PRIORITY := 4
+const TA_COMMENT := 5
+const TA_DELETE := 6
+const TA_EDIT := 7
+const MA_SYNC := 0
+const MA_SEND := 1
+const MA_TRASH := 2
+const MA_RESTORE := 3
+const MA_EMPTY_TRASH := 4
+const TASK_TITLE_MAX := 80
+const TASK_TEXT_MAX := 400
+const TASK_COMMENT_MAX := 120
+const MAIL_SUBJECT_MAX := 80
+const MAIL_BODY_MAX := 400
 ## Sound.kind -> file in res://sounds (server/src/protocol/mod.rs `sound`).
 const SOUND_FILES := {1: "coffee", 2: "till", 3: "gate_alarm", 4: "ding", 5: "lock", 6: "switch",
 	7: "flush", 8: "tap", 9: "lighter", 10: "dishwasher", 11: "fridge", 12: "cupboard",
@@ -320,6 +345,31 @@ static func encode_company_action(token: int, action: int, target: int, value: i
 	return b.data_array
 
 
+static func encode_task_action(token: int, nonce: int, action: int, task: int, arg: int, text: String) -> PackedByteArray:
+	var b := _writer(T_TASK_ACTION)
+	b.put_u32(token)
+	b.put_u16(nonce)
+	b.put_u8(action)
+	b.put_u16(task)
+	b.put_u8(arg)
+	_put_str16(b, text, TASK_TEXT_MAX)
+	return b.data_array
+
+
+static func encode_mail_action(token: int, nonce: int, action: int, id: int, to: String, subject: String, body: String) -> PackedByteArray:
+	var b := _writer(T_MAIL_ACTION)
+	b.put_u32(token)
+	b.put_u16(nonce)
+	b.put_u8(action)
+	b.put_u16(id)
+	var tb := utf8_truncated(to, MAX_NICK_BYTES)
+	b.put_u8(tb.size())
+	b.put_data(tb)
+	_put_str16(b, subject, MAIL_SUBJECT_MAX)
+	_put_str16(b, body, MAIL_BODY_MAX)
+	return b.data_array
+
+
 static func encode_skip_wait(token: int) -> PackedByteArray:
 	var b := _writer(T_SKIP_WAIT)
 	b.put_u32(token)
@@ -547,6 +597,52 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			p.founded = r.u8() != 0
 			p.alarm = r.u8()
 			p.skip = r.u8()
+		T_TASK_BOARD:
+			p.dept = r.u8()
+			p.done = r.u16()
+			p.part = r.u8()
+			p.parts = r.u8()
+			var nm := r.u8()
+			if nm > 24:
+				return {}
+			var members := []
+			for i in nm:
+				members.append(r.str8())
+			p.members = members
+			var nt := r.u8()
+			var tasks := []
+			for i in nt:
+				tasks.append({"id": r.u16(), "column": r.u8(), "priority": r.u8(), "comments": r.u8(),
+					"title": r.str16(TASK_TITLE_MAX), "author": r.str8(), "assignee": r.str8()})
+			p.tasks = tasks
+		T_TASK_DETAIL:
+			p.id = r.u16()
+			p.desc = r.str16(TASK_TEXT_MAX)
+			var nc := r.u8()
+			if nc > 6:
+				return {}
+			var comments := []
+			for i in nc:
+				comments.append([r.str8(), r.str16(TASK_COMMENT_MAX)])
+			p.comments = comments
+		T_WORK_MAIL:
+			p.id = r.u16()
+			p.from = r.str8()
+			p.to = r.str8()
+			p.subject = r.str16(MAIL_SUBJECT_MAX)
+			p.body = r.str16(MAIL_BODY_MAX)
+			p.day = r.u16()
+			p.minute = r.u16()
+		T_MAIL_STATE:
+			p.done = r.u16()
+			for key in ["ids", "trashed"]:
+				var n := r.u8()
+				if n > 64:
+					return {}
+				var list := []
+				for i in n:
+					list.append(r.u16())
+				p[key] = list
 		T_SOUND:
 			var n := r.u8()
 			if n > 64:

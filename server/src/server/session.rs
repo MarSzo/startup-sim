@@ -83,6 +83,10 @@ impl Server {
             Packet::LunchOrder { dish, .. } => self.handle_lunch_order(id, dish),
             Packet::FridgeAction { action, arg, .. } => self.handle_fridge_action(id, action, arg),
             Packet::SkipWait { .. } => self.handle_skip_wait(id),
+            Packet::TaskAction { nonce, action, task, arg, text, .. } => self.handle_task_action(id, nonce, action, task, arg, &text),
+            Packet::MailAction { nonce, action, id: mid, to, subject, body, .. } => {
+                self.handle_mail_action(id, nonce, action, mid, &to, &subject, &body)
+            }
             Packet::CompanyAction { action, target, value, text, .. } => self.handle_company_action(id, action, target, value, &text),
             Packet::CommuteChoice { mode, .. } => self.handle_commute_choice(id, mode),
             _ => {}
@@ -316,6 +320,8 @@ fn session_token(packet: &Packet) -> Option<u32> {
         | Packet::LunchOrder { token, .. }
         | Packet::FridgeAction { token, .. }
         | Packet::SkipWait { token }
+        | Packet::TaskAction { token, .. }
+        | Packet::MailAction { token, .. }
         | Packet::CompanyAction { token, .. } => Some(*token),
         _ => None,
     }

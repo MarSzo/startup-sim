@@ -70,6 +70,7 @@ client/                 projekt Godota 4.7
   audio/audio.gd        dźwięk: szyny SFX / Ambient / Music, efekty płaskie i w świecie, pętle otoczenia, muzyka
   audio/game_sounds.gd  kroki wg podłoża, pakiety Sound, blipy mowy, otoczenie, syreny, grzmoty
   sounds/               pliki WAV z tools/sounds/gen_sounds.py (syntetyzowane)
+  ui/office/            aplikacje firmowego komputera: okno (os_window), tablica kanban, poczta (mail_box = dane, mail_view = skrzynka / kosz)
   icons/                ikona gry (icon.svg — źródło; icon.icns / icon.ico do eksportu) i ekran startowy splash.png
   maps/building.json    lista pięter (piętro 2 zablokowane)
   maps/floor0.json      parter + teren zewnętrzny
@@ -337,6 +338,12 @@ parking / stojak / krawężnik / przystanek), gracz jest `Working` z `riding`
 Na przystanku `VehicleEvent::Arrived` → wysiada, efekty na potrzeby,
 spóźnienie po 9:00. Auto i rower zostają zaparkowane do wieczora (znikają
 przy `go_home`), taksówka i tramwaj odjeżdżają (`Gone`).
+Firmowy komputer (`tasks.rs`, `workmail.rs`, `server/office.rs`): tablice
+zadań per dział (`Boards`) i skrzynki po nicku (`PostOffice`); obsługa działa
+jako właściciel odblokowanego komputera, przy którym siedzi gracz. Akcje mają
+nonce (ostatni zastosowany w `Player::task_nonce` / `mail_nonce`), a każda
+odpowiedź niesie pełny stan — klient ponawia, dopóki nie zobaczy swojego
+nonce. `office_mail` wysyła maile systemowe (HR, kalendarz, obiady, tablica).
 Dźwięki (`Server::sounds`): zdarzenia dopisują `(rodzaj, piętro, pozycja)`
 (`sound()` dla miejsca gracza); `queue_sounds` wysyła `Sound` każdemu na tym
 piętrze w promieniu `HEAR_RADIUS`. Resztę (kroki, otoczenie, muzykę) klient

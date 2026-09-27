@@ -104,7 +104,7 @@ func reset() -> void:
 func _build_desktop() -> void:
 	var bg := TextureRect.new()
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
-	bg.texture = _wallpaper()
+	bg.texture = wallpaper()
 	bg.stretch_mode = TextureRect.STRETCH_SCALE
 	bg.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	add_child(bg)
@@ -164,11 +164,9 @@ func _build_desktop() -> void:
 	_root.add_child(_toast)
 
 
-## A pixel-art wallpaper: evening sky in bands, stars, a city skyline with
-## lit windows (drawn small, scaled up with nearest filtering).
 ## The desktop wallpaper: a soft dusk sky, a few stars and a dark city
 ## skyline with lit windows (drawn small, smoothly scaled up).
-func _wallpaper() -> Texture2D:
+static func wallpaper() -> Texture2D:
 	var w := 320
 	var h := 180
 	var img := Image.create(w, h, false, Image.FORMAT_RGBA8)
@@ -209,7 +207,7 @@ func _icon(caption: String, kind: String, on_open: Callable) -> Control:
 	var pic := Control.new()
 	pic.size = Vector2(84, 52)
 	pic.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	pic.draw.connect(func(): _draw_icon(pic, kind))
+	pic.draw.connect(func(): draw_icon(pic, kind))
 	b.add_child(pic)
 	var l := _label(caption, 16, Color.WHITE, false)
 	l.position = Vector2(0, 54)
@@ -222,8 +220,9 @@ func _icon(caption: String, kind: String, on_open: Callable) -> Control:
 	return b
 
 
-## Desktop icons, hand-drawn like the rest of the game (ink outlines).
-func _draw_icon(c: Control, kind: String) -> void:
+## Desktop icons, hand-drawn like the rest of the game (ink outlines):
+## browser, mail, trash, chat, calendar, company, tasks.
+static func draw_icon(c: Control, kind: String) -> void:
 	var ink := Ink.INK
 	var o := Vector2(c.size.x / 2, 26)
 	match kind:
@@ -257,6 +256,40 @@ func _draw_icon(c: Control, kind: String) -> void:
 			c.draw_rect(lid.grow(1.2), ink)
 			c.draw_rect(lid, Color("#b7bfbc"))
 			c.draw_rect(Rect2(o + Vector2(-4, -18), Vector2(8, 4)), ink)
+		"chat":  # two speech bubbles
+			for b in [[Vector2(-7, -5), Color("#f2e7cb")], [Vector2(7, 5), Color("#9fd0c0")]]:
+				var r := Rect2(o + b[0] - Vector2(13, 9), Vector2(26, 18))
+				c.draw_rect(r.grow(1.5), ink)
+				c.draw_rect(r, b[1])
+				var tail := PackedVector2Array([r.position + Vector2(5, 18), r.position + Vector2(3, 24), r.position + Vector2(11, 18)])
+				c.draw_colored_polygon(tail, ink)
+				for k in 3:
+					c.draw_circle(r.get_center() + Vector2(-6 + k * 6, 0), 1.6, ink)
+		"calendar":  # a desk calendar with a red header
+			var r := Rect2(o + Vector2(-17, -16), Vector2(34, 32))
+			c.draw_rect(r.grow(1.5), ink)
+			c.draw_rect(r, Color("#f4ead0"))
+			c.draw_rect(Rect2(r.position, Vector2(34, 9)), Color("#a8402f"))
+			for gy in 3:
+				for gx in 4:
+					c.draw_rect(Rect2(r.position + Vector2(3 + gx * 8, 12 + gy * 6), Vector2(5, 3)), Color(ink, 0.55))
+			c.draw_rect(Rect2(r.position + Vector2(19, 18), Vector2(5, 3)), Color("#a8402f"))
+		"company":  # an office building
+			var r := Rect2(o + Vector2(-13, -19), Vector2(26, 38))
+			c.draw_rect(r.grow(1.5), ink)
+			c.draw_rect(r, Color("#c9b48a"))
+			for wy in 5:
+				for wx in 3:
+					c.draw_rect(Rect2(r.position + Vector2(3 + wx * 8, 3 + wy * 7), Vector2(4, 4)), Color("#e8b85a") if (wx + wy) % 3 else Color(ink, 0.7))
+			c.draw_rect(Rect2(o + Vector2(-3, 11), Vector2(6, 8)), ink)
+		"tasks":  # a board with three columns of cards
+			var r := Rect2(o + Vector2(-19, -15), Vector2(38, 30))
+			c.draw_rect(r.grow(1.5), ink)
+			c.draw_rect(r, Color("#f4ead0"))
+			var cols := [Color("#e0a82e"), Color("#5b8fc2"), Color("#6f8f3e")]
+			for k in 3:
+				for n in 3 - k:
+					c.draw_rect(Rect2(r.position + Vector2(3 + k * 12, 4 + n * 8), Vector2(9, 6)), cols[k])
 
 func _process(_d: float) -> void:
 	if not visible:

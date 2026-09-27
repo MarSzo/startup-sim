@@ -84,6 +84,10 @@ impl Server {
             if let Some(r) = receptionist {
                 self.says.push(Say::addressed(r, lunch::lines::arrived(name), owner));
             }
+            if let Some(nick) = self.players.get(&owner).map(|p| p.nick.clone()) {
+                let body = format!("Kurier zostawił: {name}.\nOdbierz na recepcji (piętro 1) — E przy biurku recepcji.");
+                self.office_mail(&nick, "Obiady do biura", "Twój obiad czeka na recepcji", &body);
+            }
         }
     }
 
