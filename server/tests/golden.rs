@@ -36,6 +36,34 @@ fn packets() {
     check("packets.json", json!({ "packets": items }), true);
 }
 
+/// Sealed packets: the Godot client must produce and read the same bytes.
+#[test]
+fn sealed() {
+    use game::crypto::{connect_prefix, session_prefix, Dir, Keys};
+    let key = [0x42u8; 32];
+    let keys = Keys::derive(&key);
+    let inner = golden_samples().into_iter().find(|(n, _)| *n == "ping").unwrap().1.encode();
+    let to_server = keys.seal(Dir::ToServer, &session_prefix(0x01020304), 7, &inner);
+    let to_client = keys.seal(Dir::ToClient, &session_prefix(0x01020304), 9, &inner);
+    let ticket = [0xabu8; 32];
+    let connect = keys.seal(Dir::ToServer, &connect_prefix(&ticket), 1, &inner);
+    check(
+        "sealed.json",
+        json!({
+            "key": to_hex(&key),
+            "token": 0x01020304u32,
+            "inner": to_hex(&inner),
+            "to_server_counter": 7,
+            "to_server": to_hex(&to_server),
+            "to_client_counter": 9,
+            "to_client": to_hex(&to_client),
+            "ticket": to_hex(&ticket),
+            "connect": to_hex(&connect),
+        }),
+        true,
+    );
+}
+
 #[test]
 fn movement_vectors() {
     let b = Building::load(&default_building_path()).unwrap();

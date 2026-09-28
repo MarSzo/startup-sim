@@ -1,0 +1,11 @@
+{
+  "connect": "545322f1abababababababababababababababababababababababababababababababab0100000000000000ef320659f727de76d1ffd5e6e5707e505265b516eb42a059558d2b245b136921",
+  "inner": "545322080403020128db0b00",
+  "key": "4242424242424242424242424242424242424242424242424242424242424242",
+  "ticket": "abababababababababababababababababababababababababababababababab",
+  "to_client": "545322f004030201090000000000000044abcb1d739562a3d54505ac49ee00b8be49800d53ea3363ef8af333b252ddc6",
+  "to_client_counter": 9,
+  "to_server": "545322f00403020107000000000000004124219dfab696394df33b7dd76fc7240b0f3033599e51f398ad8356f42abc9c",
+  "to_server_counter": 7,
+  "token": 16909060
+}

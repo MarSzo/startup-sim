@@ -47,7 +47,8 @@ var audio := Audio.new()
 var auth := AuthClient.new()
 var login_layer := CanvasLayer.new()
 var login := LoginScreen.new()
-## The logged-in account: {address, nick, ticket, refresh} ({} = a guest).
+## The logged-in account: {address, nick, ticket, refresh, key} ({} = a
+## guest). `key` seals the game packets; it only ever comes over HTTPS.
 var session := {}
 var _retry_login := false   # the ticket expired during a reconnect: refresh it
 var _to_login := ""         # refused (needs an account): back to the login screen
@@ -189,7 +190,7 @@ func _take_screenshots(path: String, delays: PackedStringArray) -> void:
 
 ## Logged in: straight into the game with a saved character, else create one.
 func _on_logged_in(address: String, g: Dictionary, remember: bool) -> void:
-	session = {"address": address, "nick": g.nick, "ticket": g.ticket, "refresh": g.refresh}
+	session = {"address": address, "nick": g.nick, "ticket": g.ticket, "refresh": g.refresh, "key": g.get("key", "")}
 	if remember:
 		AuthClient.remember(address, g.nick, g.refresh)
 	else:
@@ -208,7 +209,7 @@ func _on_logged_in(address: String, g: Dictionary, remember: bool) -> void:
 
 func _on_connect_pressed(nick: String, p_profile: Dictionary, address: String) -> void:
 	profile = p_profile
-	var err: String = net.connect_to_server(address, nick, p_profile, session.get("ticket", ""))
+	var err: String = net.connect_to_server(address, nick, p_profile, session.get("ticket", ""), session.get("key", ""))
 	if err != "":
 		start.set_status(err, true)
 		return
@@ -369,6 +370,7 @@ func _on_disconnected(reason: String) -> void:
 		if r.get("ok", false):
 			session.ticket = r.ticket
 			session.refresh = r.refresh
+			session.key = r.get("key", "")
 			if AuthClient.remembered().get("nick", "") == session.nick:
 				AuthClient.remember(session.address, session.nick, r.refresh)
 			start.get_parent().visible = true

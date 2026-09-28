@@ -133,6 +133,8 @@ pub(super) struct Player {
     pub(super) voice_tick: u32,
     /// Playing without an account (nothing is saved).
     pub(super) guest: bool,
+    /// Sealed packets (a logged-in account): keys, counters.
+    pub(super) crypto: Option<crate::crypto::Session>,
     /// Salary, grosze per game hour (raises from the CEO).
     pub(super) pay_rate: i64,
     /// World day of the last raise request (cooldown).
@@ -207,6 +209,7 @@ impl Player {
             voice_allowance: 200,
             voice_tick: 0,
             guest: true,
+            crypto: None,
             pay_rate: clock::PAY_PER_MIN * 60,
             last_raise_day: None,
             talk: None,

@@ -74,6 +74,8 @@ struct Reply {
     ticket: String,
     refresh: String,
     character: bool,
+    /// Session key for the game packets (hex).
+    key: String,
     error: String,
 }
 
@@ -81,7 +83,7 @@ type Answer = (StatusCode, Json<Reply>);
 
 fn answer(r: Result<Granted, AuthError>) -> Answer {
     match r {
-        Ok(g) => (StatusCode::OK, Json(Reply { ok: true, nick: g.nick, ticket: g.ticket, refresh: g.refresh, character: g.character, error: String::new() })),
+        Ok(g) => (StatusCode::OK, Json(Reply { ok: true, nick: g.nick, ticket: g.ticket, refresh: g.refresh, character: g.character, key: g.key, error: String::new() })),
         Err(e) => {
             if let AuthError::Internal(msg) = &e {
                 eprintln!("auth: {msg}");

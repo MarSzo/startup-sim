@@ -350,6 +350,14 @@ albo własny z `rcgen` w `<save>/tls/`. Klient: `net/auth_client.gd`
 (HTTPRequest, przypinanie certyfikatu w `user://known_servers.cfg`, token
 „zapamiętaj mnie” w `user://auth.cfg`), `ui/login_screen.gd`; `main.gd`
 odświeża wygasły bilet przy ponownym łączeniu.
+Szyfrowanie (`crypto.rs`, klient `net/seal.gd`): AES-256-CBC + HMAC-SHA256
+(RustCrypto `aes`/`cbc`/`hmac`; w Godocie natywne `AESContext` /
+`Crypto.hmac_digest`), `Keys::seal/open`, `ReplayWindow`. Serwer:
+`handle_datagram` otwiera `0xF0` (klucz z `Player::crypto` po tokenie) i
+`0xF1` (klucz z biletu w `Auth`, licznik przez `accept_connect`), a
+`Server::send` szyfruje wszystko dla gracza z kluczem (po `by_addr`). Klient:
+`net_client.gd` szyfruje w `send()` i otwiera w `_poll()`. Parytet bajtów:
+golden `sealed.json`.
 Zapis gry (`persist.rs`, `server/save.rs`): SQLite (`rusqlite`, WAL), tabele
 `world` (jeden JSON świata) i `characters` (nick → JSON). `Store` ma wątek
 zapisu: pętla gry co `SAVE_TICKS` (albo po `save_soon`) serializuje zrzut i

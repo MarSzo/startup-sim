@@ -9,6 +9,7 @@
 ## RECONNECT_WINDOW_SEC, before giving up to the start screen.
 extends Node
 
+const Seal = preload("res://net/seal.gd")
 const Protocol = preload("res://net/protocol.gd")
 
 signal connected(welcome: Dictionary)
@@ -36,6 +37,11 @@ var nick := ""
 var profile := {}
 ## Login ticket (HTTPS); "" = playing as a guest.
 var ticket := ""
+## With an account every packet is sealed with the session key
+## (net/seal.gd); null = a guest, plain packets.
+var _seal = null
+var _ticket_raw := PackedByteArray()
+var _send_counter := 0
 var nonce := 0
 var player_id := 0
 var token := 0
@@ -94,7 +100,7 @@ static func parse_address(address: String) -> Array:
 	return [host, port]
 
 
-func connect_to_server(address: String, p_nick: String, p_profile: Dictionary, p_ticket := "") -> String:
+func connect_to_server(address: String, p_nick: String, p_profile: Dictionary, p_ticket := "", key_hex := "") -> String:
 	var hp := parse_address(address)
 	if hp.is_empty():
 		return "Nieprawidłowy adres serwera"
@@ -103,6 +109,8 @@ func connect_to_server(address: String, p_nick: String, p_profile: Dictionary, p
 	nick = p_nick
 	profile = p_profile
 	ticket = p_ticket
+	_seal = Seal.from_key(key_hex.hex_decode()) if key_hex.length() == 64 else null
+	_ticket_raw = p_ticket.hex_decode() if _seal else PackedByteArray()
 	_reconnecting = false
 	reconnects = 0
 	return _start_connect()
@@ -129,6 +137,8 @@ func _start_connect() -> String:
 		return "Błąd gniazda UDP (%d)" % err
 	nonce = randi()
 	token = 0
+	if _seal:
+		_seal.reset_window()  # a new session counts from 1
 	state = State.CONNECTING
 	_connect_elapsed = 0.0
 	_retry_timer = 0.0
@@ -138,6 +148,15 @@ func _start_connect() -> String:
 func send(bytes: PackedByteArray) -> void:
 	if state == State.IDLE:
 		return
+	if _seal:
+		# The counter only goes up (the server refuses a replayed Connect).
+		_send_counter += 1
+		var prefix: PackedByteArray
+		if bytes[3] == Protocol.T_CONNECT:
+			prefix = Seal.connect_prefix(Protocol.MAGIC, Protocol.VERSION, _ticket_raw)
+		else:
+			prefix = Seal.session_prefix(Protocol.MAGIC, Protocol.VERSION, token)
+		bytes = _seal.seal(Seal.TO_SERVER, prefix, _send_counter, bytes)
 	_bytes_out += bytes.size()
 	udp.put_packet(bytes)
 
@@ -241,6 +260,14 @@ func _poll() -> void:
 	while state != State.IDLE and udp.get_available_packet_count() > 0:
 		var bytes := udp.get_packet()
 		_bytes_in += bytes.size()
+		if _seal and bytes.size() > 3:
+			if bytes[3] == Seal.SEALED:
+				var opened: Array = _seal.open(Seal.TO_CLIENT, 8, bytes)
+				if opened.is_empty() or not _seal.accept(opened[0]):
+					continue  # forged, damaged or replayed
+				bytes = opened[1]
+			elif bytes[3] != Protocol.T_REJECT and bytes[3] != Protocol.T_DISCONNECT:
+				continue  # a logged-in session only takes sealed packets
 		var p := Protocol.decode(bytes)
 		if p.is_empty():
 			continue

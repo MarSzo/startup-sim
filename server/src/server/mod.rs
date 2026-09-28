@@ -465,8 +465,15 @@ impl Server {
 
     /// Encode and send one packet; returns its size.
     fn send(&mut self, addr: SocketAddr, p: &Packet) -> usize {
-        let b = p.encode();
+        let mut b = p.encode();
         debug_assert!(b.len() <= proto::MAX_PACKET);
+        // A logged-in session: sealed with its key.
+        if let Some(pl) = self.by_addr.get(&addr).and_then(|id| self.players.get_mut(id)) {
+            if let Some(c) = pl.crypto.as_mut() {
+                c.send_counter += 1;
+                b = c.keys.seal(crate::crypto::Dir::ToClient, &crate::crypto::session_prefix(pl.token), c.send_counter, &b);
+            }
+        }
         let n = b.len();
         self.net.send(addr, b);
         n

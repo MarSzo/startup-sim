@@ -9,6 +9,7 @@ use crate::commute;
 use crate::inventory::{kind as item_kind, Item};
 use crate::map::access;
 use crate::net::canonical;
+use crate::crypto;
 use crate::protocol::{self as proto, DecodeError, Packet, PlayerInfoEntry, Profile};
 use crate::shop;
 use crate::sim::{self, Body, Pos};
@@ -21,6 +22,45 @@ use super::{Server, MAX_INPUT_QUEUE, TICK_HZ};
 
 impl Server {
     pub(super) fn handle_datagram(&mut self, addr: SocketAddr, data: &[u8], now: Instant) {
+        // Sealed (a logged-in player): check, decrypt, then as usual.
+        let mut keys = None;
+        let mut sealed_ticket = String::new();
+        let mut sealed_token = None;
+        let opened;
+        let data = match data.get(3) {
+            Some(&crypto::SEALED) if data.len() >= 8 && data[2] == proto::VERSION => {
+                let token = u32::from_le_bytes([data[4], data[5], data[6], data[7]]);
+                let Some(p) = self.by_token.get(&token).and_then(|id| self.players.get_mut(id)) else {
+                    self.send(addr, &Packet::Disconnect { token, reason: proto::disconnect::SESSION_UNKNOWN });
+                    return;
+                };
+                let Some(c) = p.crypto.as_mut() else { return };
+                let Some((counter, inner)) = c.keys.open(crypto::Dir::ToServer, 8, data) else { return };
+                if !c.window.accept(counter) {
+                    return; // a replay
+                }
+                sealed_token = Some(token);
+                opened = inner;
+                &opened[..]
+            }
+            Some(&crypto::SEALED_CONNECT) if data.len() >= 4 + crypto::TICKET_BYTES && data[2] == proto::VERSION => {
+                let ticket: String = data[4..4 + crypto::TICKET_BYTES].iter().map(|b| format!("{b:02x}")).collect();
+                let Some(key) = self.auth.as_ref().and_then(|a| a.ticket_key(&ticket)) else {
+                    self.send(addr, &Packet::Reject { reason: proto::reject::BAD_TICKET });
+                    return;
+                };
+                let k = crypto::Keys::derive(&key);
+                let Some((counter, inner)) = k.open(crypto::Dir::ToServer, 4 + crypto::TICKET_BYTES, data) else { return };
+                if !self.auth.as_ref().is_some_and(|a| a.accept_connect(&ticket, counter)) {
+                    return; // a recorded Connect played again
+                }
+                keys = Some(k);
+                sealed_ticket = ticket;
+                opened = inner;
+                &opened[..]
+            }
+            _ => data,
+        };
         let packet = match Packet::decode(data) {
             Ok(p) => p,
             Err(DecodeError::BadVersion(_)) => {
@@ -30,11 +70,21 @@ impl Server {
             Err(_) => return,
         };
         if let Packet::Connect { nonce, nick, profile, ticket } = packet {
-            self.handle_connect(addr, nonce, &nick, profile, &ticket, now);
+            if keys.is_some() && ticket != sealed_ticket {
+                return; // sealed with one ticket, asking for another
+            }
+            self.handle_connect(addr, nonce, &nick, profile, &ticket, keys, now);
             return;
         }
         // Every other packet is identified by its session token.
         let Some(token) = session_token(&packet) else { return };
+        if sealed_token.is_some_and(|t| t != token) {
+            return; // sealed for one session, speaking for another
+        }
+        // A logged-in session only takes sealed packets.
+        if sealed_token.is_none() && self.by_token.get(&token).and_then(|id| self.players.get(id)).is_some_and(|p| p.crypto.is_some()) {
+            return;
+        }
         let Some(&id) = self.by_token.get(&token) else {
             // Unknown/expired session: tell the client so it can reconnect.
             if matches!(packet, Packet::Input { .. } | Packet::Ping { .. }) {
@@ -113,7 +163,8 @@ impl Server {
         }
     }
 
-    fn handle_connect(&mut self, addr: SocketAddr, nonce: u32, nick: &str, profile: Profile, ticket: &str, now: Instant) {
+    #[allow(clippy::too_many_arguments)]
+    fn handle_connect(&mut self, addr: SocketAddr, nonce: u32, nick: &str, profile: Profile, ticket: &str, keys: Option<crypto::Keys>, now: Instant) {
         if let Some(&id) = self.by_addr.get(&addr) {
             if self.players.get(&id).is_some_and(|p| p.nonce == nonce) {
                 // Our Welcome was lost; resend it.
@@ -126,7 +177,9 @@ impl Server {
         }
         // An account (a ticket from logging in) or a guest.
         let (nick, guest) = if !ticket.is_empty() {
-            match self.auth.as_ref().and_then(|a| a.redeem(ticket)) {
+            // An account's Connect must come sealed with its key.
+            let redeemed = if keys.is_some() { self.auth.as_ref().and_then(|a| a.redeem(ticket)) } else { None };
+            match redeemed {
                 Some(n) => (n, false),
                 None => {
                     self.send(addr, &Packet::Reject { reason: proto::reject::BAD_TICKET });
@@ -179,6 +232,7 @@ impl Server {
         let body = Body::at(spawn_floor, spawn);
         let mut player = Player::new(id, token, nonce, addr, nick, profile, stage, body, now);
         player.guest = guest;
+        player.crypto = keys.map(crypto::Session::new);
         player.room = self.room_of(spawn_floor, spawn);
         self.log(format!("+ player {} '{}' from {} ({} online)", id, player.nick, canonical(addr), self.players.len() + 1));
         self.players.insert(id, player);

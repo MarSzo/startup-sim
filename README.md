@@ -13,6 +13,7 @@ cd server && cargo run --release            # gra na [::]:7777 (UDP) + logowanie
 godot --path client                         # klient (można odpalić kilka razy): Graj → zaloguj się / załóż konto
 cd server && cargo run --release -- --start-with-card --allow-guests   # wariant dla botów: goście z kartą
 cd server && cargo run --release -- --reset-password Ola                # administrator: nowe jednorazowe hasło
+cd server && cargo run --release -- --list-accounts                     # administrator: lista kont
 cd server && cargo run --release --bin bots -- --count 50 --room "Chill room" --all-in-room
 ```
 
@@ -22,7 +23,8 @@ trzyma na komputerze tylko token, nie hasło). Nowe konto tworzy postać (imię,
 płeć, wiek, miejscowość, e-mail postaci, wygląd z podglądem); kolejne
 logowania wchodzą prosto do gry. Serwer sam robi sobie certyfikat HTTPS —
 klient zapamiętuje go przy pierwszym połączeniu i ostrzega, jeśli się zmieni
-(własny certyfikat, np. Let's Encrypt: `--tls-cert` / `--tls-key`). Po połączeniu siedzisz w domu przy komputerze: w **przeglądarce** jest portal z
+(własny certyfikat, np. Let's Encrypt: `--tls-cert` / `--tls-key`).
+Po zalogowaniu cały ruch gry jest szyfrowany kluczem sesji z logowania. Po połączeniu siedzisz w domu przy komputerze: w **przeglądarce** jest portal z
 ogłoszeniami (kilka firm; zatrudnia tylko nasz startup), wypełniasz formularz,
 po chwili w **Poczcie** czeka zaproszenie na **rozmowę online** (3 pytania,
 2 poprawne = przyjęcie), a potem zaproszenie na dzień próbny — „Idę do biura”.

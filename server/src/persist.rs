@@ -319,6 +319,8 @@ fn backup(db: &Connection, path: &Path) -> Result<(), String> {
     let file = dir.join(format!("{stem}-{}.db", now_secs() / DAY_SECS));
     if !file.exists() {
         db.execute("VACUUM INTO ?1", params![file.to_string_lossy()]).map_err(|e| e.to_string())?;
+        let size = std::fs::metadata(&file).map_or(0, |m| m.len());
+        println!("* save: backup {} ({} KB)", file.display(), size / 1024);
     }
     let mut old: Vec<PathBuf> = std::fs::read_dir(&dir)
         .map_err(|e| e.to_string())?

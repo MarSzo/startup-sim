@@ -1101,8 +1101,24 @@ pełnym ekranie — zastąpiona stylem inspirowanym Don't Starve:
   zmienia je sam.
 - **Goście** (bez konta, bez zapisu) tylko z `--allow-guests` (boty, testy,
   zwiastun) albo na serwerze bez zapisu (`--no-save`).
-- Etap 3 (później): szyfrowanie pakietów UDP kluczem z logowania — dziś
-  bilet w pakiecie `Connect` da się podsłuchać w sieci.
+- Etap 3: pakiety gry zalogowanego gracza są szyfrowane (10.43).
+
+### 10.43 Szyfrowanie gry (etap 3)
+
+- Logowanie (HTTPS) daje oprócz biletu **klucz sesji** (32 B); przez UDP
+  nigdy nie leci. Każdy pakiet gry zalogowanego gracza — w obie strony,
+  także `Connect` i `Welcome` — jest **szyfrowany i podpisany** (AES-256-CBC
+  + HMAC-SHA256, szyfruj-potem-podpisz; IV = licznik zaszyfrowany kluczem;
+  podpis obejmuje kierunek, nagłówek i licznik).
+- Podsłuchany bilet nic nie daje (Connect musi być podpisany kluczem);
+  podrobione / zmienione pakiety są odrzucane; **powtórki** też (okno 64
+  ostatnich liczników na sesję; nagrany Connect nie przejdzie drugi raz,
+  więc nikt nie wyrzuci gracza jego starym pakietem). Sesja zalogowanego
+  gracza przyjmuje tylko pakiety szyfrowane.
+- Goście (`--allow-guests`) grają jak dawniej, jawnie.
+- Pakiet gry ma do 1152 B (zaszyfrowany ≤ 1200 B).
+- Administracja: `--list-accounts` (nick, od kiedy, ostatnie logowanie),
+  `--reset-password <nick>`; kopie zapasowe są logowane (`* save: backup …`).
 
 ### 10.6 Stan implementacji
 
@@ -1201,12 +1217,12 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Sieć mobilna**: serwer dual-stack IPv4/IPv6; gracz identyfikowany tokenem
   (zmiana adresu w trakcie gry przenosi sesję); klient przepina gniazdo po
   ciszy/powrocie z tła i sam łączy się ponownie po utracie sesji.
-- **Testy**: 111 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
+- **Testy**: 114 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
   zależna od uprawnień, bramki, ruch/kolizje, schody, winda, nawigacja,
-  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, zegar, dojazd, pogoda, zarząd, słodycze, obiady, wakaty, firma, ochrona i policja, kubki, dym, balkon, tablica zadań, poczta służbowa, zapis gry, protokół), 2 golden, 33 e2e serwera
+  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, zegar, dojazd, pogoda, zarząd, słodycze, obiady, wakaty, firma, ochrona i policja, kubki, dym, balkon, tablica zadań, poczta służbowa, zapis gry, protokół), 3 golden, 33 e2e serwera
   (m.in. portal: odrzucenie → przyjęcie → spawn; całe wdrożenie aż do karty;
   niewidoczność między piętrami; zgodność stanu serwera z predykcją) —
-  łącznie 146 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 porannego dojazdu samochodem moknięcia w deszczu spotkania z Prezesem tacy ze słodyczami obiadu z odbiorem na recepcji, obsadzonego stanowiska, panelu założyciela kradzieży w sklepie z ochroną i policją , kubka zebranego przez sprzątaczkę oraz papierosa, który uruchamia alarm pożarowy, wcześniejszego powrotu do domu z przystanku i pomijania czekania, zatrzymania przez ochronę, dźwięku ekspresu słyszanego przez innych, tablicy zadań działu z przypisaniem i komentarzem oraz poczty z koszem, głosu słyszanego tylko w pokoju i szeptu do osoby obok, restartu serwera z zapisem i kontami — prawdziwa binarka, rejestracja i logowanie przez HTTPS, odrzucenie gościa i złego biletu, SIGINT i powrót postaci); 161 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
+  łącznie 150 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 porannego dojazdu samochodem moknięcia w deszczu spotkania z Prezesem tacy ze słodyczami obiadu z odbiorem na recepcji, obsadzonego stanowiska, panelu założyciela kradzieży w sklepie z ochroną i policją , kubka zebranego przez sprzątaczkę oraz papierosa, który uruchamia alarm pożarowy, wcześniejszego powrotu do domu z przystanku i pomijania czekania, zatrzymania przez ochronę, dźwięku ekspresu słyszanego przez innych, tablicy zadań działu z przypisaniem i komentarzem oraz poczty z koszem, głosu słyszanego tylko w pokoju i szeptu do osoby obok, restartu serwera z zapisem i kontami — prawdziwa binarka, rejestracja i logowanie przez HTTPS, odrzucenie gościa, złego i jawnego biletu, szyfrowana sesja, odrzucone powtórki pakietu i Connect, SIGINT i powrót postaci); 168 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
   adresów).
 
 #### Pomiary (MacBook, wszystko lokalnie)

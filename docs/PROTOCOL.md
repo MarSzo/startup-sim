@@ -359,11 +359,30 @@ Dym papierosowy na piętrze odbiorcy (co 1 s, tylko w budynku): `floor u8`, n
 u8 (≤ 64) × {`room u16`, `level u8` 1–255}. Pokoi spoza listy nie ma dymu.
 Czujki dymu są w danych mapy (`room_defs.*.detector`), klient rysuje je sam.
 
+### Szyfrowanie (zalogowani gracze)
+
+Klucz sesji K (32 B, hex w polu `key` odpowiedzi logowania — tylko przez
+HTTPS). Klucze: `enc = HMAC-SHA256(K, "startup-sim enc")`,
+`mac = HMAC-SHA256(K, "startup-sim mac")`. Datagram:
+
+    magic u16 | version u8 | 0xF0 | token u32              (sesja)
+    magic u16 | version u8 | 0xF1 | bilet 32 B (surowy)    (Connect)
+    | licznik u64 | AES-256-CBC(pakiet gry, PKCS#7) | MAC 16 B
+
+IV = AES-256-ECB(enc, [kierunek u8 (1 do serwera, 2 do klienta), licznik u64
+LE, 7 × 0]). MAC = pierwsze 16 B z HMAC-SHA256(mac, kierunek u8 ‖ wszystko
+przed MAC). Liczniki rosną (od 1), każda strona odrzuca licznik widziany już
+w oknie 64 ostatnich; licznik zaszyfrowanego Connect musi być większy niż
+ostatni dla tego biletu. Bilet w środku Connect musi się zgadzać z tym w
+nagłówku. Sesja z kluczem przyjmuje tylko pakiety `0xF0`; klient przyjmuje
+jawnie tylko `Reject` i `Disconnect` (np. serwer po restarcie nie zna już
+sesji). Wektory testowe: `server/tests/golden/sealed.json`.
+
 ### Logowanie (HTTPS, port gry + 1)
 
 Poza UDP, JSON: `POST /api/register` i `/api/login` `{nick, password}`,
 `/api/password` `{nick, password, new_password}`, `/api/refresh` `{refresh}`,
-`/api/logout` `{refresh}` → `{ok, nick, ticket, refresh, character, error}`
+`/api/logout` `{refresh}` → `{ok, nick, ticket, refresh, character, key, error}`
 (`character` = postać już istnieje). `GET /api/cert` — PEM własnego
 certyfikatu serwera (404 przy prawdziwym certyfikacie); klient przypina go
 przy pierwszym kontakcie i weryfikuje z nazwą `startup-sim`. `ticket` idzie
@@ -505,6 +524,7 @@ szyfrowaniem.
 
 ## Historia wersji
 
+- **34** — szyfrowanie: pakiety `0xF0` (sesja) i `0xF1` (Connect) dla zalogowanych; pakiet gry ≤ 1152 B (datagram ≤ 1200 B); klucz sesji w odpowiedzi logowania (`key`).
 - **33** — konta: `Connect` + `ticket` str16 (≤ 64 B, z logowania HTTPS; pusty = gość); `Reject` 5 (bilet wygasł), 6 (serwer wymaga konta), 7 (nick ma konto).
 - **32** — czat głosowy: `Voice` (52, C→S), `VoiceFrom` (53, S→C).
 - **31** — firmowy komputer: `TaskAction` (46, C→S), `TaskBoard` (47), `TaskDetail` (48), `MailAction` (49, C→S), `WorkMail` (50), `MailState` (51).

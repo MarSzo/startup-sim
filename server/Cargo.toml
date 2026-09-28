@@ -33,6 +33,9 @@ axum-server = { version = "0.7", features = ["tls-rustls"] }
 rcgen = "0.14"
 sha2 = "0.10"
 rustls = "0.23"
+aes = "0.8"
+cbc = { version = "0.1", features = ["alloc"] }
+hmac = "0.12"
 
 [profile.dev]
 opt-level = 1

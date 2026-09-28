@@ -101,6 +101,8 @@ struct Client {
     id: u16,
     token: u32,
     seq: u32,
+    /// A logged-in client: packets sealed with the session key.
+    crypto: Option<std::cell::RefCell<game::crypto::Session>>,
 }
 
 impl Client {
@@ -119,7 +121,7 @@ impl Client {
     fn connect_with(server: SocketAddr, nick: &str, ticket: &str) -> (Client, u32) {
         let sock = Client::socket_for(server);
         sock.send(&Packet::Connect { nonce: 42, nick: nick.into(), profile: test_profile(), ticket: ticket.into() }.encode()).unwrap();
-        let mut c = Client { sock, id: 0, token: 0, seq: 0 };
+        let mut c = Client { sock, id: 0, token: 0, seq: 0, crypto: None };
         let deadline = Instant::now() + Duration::from_secs(2);
         while Instant::now() < deadline {
             if let Some(Packet::Welcome { player_id, token, map_crc, nonce, .. }) = c.recv() {
@@ -135,14 +137,56 @@ impl Client {
     fn recv(&self) -> Option<Packet> {
         let mut buf = [0u8; 2048];
         let n = self.sock.recv(&mut buf).ok()?;
+        assert!(n <= proto::MAX_DATAGRAM);
+        if let Some(c) = &self.crypto {
+            if buf[3] == game::crypto::SEALED {
+                let mut c = c.borrow_mut();
+                let (counter, inner) = c.keys.open(game::crypto::Dir::ToClient, 8, &buf[..n]).expect("sealed by the server");
+                assert!(c.window.accept(counter), "no replays");
+                assert!(inner.len() <= proto::MAX_PACKET);
+                return Some(Packet::decode(&inner).expect("server sent a valid packet"));
+            }
+        }
         assert!(n <= proto::MAX_PACKET);
         Some(Packet::decode(&buf[..n]).expect("server sent a valid packet"))
+    }
+
+    /// Send a packet (sealed for a logged-in client).
+    fn send(&self, p: &Packet) {
+        let mut bytes = p.encode();
+        if let Some(c) = &self.crypto {
+            let mut c = c.borrow_mut();
+            c.send_counter += 1;
+            bytes = c.keys.seal(game::crypto::Dir::ToServer, &game::crypto::session_prefix(self.token), c.send_counter, &bytes);
+        }
+        self.sock.send(&bytes).unwrap();
+    }
+
+    /// A logged-in client: a sealed Connect with the ticket and the key
+    /// from the login API.
+    fn connect_sealed(server: SocketAddr, ticket: &str, key: &str) -> Client {
+        use game::crypto::{connect_prefix, from_hex, Dir, Keys, Session};
+        let sock = Client::socket_for(server);
+        let keys = Keys::derive(&from_hex::<32>(key).expect("key"));
+        let raw = from_hex::<32>(ticket).expect("ticket");
+        let connect = Packet::Connect { nonce: 42, nick: String::new(), profile: test_profile(), ticket: ticket.into() }.encode();
+        sock.send(&keys.seal(Dir::ToServer, &connect_prefix(&raw), 1, &connect)).unwrap();
+        let mut c = Client { sock, id: 0, token: 0, seq: 0, crypto: Some(std::cell::RefCell::new(Session { keys, send_counter: 1, window: Default::default() })) };
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while Instant::now() < deadline {
+            if let Some(Packet::Welcome { player_id, token, .. }) = c.recv() {
+                c.id = player_id;
+                c.token = token;
+                return c;
+            }
+        }
+        panic!("no Welcome for the sealed Connect");
     }
 
     fn send_inputs(&mut self, bits: u8, n: usize) {
         self.seq += n as u32;
         let p = Packet::Input { token: self.token, ack_tick: 0, last_seq: self.seq, inputs: vec![bits; n] };
-        self.sock.send(&p.encode()).unwrap();
+        self.send(&p);
     }
 
     /// Latest snapshot (tick, room, pos, visible ids) seen within `wait`.
@@ -173,7 +217,7 @@ impl Client {
             }
             self.seq += batch.len() as u32;
             let p = Packet::Input { token: self.token, ack_tick: 0, last_seq: self.seq, inputs: batch };
-            self.sock.send(&p.encode()).unwrap();
+            self.send(&p);
             for o in others {
                 o.ping();
             }
@@ -186,7 +230,7 @@ impl Client {
     fn press_e(&mut self, b: &Building, body: Body) -> Body {
         self.seq += 2;
         let p = Packet::Input { token: self.token, ack_tick: 0, last_seq: self.seq, inputs: vec![0, sim::IN_INTERACT] };
-        self.sock.send(&p.encode()).unwrap();
+        self.send(&p);
         sim::step(b, sim::step(b, body, 0), sim::IN_INTERACT)
     }
 
@@ -210,7 +254,7 @@ impl Client {
     }
 
     fn ping(&self) {
-        self.sock.send(&Packet::Ping { token: self.token, client_time: 1 }.encode()).unwrap();
+        self.send(&Packet::Ping { token: self.token, client_time: 1 });
     }
 }
 
@@ -490,7 +534,7 @@ fn desktop_portal_mail_interview_and_office() {
 
     // Another company answers with a (funny) rejection; a silent one never does.
     let apply = |offer: u8| {
-        c.sock.send(&Packet::Apply { token: c.token, offer, motivation: "Bo lubię kawę.".into() }.encode()).unwrap();
+        c.send(&Packet::Apply { token: c.token, offer, motivation: "Bo lubię kawę.".into() });
     };
     apply(12);
     apply(11);
@@ -508,14 +552,14 @@ fn desktop_portal_mail_interview_and_office() {
         else {
             unreachable!()
         };
-        c.sock.send(&Packet::PortalAction { token: c.token, action, arg }.encode()).unwrap();
+        c.send(&Packet::PortalAction { token: c.token, action, arg });
         loop {
             match recv_until(&|p| matches!(p, Packet::Question { .. } | Packet::RecruitResult { .. }), false) {
                 Packet::Question { attempt, index, text, options, .. } => {
                     let q = bank.offer(1).unwrap().questions.iter().find(|q| q.text == text).expect("known question");
                     let right = options.iter().position(|o| *o == q.options[0]).unwrap() as u8;
                     let choice = if want_correct { right } else { (right + 1) % options.len() as u8 };
-                    c.sock.send(&Packet::Answer { token: c.token, attempt, index, choice }.encode()).unwrap();
+                    c.send(&Packet::Answer { token: c.token, attempt, index, choice });
                 }
                 result => return result,
             }
@@ -532,7 +576,7 @@ fn desktop_portal_mail_interview_and_office() {
     else {
         unreachable!()
     };
-    c.sock.send(&Packet::PortalAction { token: c.token, action, arg: 0 }.encode()).unwrap();
+    c.send(&Packet::PortalAction { token: c.token, action, arg: 0 });
     let b = building();
     let Packet::Snapshot { floor, room, self_access, .. } = recv_until(&|p| matches!(p, Packet::Snapshot { .. }), true) else {
         unreachable!()
@@ -554,7 +598,7 @@ fn a_mug_left_in_the_chill_room_is_collected_by_the_cleaner() {
     let ws = game::computer::find_workstations(&b);
     let w = ws.iter().find(|w| w.room_name == "IT / Produkt").unwrap();
     let body = Body { access: access::CARD, ..Body::at(w.floor, Pos::tile_center(w.tile.x, w.tile.y + 1)) };
-    let action = |c: &Client, a: u8| c.sock.send(&Packet::ItemAction { token: c.token, action: a, slot: 0 }.encode()).unwrap();
+    let action = |c: &Client, a: u8| c.send(&Packet::ItemAction { token: c.token, action: a, slot: 0 });
     let hands = |c: &Client, k: u8| {
         wait_for(c, &[], Duration::from_millis(2500), |p| match p {
             Packet::Inventory { slots } if slots[0].kind == k => Some(()),
@@ -603,7 +647,7 @@ fn smoking_inside_sets_off_the_fire_alarm_and_the_smoker_pays() {
     let ws = game::computer::find_workstations(&b);
     let w = ws.iter().find(|w| w.room_name == "IT / Produkt").unwrap();
     let body = Body { access: access::CARD, ..Body::at(w.floor, Pos::tile_center(w.tile.x, w.tile.y + 1)) };
-    let action = |c: &Client, a: u8, slot: u8| c.sock.send(&Packet::ItemAction { token: c.token, action: a, slot }.encode()).unwrap();
+    let action = |c: &Client, a: u8, slot: u8| c.send(&Packet::ItemAction { token: c.token, action: a, slot });
     let said = |line: String| move |p: &Packet| matches!(p, Packet::Say { text, .. } if *text == line).then_some(());
     let alarm = |c: &Client, on: u8, wait: Duration| {
         wait_for(c, &[], wait, |p| matches!(p, Packet::Clock { alarm, .. } if *alarm == on).then_some(())).is_some()
@@ -612,7 +656,7 @@ fn smoking_inside_sets_off_the_fire_alarm_and_the_smoker_pays() {
     std::thread::sleep(Duration::from_millis(100));
     // A pack of cigarettes from the shop, paid for.
     let body = ola.walk_to(&b, body, (0, Tile { x: 55, y: 25 }), &[]);
-    ola.sock.send(&Packet::ShopTake { token: ola.token, shelf: 5, kind: item_kind::CIGARETTES }.encode()).unwrap();
+    ola.send(&Packet::ShopTake { token: ola.token, shelf: 5, kind: item_kind::CIGARETTES });
     std::thread::sleep(Duration::from_millis(150));
     let body = ola.walk_to(&b, body, (0, Tile { x: 53, y: 30 }), &[]);
     while ola.recv().is_some() {}
@@ -685,7 +729,7 @@ fn kitchenette_mugs_dishwasher_and_fridge() {
     let ws = game::computer::find_workstations(&b);
     let w = ws.iter().find(|w| w.room_name == "IT / Produkt").unwrap();
     let body = Body { access: access::CARD, ..Body::at(w.floor, Pos::tile_center(w.tile.x, w.tile.y + 1)) };
-    let action = |c: &Client, a: u8| c.sock.send(&Packet::ItemAction { token: c.token, action: a, slot: 0 }.encode()).unwrap();
+    let action = |c: &Client, a: u8| c.send(&Packet::ItemAction { token: c.token, action: a, slot: 0 });
     let hands = |c: &Client, k: u8| {
         wait_for(c, &[], Duration::from_millis(2500), |p| match p {
             Packet::Inventory { slots } if slots[0].kind == k => Some(()),
@@ -693,7 +737,7 @@ fn kitchenette_mugs_dishwasher_and_fridge() {
         })
         .is_some()
     };
-    let fridge = |c: &Client, a: u8| c.sock.send(&Packet::FridgeAction { token: c.token, action: a, arg: 0 }.encode()).unwrap();
+    let fridge = |c: &Client, a: u8| c.send(&Packet::FridgeAction { token: c.token, action: a, arg: 0 });
     action(&ola, act::DROP); // the laptop stays at the desk
     std::thread::sleep(Duration::from_millis(100));
     // No mug, no coffee.
@@ -765,7 +809,7 @@ fn going_home_early_from_the_tram_stop_pays_and_speeds_the_day_up() {
     let later = clock_until(&ola, Duration::from_millis(1500), |_, _, _, _, _| true).expect("clock");
     assert!(later.1 >= m0 + 15, "fast forward: {} -> {}", m0, later.1);
     // "Skip the waiting": straight to the next morning's commute.
-    ola.sock.send(&Packet::SkipWait { token: ola.token }.encode()).unwrap();
+    ola.send(&Packet::SkipWait { token: ola.token });
     let skipping = wait_for(&ola, &[], Duration::from_millis(1000), |p| matches!(p, Packet::Clock { skip: 2, .. }).then_some(()));
     assert!(skipping.is_some(), "time flies");
     let morning = clock_until(&ola, Duration::from_millis(9000), |day, _, pl, _, _| pl == place::COMMUTING && day >= 2);
@@ -904,7 +948,7 @@ fn access_card_can_be_dropped_picked_up_and_handed_over() {
         (acc.unwrap_or(0), inv.unwrap_or_default())
     };
     let item_action = |who: &Client, action: u8, slot: u8| {
-        who.sock.send(&Packet::ItemAction { token: who.token, action, slot }.encode()).unwrap();
+        who.send(&Packet::ItemAction { token: who.token, action, slot });
     };
 
     let (acc, inv) = state(&a, &c, Duration::from_millis(300));
@@ -969,7 +1013,7 @@ fn laptop_on_desk_messenger_lock_and_take() {
     assert_eq!((ola.id, kuba.id, ewa.id), (1, 2, 3));
     let action = |who: &Client, action: u8, conv: u16, arg: u32, text: &str| {
         let p = Packet::ComputerAction { token: who.token, action, conv, arg, text: text.into() };
-        who.sock.send(&p.encode()).unwrap();
+        who.send(&p);
     };
     let said = |line: &'static str| move |p: &Packet| matches!(p, Packet::Say { text, .. } if text == line).then_some(());
     let screen = |p: &Packet| match p {
@@ -1053,7 +1097,7 @@ fn laptop_on_desk_messenger_lock_and_take() {
     // (too big), so she drops it and takes Ola's.
     action(&ewa, ca::TAKE, 0, 0, "");
     assert!(wait_for(&ewa, &[&ola, &kuba], wait, said(pc::HANDS_FULL)).is_some());
-    ewa.sock.send(&Packet::ItemAction { token: ewa.token, action: proto::item_action::DROP, slot: 0 }.encode()).unwrap();
+    ewa.send(&Packet::ItemAction { token: ewa.token, action: proto::item_action::DROP, slot: 0 });
     std::thread::sleep(Duration::from_millis(100));
     action(&ewa, ca::TAKE, 0, 0, "");
     let hands = wait_for(&ewa, &[&ola, &kuba], wait, |p| match p {
@@ -1109,9 +1153,9 @@ fn needs_fruit_sofa_and_the_wrong_bathroom() {
     })
     .expect("fruit in a pocket");
     let before = hunger(&ola).unwrap();
-    ola.sock.send(&Packet::ItemAction { token: ola.token, action: act::TAKE_OUT, slot: slot as u8 }.encode()).unwrap();
+    ola.send(&Packet::ItemAction { token: ola.token, action: act::TAKE_OUT, slot: slot as u8 });
     std::thread::sleep(Duration::from_millis(120));
-    ola.sock.send(&Packet::ItemAction { token: ola.token, action: act::USE, slot: 0 }.encode()).unwrap();
+    ola.send(&Packet::ItemAction { token: ola.token, action: act::USE, slot: 0 });
     // (Sometimes the fruit is stale: a different line, same meal.)
     let ate = wait_for(&ola, &[], wait, |p| match p {
         Packet::Say { text, .. } if text.starts_with("Mniam") || text == game::treats::lines::STALE_EATEN => Some(()),
@@ -1154,7 +1198,7 @@ fn toilet_stall_hides_who_is_inside_and_locks() {
         Body { access: access::CARD, ..Body::at(w.floor, Pos::tile_center(w.tile.x, w.tile.y + 1)) }
     };
     let said = |line: &'static str| move |p: &Packet| matches!(p, Packet::Say { text, .. } if text == line).then_some(());
-    let door_action = |c: &Client| c.sock.send(&Packet::DoorAction { token: c.token }.encode()).unwrap();
+    let door_action = |c: &Client| c.send(&Packet::DoorAction { token: c.token });
     let locked_doors = |c: &Client, keep: &Client| {
         wait_for(c, &[keep], wait, |p| if let Packet::Doors { tiles, .. } = p { Some(tiles.clone()) } else { None })
     };
@@ -1191,7 +1235,7 @@ fn toilet_stall_hides_who_is_inside_and_locks() {
     let _ = o;
 
     // Ola leaves the game while locked in: the stall opens by itself.
-    ola.sock.send(&Packet::Disconnect { token: ola.token, reason: proto::disconnect::CLIENT_QUIT }.encode()).unwrap();
+    ola.send(&Packet::Disconnect { token: ola.token, reason: proto::disconnect::CLIENT_QUIT });
     let opened = wait_for(&kuba, &[], wait, |p| match p {
         Packet::Doors { tiles, .. } if !tiles.contains(&(46, 27)) => Some(()),
         _ => None,
@@ -1294,7 +1338,7 @@ fn shop_take_from_shelf_alarm_and_pay() {
     let money = |c: &Client| wait_for(c, &[], Duration::from_millis(1200), |p| if let Packet::Stats { money, .. } = p { Some(*money) } else { None });
     // (Resent every 2 s, so a missed one comes again.)
     let inventory = |c: &Client| wait_for(c, &[], Duration::from_millis(2500), |p| if let Packet::Inventory { slots } = p { Some(slots.clone()) } else { None });
-    let take = |c: &Client, shelf: u8, kind: u8| c.sock.send(&Packet::ShopTake { token: c.token, shelf, kind }.encode()).unwrap();
+    let take = |c: &Client, shelf: u8, kind: u8| c.send(&Packet::ShopTake { token: c.token, shelf, kind });
     let ws = game::computer::find_workstations(&b);
     let w = ws.iter().find(|w| w.room_name == "IT / Produkt").unwrap();
     let body = Body { access: access::CARD, ..Body::at(w.floor, Pos::tile_center(w.tile.x, w.tile.y + 1)) };
@@ -1413,7 +1457,7 @@ fn morning_commute_choice_ride_and_arrival() {
     })
     .expect("morning: a departure time");
     assert!((6 * 60 + 15..=8 * 60 + 45).contains(&depart), "leaves 6:15-8:45: {depart}");
-    ola.sock.send(&Packet::CommuteChoice { token: ola.token, mode: mode::CAR }.encode()).unwrap();
+    ola.send(&Packet::CommuteChoice { token: ola.token, mode: mode::CAR });
     // Leaves: pays for fuel; arrives, rides in, gets out on the car park.
     let paid = wait_for(&ola, &[], Duration::from_millis(5000), |p| match p {
         Packet::Clock { mode: m, money, arrive, .. } if *m == mode::CAR && *arrive != proto::NO_TIME => Some(*money),
@@ -1480,13 +1524,13 @@ fn calendar_meeting_with_the_ceo() {
     })
     .expect("calendar");
     assert_eq!(slots.first(), Some(&(600, proto::slot::FREE)), "10:00 is free");
-    ola.sock.send(&Packet::CalendarBook { token: ola.token, start: 600, topic: topic::CHAT }.encode()).unwrap();
+    ola.send(&Packet::CalendarBook { token: ola.token, start: 600, topic: topic::CHAT });
     let mine = wait_for(&ola, &[], wait, |p| match p {
         Packet::Calendar { mine_start, mine_topic, .. } if *mine_start == 600 => Some(*mine_topic),
         _ => None,
     });
     assert_eq!(mine, Some(topic::CHAT));
-    ola.sock.send(&Packet::ComputerAction { token: ola.token, action: ca::CLOSE, conv: 0, arg: 0, text: String::new() }.encode()).unwrap();
+    ola.send(&Packet::ComputerAction { token: ola.token, action: ca::CLOSE, conv: 0, arg: 0, text: String::new() });
     assert_eq!(access(&ola).map(|a| a & access::BOARD), Some(0), "9:49: the door is still closed");
     // By 9:50 the door lets her in: walk into the board room, talk to the CEO.
     let open = wait_for(&ola, &[], Duration::from_millis(8000), |p| match p {
@@ -1504,7 +1548,7 @@ fn calendar_meeting_with_the_ceo() {
     });
     let (id, n) = dialog.expect("the CEO talks");
     assert_eq!(n, 3);
-    ola.sock.send(&Packet::DialogAnswer { token: ola.token, id, choice: 0 }.encode()).unwrap();
+    ola.send(&Packet::DialogAnswer { token: ola.token, id, choice: 0 });
     let closed = wait_for(&ola, &[], wait, |p| matches!(p, Packet::Dialog { id: 0, .. }).then_some(()));
     assert!(closed.is_some(), "meeting over");
 }
@@ -1561,7 +1605,7 @@ fn lunch_ordered_in_the_app_and_picked_up_at_the_reception() {
         _ => None,
     });
     assert_eq!(dishes, Some(6), "the lunch app with the menu");
-    ola.sock.send(&Packet::LunchOrder { token: ola.token, dish: item_kind::KEBAB }.encode()).unwrap();
+    ola.send(&Packet::LunchOrder { token: ola.token, dish: item_kind::KEBAB });
     let ordered = wait_for(&ola, &[], Duration::from_millis(1500), |p| match p {
         Packet::LunchMenu { state: 1, dish, .. } => Some(*dish),
         _ => None,
@@ -1569,7 +1613,7 @@ fn lunch_ordered_in_the_app_and_picked_up_at_the_reception() {
     assert_eq!(ordered, Some(item_kind::KEBAB));
     let money = wait_for(&ola, &[], Duration::from_millis(1500), |p| if let Packet::Stats { money, .. } = p { Some(*money) } else { None });
     assert_eq!(money, Some(200_00 - 25_00));
-    ola.sock.send(&Packet::ComputerAction { token: ola.token, action: ca::CLOSE, conv: 0, arg: 0, text: String::new() }.encode()).unwrap();
+    ola.send(&Packet::ComputerAction { token: ola.token, action: ca::CLOSE, conv: 0, arg: 0, text: String::new() });
     // To the reception while the courier is on the way; told when it's there.
     let body = ola.walk_to(&b, body, (1, Tile { x: 32, y: 18 }), &[]);
     let told = wait_for(&ola, &[], Duration::from_millis(8000), |p| {
@@ -1592,7 +1636,7 @@ fn a_filled_position_is_gone_for_the_others() {
     let (bob, _) = Client::connect(addr, "Bob");
     // Both apply for the one programmer position; both get invited.
     for c in [&ala, &bob] {
-        c.sock.send(&Packet::Apply { token: c.token, offer: 1, motivation: "Kocham kod.".into() }.encode()).unwrap();
+        c.send(&Packet::Apply { token: c.token, offer: 1, motivation: "Kocham kod.".into() });
     }
     let invited = |c: &Client, other: &Client| {
         wait_for(c, &[other], Duration::from_millis(3000), |p| match p {
@@ -1602,7 +1646,7 @@ fn a_filled_position_is_gone_for_the_others() {
     };
     assert!(invited(&ala, &bob).is_some() && invited(&bob, &ala).is_some());
     // Ala takes the interview and passes.
-    ala.sock.send(&Packet::PortalAction { token: ala.token, action: proto::portal_action::JOIN_INTERVIEW, arg: 1 }.encode()).unwrap();
+    ala.send(&Packet::PortalAction { token: ala.token, action: proto::portal_action::JOIN_INTERVIEW, arg: 1 });
     let mut passed = false;
     let deadline = Instant::now() + Duration::from_millis(5000);
     while !passed && Instant::now() < deadline {
@@ -1614,7 +1658,7 @@ fn a_filled_position_is_gone_for_the_others() {
                 Packet::Question { attempt, index, text, options, .. } => {
                     let q = bank.offer(1).unwrap().questions.iter().find(|q| q.text == text).unwrap();
                     let right = options.iter().position(|o| *o == q.options[0]).unwrap() as u8;
-                    ala.sock.send(&Packet::Answer { token: ala.token, attempt, index, choice: right }.encode()).unwrap();
+                    ala.send(&Packet::Answer { token: ala.token, attempt, index, choice: right });
                 }
                 Packet::RecruitResult { passed: true, .. } => passed = true,
                 _ => {}
@@ -1651,7 +1695,7 @@ fn founder_founds_the_company_and_hires_from_the_panel() {
     };
     assert_eq!(clock(&ola, &[]).map(|c| c.1), Some(false), "no founder yet");
     let act = |c: &Client, action: u8, target: u16, value: u8, text: &str| {
-        c.sock.send(&Packet::CompanyAction { token: c.token, action, target, value, text: text.into() }.encode()).unwrap();
+        c.send(&Packet::CompanyAction { token: c.token, action, target, value, text: text.into() });
     };
     act(&ola, ca::FOUND, 0, 0, "Pixel Pierogi sp. z o.o.");
     let founded = wait_for(&ola, &[], Duration::from_millis(1500), |p| match p {
@@ -1677,12 +1721,12 @@ fn founder_founds_the_company_and_hires_from_the_panel() {
         _ => None,
     });
     assert_eq!(name.as_deref(), Some("Pixel Pierogi sp. z o.o."));
-    bob.sock.send(&Packet::Apply { token: bob.token, offer: 1, motivation: "Chcę pierogi.".into() }.encode()).unwrap();
+    bob.send(&Packet::Apply { token: bob.token, offer: 1, motivation: "Chcę pierogi.".into() });
     let invited = wait_for(&bob, &[&ola], Duration::from_millis(3000), |p| {
         matches!(p, Packet::Mail { action, arg: 1, .. } if *action == proto::portal_action::JOIN_INTERVIEW).then_some(())
     });
     assert!(invited.is_some());
-    bob.sock.send(&Packet::PortalAction { token: bob.token, action: proto::portal_action::JOIN_INTERVIEW, arg: 1 }.encode()).unwrap();
+    bob.send(&Packet::PortalAction { token: bob.token, action: proto::portal_action::JOIN_INTERVIEW, arg: 1 });
     let deadline = Instant::now() + Duration::from_millis(5000);
     let mut awaiting = false;
     while !awaiting && Instant::now() < deadline {
@@ -1694,7 +1738,7 @@ fn founder_founds_the_company_and_hires_from_the_panel() {
                 Packet::Question { attempt, index, text, options, .. } => {
                     let q = bank.offer(1).unwrap().questions.iter().find(|q| q.text == text).unwrap();
                     let right = options.iter().position(|o| *o == q.options[0]).unwrap() as u8;
-                    bob.sock.send(&Packet::Answer { token: bob.token, attempt, index, choice: right }.encode()).unwrap();
+                    bob.send(&Packet::Answer { token: bob.token, attempt, index, choice: right });
                 }
                 Packet::Mail { subject, .. } if subject == "Decyzja zarządu wkrótce" => awaiting = true,
                 _ => {}
@@ -1757,7 +1801,7 @@ fn task_board_per_department_and_work_mail() {
     sit(&mut kuba, [&ola, &ewa]);
     sit(&mut ewa, [&ola, &kuba]);
     let task = |c: &Client, nonce: u16, action: u8, task: u16, arg: u8, text: &str| {
-        c.sock.send(&Packet::TaskAction { token: c.token, nonce, action, task, arg, text: text.into() }.encode()).unwrap();
+        c.send(&Packet::TaskAction { token: c.token, nonce, action, task, arg, text: text.into() });
     };
     let board = |c: &Client, keep: &[&Client], done: u16| {
         wait_for(c, keep, Duration::from_millis(800), |p| match p {
@@ -1781,7 +1825,7 @@ fn task_board_per_department_and_work_mail() {
     task(&ola, 2, ta::ASSIGN, id, 0, "Ewa");
     let mail = |c: &Client, nonce: u16, action: u8, id: u16, to: &str, subject: &str, body: &str| {
         let p = Packet::MailAction { token: c.token, nonce, action, id, to: to.into(), subject: subject.into(), body: body.into() };
-        c.sock.send(&p.encode()).unwrap();
+        c.send(&p);
     };
     std::thread::sleep(Duration::from_millis(150));
     mail(&ewa, 0, ma::SYNC, 0, "", "", "");
@@ -1832,7 +1876,7 @@ fn voice_reaches_the_room_and_whispers_only_the_one_next_to_you() {
     let (kuba, _) = Client::connect(addr, "Kuba"); // id 2: Biznes (another room)
     let (mut ewa, _) = Client::connect(addr, "Ewa"); // id 3: IT, the next desk
     let say = |c: &Client, seq: u16, whisper: u8| {
-        c.sock.send(&Packet::Voice { token: c.token, seq, whisper, data: vec![1, 2, 3, 4] }.encode()).unwrap();
+        c.send(&Packet::Voice { token: c.token, seq, whisper, data: vec![1, 2, 3, 4] });
     };
     let heard = |c: &Client, keep: &[&Client], seq: u16| {
         wait_for(c, keep, Duration::from_millis(400), |p| match p {
@@ -1933,20 +1977,24 @@ fn progress_survives_a_server_restart() {
         _ => None,
     });
     let s = Client::socket_for(addr);
-    let guest = Client { sock: s, id: 0, token: 0, seq: 0 };
-    guest.sock.send(&Packet::Connect { nonce: 1, nick: "Ola".into(), profile: test_profile(), ticket: String::new() }.encode()).unwrap();
+    let guest = Client { sock: s, id: 0, token: 0, seq: 0, crypto: None };
+    guest.send(&Packet::Connect { nonce: 1, nick: "Ola".into(), profile: test_profile(), ticket: String::new() });
     assert_eq!(refused(&guest), Some(proto::reject::GUESTS_OFF));
-    guest.sock.send(&Packet::Connect { nonce: 2, nick: "Ola".into(), profile: test_profile(), ticket: "zly".into() }.encode()).unwrap();
+    guest.send(&Packet::Connect { nonce: 2, nick: "Ola".into(), profile: test_profile(), ticket: "zly".into() });
     assert_eq!(refused(&guest), Some(proto::reject::BAD_TICKET));
-    let (mut ola, _) = Client::connect_with(addr, "ktokolwiek", &ticket(&reg));
+    // A sniffed ticket alone is useless: the Connect must be sealed with the key.
+    guest.send(&Packet::Connect { nonce: 3, nick: "Ola".into(), profile: test_profile(), ticket: ticket(&reg) });
+    assert_eq!(refused(&guest), Some(proto::reject::BAD_TICKET));
+    let key = |v: &serde_json::Value| v["key"].as_str().unwrap_or_default().to_string();
+    let mut ola = Client::connect_sealed(addr, &ticket(&reg), &key(&reg));
     ola.press_e(&b, nobody);
     assert!(wait_for(&ola, &[], wait, said(pc::PLACED)).is_some());
     ola.press_e(&b, nobody);
     assert_eq!(wait_for(&ola, &[], wait, computer), Some(ola.id));
     let task = Packet::TaskAction { token: ola.token, nonce: 1, action: ta::CREATE, task: 0, arg: 2, text: "Przetrwać restart".into() };
-    ola.sock.send(&task.encode()).unwrap();
+    ola.send(&task);
     let mail = Packet::MailAction { token: ola.token, nonce: 1, action: ma::SEND, id: 0, to: "Ola".into(), subject: "Notatka".into(), body: "Nie zapomnij.".into() };
-    ola.sock.send(&mail.encode()).unwrap();
+    ola.send(&mail);
     assert!(wait_for(&ola, &[], wait, |p| matches!(p, Packet::MailState { done: 1, .. }).then_some(())).is_some());
     let (money, day, _) = wait_for(&ola, &[], wait, clock).expect("clock");
     std::thread::sleep(Duration::from_millis(300));
@@ -1957,10 +2005,39 @@ fn progress_survives_a_server_restart() {
     let server = start();
     let login = api("login", r#"{"nick":"ola","password":"tajne-haslo"}"#);
     assert_eq!((login["ok"].as_bool(), login["nick"].as_str(), login["character"].as_bool()), (Some(true), Some("Ola"), Some(true)));
-    let (mut ola, _) = Client::connect_with(addr, "", &ticket(&login));
+    let mut ola = Client::connect_sealed(addr, &ticket(&login), &key(&login));
+    // Recorded packets played again go nowhere: a sealed ping sent twice is
+    // answered once; the recorded Connect makes no new session (Ola stays).
+    {
+        use game::crypto::{connect_prefix, from_hex, session_prefix, Dir, Keys};
+        let keys = Keys::derive(&from_hex::<32>(&key(&login)).unwrap());
+        let ping = Packet::Ping { token: ola.token, client_time: 77 }.encode();
+        let sealed = keys.seal(Dir::ToServer, &session_prefix(ola.token), 1_000, &ping);
+        ola.sock.send(&sealed).unwrap();
+        ola.sock.send(&sealed).unwrap();
+        ola.crypto.as_ref().unwrap().borrow_mut().send_counter = 1_000; // go on after it
+        let mut pongs = 0;
+        let deadline = Instant::now() + Duration::from_millis(500);
+        while Instant::now() < deadline {
+            if let Some(Packet::Pong { client_time: 77, .. }) = ola.recv() {
+                pongs += 1;
+            }
+        }
+        assert_eq!(pongs, 1, "the replay was dropped");
+        let raw = from_hex::<32>(&ticket(&login)).unwrap();
+        let connect = Packet::Connect { nonce: 42, nick: String::new(), profile: test_profile(), ticket: ticket(&login) }.encode();
+        let spy = Client::socket_for(addr);
+        spy.send(&keys.seal(Dir::ToServer, &connect_prefix(&raw), 1, &connect)).unwrap();
+        std::thread::sleep(Duration::from_millis(200));
+        let mut buf = [0u8; 2048];
+        spy.set_read_timeout(Some(Duration::from_millis(200))).unwrap();
+        assert!(spy.recv(&mut buf).is_err(), "no Welcome for a replayed Connect");
+        ola.ping();
+        assert!(wait_for(&ola, &[], Duration::from_millis(500), |p| matches!(p, Packet::Pong { .. }).then_some(())).is_some(), "Ola still in");
+    }
     let (money2, day2, place) = wait_for(&ola, &[], wait, clock).expect("clock after restart");
     assert_eq!((money2, day2, place), (money, day, proto::place::BUILDING), "the same character, at work");
-    let inv = wait_for(&ola, &[], wait, |p| match p {
+    let inv = wait_for(&ola, &[], Duration::from_secs(3), |p| match p {
         Packet::Inventory { slots } => Some(slots.iter().map(|s| s.kind).collect::<Vec<_>>()),
         _ => None,
     })
@@ -1974,14 +2051,14 @@ fn progress_survives_a_server_restart() {
     let at = ola.walk_to(&b, body, (desk.floor, Tile { x: desk.tile.x, y: desk.tile.y + 1 }), &[]);
     ola.press_e(&b, at);
     assert_eq!(wait_for(&ola, &[], wait, computer), Some(ola.id), "her laptop, her account");
-    ola.sock.send(&Packet::TaskAction { token: ola.token, nonce: 0, action: ta::SYNC, task: 0, arg: 0, text: String::new() }.encode()).unwrap();
+    ola.send(&Packet::TaskAction { token: ola.token, nonce: 0, action: ta::SYNC, task: 0, arg: 0, text: String::new() });
     let titles = wait_for(&ola, &[], wait, |p| match p {
         Packet::TaskBoard { tasks, .. } => Some(tasks.iter().map(|t| t.title.clone()).collect::<Vec<_>>()),
         _ => None,
     });
     assert_eq!(titles, Some(vec!["Przetrwać restart".to_string()]));
     let sync = Packet::MailAction { token: ola.token, nonce: 0, action: ma::SYNC, id: 0, to: String::new(), subject: String::new(), body: String::new() };
-    ola.sock.send(&sync.encode()).unwrap();
+    ola.send(&sync);
     let subject = wait_for(&ola, &[], wait, |p| match p {
         Packet::WorkMail { subject, .. } => Some(subject.clone()),
         _ => None,

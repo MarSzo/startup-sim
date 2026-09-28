@@ -23,10 +23,13 @@ pub use golden::{golden_samples, to_hex};
 pub use snapshot::{snapshot_fragments, SelfState};
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 33;
+pub const VERSION: u8 = 34;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
-pub const MAX_PACKET: usize = 1200;
+/// A game packet at most (sealed, it grows by up to 48 B to `MAX_DATAGRAM`).
+pub const MAX_PACKET: usize = 1152;
+/// A UDP datagram at most (a sealed packet included).
+pub const MAX_DATAGRAM: usize = 1200;
 pub const MAX_NICK_BYTES: usize = 16;
 /// Max UTF-8 bytes of longer texts (speech, offers, questions, options).
 pub const MAX_TEXT_BYTES: usize = 240;

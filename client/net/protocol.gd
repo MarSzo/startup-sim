@@ -3,8 +3,9 @@
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 33
-const MAX_PACKET := 1200
+const VERSION := 34
+const MAX_PACKET := 1152  # a game packet; sealed it grows to at most MAX_DATAGRAM
+const MAX_DATAGRAM := 1200
 const MAX_NICK_BYTES := 16
 const MAX_SAY_BYTES := 240
 const MAX_TEXT_BYTES := 240

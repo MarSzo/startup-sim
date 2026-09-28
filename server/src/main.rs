@@ -46,6 +46,7 @@ OPTIONS:
   --tls-cert <pem>      certificate for the login API (e.g. Let's Encrypt fullchain.pem)
   --tls-key <pem>       its private key       [default: a self-made one in <save dir>/tls,
                                                pinned by the clients on first contact]
+  --list-accounts       admin: print the accounts (nick, created, last login) and exit
   --reset-password <nick>  admin: set a new one-time password for an account, print it
                         and exit (its remember-me logins stop working)
 ";
@@ -78,6 +79,23 @@ fn main() -> ExitCode {
     if let Err(e) = ctrlc::set_handler(|| game::server::STOP.store(true, std::sync::atomic::Ordering::Relaxed)) {
         eprintln!("no Ctrl+C handler: {e}");
     }
+    // Admin: list the accounts and quit.
+    if args.flag("list-accounts") {
+        let path = args.str("save").map_or_else(|| PathBuf::from("saves/world.db"), PathBuf::from);
+        return match Auth::open(&path) {
+            Ok(a) => {
+                let day = |t: i64| format!("{} dni temu", (now_secs() - t).max(0) / 86_400);
+                for (nick, created, last) in a.list() {
+                    println!("{nick:<16}  konto od: {:<14}  ostatnio: {}", day(created), last.map_or("-".into(), day));
+                }
+                ExitCode::SUCCESS
+            }
+            Err(e) => {
+                eprintln!("{e}");
+                ExitCode::FAILURE
+            }
+        };
+    }
     // Admin: reset an account's password and quit.
     if let Some(nick) = args.str("reset-password") {
         let path = args.str("save").map_or_else(|| PathBuf::from("saves/world.db"), PathBuf::from);
@@ -103,6 +121,10 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+fn now_secs() -> i64 {
+    std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs() as i64)
 }
 
 /// Load the data, parse the options, bind the socket.

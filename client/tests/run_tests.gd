@@ -16,6 +16,7 @@ func _init() -> void:
 	var golden := ProjectSettings.globalize_path("res://").path_join("../server/tests/golden")
 	test_protocol(golden.path_join("packets.json"))
 	test_movement(golden.path_join("movement_vectors.json"))
+	test_sealed(golden.path_join("sealed.json"))
 	test_rejects_garbage()
 	test_parse_address()
 	print("%d checks, %d failures" % [checks, failures])
@@ -230,6 +231,26 @@ func test_movement(path: String) -> void:
 	m.set_closed_tiles([Vector2i(46, 27)])
 	expect(walk_left.call().pos.x == 47 * 256 + 5 * 16, "locked stall door stops at the door (%d)" % walk_left.call().pos.x)
 	m.set_closed_tiles([])
+
+
+## Sealed packets: the same bytes as the server's (and back).
+func test_sealed(path: String) -> void:
+	var Seal = load("res://net/seal.gd")
+	var g: Dictionary = load_json(path)
+	var s = Seal.from_key(str(g.key).hex_decode())
+	var inner: PackedByteArray = str(g.inner).hex_decode()
+	var prefix: PackedByteArray = Seal.session_prefix(Protocol.MAGIC, Protocol.VERSION, int(g.token))
+	var to_server: PackedByteArray = s.seal(Seal.TO_SERVER, prefix, int(g.to_server_counter), inner)
+	expect(to_server.hex_encode() == g.to_server, "seal to server")
+	var cprefix: PackedByteArray = Seal.connect_prefix(Protocol.MAGIC, Protocol.VERSION, str(g.ticket).hex_decode())
+	expect(s.seal(Seal.TO_SERVER, cprefix, 1, inner).hex_encode() == g.connect, "seal a Connect")
+	var opened: Array = s.open(Seal.TO_CLIENT, 8, str(g.to_client).hex_decode())
+	expect(opened.size() == 2 and opened[0] == int(g.to_client_counter) and opened[1] == inner, "open from the server")
+	expect(s.open(Seal.TO_SERVER, 8, str(g.to_client).hex_decode()).is_empty(), "wrong direction")
+	var bad: PackedByteArray = str(g.to_client).hex_decode()
+	bad[20] ^= 1
+	expect(s.open(Seal.TO_CLIENT, 8, bad).is_empty(), "tampered")
+	expect(s.accept(3) and s.accept(1) and not s.accept(3) and s.accept(80) and not s.accept(10), "replay window")
 
 
 func test_rejects_garbage() -> void:

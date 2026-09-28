@@ -81,11 +81,17 @@ pub struct Granted {
     pub refresh: String,
     /// The account already has a character (skip the creation screen).
     pub character: bool,
+    /// Session key (hex, 32 bytes): the game packets are sealed with it
+    /// (`crypto.rs`). Only ever sent over HTTPS.
+    pub key: String,
 }
 
 struct Ticket {
     nick: String,
+    key: [u8; 32],
     expires: Instant,
+    /// The newest sealed Connect counter seen (replays are refused).
+    last_connect: u64,
 }
 
 struct Inner {
@@ -284,7 +290,7 @@ impl Auth {
     }
 
     fn grant(&self, account: i64, nick: &str) -> Result<Granted, AuthError> {
-        let (ticket, refresh) = (random_token(), random_token());
+        let (ticket, refresh, key) = (random_token(), random_token(), random_token());
         let mut g = self.lock();
         g.db.execute(
             "INSERT INTO refresh_tokens (hash, account, expires_at) VALUES (?1, ?2, ?3)",
@@ -292,14 +298,41 @@ impl Auth {
         )?;
         let character = g.db.query_row("SELECT 1 FROM characters WHERE nick = ?1", [nick], |_| Ok(())).optional()?.is_some();
         g.tickets.retain(|_, t| t.expires > Instant::now());
-        g.tickets.insert(ticket.clone(), Ticket { nick: nick.to_string(), expires: Instant::now() + TICKET_TTL });
-        Ok(Granted { nick: nick.to_string(), ticket, refresh, character })
+        let key_bytes = crate::crypto::from_hex::<32>(&key).ok_or_else(|| AuthError::Internal("key".into()))?;
+        g.tickets.insert(ticket.clone(), Ticket { nick: nick.to_string(), key: key_bytes, expires: Instant::now() + TICKET_TTL, last_connect: 0 });
+        Ok(Granted { nick: nick.to_string(), ticket, refresh, character, key })
     }
 
     /// UDP Connect: whose ticket is it (the account's nick), if still valid.
     pub fn redeem(&self, ticket: &str) -> Option<String> {
         let g = self.lock();
         g.tickets.get(ticket).filter(|t| t.expires > Instant::now()).map(|t| t.nick.clone())
+    }
+
+    /// Sealed Connect: the ticket's session key (if still valid).
+    pub fn ticket_key(&self, ticket: &str) -> Option<[u8; 32]> {
+        let g = self.lock();
+        g.tickets.get(ticket).filter(|t| t.expires > Instant::now()).map(|t| t.key)
+    }
+
+    /// A sealed Connect's counter must be newer than the last one (a
+    /// recorded Connect can't be replayed to kick the player out).
+    pub fn accept_connect(&self, ticket: &str, counter: u64) -> bool {
+        let mut g = self.lock();
+        match g.tickets.get_mut(ticket) {
+            Some(t) if counter > t.last_connect => {
+                t.last_connect = counter;
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// Accounts (admin): nick, created, last login (unix seconds).
+    pub fn list(&self) -> Vec<(String, i64, Option<i64>)> {
+        let g = self.lock();
+        let Ok(mut stmt) = g.db.prepare("SELECT nick, created_at, last_login FROM accounts ORDER BY nick") else { return Vec::new() };
+        stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).map(|rows| rows.flatten().collect()).unwrap_or_default()
     }
 
     /// Admin (server console): a new one-time password for `nick`; its
