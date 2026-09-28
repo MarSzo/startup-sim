@@ -340,6 +340,16 @@ parking / stojak / krawężnik / przystanek), gracz jest `Working` z `riding`
 Na przystanku `VehicleEvent::Arrived` → wysiada, efekty na potrzeby,
 spóźnienie po 9:00. Auto i rower zostają zaparkowane do wieczora (znikają
 przy `go_home`), taksówka i tramwaj odjeżdżają (`Gone`).
+Zapis gry (`persist.rs`, `server/save.rs`): SQLite (`rusqlite`, WAL), tabele
+`world` (jeden JSON świata) i `characters` (nick → JSON). `Store` ma wątek
+zapisu: pętla gry co `SAVE_TICKS` (albo po `save_soon`) serializuje zrzut i
+wysyła tylko zmienione wiersze kanałem; wątek zapisuje je w jednej
+transakcji i raz na dobę robi `VACUUM INTO` do `backups/`. Ctrl+C / SIGTERM
+(`ctrlc`) ustawia `server::STOP` → `shutdown()` = ostatni zrzut + `flush`.
+Identyfikacja po nicku (`restore` przy Connect, `remember_leaving` przy
+wyjściu); przedmioty, laptopy, założyciel i zatrudnieni są w zapisie po
+nicku, bo id sesji się zmieniają. Z zapisem świat jest trwały (wyjście nie
+zwalnia etatu, biurka ani firmy); bez niego (`--no-save`, testy) — jak dawniej.
 Firmowy komputer (`tasks.rs`, `workmail.rs`, `server/office.rs`): tablice
 zadań per dział (`Boards`) i skrzynki po nicku (`PostOffice`); obsługa działa
 jako właściciel odblokowanego komputera, przy którym siedzi gracz. Akcje mają

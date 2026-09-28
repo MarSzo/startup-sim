@@ -120,6 +120,7 @@ impl Server {
         p.stage = Stage::Home { arrive_at: None };
         let msg = format!("* {} goes home: worked {} min, paid {}", p.nick, minutes, shop::zl(pay));
         self.log(msg);
+        self.save_soon = true;
     }
 
     /// Morning arrival: on foot along the sidewalk, or riding in a vehicle
@@ -245,7 +246,7 @@ impl Server {
             money: p.money.clamp(0, u32::MAX as i64) as u32,
             weather: self.weather.now,
             company: self.company.name.clone(),
-            founded: self.company.founder.is_some(),
+            founded: self.company.founder.is_some() || self.offline.founder.is_some(),
             alarm: self.alarm.is_some() as u8,
             skip: if self.clock.skip { 2 } else { p.skip_wait as u8 },
         }

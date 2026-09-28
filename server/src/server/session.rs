@@ -157,7 +157,8 @@ impl Server {
         self.players.insert(id, player);
         self.by_addr.insert(addr, id);
         self.by_token.insert(token, id);
-        if self.cfg.start_employed {
+        let restored = self.restore(id);
+        if self.cfg.start_employed && !restored {
             self.start_employed(id);
         } else if skip && self.cfg.start_access & access::CARD != 0 {
             self.give_new(id, item_kind::EMPLOYEE_CARD); // load tests: straight in with a card
@@ -257,6 +258,8 @@ impl Server {
 
     pub(super) fn remove_player(&mut self, id: u16, why: &str) {
         let Some(mut p) = self.players.remove(&id) else { return };
+        self.remember_leaving(&p);
+        let persistent = self.persistent();
         coffee::release(&mut self.machines, &p.cup);
         for c in &mut self.computers {
             if c.user == Some(id) {
@@ -271,7 +274,7 @@ impl Server {
         }
         // ...their own go with them (no persistent accounts yet): laptop on
         // a desk, card lent to someone, anything on the floor.
-        self.computers.retain(|c| c.owner() != id);
+        self.computers.retain(|c| c.owner() != id); // (persistent: already handed to the save)
         self.vehicles.retain(|v| v.owner != id);
         self.lunch_orders.retain(|o| o.owner != id);
         self.company.candidates.retain(|c| c.player != id);
@@ -280,8 +283,8 @@ impl Server {
             self.company.founder = None; // the company stays; someone may found it anew
             self.clock_dirty = true;
         }
-        // Their job is free again.
-        if let Some(v) = p.position.and_then(|o| self.vacancies.get_mut(&o)) {
+        // Their job is free again (a persistent world keeps it for them).
+        if let Some(v) = p.position.and_then(|o| self.vacancies.get_mut(&o)).filter(|_| !persistent) {
             *v = (*v + 1).min(MAX_VACANCIES);
         }
         self.dropped.retain(|d| d.item.owner != id || d.item.kind == item_kind::EMPTY_CUP); // mugs stay

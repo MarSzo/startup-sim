@@ -162,7 +162,7 @@ pub enum Event {
     RestDone(&'static str),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Needs {
     pub hunger: i32,
     pub energy: i32,

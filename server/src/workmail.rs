@@ -11,7 +11,7 @@ pub const MAX_MAILS: usize = 40;
 pub const SUBJECT_MAX: usize = 80;
 pub const BODY_MAX: usize = 400;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Mail {
     pub id: u16,
     pub from: String,
@@ -24,13 +24,13 @@ pub struct Mail {
     pub trashed: bool,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct Inbox {
     pub mails: Vec<Mail>,
     next_id: u16,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct PostOffice {
     inboxes: HashMap<String, Inbox>,
 }

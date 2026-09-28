@@ -56,6 +56,7 @@ impl Server {
         let line = format!("* shop: {} paid {}", p.nick, shop::zl(total));
         self.log(line);
         self.sound(crate::protocol::sound::TILL, pid);
+        self.save_soon = true;
         Some(shop::lines::paid(total, left))
     }
 }

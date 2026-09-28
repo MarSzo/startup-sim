@@ -11,7 +11,7 @@ rm -rf $V/$name
 pkill -f "server --bind 127.0.0.1:$PORT" 2>/dev/null
 pkill -f "bots --server 127.0.0.1:$PORT" 2>/dev/null
 sleep 0.3
-eval "$R/server/target/release/server --bind 127.0.0.1:$PORT $sflags" > $V/$name.srv.log 2>&1 &
+eval "$R/server/target/release/server --bind 127.0.0.1:$PORT --no-save $sflags" > $V/$name.srv.log 2>&1 &
 sleep 0.8
 if [ $bots -gt 0 ]; then
   $R/server/target/release/bots --server 127.0.0.1:$PORT --count $bots --room "$room" --room-share 0.6 \

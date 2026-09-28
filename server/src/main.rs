@@ -36,6 +36,9 @@ OPTIONS:
   --start-cigarettes    with --start-employed: a pack of cigarettes in the pocket (dev)
   --needs-speed <n>     needs (hunger, energy...) change n times faster (dev)
   --recruitment <path>  recruitment JSON  [default: data/recruitment.json]
+  --save <path>         save file (SQLite): characters, company, desks, boards, mail,
+                        clock; a daily backup in <dir>/backups   [default: saves/world.db]
+  --no-save             don't load or save anything (dev / tests)
 ";
 
 const PORT: u16 = 7777;
@@ -61,6 +64,10 @@ fn main() -> ExitCode {
     if args.flag("help") {
         print!("{HELP}");
         return ExitCode::SUCCESS;
+    }
+    // Ctrl+C / SIGTERM: save, then stop.
+    if let Err(e) = ctrlc::set_handler(|| game::server::STOP.store(true, std::sync::atomic::Ordering::Relaxed)) {
+        eprintln!("no Ctrl+C handler: {e}");
     }
     match start(&args) {
         Ok(mut server) => server.run(),
@@ -130,6 +137,7 @@ fn start(args: &Args) -> Result<Server, StartError> {
         cleaning_at: time("cleaning-at", game::cleaning::ROUND_AT)?,
         cleaning_spread: if cleaning_fixed { 0 } else { game::cleaning::ROUND_SPREAD },
         weather,
+        save_path: if args.flag("no-save") { None } else { Some(args.str("save").map_or_else(|| PathBuf::from("saves/world.db"), PathBuf::from)) },
     };
     let crc = building.crc;
     let floors = building.active_floors().count();

@@ -37,6 +37,7 @@ mod items;
 mod kitchen;
 mod leave;
 mod office;
+mod save;
 mod voice;
 mod lunch;
 mod movement;
@@ -98,6 +99,9 @@ pub const MAX_INPUTS_PER_TICK: usize = 6;
 /// Inputs buffered beyond this are dropped (client running ahead / flooding).
 pub const MAX_INPUT_QUEUE: usize = 30;
 
+/// Set (Ctrl+C / SIGTERM) to save and stop at the next loop turn.
+pub static STOP: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 pub struct Config {
     pub bind: SocketAddr,
     pub link: LinkConditions,
@@ -132,6 +136,8 @@ pub struct Config {
     pub cleaning_spread: u32,
     /// Everybody starts with a (paid) pack of cigarettes (dev).
     pub start_cigarettes: bool,
+    /// SQLite save file (None = nothing is saved).
+    pub save_path: Option<std::path::PathBuf>,
 }
 
 impl Config {
@@ -156,6 +162,7 @@ impl Config {
             cleaning_at: crate::cleaning::ROUND_AT,
             cleaning_spread: crate::cleaning::ROUND_SPREAD,
             start_cigarettes: false,
+            save_path: None,
         }
     }
 }
@@ -246,6 +253,11 @@ pub struct Server {
     /// Task boards (per department) and work mail.
     boards: crate::tasks::Boards,
     post: crate::workmail::PostOffice,
+    /// Saving (None = off) and what is known by nick of people not online.
+    store: Option<crate::persist::Store>,
+    offline: save::Offline,
+    /// Save at the next tick (money / hiring changed).
+    save_soon: bool,
     /// Packets queued this tick (kept to reuse the allocation).
     outbox: Vec<Outgoing>,
     net: Net,
@@ -323,6 +335,9 @@ impl Server {
             sounds: Vec::new(),
             boards: Default::default(),
             post: Default::default(),
+            store: None,
+            offline: Default::default(),
+            save_soon: false,
             outbox: Vec::new(),
             building,
             net,
@@ -342,6 +357,7 @@ impl Server {
             Some(k) => Weather::fixed(k),
             None => Weather::new(server.clock.total_minutes()),
         };
+        server.load_save().map_err(std::io::Error::other)?;
         server.schedule_treats();
         if server.cfg.treats_now {
             server.put_tray();
@@ -380,6 +396,10 @@ impl Server {
                     self.tick = self.tick.wrapping_add(skipped);
                     next_tick += TICK.saturating_mul(skipped);
                 }
+            }
+            if STOP.load(std::sync::atomic::Ordering::Relaxed) {
+                self.shutdown();
+                std::process::exit(0);
             }
             if now >= next_stats {
                 self.print_stats();
@@ -429,6 +449,7 @@ impl Server {
 
         // Everything the clients need to know.
         self.send_updates();
+        self.tick_save();
     }
 
     /// Encode and send one packet; returns its size.

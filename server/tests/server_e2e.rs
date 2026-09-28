@@ -83,6 +83,7 @@ fn start_server_at(start_access: u8, skip_recruitment: bool, start_employed: boo
         cleaning_at: CLEANING_AT.with(|c| c.get()),
         cleaning_spread: 0,
         start_cigarettes: false,
+        save_path: None,
     };
     let mut server = Server::new(map, cfg).unwrap();
     let port = server.local_addr().port();
@@ -1859,4 +1860,100 @@ fn voice_reaches_the_room_and_whispers_only_the_one_next_to_you() {
     assert_eq!(heard(&ewa, &[&ola, &kuba], 5), None, "too far for a whisper");
     say(&ola, 6, 0);
     assert_eq!(heard(&ewa, &[&ola, &kuba], 6).map(|h| h.1), Some(0), "the room still hears");
+}
+
+/// The real server binary with a save file: play, Ctrl+C (SIGINT), start
+/// again — the character, the laptop on the desk, the task board and the
+/// mail are all still there.
+#[cfg(unix)]
+#[test]
+fn progress_survives_a_server_restart() {
+    use game::computer::lines as pc;
+    use game::inventory::kind as item_kind;
+    use proto::{mail_action as ma, task_action as ta};
+    use std::process::{Child, Command, Stdio};
+    let dir = std::env::temp_dir().join(format!("startup-sim-restart-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let save = dir.join("world.db");
+    let port = UdpSocket::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
+    let addr = SocketAddr::from(([127, 0, 0, 1], port));
+    let start = || -> Child {
+        let child = Command::new(env!("CARGO_BIN_EXE_server"))
+            .args(["--bind", &addr.to_string(), "--save", save.to_str().unwrap(), "--start-employed"])
+            .args(["--start-time", "10:00", "--weather", "clouds", "--stats-secs", "3600"])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .unwrap();
+        std::thread::sleep(Duration::from_millis(800));
+        child
+    };
+    let stop = |mut child: Child| {
+        Command::new("kill").args(["-INT", &child.id().to_string()]).status().unwrap();
+        let status = child.wait().unwrap();
+        assert!(status.success(), "clean shutdown: {status}");
+    };
+    let wait = Duration::from_millis(1500);
+    let nobody = Body::at(1, Pos::tile_center(0, 0));
+    let said = |line: &'static str| move |p: &Packet| matches!(p, Packet::Say { text, .. } if text == line).then_some(());
+    let computer = |p: &Packet| match p {
+        Packet::Computer { owner, .. } => Some(*owner),
+        _ => None,
+    };
+    let clock = |p: &Packet| match p {
+        Packet::Clock { money, day, place, .. } => Some((*money, *day, *place)),
+        _ => None,
+    };
+
+    // Day one: the laptop on the desk, a card on the board, a note-to-self.
+    let b = building();
+    let server = start();
+    let (mut ola, _) = Client::connect(addr, "Ola");
+    ola.press_e(&b, nobody);
+    assert!(wait_for(&ola, &[], wait, said(pc::PLACED)).is_some());
+    ola.press_e(&b, nobody);
+    assert_eq!(wait_for(&ola, &[], wait, computer), Some(ola.id));
+    let task = Packet::TaskAction { token: ola.token, nonce: 1, action: ta::CREATE, task: 0, arg: 2, text: "Przetrwać restart".into() };
+    ola.sock.send(&task.encode()).unwrap();
+    let mail = Packet::MailAction { token: ola.token, nonce: 1, action: ma::SEND, id: 0, to: "Ola".into(), subject: "Notatka".into(), body: "Nie zapomnij.".into() };
+    ola.sock.send(&mail.encode()).unwrap();
+    assert!(wait_for(&ola, &[], wait, |p| matches!(p, Packet::MailState { done: 1, .. }).then_some(())).is_some());
+    let (money, day, _) = wait_for(&ola, &[], wait, clock).expect("clock");
+    std::thread::sleep(Duration::from_millis(300));
+    stop(server);
+
+    // The server comes back: Ola too.
+    let server = start();
+    let (mut ola, _) = Client::connect(addr, "Ola");
+    let (money2, day2, place) = wait_for(&ola, &[], wait, clock).expect("clock after restart");
+    assert_eq!((money2, day2, place), (money, day, proto::place::BUILDING), "the same character, at work");
+    let inv = wait_for(&ola, &[], wait, |p| match p {
+        Packet::Inventory { slots } => Some(slots.iter().map(|s| s.kind).collect::<Vec<_>>()),
+        _ => None,
+    })
+    .expect("inventory");
+    assert!(inv.contains(&item_kind::EMPLOYEE_CARD) && !inv.contains(&item_kind::LAPTOP), "card kept, laptop still on the desk: {inv:?}");
+    // Walk in from the entrance to her desk: the laptop logs in as Ola.
+    let ws = game::computer::find_workstations(&b);
+    let desk = ws.iter().find(|w| w.room_name == "IT / Produkt").unwrap();
+    let s = b.spawns()[0];
+    let body = Body { access: access::CARD, ..Body::at(s.0, Pos::tile_center(s.1.x, s.1.y)) };
+    let at = ola.walk_to(&b, body, (desk.floor, Tile { x: desk.tile.x, y: desk.tile.y + 1 }), &[]);
+    ola.press_e(&b, at);
+    assert_eq!(wait_for(&ola, &[], wait, computer), Some(ola.id), "her laptop, her account");
+    ola.sock.send(&Packet::TaskAction { token: ola.token, nonce: 0, action: ta::SYNC, task: 0, arg: 0, text: String::new() }.encode()).unwrap();
+    let titles = wait_for(&ola, &[], wait, |p| match p {
+        Packet::TaskBoard { tasks, .. } => Some(tasks.iter().map(|t| t.title.clone()).collect::<Vec<_>>()),
+        _ => None,
+    });
+    assert_eq!(titles, Some(vec!["Przetrwać restart".to_string()]));
+    let sync = Packet::MailAction { token: ola.token, nonce: 0, action: ma::SYNC, id: 0, to: String::new(), subject: String::new(), body: String::new() };
+    ola.sock.send(&sync.encode()).unwrap();
+    let subject = wait_for(&ola, &[], wait, |p| match p {
+        Packet::WorkMail { subject, .. } => Some(subject.clone()),
+        _ => None,
+    });
+    assert_eq!(subject.as_deref(), Some("Notatka"));
+    stop(server);
+    let _ = std::fs::remove_dir_all(&dir);
 }

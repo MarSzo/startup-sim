@@ -85,7 +85,7 @@ impl Server {
     /// Found the company from the job portal: into the board, with a card and
     /// a laptop, in the board room.
     pub(super) fn found_company(&mut self, pid: u16, name: &str) {
-        if self.company.founder.is_some() {
+        if self.company.founder.is_some() || self.offline.founder.is_some() {
             return;
         }
         let Some(name) = company::clean(name, company::NAME_MIN, company::NAME_MAX) else { return };
@@ -121,6 +121,7 @@ impl Server {
             other.known.remove(&pid); // new department on the name tag
         }
         self.log(format!("* company founded: '{name}' by {nick}"));
+        self.save_soon = true;
     }
 
     /// The panel's account: the founder's computer (whoever sits at it).
@@ -277,6 +278,7 @@ impl Server {
             "Cześć {nick}!\nWitamy w {company}, dział: {dept}.\n\nNa pulpicie masz komunikator, pocztę i przeglądarkę — w ulubionych jest tablica zadań działu i zamawianie obiadów. Kubki są w szafce w aneksie kuchennym.\n\nPowodzenia!\nHR"
         );
         self.office_mail(&nick, "HR", &format!("Witamy w {company}!"), &body);
+        self.save_soon = true;
         // Everyone gets the updated PlayerInfo (department) again.
         for other in self.players.values_mut() {
             other.known.remove(&pid);

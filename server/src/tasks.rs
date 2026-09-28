@@ -25,7 +25,7 @@ pub mod priority {
     pub const URGENT: u8 = 2;
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Task {
     pub id: u16,
     pub column: u8,
@@ -46,7 +46,7 @@ pub enum Notice {
     Commented { to: Vec<String>, by: String, title: String, text: String },
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct Boards {
     next_id: u16,
     boards: HashMap<u8, Vec<Task>>,

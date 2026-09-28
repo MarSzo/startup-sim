@@ -1051,6 +1051,31 @@ pełnym ekranie — zastąpiona stylem inspirowanym Don't Starve:
 - Eksport na macOS będzie potrzebował opisu uprawnienia mikrofonu
   (`privacy/microphone_usage_description` w presecie eksportu).
 
+### 10.41 Zapis postępu (etap 1 kont)
+
+- Serwer zapisuje grę w pliku SQLite (`--save`, domyślnie
+  `server/saves/world.db`; `--no-save` wyłącza). Po restarcie serwera, a
+  także po wyjściu z gry i powrocie **tym samym nickiem**, wszystko wraca:
+  - postać: profil (dane postaci tylko na serwerze), pieniądze, dzień, dział
+    i umowa, stawka, potrzeby, ekwipunek (kawa przez restart stygnie — w
+    kieszeni zostaje brudny kubek), sposób dojazdu;
+  - świat: zegar, pogoda, firma (nazwa, założyciel, opisy stanowisk,
+    zatrudnieni), wolne etaty, laptopy na biurkach, tablice zadań, poczta
+    służbowa, aneks kuchenny.
+- Nie zapisujemy tego, co odtwarza się samo: NPC, pojazdy, dym, dźwięki,
+  głos, winda; historia komunikatora i spotkania w kalendarzu — jeszcze nie.
+- Świat jest trwały: kto wychodzi, **zachowuje etat, biurko i firmę**
+  (założyciel offline nadal jest założycielem). Postać bez umowy wraca na
+  portal z pracą (z tymi samymi pieniędzmi i dniem).
+- Po restarcie zatrudniony wraca do pracy przy wejściu do budynku (w nocy —
+  w domu).
+- Zapis co 10 s (tylko zmienione wiersze, w osobnym wątku — pętla gry nie
+  czeka), od razu po zmianach pieniędzy i zatrudnienia, a przy Ctrl+C /
+  SIGTERM całość przed wyjściem. Raz na dobę kopia w `saves/backups/`
+  (7 ostatnich).
+- **Uwaga:** na razie postać rozpoznaje się po nicku (bez hasła) — hasła i
+  konta to etap 2.
+
 ### 10.6 Stan implementacji
 
 *Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie,
@@ -1148,12 +1173,12 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Sieć mobilna**: serwer dual-stack IPv4/IPv6; gracz identyfikowany tokenem
   (zmiana adresu w trakcie gry przenosi sesję); klient przepina gniazdo po
   ciszy/powrocie z tła i sam łączy się ponownie po utracie sesji.
-- **Testy**: 103 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
+- **Testy**: 108 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
   zależna od uprawnień, bramki, ruch/kolizje, schody, winda, nawigacja,
-  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, zegar, dojazd, pogoda, zarząd, słodycze, obiady, wakaty, firma, ochrona i policja, kubki, dym, balkon, tablica zadań, poczta służbowa, protokół), 2 golden, 32 e2e serwera
+  portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, zegar, dojazd, pogoda, zarząd, słodycze, obiady, wakaty, firma, ochrona i policja, kubki, dym, balkon, tablica zadań, poczta służbowa, zapis gry, protokół), 2 golden, 33 e2e serwera
   (m.in. portal: odrzucenie → przyjęcie → spawn; całe wdrożenie aż do karty;
   niewidoczność między piętrami; zgodność stanu serwera z predykcją) —
-  łącznie 140 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 porannego dojazdu samochodem moknięcia w deszczu spotkania z Prezesem tacy ze słodyczami obiadu z odbiorem na recepcji, obsadzonego stanowiska, panelu założyciela kradzieży w sklepie z ochroną i policją , kubka zebranego przez sprzątaczkę oraz papierosa, który uruchamia alarm pożarowy, wcześniejszego powrotu do domu z przystanku i pomijania czekania, zatrzymania przez ochronę, dźwięku ekspresu słyszanego przez innych, tablicy zadań działu z przypisaniem i komentarzem oraz poczty z koszem, głosu słyszanego tylko w pokoju i szeptu do osoby obok); 161 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
+  łącznie 143 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 porannego dojazdu samochodem moknięcia w deszczu spotkania z Prezesem tacy ze słodyczami obiadu z odbiorem na recepcji, obsadzonego stanowiska, panelu założyciela kradzieży w sklepie z ochroną i policją , kubka zebranego przez sprzątaczkę oraz papierosa, który uruchamia alarm pożarowy, wcześniejszego powrotu do domu z przystanku i pomijania czekania, zatrzymania przez ochronę, dźwięku ekspresu słyszanego przez innych, tablicy zadań działu z przypisaniem i komentarzem oraz poczty z koszem, głosu słyszanego tylko w pokoju i szeptu do osoby obok, restartu serwera z zapisem — prawdziwa binarka, SIGINT i powrót postaci); 161 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
   adresów).
 
 #### Pomiary (MacBook, wszystko lokalnie)

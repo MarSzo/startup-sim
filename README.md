@@ -9,7 +9,7 @@ Etap 1: fundament sieci. Dokumentacja: [GDD](docs/GDD.md) ·
 Wymagania: Rust (rustup), Godot 4.7 (`godot` w PATH).
 
 ```bash
-cd server && cargo run --release            # serwer na [::]:7777 (IPv4 + IPv6)
+cd server && cargo run --release            # serwer na [::]:7777 (IPv4 + IPv6); zapis gry w server/saves/world.db (--no-save wyłącza)
 godot --path client                         # klient (można odpalić kilka razy)
 cd server && cargo run --release -- --start-with-card   # wariant dla botów: wszyscy mają kartę
 cd server && cargo run --release --bin bots -- --count 50 --room "Chill room" --all-in-room
