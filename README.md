@@ -27,7 +27,8 @@ klient zapamiętuje go przy pierwszym połączeniu i ostrzega, jeśli się zmien
 (własny certyfikat, np. Let's Encrypt: `--tls-cert` / `--tls-key`).
 Po zalogowaniu cały ruch gry jest szyfrowany kluczem sesji z logowania. Po połączeniu siedzisz w domu przy komputerze: w **przeglądarce** jest portal z
 ogłoszeniami (kilka firm; zatrudnia tylko nasz startup), wypełniasz formularz,
-po chwili w **Poczcie** czeka zaproszenie na **rozmowę online** (3 pytania,
+po chwili w **Poczcie** czeka zaproszenie na **rozmowę online** (3 pytania
+z puli 25 na stanowisko, bez powtórek dopóki nie przejdziesz całej puli;
 2 poprawne = przyjęcie), a potem zaproszenie na dzień próbny — „Idę do biura”.
 Na miejscu startujesz przed budynkiem bez przepustki: bramki w holu go nie wpuszczą,
 więc trzeba podejść do portierni i porozmawiać z portierem (E) — da przepustkę

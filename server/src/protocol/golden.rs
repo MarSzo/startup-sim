@@ -212,7 +212,13 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
             "company_offers",
             Packet::CompanyOffers {
                 name: "Pixel Pierogi sp. z o.o.".into(),
-                offers: vec![(1, 2, "Programista/ka".into(), "Piszemy w Ruście.".into()), (4, 0, "Marketing".into(), String::new())],
+                part: 0,
+                parts: 1,
+                sets: vec![("programming".into(), "Programowanie".into()), ("general".into(), "Ogólne".into())],
+                offers: vec![
+                    CompanyOffer { id: 1, places: 2, department: 1, set: "programming".into(), title: "Programista/ka".into(), description: "Piszemy w Ruście.".into() },
+                    CompanyOffer { id: 20, places: 0, department: 2, set: "general".into(), title: "Office manager".into(), description: String::new() },
+                ],
             },
         ),
         (

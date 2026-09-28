@@ -446,14 +446,23 @@ impl Packet {
                     w.u8(*level);
                 }
             }
-            Packet::CompanyOffers { name, offers } => {
+            Packet::CompanyOffers { name, part, parts, sets, offers } => {
                 w.str16(name, 64);
-                w.u8(offers.len().min(8) as u8);
-                for (id, places, title, desc) in offers.iter().take(8) {
-                    w.u8(*id);
-                    w.u8(*places);
-                    w.str16(title, 64);
-                    w.str16(desc, MAX_TEXT_BYTES);
+                w.u8(*part);
+                w.u8(*parts);
+                w.u8(sets.len().min(16) as u8);
+                for (id, label) in sets.iter().take(16) {
+                    w.str8(id);
+                    w.str16(label, 64);
+                }
+                w.u8(offers.len().min(16) as u8);
+                for o in offers.iter().take(16) {
+                    w.u8(o.id);
+                    w.u8(o.places);
+                    w.u8(o.department);
+                    w.str8(&o.set);
+                    w.str16(&o.title, 64);
+                    w.str16(&o.description, MAX_TEXT_BYTES);
                 }
             }
             Packet::CompanyPeople { candidates, staff } => {

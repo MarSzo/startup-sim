@@ -20,6 +20,28 @@ pub const NAME_MIN: usize = 3;
 pub const NAME_MAX: usize = 40;
 pub const DESCRIPTION_MAX: usize = 200;
 
+/// Positions (job openings) the company may have at once.
+pub const MAX_POSITIONS: usize = 10;
+pub const TITLE_MIN: usize = 3;
+pub const TITLE_MAX: usize = 40;
+/// Ids of positions created in the game (the file's are lower).
+pub const FIRST_CUSTOM_ID: u8 = 20;
+
+/// A position (job opening) of our startup: the founder adds, edits and
+/// removes them; the interview uses its question set.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Position {
+    pub id: u8,
+    pub title: String,
+    /// IT / Produkt (1) or Biznes (2).
+    pub department: u8,
+    /// Question set id.
+    pub set: String,
+    pub description: String,
+    /// Open places.
+    pub places: u8,
+}
+
 /// `CompanyAction::action`.
 pub mod action {
     /// From the job portal: found the company (`text` = name).
@@ -34,6 +56,21 @@ pub mod action {
     pub const REJECT: u8 = 6;
     /// Employee `target`.
     pub const FIRE: u8 = 7;
+    /// A new position: `value` = department, `text` = "title\nset\ndescription".
+    pub const ADD_POSITION: u8 = 8;
+    /// Position `target`: title = `text`.
+    pub const SET_TITLE: u8 = 9;
+    /// Position `target`: department = `value`.
+    pub const SET_DEPARTMENT: u8 = 10;
+    /// Position `target`: question set = `text`.
+    pub const SET_QUESTIONS: u8 = 11;
+    /// Remove position `target` (people hired for it stay).
+    pub const REMOVE_POSITION: u8 = 12;
+}
+
+/// Departments a position can be in (not the board).
+pub fn position_department(d: u8) -> bool {
+    matches!(d, 1 | 2)
 }
 
 #[derive(Debug, Clone)]
@@ -50,8 +87,6 @@ pub struct Candidate {
 pub struct Company {
     pub name: String,
     pub founder: Option<u16>,
-    /// Custom job descriptions (offer id -> text).
-    pub descriptions: HashMap<u8, String>,
     /// Passed the interview, waiting for the founder.
     pub candidates: Vec<Candidate>,
     /// Employee -> world day they were hired.
@@ -60,7 +95,7 @@ pub struct Company {
 
 impl Company {
     pub fn new(name: &str) -> Company {
-        Company { name: name.into(), founder: None, descriptions: HashMap::new(), candidates: Vec::new(), hired_on: HashMap::new() }
+        Company { name: name.into(), founder: None, candidates: Vec::new(), hired_on: HashMap::new() }
     }
 }
 

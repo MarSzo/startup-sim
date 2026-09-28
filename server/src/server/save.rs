@@ -60,14 +60,23 @@ impl Server {
         if !w.company_name.is_empty() {
             self.company.name = w.company_name;
         }
-        self.company.descriptions = w.descriptions;
-        self.offline.founder = w.founder;
-        self.offline.hired_on = w.hired_on;
-        for (offer, n) in w.vacancies {
-            if let Some(v) = self.vacancies.get_mut(&offer) {
-                *v = n;
+        match w.positions {
+            Some(list) => self.positions = list,
+            // Saved before positions could be edited: places and descriptions.
+            None => {
+                for pos in &mut self.positions {
+                    if let Some(&n) = w.vacancies.get(&pos.id) {
+                        pos.places = n;
+                    }
+                    if let Some(d) = w.descriptions.get(&pos.id) {
+                        pos.description = d.clone();
+                    }
+                }
             }
         }
+        self.offline.founder = w.founder;
+        self.offline.hired_on = w.hired_on;
+
         for c in w.computers {
             if c.station >= self.workstations.len() || self.computers.iter().any(|x| x.station == c.station) {
                 continue;
@@ -139,6 +148,7 @@ impl Server {
             last_raise_day: p.last_raise_day,
             needs: p.needs.clone(),
             inventory,
+            seen_questions: p.seen_questions.clone(),
         }
     }
 
@@ -160,9 +170,10 @@ impl Server {
             weather: self.weather.now,
             company_name: self.company.name.clone(),
             founder,
-            descriptions: self.company.descriptions.clone(),
+            descriptions: Default::default(),
             hired_on,
-            vacancies: self.vacancies.clone(),
+            vacancies: Default::default(),
+            positions: Some(self.positions.clone()),
             computers: self
                 .computers
                 .iter()
@@ -247,6 +258,7 @@ impl Server {
         p.last_pay = c.last_pay;
         p.worked_ds = c.worked_ds;
         p.attempts = c.attempts;
+        p.seen_questions = c.seen_questions.clone();
         if c.contract {
             p.contract = true;
             p.department = c.department;

@@ -447,7 +447,10 @@ zasłania recepcji).
 Ustalenia 2026-09-26: **portal na starcie** (zgodnie z sekcją 4), quiz
 **3 pytania, 2 poprawne = przyjęcie**, ponowna próba od razu (inne pytania)
 lub inna oferta; pytania **humorystyczne**, w klimacie startupu, z jedną
-poprawną odpowiedzią.
+poprawną odpowiedzią. Każde stanowisko ma **25 pytań**; postać dostaje
+najpierw te, których jeszcze nie widziała (pamięć per stanowisko, w zapisie
+gry; pytanie rozpoznawane po treści), a po przejściu całej puli zaczyna się
+nowa runda.
 
 - Po połączeniu gracz widzi „Portal z ofertami pracy · Startup Sim sp. z o.o.”
   z dwiema ofertami: **Programista/ka** (dział IT / Produkt) i **Marketing i
@@ -782,7 +785,13 @@ Zastępuje prosty portal z 10.8. Po połączeniu gracz widzi pulpit komputera
 - **Panel** to zakładka **„Firma”** na komputerze założyciela (widoczna tylko
   przy jego własnym koncie):
   - zmiana nazwy;
-  - ogłoszenia: liczba miejsc (−/+, 0–5) i opis stanowiska;
+  - **stanowiska** (do 10): dodawanie („Nowe stanowisko”: nazwa 3–40
+    znaków, dział IT / Produkt albo Biznes, zestaw pytań na rozmowę, opis),
+    zmiana nazwy, działu i zestawu pytań, liczba miejsc (−/+, 0–5), opis,
+    **usuwanie** — kandydaci w trakcie rekrutacji dostają maila
+    „Rekrutacja zakończona”, zatrudnieni zostają. Zestawy pytań (po 25):
+    Programowanie, Design, Sprzedaż, Marketing, Ogólne (praca w startupie).
+    Na start firma ma 4 stanowiska z pliku danych; zmiany są w zapisie gry;
   - **kandydaci** po zdanej rozmowie: Zatrudnij / Odrzuć. Kandydat dostaje
     maila „Decyzja zarządu wkrótce”; jeśli założyciel nie zdecyduje w 30 min
     gry albo nie ma go w grze, kandydat jest zatrudniany automatycznie (jak
@@ -1225,12 +1234,12 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Sieć mobilna**: serwer dual-stack IPv4/IPv6; gracz identyfikowany tokenem
   (zmiana adresu w trakcie gry przenosi sesję); klient przepina gniazdo po
   ciszy/powrocie z tła i sam łączy się ponownie po utracie sesji.
-- **Testy**: 114 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
+- **Testy**: 115 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
   zależna od uprawnień, bramki, ruch/kolizje, schody, winda, nawigacja,
   portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, zegar, dojazd, pogoda, zarząd, słodycze, obiady, wakaty, firma, ochrona i policja, kubki, dym, balkon, tablica zadań, poczta służbowa, zapis gry, protokół), 3 golden, 34 e2e serwera
   (m.in. portal: odrzucenie → przyjęcie → spawn; całe wdrożenie aż do karty;
   niewidoczność między piętrami; zgodność stanu serwera z predykcją) —
-  łącznie 151 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 porannego dojazdu samochodem moknięcia w deszczu spotkania z Prezesem tacy ze słodyczami obiadu z odbiorem na recepcji, obsadzonego stanowiska, panelu założyciela kradzieży w sklepie z ochroną i policją , kubka zebranego przez sprzątaczkę oraz papierosa, który uruchamia alarm pożarowy, wcześniejszego powrotu do domu z przystanku i pomijania czekania, zatrzymania przez ochronę, dźwięku ekspresu słyszanego przez innych, tablicy zadań działu z przypisaniem i komentarzem oraz poczty z koszem, głosu słyszanego tylko w pokoju i szeptu do osoby obok, restartu serwera z zapisem i kontami — prawdziwa binarka, rejestracja i logowanie przez HTTPS, odrzucenie gościa, złego i jawnego biletu, szyfrowana sesja, odrzucone powtórki pakietu i Connect, zajęty e-mail postaci, SIGINT i powrót postaci; unikalny nick gościa); 168 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
+  łącznie 152 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 porannego dojazdu samochodem moknięcia w deszczu spotkania z Prezesem tacy ze słodyczami obiadu z odbiorem na recepcji, obsadzonego stanowiska, panelu założyciela kradzieży w sklepie z ochroną i policją , kubka zebranego przez sprzątaczkę oraz papierosa, który uruchamia alarm pożarowy, wcześniejszego powrotu do domu z przystanku i pomijania czekania, zatrzymania przez ochronę, dźwięku ekspresu słyszanego przez innych, tablicy zadań działu z przypisaniem i komentarzem oraz poczty z koszem, głosu słyszanego tylko w pokoju i szeptu do osoby obok, restartu serwera z zapisem i kontami — prawdziwa binarka, rejestracja i logowanie przez HTTPS, odrzucenie gościa, złego i jawnego biletu, szyfrowana sesja, odrzucone powtórki pakietu i Connect, zajęty e-mail postaci, SIGINT i powrót postaci; unikalny nick gościa); 168 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
   adresów).
 
 #### Pomiary (MacBook, wszystko lokalnie)

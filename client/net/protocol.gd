@@ -3,7 +3,7 @@
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 34
+const VERSION := 35
 const MAX_PACKET := 1152  # a game packet; sealed it grows to at most MAX_DATAGRAM
 const MAX_DATAGRAM := 1200
 const MAX_NICK_BYTES := 16
@@ -103,7 +103,13 @@ const CO_SET_DESCRIPTION := 4
 const CO_HIRE := 5
 const CO_REJECT := 6
 const CO_FIRE := 7
+const CO_ADD_POSITION := 8    # value = department, text = "title\nset\ndescription"
+const CO_SET_TITLE := 9
+const CO_SET_DEPARTMENT := 10
+const CO_SET_QUESTIONS := 11  # text = question set id
+const CO_REMOVE_POSITION := 12
 const CO_MAX_PLACES := 5
+const CO_MAX_POSITIONS := 10
 # LunchMenu.state
 const LUNCH_NONE := 0
 const LUNCH_ORDERED := 1
@@ -720,12 +726,22 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			p.rooms = rooms
 		T_COMPANY_OFFERS:
 			p.name = r.str16(64)
+			p.part = r.u8()
+			p.parts = r.u8()
+			var ns := r.u8()
+			if ns > 16:
+				return {}
+			var sets := []
+			for i in ns:
+				sets.append({"id": r.str8(), "name": r.str16(64)})
+			p.sets = sets
 			var n := r.u8()
 			if n > 16:
 				return {}
 			var offers := []
 			for i in n:
-				offers.append({"id": r.u8(), "places": r.u8(), "title": r.str16(64), "description": r.str16(MAX_TEXT_BYTES)})
+				offers.append({"id": r.u8(), "places": r.u8(), "department": r.u8(), "set": r.str8(),
+					"title": r.str16(64), "description": r.str16(MAX_TEXT_BYTES)})
 			p.offers = offers
 		T_COMPANY_PEOPLE:
 			var n := r.u8()

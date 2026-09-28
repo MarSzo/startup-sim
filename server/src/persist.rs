@@ -114,6 +114,9 @@ pub struct Character {
     pub needs: Needs,
     /// Hands, then the pockets.
     pub inventory: Vec<Option<SavedItem>>,
+    /// Interview questions already asked (question set -> question ids).
+    #[serde(default)]
+    pub seen_questions: HashMap<String, Vec<u32>>,
 }
 
 /// A laptop standing on a desk.
@@ -144,10 +147,16 @@ pub struct World {
     pub weather: u8,
     pub company_name: String,
     pub founder: Option<String>,
+    #[serde(default)]
     pub descriptions: HashMap<u8, String>,
     /// Employee nick -> world day hired.
     pub hired_on: HashMap<String, u32>,
+    /// Older saves (before positions): places and descriptions per offer.
+    #[serde(default)]
     pub vacancies: HashMap<u8, u8>,
+    /// Our startup's positions (None in older saves).
+    #[serde(default)]
+    pub positions: Option<Vec<crate::company::Position>>,
     pub computers: Vec<SavedComputer>,
     pub kitchen: Option<SavedKitchen>,
     pub boards: Boards,
@@ -362,6 +371,7 @@ mod tests {
             last_raise_day: None,
             needs: Needs::default(),
             inventory: vec![None, Some(SavedItem { kind: 2, label: "Ola · IT".into(), owner: "Ola".into(), count: 1, unpaid: false, stale: false }), None, None],
+            seen_questions: HashMap::from([("programming".to_string(), vec![11, 22])]),
         }
     }
 

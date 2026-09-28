@@ -572,7 +572,7 @@ fn desktop_portal_mail_interview_and_office() {
         loop {
             match recv_until(&|p| matches!(p, Packet::Question { .. } | Packet::RecruitResult { .. }), false) {
                 Packet::Question { attempt, index, text, options, .. } => {
-                    let q = bank.offer(1).unwrap().questions.iter().find(|q| q.text == text).expect("known question");
+                    let q = bank.set("programming").unwrap().questions.iter().find(|q| q.text == text).expect("known question");
                     let right = options.iter().position(|o| *o == q.options[0]).unwrap() as u8;
                     let choice = if want_correct { right } else { (right + 1) % options.len() as u8 };
                     c.send(&Packet::Answer { token: c.token, attempt, index, choice });
@@ -1672,7 +1672,7 @@ fn a_filled_position_is_gone_for_the_others() {
         while let Some(p) = ala.recv() {
             match p {
                 Packet::Question { attempt, index, text, options, .. } => {
-                    let q = bank.offer(1).unwrap().questions.iter().find(|q| q.text == text).unwrap();
+                    let q = bank.set("programming").unwrap().questions.iter().find(|q| q.text == text).unwrap();
                     let right = options.iter().position(|o| *o == q.options[0]).unwrap() as u8;
                     ala.send(&Packet::Answer { token: ala.token, attempt, index, choice: right });
                 }
@@ -1725,7 +1725,7 @@ fn founder_founds_the_company_and_hires_from_the_panel() {
     std::thread::sleep(Duration::from_millis(150));
     ola.press_e(&b, body);
     let panel = wait_for(&ola, &[], Duration::from_millis(2500), |p| match p {
-        Packet::CompanyOffers { name, offers } => Some((name.clone(), offers.len())),
+        Packet::CompanyOffers { name, offers, .. } => Some((name.clone(), offers.len())),
         _ => None,
     });
     assert_eq!(panel, Some(("Pixel Pierogi sp. z o.o.".into(), 4)), "the company panel");
@@ -1752,7 +1752,7 @@ fn founder_founds_the_company_and_hires_from_the_panel() {
         while let Some(p) = bob.recv() {
             match p {
                 Packet::Question { attempt, index, text, options, .. } => {
-                    let q = bank.offer(1).unwrap().questions.iter().find(|q| q.text == text).unwrap();
+                    let q = bank.set("programming").unwrap().questions.iter().find(|q| q.text == text).unwrap();
                     let right = options.iter().position(|o| *o == q.options[0]).unwrap() as u8;
                     bob.send(&Packet::Answer { token: bob.token, attempt, index, choice: right });
                 }
@@ -1776,7 +1776,7 @@ fn founder_founds_the_company_and_hires_from_the_panel() {
     // More places for designers.
     act(&ola, ca::SET_PLACES, 2, 2, "");
     let places = wait_for(&ola, &[&bob], Duration::from_millis(2500), |p| match p {
-        Packet::CompanyOffers { offers, .. } => offers.iter().find(|o| o.0 == 2).map(|o| o.1),
+        Packet::CompanyOffers { offers, .. } => offers.iter().find(|o| o.id == 2).map(|o| o.places),
         _ => None,
     });
     assert_eq!(places, Some(2));
@@ -1791,6 +1791,53 @@ fn founder_founds_the_company_and_hires_from_the_panel() {
         matches!(p, Packet::Mail { subject, .. } if subject == "Rozwiązanie umowy").then_some(())
     });
     assert!(fired.is_some(), "Bob fired");
+
+    // A new position: Office manager in Biznes, with the general questions.
+    act(&ola, ca::ADD_POSITION, 0, 2, "Office manager\nnie-ma-takiego\n");
+    let refused = wait_for(&ola, &[&bob], Duration::from_millis(1500), |p| {
+        matches!(p, Packet::Say { text, .. } if text == game::server::position_lines::BAD_SET).then_some(())
+    });
+    assert!(refused.is_some(), "no such question set");
+    act(&ola, ca::ADD_POSITION, 0, 2, "Office manager\ngeneral\nOgarniasz biuro, kawę i ludzi.");
+    let added = wait_for(&ola, &[&bob], Duration::from_millis(2500), |p| match p {
+        Packet::CompanyOffers { offers, sets, .. } if !sets.is_empty() => {
+            offers.iter().find(|o| o.title == "Office manager").map(|o| (o.id, o.department, o.set.clone(), o.places, sets.len()))
+        }
+        _ => None,
+    });
+    let (new_id, dept, set, places, sets) = added.expect("the new position in the panel");
+    assert!(new_id >= game::company::FIRST_CUSTOM_ID);
+    assert_eq!((dept, set.as_str(), places, sets), (2, "general", 1, 5));
+    // Ewa finds it on the portal, applies and gets the general questions.
+    let (ewa, _) = Client::connect(addr, "Ewa");
+    let seen = wait_for(&ewa, &[&ola, &bob], Duration::from_millis(2500), |p| match p {
+        Packet::JobOffers { offers } => offers.iter().find(|o| o.id == new_id).map(|o| (o.title.clone(), o.vacancies)),
+        _ => None,
+    });
+    assert_eq!(seen, Some(("Office manager".into(), 1)));
+    ewa.send(&Packet::Apply { token: ewa.token, offer: new_id, motivation: String::new() });
+    assert!(wait_for(&ewa, &[&ola, &bob], Duration::from_millis(3000), |p| {
+        matches!(p, Packet::Mail { action, arg, .. } if *action == proto::portal_action::JOIN_INTERVIEW && *arg == new_id).then_some(())
+    })
+    .is_some());
+    ewa.send(&Packet::PortalAction { token: ewa.token, action: proto::portal_action::JOIN_INTERVIEW, arg: new_id });
+    let question = wait_for(&ewa, &[&ola, &bob], Duration::from_millis(2500), |p| match p {
+        Packet::Question { text, .. } => Some(text.clone()),
+        _ => None,
+    })
+    .expect("an interview question");
+    assert!(bank.set("general").unwrap().questions.iter().any(|q| q.text == question), "from the general set: {question}");
+    // Ola closes the position mid-interview: Ewa hears the recruitment is over.
+    act(&ola, ca::REMOVE_POSITION, new_id as u16, 0, "");
+    let closed = wait_for(&ewa, &[&ola, &bob], Duration::from_millis(2500), |p| {
+        matches!(p, Packet::Mail { subject, .. } if subject == "Rekrutacja zakończona: Office manager").then_some(())
+    });
+    assert!(closed.is_some(), "Ewa is told");
+    let gone = wait_for(&ola, &[&bob, &ewa], Duration::from_millis(2500), |p| match p {
+        Packet::CompanyOffers { offers, part: 0, .. } => Some(offers.iter().any(|o| o.id == new_id)),
+        _ => None,
+    });
+    assert_eq!(gone, Some(false), "gone from the panel");
     let _ = pc::CLOSE;
 }
 

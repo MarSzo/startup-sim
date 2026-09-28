@@ -76,8 +76,8 @@ fn a_conversation_survives_other_meetings_going_away() {
 #[test]
 fn company_actions_ignore_offer_ids_that_do_not_fit_a_byte() {
     let mut s = server();
-    let before = s.vacancies.clone();
+    let before = s.positions.clone();
     // 256 would wrap to offer 0 with an `as u8` cast.
     s.company_set_places(256, 3);
-    assert_eq!(s.vacancies, before);
+    assert_eq!(s.positions, before);
 }

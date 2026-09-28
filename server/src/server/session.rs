@@ -384,8 +384,8 @@ impl Server {
             self.clock_dirty = true;
         }
         // Their job is free again (a persistent world keeps it for them).
-        if let Some(v) = p.position.and_then(|o| self.vacancies.get_mut(&o)).filter(|_| !persistent) {
-            *v = (*v + 1).min(MAX_VACANCIES);
+        if let Some(pos) = p.position.and_then(|o| self.positions.iter_mut().find(|x| x.id == o)).filter(|_| !persistent) {
+            pos.places = (pos.places + 1).min(MAX_VACANCIES);
         }
         self.dropped.retain(|d| d.item.owner != id || d.item.kind == item_kind::EMPTY_CUP); // mugs stay
         for other in self.players.values_mut() {

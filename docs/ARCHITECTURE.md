@@ -340,6 +340,11 @@ parking / stojak / krawężnik / przystanek), gracz jest `Working` z `riding`
 Na przystanku `VehicleEvent::Arrived` → wysiada, efekty na potrzeby,
 spóźnienie po 9:00. Auto i rower zostają zaparkowane do wieczora (znikają
 przy `go_home`), taksówka i tramwaj odjeżdżają (`Gone`).
+Stanowiska (`company::Position`, `server/positions.rs`): lista stanowisk
+naszej firmy w `Server::positions` (start = oferty z `hiring` z pliku; potem
+zmienia je założyciel; zapis w `World::positions`). Pytania są w zestawach
+(`recruitment.json` → `question_sets`), stanowisko wskazuje zestaw;
+`Recruitment::start(set, …)`. Oferty innych firm zostają w pliku.
 Konta (`auth.rs`, `http.rs`): tabele `accounts` (nick bez rozróżniania
 wielkości liter, skrót Argon2id) i `refresh_tokens` (SHA-256 tokenu) w tym
 samym pliku SQLite; bilety w pamięci (`Auth` = `Arc<Mutex>` współdzielony

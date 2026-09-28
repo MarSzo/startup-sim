@@ -104,7 +104,8 @@ func test_protocol(path: String) -> void:
 	expect(sm.get("type") == Protocol.T_SMOKE and sm.floor == 1 and sm.rooms == [[9, 40], [33, 200]], "decode smoke %s" % sm)
 	var co := Protocol.decode(golden["company_offers"].hex_decode())
 	expect(co.get("type") == Protocol.T_COMPANY_OFFERS and co.name.begins_with("Pixel") and co.offers.size() == 2
-		and co.offers[0].places == 2 and co.offers[0].description == "Piszemy w Ruście.", "decode company offers %s" % co)
+		and co.offers[0].places == 2 and co.offers[0].description == "Piszemy w Ruście." and co.offers[1].set == "general"
+		and co.offers[1].department == 2 and co.sets.size() == 2 and co.sets[0].name == "Programowanie" and co.parts == 1, "decode company offers %s" % co)
 	var cp := Protocol.decode(golden["company_people"].hex_decode())
 	expect(cp.get("type") == Protocol.T_COMPANY_PEOPLE and cp.candidates.size() == 1 and cp.candidates[0].nick == "Bob"
 		and cp.staff.size() == 2 and cp.staff[1].day == 5, "decode company people %s" % cp)

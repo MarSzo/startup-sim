@@ -23,7 +23,7 @@ pub use golden::{golden_samples, to_hex};
 pub use snapshot::{snapshot_fragments, SelfState};
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 34;
+pub const VERSION: u8 = 35;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
 /// A game packet at most (sealed, it grows by up to 48 B to `MAX_DATAGRAM`).
@@ -259,6 +259,18 @@ pub mod sound {
     pub const EAT: u8 = 15;
     pub const DRINK: u8 = 16;
     pub const WHISTLE: u8 = 17;
+}
+
+/// A position of our startup in the founder's panel.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CompanyOffer {
+    pub id: u8,
+    pub places: u8,
+    pub department: u8,
+    /// Question set id (`QuestionSet::id`).
+    pub set: String,
+    pub title: String,
+    pub description: String,
 }
 
 /// A card on the task board (without its description and comments).
@@ -567,9 +579,10 @@ pub enum Packet {
     /// of the day or `NO_TIME`), and the menu.
     LunchMenu { state: u8, dish: u8, arrives: u16, dishes: Vec<Dish> },
     LunchOrder { token: u32, dish: u8 },
-    /// Company panel (the founder's computer): name and the job openings
-    /// (offer id, places, title, description).
-    CompanyOffers { name: String, offers: Vec<(u8, u8, String, String)> },
+    /// Company panel (the founder's computer): the name, the question sets
+    /// to choose from (id, name; part 0) and the positions, in parts of at
+    /// most `MAX_PACKET` (the client puts them together).
+    CompanyOffers { name: String, part: u8, parts: u8, sets: Vec<(String, String)>, offers: Vec<CompanyOffer> },
     /// Company panel: candidates (player, offer, score, total, nick) and
     /// staff (player, department, hired on day, nick).
     CompanyPeople { candidates: Vec<(u16, u8, u8, u8, String)>, staff: Vec<(u16, u8, u16, String)> },

@@ -79,7 +79,9 @@ var _lunch_sig := ""
 ## Company panel: the server sends CompanyOffers / CompanyPeople only to the
 ## founder at their own computer; the tab shows while they keep coming.
 const COMPANY_FRESH_MSEC := 3000
-var company_offers := {}
+var company_offers := {}       # {name, sets, offers} once all parts are in
+var _co_parts := {}            # parts arriving (CompanyOffers comes in pieces)
+var _co_got := 0
 var company_people := {}
 var _company_msec := -COMPANY_FRESH_MSEC
 var _co_view := VBoxContainer.new()
@@ -848,7 +850,18 @@ func _company_fresh() -> bool:
 func on_company(p: Dictionary) -> void:
 	var was := _company_fresh()
 	if p.type == Protocol.T_COMPANY_OFFERS:
-		company_offers = p
+		# The positions come in parts: put them together first.
+		if p.part == 0:
+			_co_parts = {"name": p.name, "sets": p.sets, "offers": []}
+			_co_got = 0
+		elif _co_parts.is_empty():
+			return
+		_co_parts.offers.append_array(p.offers)
+		_co_got += 1
+		if _co_got < p.parts:
+			return
+		company_offers = _co_parts.duplicate(true)
+		_co_parts = {}
 	else:
 		company_people = p
 	_company_msec = Time.get_ticks_msec()
@@ -885,6 +898,130 @@ func _co_edit(key: String, value: String, max_len: int, width: int) -> LineEdit:
 	return e
 
 
+## One position in the founder's panel: name, department, question set,
+## places, description, remove.
+func _position_card(o: Dictionary) -> Control:
+	var id: int = o.id
+	var places: int = o.places
+	var card := Ink.panel("card")
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 6)
+	card.add_child(box)
+	var r1 := HBoxContainer.new()
+	r1.add_theme_constant_override("separation", 8)
+	box.add_child(r1)
+	var tkey := "title:%d" % id
+	var title := _co_edit(tkey, o.title, 40, 240)
+	r1.add_child(title)
+	var rename := _button("Zmień nazwę", false)
+	rename.add_theme_color_override("font_color", Color("#1c2430"))
+	rename.pressed.connect(func():
+		_co_drafts.erase(tkey)
+		company_action.emit(Protocol.CO_SET_TITLE, id, 0, title.text.strip_edges()))
+	r1.add_child(rename)
+	var dept := _dept_select(o.department)
+	dept.item_selected.connect(func(i: int): company_action.emit(Protocol.CO_SET_DEPARTMENT, id, dept.get_item_id(i), ""))
+	r1.add_child(dept)
+	var qs := _set_select(o.set)
+	qs.item_selected.connect(func(i: int): company_action.emit(Protocol.CO_SET_QUESTIONS, id, 0, qs.get_item_metadata(i)))
+	r1.add_child(qs)
+	var del := Ink.button("Usuń", false, true)
+	del.tooltip_text = "Zamyka rekrutację (zatrudnieni zostają)"
+	del.pressed.connect(func(): company_action.emit(Protocol.CO_REMOVE_POSITION, id, 0, ""))
+	r1.add_child(del)
+	var r2 := HBoxContainer.new()
+	r2.add_theme_constant_override("separation", 8)
+	box.add_child(r2)
+	var minus := _button("−", false)
+	minus.add_theme_color_override("font_color", Color("#1c2430"))
+	minus.disabled = places == 0
+	minus.pressed.connect(func(): company_action.emit(Protocol.CO_SET_PLACES, id, places - 1, ""))
+	r2.add_child(minus)
+	var n := _co_label("%d miejsc" % places if places != 1 else "1 miejsce", 15, Color("#16a085") if places else Color("#8a93a3"))
+	n.custom_minimum_size = Vector2(80, 0)
+	n.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	r2.add_child(n)
+	var plus := _button("+", false)
+	plus.add_theme_color_override("font_color", Color("#1c2430"))
+	plus.disabled = places >= Protocol.CO_MAX_PLACES
+	plus.pressed.connect(func(): company_action.emit(Protocol.CO_SET_PLACES, id, places + 1, ""))
+	r2.add_child(plus)
+	var key := "desc:%d" % id
+	var desc := _co_edit(key, o.description, 200, 380)
+	desc.placeholder_text = "Opis stanowiska"
+	r2.add_child(desc)
+	var save := _button("Zapisz opis", false)
+	save.add_theme_color_override("font_color", Color("#1c2430"))
+	save.pressed.connect(func():
+		_co_drafts.erase(key)
+		company_action.emit(Protocol.CO_SET_DESCRIPTION, id, 0, desc.text.strip_edges()))
+	r2.add_child(save)
+	return card
+
+
+## "Nowe stanowisko": name, department, question set, description.
+func _new_position_card(count: int) -> Control:
+	var card := Ink.panel("card")
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 6)
+	card.add_child(box)
+	box.add_child(_co_label("Nowe stanowisko", 16, Ink.ACCENT))
+	var r1 := HBoxContainer.new()
+	r1.add_theme_constant_override("separation", 8)
+	box.add_child(r1)
+	var title := _co_edit("new:title", "", 40, 240)
+	title.placeholder_text = "Nazwa, np. Office manager"
+	r1.add_child(title)
+	var dept := _dept_select(int(_co_drafts.get("new:dept", 1)))
+	dept.item_selected.connect(func(i: int): _co_drafts["new:dept"] = dept.get_item_id(i))
+	r1.add_child(dept)
+	var qs := _set_select(str(_co_drafts.get("new:set", "general")))
+	qs.item_selected.connect(func(i: int): _co_drafts["new:set"] = qs.get_item_metadata(i))
+	r1.add_child(qs)
+	var r2 := HBoxContainer.new()
+	r2.add_theme_constant_override("separation", 8)
+	box.add_child(r2)
+	var desc := _co_edit("new:desc", "", 200, 500)
+	desc.placeholder_text = "Opis stanowiska (opcjonalnie)"
+	r2.add_child(desc)
+	var add := _button("Dodaj stanowisko", true)
+	add.disabled = count >= Protocol.CO_MAX_POSITIONS
+	add.pressed.connect(func():
+		var t := title.text.strip_edges()
+		if t.length() < 3:
+			title.grab_focus()
+			return
+		var set_id: String = qs.get_item_metadata(qs.selected)
+		company_action.emit(Protocol.CO_ADD_POSITION, 0, dept.get_item_id(dept.selected), "%s\n%s\n%s" % [t, set_id, desc.text.strip_edges()])
+		for k in ["new:title", "new:desc"]:
+			_co_drafts.erase(k))
+	r2.add_child(add)
+	if count >= Protocol.CO_MAX_POSITIONS:
+		box.add_child(_co_label("Limit 10 stanowisk — usuń któreś, żeby dodać nowe.", 14, Color("#8a93a3")))
+	return card
+
+
+func _dept_select(selected: int) -> OptionButton:
+	var o := OptionButton.new()
+	for d in [1, 2]:
+		o.add_item(DEPARTMENTS[d], d)
+		if d == selected:
+			o.select(o.item_count - 1)
+	o.add_theme_font_size_override("font_size", 14)
+	return o
+
+
+func _set_select(selected: String) -> OptionButton:
+	var o := OptionButton.new()
+	for s in company_offers.get("sets", []):
+		o.add_item("Pytania: " + s.name)
+		o.set_item_metadata(o.item_count - 1, s.id)
+		if s.id == selected:
+			o.select(o.item_count - 1)
+	o.add_theme_font_size_override("font_size", 14)
+	return o
+
+
 func _co_row() -> HBoxContainer:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 10)
@@ -916,38 +1053,11 @@ func _render_company() -> void:
 		company_action.emit(Protocol.CO_RENAME, 0, 0, name_edit.text.strip_edges()))
 	row.add_child(rename)
 
-	_co_view.add_child(_co_label("Ogłoszenia na portalu", 18, Ink.ACCENT))
-	for o in company_offers.offers:
-		var id: int = o.id
-		var places: int = o.places
-		row = _co_row()
-		var t := _co_label(o.title, 15)
-		t.custom_minimum_size = Vector2(250, 0)
-		row.add_child(t)
-		var minus := _button("−", false)
-		minus.add_theme_color_override("font_color", Color("#1c2430"))
-		minus.disabled = places == 0
-		minus.pressed.connect(func(): company_action.emit(Protocol.CO_SET_PLACES, id, places - 1, ""))
-		row.add_child(minus)
-		var n := _co_label("%d miejsc" % places if places != 1 else "1 miejsce", 15, Color("#16a085") if places else Color("#8a93a3"))
-		n.custom_minimum_size = Vector2(80, 0)
-		n.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		row.add_child(n)
-		var plus := _button("+", false)
-		plus.add_theme_color_override("font_color", Color("#1c2430"))
-		plus.disabled = places >= Protocol.CO_MAX_PLACES
-		plus.pressed.connect(func(): company_action.emit(Protocol.CO_SET_PLACES, id, places + 1, ""))
-		row.add_child(plus)
-		var key := "desc:%d" % id
-		var desc := _co_edit(key, o.description, 200, 300)
-		desc.placeholder_text = "Opis stanowiska"
-		row.add_child(desc)
-		var save := _button("Zapisz opis", false)
-		save.add_theme_color_override("font_color", Color("#1c2430"))
-		save.pressed.connect(func():
-			_co_drafts.erase(key)
-			company_action.emit(Protocol.CO_SET_DESCRIPTION, id, 0, desc.text.strip_edges()))
-		row.add_child(save)
+	var positions: Array = company_offers.offers
+	_co_view.add_child(_co_label("Stanowiska (%d/%d) — ogłoszenia na portalu" % [positions.size(), Protocol.CO_MAX_POSITIONS], 18, Ink.ACCENT))
+	for o in positions:
+		_co_view.add_child(_position_card(o))
+	_co_view.add_child(_new_position_card(positions.size()))
 
 	_co_view.add_child(_co_label("Kandydaci po rozmowie", 18, Ink.ACCENT))
 	var cands: Array = company_people.get("candidates", [])

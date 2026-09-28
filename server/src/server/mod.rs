@@ -37,6 +37,8 @@ mod items;
 mod kitchen;
 mod leave;
 mod office;
+mod positions;
+pub use positions::lines as position_lines;
 mod save;
 mod voice;
 mod lunch;
@@ -214,7 +216,8 @@ pub struct Server {
     /// Board meetings (calendar).
     meetings: Vec<Meeting>,
     /// Open positions per job offer (our startup).
-    vacancies: HashMap<u8, u8>,
+    /// Our startup's positions (job openings; the founder edits them).
+    positions: Vec<crate::company::Position>,
     company: Company,
     /// Lunch orders (the app on the computer).
     lunch_orders: Vec<crate::lunch::Order>,
@@ -295,7 +298,7 @@ impl Server {
         let shop_rooms = rooms_where(|r| r.kind == "shop");
         let outdoor_rooms = rooms_where(|r| r.outdoor);
         let hiring = cfg.recruitment.offers.iter().filter(|o| o.hiring);
-        let vacancies = hiring.clone().map(|o| (o.id, o.vacancies)).collect();
+        let positions = positions::from_file(&cfg.recruitment);
         let company_name = hiring.clone().next().map_or("Startup Sim sp. z o.o.", |o| o.company.as_str()).to_string();
         let npcs = Npc::spawn_all(&building);
         let mut server = Server {
@@ -314,7 +317,7 @@ impl Server {
             vehicles: Vec::new(),
             weather: Weather::new(0),
             meetings: Vec::new(),
-            vacancies,
+            positions,
             company: Company::new(&company_name),
             lunch_orders: Vec::new(),
             tray: None,

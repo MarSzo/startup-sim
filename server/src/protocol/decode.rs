@@ -375,16 +375,31 @@ impl Packet {
                 Packet::Smoke { floor, rooms }
             }
             ty::COMPANY_OFFERS => {
-                let name = r.str16(64)?;
+                let (name, part, parts) = (r.str16(64)?, r.u8()?, r.u8()?);
                 let n = r.u8()? as usize;
-                if n > 8 {
+                if n > 16 {
+                    return Err(DecodeError::Invalid("too many question sets"));
+                }
+                let mut sets = Vec::with_capacity(n);
+                for _ in 0..n {
+                    sets.push((r.str8()?, r.str16(64)?));
+                }
+                let n = r.u8()? as usize;
+                if n > 16 {
                     return Err(DecodeError::Invalid("too many offers"));
                 }
                 let mut offers = Vec::with_capacity(n);
                 for _ in 0..n {
-                    offers.push((r.u8()?, r.u8()?, r.str16(64)?, r.str16(MAX_TEXT_BYTES)?));
+                    offers.push(CompanyOffer {
+                        id: r.u8()?,
+                        places: r.u8()?,
+                        department: r.u8()?,
+                        set: r.str8()?,
+                        title: r.str16(64)?,
+                        description: r.str16(MAX_TEXT_BYTES)?,
+                    });
                 }
-                Packet::CompanyOffers { name, offers }
+                Packet::CompanyOffers { name, part, parts, sets, offers }
             }
             ty::COMPANY_PEOPLE => {
                 let n = r.u8()? as usize;

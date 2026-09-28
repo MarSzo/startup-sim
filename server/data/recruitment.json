@@ -1,5 +1,5 @@
 {
- "version": 2,
+ "version": 3,
  "questions_per_attempt": 3,
  "pass_score": 2,
  "invite_delay_secs": 4,
@@ -17,14 +17,10 @@
    "name": "Zarząd"
   }
  ],
- "offers": [
+ "question_sets": [
   {
-   "id": 1,
-   "company": "Startup Sim sp. z o.o.",
-   "hiring": true,
-   "department": 1,
-   "title": "Programista/ka",
-   "description": "Rozwijasz nasz produkt. Oferujemy: owocowe czwartki, elastyczne godziny (głównie w nocy) i pełen dostęp do produkcji od pierwszego dnia.",
+   "id": "programming",
+   "name": "Programowanie",
    "questions": [
     {
      "q": "Produkcja leży w piątek o 16:55. Co robisz?",
@@ -97,17 +93,165 @@
       "Kolejką do ekspresu o 9:00",
       "Pętlą, która wykonuje się 1000 razy"
      ]
+    },
+    {
+     "q": "Co to jest bug?",
+     "options": [
+      "Błąd w programie",
+      "Owad w serwerowni",
+      "Funkcja, o którą nikt nie prosił",
+      "Nowa wersja Javy"
+     ]
+    },
+    {
+     "q": "Test jednostkowy sprawdza:",
+     "options": [
+      "Mały fragment kodu w izolacji",
+      "Czy jednostka (czyli Ty) przyszła do pracy",
+      "Wydajność całej firmy",
+      "Czy kod ładnie wygląda"
+     ]
+    },
+    {
+     "q": "Merge conflict to:",
+     "options": [
+      "Zmiany w tym samym miejscu z dwóch gałęzi",
+      "Kłótnia o ostatnią kawę",
+      "Spotkanie dwóch zespołów",
+      "Błąd kompilatora"
+     ]
+    },
+    {
+     "q": "Kiedy commitować zmiany?",
+     "options": [
+      "Często, małymi logicznymi kawałkami",
+      "Raz na kwartał, wszystko naraz",
+      "Tylko w piątek po 17",
+      "Nigdy — kod żyje w schowku"
+     ]
+    },
+    {
+     "q": "Czym jest API?",
+     "options": [
+      "Interfejsem, przez który programy się komunikują",
+      "Aplikacją do pisania ikonek",
+      "Automatycznym piekarnikiem internetowym",
+      "Skrótem od „A Po Integracji”"
+     ]
+    },
+    {
+     "q": "Co zrobić z ostrzeżeniami kompilatora?",
+     "options": [
+      "Przeczytać i poprawić",
+      "Wyłączyć — i tak są żółte",
+      "Wydrukować i powiesić w kuchni",
+      "Czekać, aż same znikną"
+     ]
+    },
+    {
+     "q": "Po co jest plik .gitignore?",
+     "options": [
+      "Żeby git pomijał wybrane pliki",
+      "Żeby ignorować maile od szefa",
+      "Żeby ukryć kod przed testerami",
+      "Kasuje historię repozytorium"
+     ]
+    },
+    {
+     "q": "Klient zgłasza błąd, którego u Ciebie nie ma. Co robisz?",
+     "options": [
+      "Proszę o kroki i próbuję odtworzyć problem",
+      "Mówię „u mnie działa” i zamykam zgłoszenie",
+      "Wysyłam mu swój komputer",
+      "Zmieniam klientowi hasło"
+     ]
+    },
+    {
+     "q": "Czym jest refaktoryzacja?",
+     "options": [
+      "Poprawą struktury kodu bez zmiany działania",
+      "Przepisaniem wszystkiego w nowym języku",
+      "Wymianą monitorów",
+      "Faktura wystawiona drugi raz"
+     ]
+    },
+    {
+     "q": "Tabela w bazie ma 10 mln wierszy, zapytanie się wlecze. Co sprawdzasz?",
+     "options": [
+      "Indeksy i plan zapytania",
+      "Czy baza nie jest zmęczona",
+      "Kolor tabeli w panelu admina",
+      "Dokładam RAM do laptopa"
+     ]
+    },
+    {
+     "q": "Co oznacza „deploy”?",
+     "options": [
+      "Wdrożenie aplikacji na serwer",
+      "Deptanie po kablach w serwerowni",
+      "Nowy dział w firmie",
+      "Zamówienie pizzy dla zespołu"
+     ]
+    },
+    {
+     "q": "Dwie osoby piszą ten sam moduł. Jak unikacie chaosu?",
+     "options": [
+      "Dzielimy zadanie i często łączymy zmiany",
+      "Wygrywa ten, kto później zrobi push",
+      "Każdy pisze w swoim edytorze tekstu",
+      "Losujemy, czyj kod zostaje"
+     ]
+    },
+    {
+     "q": "Co zwraca 2 + 2 w JavaScripcie?",
+     "options": [
+      "4",
+      "22",
+      "„2 + 2”",
+      "Zależy od humoru przeglądarki"
+     ]
+    },
+    {
+     "q": "Czym jest dług techniczny?",
+     "options": [
+      "Skrótami w kodzie, które trzeba będzie kiedyś naprawić",
+      "Pożyczką na nowy komputer",
+      "Zaległym abonamentem na IDE",
+      "Kredytem studenckim programisty"
+     ]
+    },
+    {
+     "q": "Jak nazwać zmienną z liczbą klientów?",
+     "options": [
+      "customerCount albo liczbaKlientow",
+      "x",
+      "zmienna2_final",
+      "asdfgh"
+     ]
+    },
+    {
+     "q": "Aplikacja zużywa 16 GB RAM przy jednym użytkowniku. Co podejrzewasz?",
+     "options": [
+      "Wyciek pamięci",
+      "Że użytkownik ma dużo marzeń",
+      "To normalne w 2026",
+      "Za mało RAM-u na serwerze — dokupmy"
+     ]
+    },
+    {
+     "q": "Standup trwa już godzinę. Co proponujesz?",
+     "options": [
+      "Szczegóły omówić osobno, standup krótko",
+      "Przenieść go na lunch",
+      "Stanie na jednej nodze",
+      "Wyłączyć kamerę i uciec"
+     ]
     }
-   ],
-   "vacancies": 1
+   ]
   },
   {
-   "id": 2,
-   "company": "Startup Sim sp. z o.o.",
-   "hiring": true,
-   "department": 1,
-   "title": "Designer/ka",
-   "description": "Projektujesz produkt, który programiści zrobią „prawie tak samo”. Oferujemy: dwa monitory, zapas żółtych karteczek i prawo weta wobec Comic Sansa.",
+   "id": "design",
+   "name": "Design",
    "questions": [
     {
      "q": "Klient prosi: „logo ma być większe, ale mniejsze”. Co robisz?",
@@ -162,17 +306,183 @@
       "Jasnoszary na białym",
       "Niewidzialny — minimalizm"
      ]
+    },
+    {
+     "q": "Co to jest makieta (wireframe)?",
+     "options": [
+      "Uproszczony szkic układu ekranu",
+      "Model 3D budynku firmy",
+      "Plik z czcionkami",
+      "Rama do obrazu"
+     ]
+    },
+    {
+     "q": "Po co projektować najpierw na telefon (mobile first)?",
+     "options": [
+      "Bo wymusza skupienie na tym, co najważniejsze",
+      "Bo monitory wychodzą z mody",
+      "Żeby klient nie widział szczegółów",
+      "Bo telefon jest tańszy od monitora"
+     ]
+    },
+    {
+     "q": "Czym jest system projektowy (design system)?",
+     "options": [
+      "Zbiorem wspólnych komponentów i zasad",
+      "Programem do rysowania",
+      "Planem biura",
+      "Katalogiem mebli"
+     ]
+    },
+    {
+     "q": "Klient chce „więcej koloru”. Co robisz?",
+     "options": [
+      "Pytam o cel i pokazuję propozycje zgodne z marką",
+      "Dodaję wszystkie kolory tęczy",
+      "Zmieniam tło na migające",
+      "Kupuję mu kredki"
+     ]
+    },
+    {
+     "q": "Co to jest persona?",
+     "options": [
+      "Opis typowego użytkownika na podstawie badań",
+      "Nowy pracownik działu HR",
+      "Maskotka firmy",
+      "Tryb samolotowy w telefonie"
+     ]
+    },
+    {
+     "q": "Ikona bez podpisu, której nikt nie rozumie. Co robisz?",
+     "options": [
+      "Dodaję etykietę albo zmieniam ikonę",
+      "Powiększam ją trzy razy",
+      "Dodaję animację obrotu",
+      "Nic — to nowy trend"
+     ]
+    },
+    {
+     "q": "Czym jest prototyp klikalny?",
+     "options": [
+      "Interaktywną makietą do testów",
+      "Myszką z dodatkowymi przyciskami",
+      "Gotową aplikacją w sklepie",
+      "Grą w kliknij-sam"
+     ]
+    },
+    {
+     "q": "Najważniejszy przycisk na ekranie powinien:",
+     "options": [
+      "Wyraźnie się wyróżniać",
+      "Być ukryty w menu",
+      "Mieć kolor tła",
+      "Uciekać przed kursorem"
+     ]
+    },
+    {
+     "q": "Co to jest siatka (grid) w projektowaniu?",
+     "options": [
+      "Układ kolumn porządkujący elementy",
+      "Ogrodzenie wokół biura",
+      "Siatka na zakupy",
+      "Błąd renderowania"
+     ]
+    },
+    {
+     "q": "Programista mówi, że animacji nie da się zrobić. Co robisz?",
+     "options": [
+      "Rozmawiam, szukamy prostszej wersji",
+      "Robię ją sam w PowerPoincie",
+      "Zgłaszam go do HR",
+      "Rezygnuję z projektu"
+     ]
+    },
+    {
+     "q": "Pusty stan ekranu (brak danych) powinien:",
+     "options": [
+      "Wyjaśnić, co zrobić, żeby coś się pojawiło",
+      "Być całkiem biały",
+      "Pokazać błąd 500",
+      "Przekierować na stronę konkurencji"
+     ]
+    },
+    {
+     "q": "Formularz ma 40 pól. Co proponujesz?",
+     "options": [
+      "Zostawić tylko potrzebne i podzielić na kroki",
+      "Zmniejszyć czcionkę",
+      "Dodać pole nr 41 na opinię",
+      "Kazać użytkownikom się nie poddawać"
+     ]
+    },
+    {
+     "q": "Jaki format do zdjęć na stronie?",
+     "options": [
+      "Skompresowany, np. WebP lub JPG",
+      "BMP 50 MB",
+      "Zdjęcie ekranu z Painta",
+      "PDF w ZIP-ie"
+     ]
+    },
+    {
+     "q": "Czym jest dostępność (accessibility)?",
+     "options": [
+      "Projektowaniem dla wszystkich, także z niepełnosprawnościami",
+      "Godzinami otwarcia biura",
+      "Ceną licencji",
+      "Liczbą wolnych miejsc na parkingu"
+     ]
+    },
+    {
+     "q": "Zespół kłóci się o kolor przycisku. Co proponujesz?",
+     "options": [
+      "Test A/B albo odwołanie się do celów",
+      "Rzut monetą",
+      "Wybrać kolor szefa",
+      "Przycisk w paski"
+     ]
+    },
+    {
+     "q": "Co to jest hierarchia wizualna?",
+     "options": [
+      "Kolejność, w jakiej oko czyta elementy",
+      "Schemat organizacyjny firmy",
+      "Kolejka do ekspresu",
+      "Rodzaj czcionki szeryfowej"
+     ]
+    },
+    {
+     "q": "Klient przysłał logo jako zrzut ekranu w Wordzie. Co robisz?",
+     "options": [
+      "Proszę o plik wektorowy lub odtwarzam go",
+      "Rozciągam i wklejam",
+      "Zmieniam klienta",
+      "Rysuję logo od nowa bez pytania"
+     ]
+    },
+    {
+     "q": "Po co jest przewodnik po marce (brand book)?",
+     "options": [
+      "Żeby wszyscy używali marki spójnie",
+      "Żeby zająć półkę",
+      "To powieść o firmie",
+      "Instrukcja ekspresu"
+     ]
+    },
+    {
+     "q": "Użytkownicy nie znajdują koszyka. Co zmieniasz?",
+     "options": [
+      "Umieszczam go w znanym, widocznym miejscu",
+      "Dodaję quiz „znajdź koszyk”",
+      "Usuwam koszyk",
+      "Obwiniam użytkowników"
+     ]
     }
-   ],
-   "vacancies": 0
+   ]
   },
   {
-   "id": 3,
-   "company": "Startup Sim sp. z o.o.",
-   "hiring": true,
-   "department": 2,
-   "title": "Specjalista/ka ds. sprzedaży",
-   "description": "Sprzedajesz produkt, który IT właśnie skończy (prawie). Oferujemy: prowizję od sukcesów, nielimitowane spotkania i własny kubek z logo.",
+   "id": "sales",
+   "name": "Sprzedaż",
    "questions": [
     {
      "q": "Klient pyta o funkcję, której nie mamy. Co odpowiadasz?",
@@ -227,17 +537,183 @@
       "Przekierowuję do IT",
       "Proponuję, żeby spróbował jutro"
      ]
+    },
+    {
+     "q": "Co to jest cold call?",
+     "options": [
+      "Telefon do klienta, który nas nie zna",
+      "Rozmowa w nieogrzewanym biurze",
+      "Telefon z lodówki",
+      "Połączenie bez kawy"
+     ]
+    },
+    {
+     "q": "Klient mówi „za drogo”. Co robisz?",
+     "options": [
+      "Pytam, z czym porównuje, i pokazuję wartość",
+      "Od razu daję 70% rabatu",
+      "Mówię, że tanio nie będzie, i się rozłączam",
+      "Pytam, czy ma kogoś bogatszego"
+     ]
+    },
+    {
+     "q": "Czym jest upselling?",
+     "options": [
+      "Proponowaniem lepszej lub większej wersji produktu",
+      "Sprzedażą na piętrze wyżej",
+      "Podnoszeniem cen o północy",
+      "Sprzedażą samego pudełka"
+     ]
+    },
+    {
+     "q": "Co powinien zawierać dobry mail ofertowy?",
+     "options": [
+      "Konkretną korzyść dla klienta i jasny następny krok",
+      "Dziesięć załączników bez opisu",
+      "Tylko cennik",
+      "Emotikony zamiast tekstu"
+     ]
+    },
+    {
+     "q": "Najlepszy pierwszy krok przed spotkaniem z klientem?",
+     "options": [
+      "Poznać firmę klienta i jego potrzeby",
+      "Wydrukować kontrakt do podpisu",
+      "Kupić nowy garnitur",
+      "Wymyślić trzy żarty"
+     ]
+    },
+    {
+     "q": "Klient milczy od dwóch tygodni. Co robisz?",
+     "options": [
+      "Wysyłam krótki follow-up z wartością",
+      "Dzwonię 20 razy dziennie",
+      "Zakładam, że umarł",
+      "Wysyłam mu kwiaty i fakturę"
+     ]
+    },
+    {
+     "q": "Co to jest pipeline sprzedażowy?",
+     "options": [
+      "Lista szans sprzedaży na różnych etapach",
+      "Rura w kuchni",
+      "Kolejka do działu IT",
+      "Nowy serial o sprzedawcach"
+     ]
+    },
+    {
+     "q": "Klient pyta o termin wdrożenia. Co mówisz?",
+     "options": [
+      "Sprawdzam z zespołem i podaję realny termin",
+      "Mówię „jutro” na wszelki wypadek",
+      "Mówię „kiedyś”",
+      "Pytam, kiedy by chciał, i się zgadzam"
+     ]
+    },
+    {
+     "q": "Po co notować ustalenia w CRM?",
+     "options": [
+      "Żeby zespół wiedział, co ustalono z klientem",
+      "Żeby szef myślał, że pracuję",
+      "Żeby zapełnić dysk",
+      "Nie trzeba — mam dobrą pamięć"
+     ]
+    },
+    {
+     "q": "Co to jest rabat ilościowy?",
+     "options": [
+      "Niższa cena za większe zamówienie",
+      "Rabat dla tych, którzy dużo mówią",
+      "Rabat co drugi wtorek",
+      "Zniżka na liczbę emaili"
+     ]
+    },
+    {
+     "q": "Klient prosi o referencje. Co robisz?",
+     "options": [
+      "Pytam zadowolonych klientów o zgodę na kontakt",
+      "Piszę je sam",
+      "Podaję numer mamy",
+      "Mówię, że to tajemnica handlowa"
+     ]
+    },
+    {
+     "q": "Czym jest USP (unikalna propozycja wartości)?",
+     "options": [
+      "Tym, co wyróżnia naszą ofertę",
+      "Kurierem ekspresowym",
+      "Nowym typem kabla USB",
+      "Umową o pracę"
+     ]
+    },
+    {
+     "q": "Negocjacje utknęły. Co proponujesz?",
+     "options": [
+      "Szukam, na czym zależy obu stronom",
+      "Straszę sądem",
+      "Wychodzę bez słowa",
+      "Proponuję papier-kamień-nożyce"
+     ]
+    },
+    {
+     "q": "Jak mierzyć skuteczność sprzedawcy?",
+     "options": [
+      "Wynikami: np. konwersją i przychodem",
+      "Liczbą wypitych kaw",
+      "Głośnością rozmów",
+      "Liczbą krawatów"
+     ]
+    },
+    {
+     "q": "Klient zamówił, ale produkt nie dotarł. Co robisz?",
+     "options": [
+      "Wyjaśniam z logistyką i informuję klienta",
+      "Mówię, że to wina poczty, i kończę",
+      "Wysyłam drugi — może dojdzie",
+      "Zmieniam numer telefonu"
+     ]
+    },
+    {
+     "q": "Co to jest lead?",
+     "options": [
+      "Potencjalny klient zainteresowany ofertą",
+      "Lider zespołu",
+      "Ołowiany ciężarek",
+      "Rozdział w książce"
+     ]
+    },
+    {
+     "q": "Najlepsza pora na telefon do firmy B2B?",
+     "options": [
+      "W godzinach pracy, nie w poniedziałek o 8",
+      "O północy w sobotę",
+      "W trakcie ich świąt",
+      "Kiedy mi się nudzi"
+     ]
+    },
+    {
+     "q": "Klient chce rozwiązać umowę. Pierwszy krok?",
+     "options": [
+      "Dowiadujesz się dlaczego i czy da się coś naprawić",
+      "Grozisz karą",
+      "Udajesz, że nie dostałeś maila",
+      "Podnosisz mu cenę"
+     ]
+    },
+    {
+     "q": "Po spotkaniu klient mówi „odezwiemy się”. Co robisz?",
+     "options": [
+      "Ustalam konkretny termin kolejnego kontaktu",
+      "Czekam do emerytury",
+      "Wysyłam fakturę na zaś",
+      "Zapisuję go jako wygraną"
+     ]
     }
-   ],
-   "vacancies": 1
+   ]
   },
   {
-   "id": 4,
-   "company": "Startup Sim sp. z o.o.",
-   "hiring": true,
-   "department": 2,
-   "title": "Specjalista/ka ds. marketingu",
-   "description": "Opowiadasz światu, że nasz produkt jest rewolucyjny. Oferujemy: budżet na kampanie (mały) i swobodę twórczą (dużą).",
+   "id": "marketing",
+   "name": "Marketing",
    "questions": [
     {
      "q": "Kampania ma 0 kliknięć. Pierwszy krok?",
@@ -292,8 +768,451 @@
       "Logo na całą stronę",
       "Słowo „rewolucyjny” co drugi wyraz"
      ]
+    },
+    {
+     "q": "Co to jest SEO?",
+     "options": [
+      "Optymalizacja strony pod wyszukiwarki",
+      "Prezes spółki (Senior Executive Officer)",
+      "Nowa sieć społecznościowa",
+      "Rodzaj reklamy w radiu"
+     ]
+    },
+    {
+     "q": "Czym jest persona zakupowa?",
+     "options": [
+      "Opis idealnego klienta oparty na danych",
+      "Klient, który kupuje najwięcej kawy",
+      "Pracownik działu zakupów",
+      "Awatar w grze"
+     ]
+    },
+    {
+     "q": "Kampania przyniosła dużo wejść, ale zero zakupów. Co sprawdzasz?",
+     "options": [
+      "Stronę docelową i dopasowanie grupy",
+      "Czy liczniki się nie pomyliły z radości",
+      "Kolor logo",
+      "Horoskop"
+     ]
+    },
+    {
+     "q": "Czym jest CTA (call to action)?",
+     "options": [
+      "Wezwaniem do działania, np. „Kup teraz”",
+      "Telefonem do agencji",
+      "Nowym formatem wideo",
+      "Skrótem od „Coś Trzeba Artykułować”"
+     ]
+    },
+    {
+     "q": "Po co jest newsletter?",
+     "options": [
+      "Żeby utrzymywać kontakt z odbiorcami",
+      "Żeby zapełniać skrzynki",
+      "Żeby wysyłać memy szefa",
+      "To gazeta dla stażystów"
+     ]
+    },
+    {
+     "q": "Co to jest współczynnik konwersji?",
+     "options": [
+      "Odsetek osób, które wykonały pożądaną akcję",
+      "Kurs wymiany walut",
+      "Liczba zmian logo w roku",
+      "Temperatura w biurze"
+     ]
+    },
+    {
+     "q": "Influencer chce 50 tys. zł za jeden post. Co robisz?",
+     "options": [
+      "Sprawdzam jego odbiorców i zasięgi, liczę zwrot",
+      "Płacę od razu — to influencer",
+      "Proszę o post za darmo",
+      "Zakładam własny kanał"
+     ]
+    },
+    {
+     "q": "Jak zmierzyć, czy reklama działa?",
+     "options": [
+      "Śledzę cel kampanii i porównuję wyniki",
+      "Pytam mamę, czy widziała",
+      "Liczę lajki pod postem szefa",
+      "Po kolorze wykresu"
+     ]
+    },
+    {
+     "q": "Czym jest remarketing?",
+     "options": [
+      "Reklamą dla osób, które już nas odwiedziły",
+      "Robieniem marketingu drugi raz od zera",
+      "Zmianą nazwy firmy",
+      "Sprzątaniem po kampanii"
+     ]
+    },
+    {
+     "q": "Tekst reklamy powinien być:",
+     "options": [
+      "Krótki, jasny i o korzyści dla odbiorcy",
+      "Jak najdłuższy — żeby było widać pracę",
+      "Tylko po angielsku",
+      "Pisany wielkimi literami"
+     ]
+    },
+    {
+     "q": "Co to jest content marketing?",
+     "options": [
+      "Przyciąganie odbiorców wartościowymi treściami",
+      "Marketing zadowolonych pracowników",
+      "Reklama pudełek kartonowych",
+      "Kopiowanie treści konkurencji"
+     ]
+    },
+    {
+     "q": "Firma ma kryzys w social media. Pierwszy krok?",
+     "options": [
+      "Szybko i szczerze odpowiadam, wyjaśniam sytuację",
+      "Kasuję wszystkie komentarze",
+      "Wyłączam internet",
+      "Obwiniam praktykanta"
+     ]
+    },
+    {
+     "q": "Budżet kampanii jest mały. Co robisz?",
+     "options": [
+      "Wybieram jeden kanał i precyzyjną grupę",
+      "Rozkładam po 5 zł na 100 kanałów",
+      "Rezygnuję z kampanii",
+      "Proszę klientów o zrzutkę"
+     ]
+    },
+    {
+     "q": "Czym jest ROI?",
+     "options": [
+      "Zwrotem z inwestycji",
+      "Nowym formatem reklamy",
+      "Rodzajem kawy",
+      "Raportem o imprezach"
+     ]
+    },
+    {
+     "q": "Co zrobić przed startem kampanii?",
+     "options": [
+      "Ustalić cel, grupę i sposób pomiaru",
+      "Kupić dużo naklejek",
+      "Zmienić logo na złote",
+      "Ogłosić sukces"
+     ]
+    },
+    {
+     "q": "Po co jest kalendarz treści?",
+     "options": [
+      "Żeby planować publikacje z wyprzedzeniem",
+      "Żeby wiedzieć, kiedy są urodziny szefa",
+      "Żeby zapisywać urlopy",
+      "Żeby wieszać go na ścianie"
+     ]
+    },
+    {
+     "q": "Czym jest storytelling w marketingu?",
+     "options": [
+      "Opowiadaniem historii, z którą odbiorca się utożsamia",
+      "Czytaniem bajek klientom",
+      "Pisaniem długich maili",
+      "Wymyślaniem wymówek"
+     ]
+    },
+    {
+     "q": "Reklama podoba się szefowi, ale nie klientom. Co robisz?",
+     "options": [
+      "Kieruję się wynikami i opinią odbiorców",
+      "Zostawiam — szef płaci",
+      "Pokazuję ją tylko szefowi",
+      "Robię drugą, jeszcze bardziej dla szefa"
+     ]
+    },
+    {
+     "q": "Co to jest branding?",
+     "options": [
+      "Budowanie spójnego wizerunku marki",
+      "Wypalanie logo na biurkach",
+      "Kupowanie markowych ubrań",
+      "Zmiana nazwy co tydzień"
+     ]
     }
-   ],
+   ]
+  },
+  {
+   "id": "general",
+   "name": "Ogólne (praca w startupie)",
+   "questions": [
+    {
+     "q": "Twój szef mówi „jesteśmy jak rodzina”. Co to zwykle znaczy?",
+     "options": [
+      "Warto dopytać o zasady i granice pracy",
+      "Że dostaniesz obiad u babci",
+      "Że wszyscy mają to samo nazwisko",
+      "Że urlop jest tylko na święta"
+     ]
+    },
+    {
+     "q": "Co zrobić, gdy nie wiesz, jak zrobić zadanie?",
+     "options": [
+      "Poszukać, spróbować i zapytać zespół",
+      "Udawać, że pracujesz, do końca sprintu",
+      "Zmienić nazwę zadania",
+      "Oddać je stażyście"
+     ]
+    },
+    {
+     "q": "Czym jest OKR?",
+     "options": [
+      "Metodą wyznaczania celów i mierzalnych wyników",
+      "Okrągłym Kubkiem Redakcyjnym",
+      "Rodzajem umowy o pracę",
+      "Oficjalnym Kodem Rekrutacji"
+     ]
+    },
+    {
+     "q": "Spotkanie bez agendy. Co proponujesz?",
+     "options": [
+      "Ustalić cel i plan na początku",
+      "Mówić o pogodzie godzinę",
+      "Wyjść na kawę w połowie",
+      "Zrobić z niego webinar"
+     ]
+    },
+    {
+     "q": "Jak dawać komuś informację zwrotną?",
+     "options": [
+      "Konkretnie, życzliwie i o zachowaniu, nie o osobie",
+      "Na forum całej firmy",
+      "Anonimowo na tablicy w kuchni",
+      "Wcale — i tak się domyśli"
+     ]
+    },
+    {
+     "q": "Startup ma pieniądze na 6 miesięcy. Co to jest?",
+     "options": [
+      "Runway — czas do końca środków",
+      "Długi weekend",
+      "Okres próbny",
+      "Nowy rekord sprzedaży"
+     ]
+    },
+    {
+     "q": "Czym jest MVP?",
+     "options": [
+      "Najprostszą wersją produktu do sprawdzenia pomysłu",
+      "Najcenniejszym Pracownikiem Piątku",
+      "Nagrodą za najlepszy kubek",
+      "Pełną wersją z wszystkimi funkcjami"
+     ]
+    },
+    {
+     "q": "Kolega z zespołu jest przeciążony. Co robisz?",
+     "options": [
+      "Pytam, czy mogę pomóc, i zgłaszam to przy planowaniu",
+      "Dorzucam mu swoje zadania",
+      "Nic — każdy ma swoje",
+      "Piszę o tym na LinkedInie"
+     ]
+    },
+    {
+     "q": "Deadline jest nierealny. Co robisz?",
+     "options": [
+      "Mówię to wcześnie i proponuję zakres lub termin",
+      "Siedzę trzy noce bez snu",
+      "Udaję, że zdążę",
+      "Zmieniam datę w kalendarzu szefa"
+     ]
+    },
+    {
+     "q": "Pivot w startupie to:",
+     "options": [
+      "Zmiana kierunku biznesu na podstawie danych",
+      "Obrót na krześle biurowym",
+      "Nowy taniec integracyjny",
+      "Wymiana ekspresu do kawy"
+     ]
+    },
+    {
+     "q": "Najlepszy sposób na dokumentowanie decyzji?",
+     "options": [
+      "Krótka notatka w miejscu, gdzie zespół jej szuka",
+      "Zapamiętać — i tak wszyscy pamiętają",
+      "Karteczka pod klawiaturą",
+      "Nagranie głosowe o 23:00"
+     ]
+    },
+    {
+     "q": "Po co jest retrospektywa?",
+     "options": [
+      "Żeby zespół wyciągnął wnioski i poprawił pracę",
+      "Żeby wskazać winnego",
+      "Żeby zjeść pizzę",
+      "Żeby obejrzeć stare zdjęcia"
+     ]
+    },
+    {
+     "q": "Mail do całej firmy „Reply All” — kiedy?",
+     "options": [
+      "Tylko gdy wszyscy naprawdę muszą to przeczytać",
+      "Zawsze, żeby było widać, że pracuję",
+      "Z „+1”, żeby się przyłączyć",
+      "Gdy odpisuję „dzięki”"
+     ]
+    },
+    {
+     "q": "Co zrobić z pomysłem na nową funkcję?",
+     "options": [
+      "Opisać problem, który rozwiązuje, i pokazać zespołowi",
+      "Zrobić ją po cichu w weekend",
+      "Zapomnieć — i tak nikt nie słucha",
+      "Ogłosić w mediach społecznościowych"
+     ]
+    },
+    {
+     "q": "Popełniłeś błąd, który zauważył klient. Co robisz?",
+     "options": [
+      "Przyznaję się, naprawiam i mówię, co zmienię",
+      "Zwalam winę na Wi-Fi",
+      "Udaję, że to funkcja",
+      "Usuwam maila klienta"
+     ]
+    },
+    {
+     "q": "Czym jest praca asynchroniczna?",
+     "options": [
+      "Pracą bez potrzeby bycia online w tym samym czasie",
+      "Pracą bez synchronizacji zegarków",
+      "Pracą po nocach",
+      "Pracą tylko na telefonie"
+     ]
+    },
+    {
+     "q": "Nowa osoba w zespole. Jak pomóc?",
+     "options": [
+      "Pokazać ludzi, narzędzia i dać pierwsze małe zadanie",
+      "Dać jej 300 stron dokumentacji",
+      "Posadzić przy serwerowni",
+      "Kazać „się ogarnąć”"
+     ]
+    },
+    {
+     "q": "Co to jest burn rate?",
+     "options": [
+      "Tempo, w jakim firma wydaje pieniądze",
+      "Temperatura procesora",
+      "Liczba spalonych tostów w kuchni",
+      "Wskaźnik wypalenia szefa"
+     ]
+    },
+    {
+     "q": "Twój pomysł został odrzucony. Co dalej?",
+     "options": [
+      "Pytam o powody i wyciągam wnioski",
+      "Obrażam się do końca kwartału",
+      "Wdrażam go i tak",
+      "Składam wypowiedzenie"
+     ]
+    },
+    {
+     "q": "Priorytety na dziś: 12 pilnych zadań. Co robisz?",
+     "options": [
+      "Ustalam z zespołem, co naprawdę najważniejsze",
+      "Robię wszystkie naraz po trochu",
+      "Robię najłatwiejsze i idę na kawę",
+      "Oznaczam wszystko jako „w toku”"
+     ]
+    },
+    {
+     "q": "Czym jest work-life balance?",
+     "options": [
+      "Zdrową równowagą między pracą a resztą życia",
+      "Deską do balansowania w biurze",
+      "Pracą w weekendy w nagrodę",
+      "Wagą w łazience"
+     ]
+    },
+    {
+     "q": "Klient chwali Twoją pracę. Co robisz?",
+     "options": [
+      "Dziękuję i dzielę się tym z zespołem",
+      "Proszę o podwyżkę od klienta",
+      "Przestaję się starać",
+      "Drukuję maila i oprawiam"
+     ]
+    },
+    {
+     "q": "Po co zespołowi wspólny kanał na komunikatorze?",
+     "options": [
+      "Żeby informacje były w jednym, widocznym miejscu",
+      "Żeby wysyłać memy do 3 w nocy",
+      "Żeby szef widział, kto jest online",
+      "Nie trzeba — mamy faks"
+     ]
+    },
+    {
+     "q": "Co to jest „due diligence” przy inwestycji?",
+     "options": [
+      "Sprawdzenie firmy przez inwestora przed decyzją",
+      "Dzień wolny od pracy",
+      "Nowa dieta w startupach",
+      "Zamówienie kawy na cały zespół"
+     ]
+    },
+    {
+     "q": "Spotkanie mogło być mailem. Co następnym razem?",
+     "options": [
+      "Proponuję mail lub krótką notatkę zamiast spotkania",
+      "Robię dłuższe spotkanie",
+      "Zapraszam jeszcze więcej osób",
+      "Nie przychodzę, bez słowa"
+     ]
+    }
+   ]
+  }
+ ],
+ "offers": [
+  {
+   "id": 1,
+   "company": "Startup Sim sp. z o.o.",
+   "hiring": true,
+   "department": 1,
+   "set": "programming",
+   "title": "Programista/ka",
+   "description": "Rozwijasz nasz produkt. Oferujemy: owocowe czwartki, elastyczne godziny (głównie w nocy) i pełen dostęp do produkcji od pierwszego dnia.",
+   "vacancies": 1
+  },
+  {
+   "id": 2,
+   "company": "Startup Sim sp. z o.o.",
+   "hiring": true,
+   "department": 1,
+   "set": "design",
+   "title": "Designer/ka",
+   "description": "Projektujesz produkt, który programiści zrobią „prawie tak samo”. Oferujemy: dwa monitory, zapas żółtych karteczek i prawo weta wobec Comic Sansa.",
+   "vacancies": 0
+  },
+  {
+   "id": 3,
+   "company": "Startup Sim sp. z o.o.",
+   "hiring": true,
+   "department": 2,
+   "set": "sales",
+   "title": "Specjalista/ka ds. sprzedaży",
+   "description": "Sprzedajesz produkt, który IT właśnie skończy (prawie). Oferujemy: prowizję od sukcesów, nielimitowane spotkania i własny kubek z logo.",
+   "vacancies": 1
+  },
+  {
+   "id": 4,
+   "company": "Startup Sim sp. z o.o.",
+   "hiring": true,
+   "department": 2,
+   "set": "marketing",
+   "title": "Specjalista/ka ds. marketingu",
+   "description": "Opowiadasz światu, że nasz produkt jest rewolucyjny. Oferujemy: budżet na kampanie (mały) i swobodę twórczą (dużą).",
    "vacancies": 0
   },
   {

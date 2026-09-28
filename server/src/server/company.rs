@@ -19,12 +19,12 @@ impl Server {
     /// Hired: invitation to the trial day, one place fewer.
     pub(super) fn hire(&mut self, pid: u16, offer: u8) {
         self.company.candidates.retain(|c| c.player != pid);
-        if self.vacancies.get(&offer).copied().unwrap_or(0) == 0 {
+        if self.places(offer) == 0 {
             self.position_filled_mail(pid, offer);
             return;
         }
         let from = format!("{} — Rekrutacja", self.company.name);
-        let Some(o) = self.cfg.recruitment.offer(offer).cloned() else { return };
+        let Some(o) = self.position(offer).cloned() else { return };
         let Some(p) = self.players.get_mut(&pid) else { return };
         let nick = p.nick.clone();
         p.position = Some(offer);
@@ -133,17 +133,7 @@ impl Server {
         if !self.is_founder_screen(pid) {
             return Vec::new();
         }
-        let offers = self
-            .cfg
-            .recruitment
-            .offers
-            .iter()
-            .filter(|o| o.hiring)
-            .map(|o| {
-                let desc = self.company.descriptions.get(&o.id).cloned().unwrap_or_else(|| o.description.clone());
-                (o.id, self.vacancies.get(&o.id).copied().unwrap_or(0), o.title.clone(), desc)
-            })
-            .collect();
+        let mut packets = self.company_offer_packets();
         let candidates = self
             .company
             .candidates
@@ -157,13 +147,14 @@ impl Server {
             .filter(|p| p.contract || p.position.is_some())
             .map(|p| {
                 let dept = match p.department {
-                    0 => p.position.and_then(|o| self.cfg.recruitment.offer(o)).map_or(0, |o| o.department),
+                    0 => p.position.and_then(|o| self.position(o)).map_or(0, |o| o.department),
                     d => d,
                 };
                 (p.id, dept, self.company.hired_on.get(&p.id).copied().unwrap_or(1) as u16, p.nick.clone())
             })
             .collect();
-        vec![Packet::CompanyOffers { name: self.company.name.clone(), offers }, Packet::CompanyPeople { candidates, staff }]
+        packets.push(Packet::CompanyPeople { candidates, staff });
+        packets
     }
 
     pub(super) fn send_company(&mut self, pid: u16) {
@@ -192,11 +183,37 @@ impl Server {
             // Offer ids are u8; a larger target must not wrap onto another offer.
             a::SET_PLACES => self.company_set_places(target, value),
             a::SET_DESCRIPTION => {
-                if let Some(offer) = u8::try_from(target).ok().filter(|o| self.vacancies.contains_key(o)) {
-                    match company::clean(text, 1, company::DESCRIPTION_MAX) {
-                        Some(d) => self.company.descriptions.insert(offer, d),
-                        None => self.company.descriptions.remove(&offer),
-                    };
+                let d = company::clean(text, 1, company::DESCRIPTION_MAX).unwrap_or_default();
+                if let Some(pos) = u8::try_from(target).ok().and_then(|o| self.position_mut(o)) {
+                    pos.description = d;
+                }
+            }
+            a::ADD_POSITION => {
+                if let Err(line) = self.add_position(value, text) {
+                    self.says.push(super::Say::new(pid, line));
+                }
+            }
+            a::SET_TITLE => match company::clean(text, company::TITLE_MIN, company::TITLE_MAX) {
+                Some(t) => {
+                    if let Some(pos) = u8::try_from(target).ok().and_then(|o| self.position_mut(o)) {
+                        pos.title = t;
+                    }
+                }
+                None => self.says.push(super::Say::new(pid, super::positions::lines::BAD_TITLE)),
+            },
+            a::SET_DEPARTMENT if company::position_department(value) => {
+                if let Some(pos) = u8::try_from(target).ok().and_then(|o| self.position_mut(o)) {
+                    pos.department = value;
+                }
+            }
+            a::SET_QUESTIONS if self.cfg.recruitment.set(text).is_some() => {
+                if let Some(pos) = u8::try_from(target).ok().and_then(|o| self.position_mut(o)) {
+                    pos.set = text.to_string();
+                }
+            }
+            a::REMOVE_POSITION => {
+                if let Ok(o) = u8::try_from(target) {
+                    self.remove_position(o);
                 }
             }
             a::HIRE => {
@@ -213,8 +230,8 @@ impl Server {
 
     /// Open places for an offer (the founder's panel).
     pub(super) fn company_set_places(&mut self, target: u16, value: u8) {
-        if let Some(v) = u8::try_from(target).ok().and_then(|o| self.vacancies.get_mut(&o)) {
-            *v = value.min(company::MAX_PLACES);
+        if let Some(pos) = u8::try_from(target).ok().and_then(|o| self.position_mut(o)) {
+            pos.places = value.min(company::MAX_PLACES);
         }
     }
 
@@ -247,8 +264,8 @@ impl Server {
         desk.next_mail = 100;
         desk.mail(&from, "Rozwiązanie umowy".into(), company::lines::fired(&nick, &company), proto::portal_action::NONE, 0);
         p.stage = Stage::Portal(desk);
-        if let Some(v) = position.and_then(|o| self.vacancies.get_mut(&o)) {
-            *v = (*v + 1).min(MAX_VACANCIES);
+        if let Some(pos) = position.and_then(|o| self.position_mut(o)) {
+            pos.places = (pos.places + 1).min(MAX_VACANCIES);
         }
         self.company.hired_on.remove(&pid);
         for other in self.players.values_mut() {

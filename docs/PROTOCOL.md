@@ -340,8 +340,10 @@ E przy NPC „Recepcja”.
 ### 37 `CompanyOffers`, 38 `CompanyPeople` (S→C), 39 `CompanyAction` (C→S)
 
 Panel założyciela — tylko dla założyciela przy jego własnym (odblokowanym)
-komputerze, co 1 s i po każdej akcji. `CompanyOffers`: `name` str16, n u8 ×
-{`id u8`, `places u8`, `title` str16, `description` str16}. `CompanyPeople`: n
+komputerze, co 1 s i po każdej akcji. `CompanyOffers` (w częściach): `name`
+str16, `part u8`, `parts u8`, zestawy pytań (tylko część 0) n u8 × {`id`
+str8, `name` str16}, stanowiska n u8 (≤ 16) × {`id u8`, `places u8`,
+`department u8`, `set` str8, `title` str16, `description` str16}. `CompanyPeople`: n
 u8 × kandydat {`player u16`, `offer u8`, `score u8`, `total u8`, `nick` str16},
 m u8 × pracownik {`player u16`, `department u8`, `day u16` (dzień zatrudnienia),
 `nick` str16}.
@@ -349,7 +351,10 @@ m u8 × pracownik {`player u16`, `department u8`, `day u16` (dzień zatrudnienia
 `CompanyAction`: token u32, `action u8`, `target u16`, `value u8`, `text` str16.
 Akcje: 1 załóż firmę (z portalu, `text` = nazwa 3–40 znaków), 2 zmień nazwę,
 3 miejsca oferty `target` = `value` (0–5), 4 opis oferty `target` = `text`
-(≤ 200 znaków), 5 zatrudnij kandydata `target`, 6 odrzuć, 7 zwolnij pracownika
+(≤ 200 znaków), 5 zatrudnij kandydata `target`, 6 odrzuć, 7 zwolnij pracownika,
+8 nowe stanowisko (`value` = dział 1–2, `text` = „nazwa\nzestaw\nopis”), 9 nazwa
+stanowiska `target` = `text`, 10 dział = `value`, 11 zestaw pytań = `text`,
+12 usuń stanowisko `target`
 `target`. Akcje 2–7 tylko od założyciela przy jego komputerze; inne są
 ignorowane. Dział 3 = Zarząd.
 
@@ -524,6 +529,7 @@ szyfrowaniem.
 
 ## Historia wersji
 
+- **35** — stanowiska firmy: `CompanyOffers` w częściach, z działem, zestawem pytań i listą zestawów; `CompanyAction` 8–12 (dodaj / nazwa / dział / zestaw / usuń stanowisko).
 - **34** (uzup.) — `Reject` 7 = nick zajęty (konto, zapisana postać albo ktoś w grze), 8 = e-mail postaci zajęty.
 - **34** — szyfrowanie: pakiety `0xF0` (sesja) i `0xF1` (Connect) dla zalogowanych; pakiet gry ≤ 1152 B (datagram ≤ 1200 B); klucz sesji w odpowiedzi logowania (`key`).
 - **33** — konta: `Connect` + `ticket` str16 (≤ 64 B, z logowania HTTPS; pusty = gość); `Reject` 5 (bilet wygasł), 6 (serwer wymaga konta), 7 (nick ma konto).

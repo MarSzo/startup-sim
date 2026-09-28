@@ -131,6 +131,9 @@ pub(super) struct Player {
     /// Voice rate limit: allowance (1/20 frame units) and when refilled.
     pub(super) voice_allowance: u32,
     pub(super) voice_tick: u32,
+    /// Interview questions already asked, per question set (question ids):
+    /// the next interviews ask the others first.
+    pub(super) seen_questions: std::collections::HashMap<String, Vec<u32>>,
     /// Playing without an account (nothing is saved).
     pub(super) guest: bool,
     /// Sealed packets (a logged-in account): keys, counters.
@@ -208,6 +211,7 @@ impl Player {
             mail_nonce: 0,
             voice_allowance: 200,
             voice_tick: 0,
+            seen_questions: Default::default(),
             guest: true,
             crypto: None,
             pay_rate: clock::PAY_PER_MIN * 60,
