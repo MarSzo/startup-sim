@@ -11,8 +11,13 @@ install -d -m 750 -o startup-sim -g startup-sim /var/lib/startup-sim
 if ! command -v cargo >/dev/null && [ ! -x /root/.cargo/bin/cargo ]; then
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
 fi
-# Firewall: SSH first (so we don't lock ourselves out), then the game.
-ufw allow OpenSSH
+# Firewall: SSH first (so we don't lock ourselves out) — only from the
+# tailnet once the VPS is on it (deploy/ssh-tailnet-only.sh) — then the game.
+if tailscale ip -4 >/dev/null 2>&1 && ufw status | grep -q tailscale0; then
+  ufw delete allow OpenSSH >/dev/null 2>&1 || true
+else
+  ufw allow OpenSSH
+fi
 ufw allow 7777/udp comment 'Startup Sim: gra'
 ufw allow 7778/tcp comment 'Startup Sim: logowanie HTTPS'
 ufw --force enable
