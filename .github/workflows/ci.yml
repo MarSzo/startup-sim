@@ -1,0 +1,63 @@
+# Tests on every push and pull request: the Rust server (clippy + unit,
+# golden and end-to-end tests) and the Godot client (protocol / movement
+# parity with the server's golden files).
+name: Testy
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  server:
+    name: Serwer (Rust)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: server
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Testy (jednostkowe, golden, e2e)
+        run: cargo test
+      - name: Golden bez zmian
+        run: git diff --exit-code -- tests/golden
+
+  client:
+    name: Klient (Godot)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GODOT_VERSION: 4.7.2
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cache Godota
+        id: godot-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/godot
+          key: godot-${{ env.GODOT_VERSION }}
+      - name: Pobierz Godota
+        if: steps.godot-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/godot
+          curl -sSL -o /tmp/godot.zip "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q /tmp/godot.zip -d ~/godot
+          mv ~/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64 ~/godot/godot
+      - name: Import projektu
+        run: ~/godot/godot --headless --path client --import
+      - name: Testy klienta
+        run: |
+          ~/godot/godot --headless --path client -s tests/run_tests.gd 2>&1 | tee /tmp/godot.log
+          grep -q ", 0 failures" /tmp/godot.log

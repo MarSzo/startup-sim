@@ -7,6 +7,7 @@ Etap 1: fundament sieci. Dokumentacja: [GDD](docs/GDD.md) ·
 ## Uruchomienie
 
 Wymagania: Rust (rustup), Godot 4.7 (`godot` w PATH).
+Testy uruchamia też GitHub Actions przy każdym pushu (`.github/workflows/ci.yml`: clippy + testy serwera, testy klienta w Godocie).
 
 ```bash
 cd server && cargo run --release            # gra na [::]:7777 (UDP) + logowanie HTTPS na :7778; zapis w server/saves/world.db
