@@ -29,8 +29,8 @@ impl Server {
             }
             Err(_) => return,
         };
-        if let Packet::Connect { nonce, nick, profile } = packet {
-            self.handle_connect(addr, nonce, &nick, profile, now);
+        if let Packet::Connect { nonce, nick, profile, ticket } = packet {
+            self.handle_connect(addr, nonce, &nick, profile, &ticket, now);
             return;
         }
         // Every other packet is identified by its session token.
@@ -113,7 +113,7 @@ impl Server {
         }
     }
 
-    fn handle_connect(&mut self, addr: SocketAddr, nonce: u32, nick: &str, profile: Profile, now: Instant) {
+    fn handle_connect(&mut self, addr: SocketAddr, nonce: u32, nick: &str, profile: Profile, ticket: &str, now: Instant) {
         if let Some(&id) = self.by_addr.get(&addr) {
             if self.players.get(&id).is_some_and(|p| p.nonce == nonce) {
                 // Our Welcome was lost; resend it.
@@ -124,10 +124,36 @@ impl Server {
             }
             self.remove_player(id, "reconnected");
         }
-        let nick = clean_text(nick);
+        // An account (a ticket from logging in) or a guest.
+        let (nick, guest) = if !ticket.is_empty() {
+            match self.auth.as_ref().and_then(|a| a.redeem(ticket)) {
+                Some(n) => (n, false),
+                None => {
+                    self.send(addr, &Packet::Reject { reason: proto::reject::BAD_TICKET });
+                    return;
+                }
+            }
+        } else if !self.cfg.allow_guests {
+            self.send(addr, &Packet::Reject { reason: proto::reject::GUESTS_OFF });
+            return;
+        } else {
+            (clean_text(nick), true)
+        };
         if nick.is_empty() {
             self.send(addr, &Packet::Reject { reason: proto::reject::BAD_NICK });
             return;
+        }
+        if guest && self.auth.as_ref().is_some_and(|a| a.is_registered(&nick)) {
+            self.send(addr, &Packet::Reject { reason: proto::reject::NICK_TAKEN });
+            return;
+        }
+        // The same account logged in again (another computer): the old
+        // session goes.
+        if !guest {
+            let old: Vec<u16> = self.players.values().filter(|p| !p.guest && p.nick == nick).map(|p| p.id).collect();
+            for id in old {
+                self.remove_player(id, "logged in elsewhere");
+            }
         }
         let Some(profile) = validate_profile(profile) else {
             self.send(addr, &Packet::Reject { reason: proto::reject::BAD_PROFILE });
@@ -152,12 +178,13 @@ impl Server {
         let stage = if skip { Stage::Working } else { Stage::Portal(Box::default()) };
         let body = Body::at(spawn_floor, spawn);
         let mut player = Player::new(id, token, nonce, addr, nick, profile, stage, body, now);
+        player.guest = guest;
         player.room = self.room_of(spawn_floor, spawn);
         self.log(format!("+ player {} '{}' from {} ({} online)", id, player.nick, canonical(addr), self.players.len() + 1));
         self.players.insert(id, player);
         self.by_addr.insert(addr, id);
         self.by_token.insert(token, id);
-        let restored = self.restore(id);
+        let restored = !guest && self.restore(id);
         if self.cfg.start_employed && !restored {
             self.start_employed(id);
         } else if skip && self.cfg.start_access & access::CARD != 0 {
@@ -165,6 +192,12 @@ impl Server {
         }
         if let Some(welcome) = self.welcome(id) {
             self.send(addr, &welcome);
+        }
+        // A saved character: its own look and name, as the server knows them.
+        if restored {
+            if let Some(info) = self.info_of(id) {
+                self.send(addr, &Packet::PlayerInfo { players: vec![info] });
+            }
         }
         if !skip {
             self.send_portal(id, true);
@@ -259,7 +292,7 @@ impl Server {
     pub(super) fn remove_player(&mut self, id: u16, why: &str) {
         let Some(mut p) = self.players.remove(&id) else { return };
         self.remember_leaving(&p);
-        let persistent = self.persistent();
+        let persistent = self.persistent() && !p.guest;
         coffee::release(&mut self.machines, &p.cup);
         for c in &mut self.computers {
             if c.user == Some(id) {

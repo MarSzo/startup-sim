@@ -8,6 +8,8 @@ const SettingsPanel = preload("res://ui/settings_panel.gd")
 
 signal to_menu
 signal quit
+## "Wyloguj": forget the remembered login and go back to the login screen.
+signal logout
 signal settings_changed
 
 var _dim := ColorRect.new()
@@ -31,7 +33,8 @@ func _ready() -> void:
 	_menu.add_child(Ink.label("Przerwa", 30, Ink.TEXT_INK))
 	_menu.add_child(Ink.label("Gra toczy się dalej — inni pracują.", 16, Ink.TEXT_MUTED))
 	for entry in [["Wróć do gry", func(): close(), true], ["Ustawienia", func(): _show(_settings), false],
-			["Wyjdź do menu", func(): close(); to_menu.emit(), false], ["Wyjdź z gry", func(): quit.emit(), false]]:
+			["Wyjdź do menu", func(): close(); to_menu.emit(), false], ["Wyloguj", func(): close(); logout.emit(), false],
+			["Wyjdź z gry", func(): quit.emit(), false]]:
 		var b := Ink.button(entry[0], entry[2])
 		b.custom_minimum_size = Vector2(300, 44)
 		b.add_theme_font_size_override("font_size", 24)

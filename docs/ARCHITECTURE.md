@@ -340,6 +340,16 @@ parking / stojak / krawężnik / przystanek), gracz jest `Working` z `riding`
 Na przystanku `VehicleEvent::Arrived` → wysiada, efekty na potrzeby,
 spóźnienie po 9:00. Auto i rower zostają zaparkowane do wieczora (znikają
 przy `go_home`), taksówka i tramwaj odjeżdżają (`Gone`).
+Konta (`auth.rs`, `http.rs`): tabele `accounts` (nick bez rozróżniania
+wielkości liter, skrót Argon2id) i `refresh_tokens` (SHA-256 tokenu) w tym
+samym pliku SQLite; bilety w pamięci (`Auth` = `Arc<Mutex>` współdzielony
+przez wątek HTTPS i pętlę gry, która tylko `redeem`-uje bilet z `Connect`).
+API: `axum` + `axum-server` (rustls) na własnym wątku z runtime `tokio`
+(current_thread), Argon2 w `spawn_blocking`. Certyfikat: `--tls-cert/--tls-key`
+albo własny z `rcgen` w `<save>/tls/`. Klient: `net/auth_client.gd`
+(HTTPRequest, przypinanie certyfikatu w `user://known_servers.cfg`, token
+„zapamiętaj mnie” w `user://auth.cfg`), `ui/login_screen.gd`; `main.gd`
+odświeża wygasły bilet przy ponownym łączeniu.
 Zapis gry (`persist.rs`, `server/save.rs`): SQLite (`rusqlite`, WAL), tabele
 `world` (jeden JSON świata) i `characters` (nick → JSON). `Store` ma wątek
 zapisu: pętla gry co `SAVE_TICKS` (albo po `save_soon`) serializuje zrzut i

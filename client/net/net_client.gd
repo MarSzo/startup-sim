@@ -15,6 +15,8 @@ signal connected(welcome: Dictionary)
 ## Lost the session; trying to get a new one (game should freeze, not quit).
 signal reconnecting(reason: String)
 signal disconnected(reason: String)
+## The server refused the Connect (Protocol.REJECT_*), just before `disconnected`.
+signal rejected(reason: int)
 signal packet_received(p: Dictionary)
 
 enum State { IDLE, CONNECTING, CONNECTED }
@@ -32,6 +34,8 @@ var state := State.IDLE
 var udp := PacketPeerUDP.new()
 var nick := ""
 var profile := {}
+## Login ticket (HTTPS); "" = playing as a guest.
+var ticket := ""
 var nonce := 0
 var player_id := 0
 var token := 0
@@ -90,7 +94,7 @@ static func parse_address(address: String) -> Array:
 	return [host, port]
 
 
-func connect_to_server(address: String, p_nick: String, p_profile: Dictionary) -> String:
+func connect_to_server(address: String, p_nick: String, p_profile: Dictionary, p_ticket := "") -> String:
 	var hp := parse_address(address)
 	if hp.is_empty():
 		return "Nieprawidłowy adres serwera"
@@ -98,6 +102,7 @@ func connect_to_server(address: String, p_nick: String, p_profile: Dictionary) -
 	_port = hp[1]
 	nick = p_nick
 	profile = p_profile
+	ticket = p_ticket
 	_reconnecting = false
 	reconnects = 0
 	return _start_connect()
@@ -214,7 +219,7 @@ func _process(delta: float) -> void:
 				if server_ip != "":
 					_open_socket()
 			if server_ip != "":
-				send(Protocol.encode_connect(nonce, nick, profile))
+				send(Protocol.encode_connect(nonce, nick, profile, ticket))
 			_retry_timer = CONNECT_RETRY_SEC
 	elif state == State.CONNECTED:
 		_since_heard += delta
@@ -252,7 +257,8 @@ func _poll() -> void:
 					connected.emit(p)
 			Protocol.T_REJECT:
 				if state == State.CONNECTING:
-					close("Odrzucono: " + Protocol.REJECT_REASONS.get(p.reason, str(p.reason)))
+					rejected.emit(p.reason)
+					close(Protocol.REJECT_REASONS.get(p.reason, "Odrzucono (%d)" % p.reason))
 			Protocol.T_DISCONNECT:
 				if state == State.CONNECTED and p.token == token:
 					if p.reason == Protocol.DISCONNECT_TIMEOUT or p.reason == Protocol.DISCONNECT_SESSION_UNKNOWN:

@@ -713,6 +713,9 @@ func _on_packet(p: Dictionary) -> void:
 			_refresh_log()
 		Protocol.T_PLAYER_INFO:
 			for e in p.players:
+				if e.id == net.player_id:
+					set_own_appearance(e.appearance)  # a saved character: its look from the server
+					continue
 				nicks[e.id] = e.nick
 				depts[e.id] = e.department
 				if kinds.get(e.id, Protocol.KIND_PLAYER) == Protocol.KIND_PLAYER:

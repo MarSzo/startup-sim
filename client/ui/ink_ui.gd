@@ -79,6 +79,7 @@ static func theme() -> Theme:
 	for c in ["LineEdit", "TextEdit", "SpinBox"]:
 		t.set_color("font_color", c, TEXT_INK)
 		t.set_color("font_placeholder_color", c, TEXT_MUTED)
+		t.set_color("font_uneditable_color", c, Color(TEXT_INK, 0.7))
 		t.set_color("caret_color", c, INK)
 		t.set_color("selection_color", c, Color(GOLD, 0.45))
 	t.set_stylebox("panel", "PanelContainer", box("paper"))

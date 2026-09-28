@@ -3,7 +3,7 @@
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 32
+const VERSION := 33
 const MAX_PACKET := 1200
 const MAX_NICK_BYTES := 16
 const MAX_SAY_BYTES := 240
@@ -191,7 +191,11 @@ const DISCONNECT_KICKED := 2
 const DISCONNECT_SHUTDOWN := 3
 const DISCONNECT_SESSION_UNKNOWN := 4
 
-const REJECT_REASONS := {1: "Serwer pełny", 2: "Niezgodna wersja protokołu", 3: "Nieprawidłowe imię", 4: "Nieprawidłowe dane postaci"}
+const REJECT_REASONS := {1: "Serwer pełny", 2: "Niezgodna wersja protokołu", 3: "Nieprawidłowe imię", 4: "Nieprawidłowe dane postaci",
+	5: "Logowanie wygasło — zaloguj się ponownie", 6: "Ten serwer wymaga konta — zaloguj się", 7: "Ten nick ma konto — zaloguj się"}
+const REJECT_BAD_TICKET := 5
+const REJECT_GUESTS_OFF := 6
+const REJECT_NICK_TAKEN := 7
 const MAX_CITY_BYTES := 48
 const MAX_EMAIL_BYTES := 64
 const DISCONNECT_REASONS := {0: "Rozłączono", 1: "Przekroczono czas", 2: "Wyrzucono", 3: "Serwer wyłączony", 4: "Sesja wygasła"}
@@ -218,7 +222,8 @@ static func utf8_truncated(s: String, max_bytes: int) -> PackedByteArray:
 
 
 ## profile: {gender, age, city, email, appearance: {skin, hair_style, hair_color, shirt, pants}}
-static func encode_connect(nonce: int, nick: String, profile: Dictionary) -> PackedByteArray:
+## `ticket`: from logging in (HTTPS); "" = a guest.
+static func encode_connect(nonce: int, nick: String, profile: Dictionary, ticket := "") -> PackedByteArray:
 	var b := _writer(T_CONNECT)
 	b.put_u32(nonce)
 	var nb := utf8_truncated(nick, MAX_NICK_BYTES)
@@ -229,6 +234,7 @@ static func encode_connect(nonce: int, nick: String, profile: Dictionary) -> Pac
 	_put_appearance(b, profile.appearance)
 	_put_str16(b, profile.city, MAX_CITY_BYTES)
 	_put_str16(b, profile.email, MAX_EMAIL_BYTES)
+	_put_str16(b, ticket, 64)
 	return b.data_array
 
 

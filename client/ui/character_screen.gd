@@ -278,6 +278,16 @@ func set_defaults(nick: String, address: String) -> void:
 	addr_edit.text = address if address != "" else (addr_edit.text if addr_edit.text != "" else "127.0.0.1:7777")
 
 
+## Creating the character of a new account: the nick is the account's,
+## the server was chosen when logging in.
+func for_account(nick: String, address: String) -> void:
+	nick_edit.text = nick
+	nick_edit.editable = false
+	addr_edit.text = address
+	addr_edit.editable = false
+	set_status("Konto %s gotowe — stwórz postać." % nick)
+
+
 func set_status(text: String, is_error := false) -> void:
 	status.text = text
 	status.modulate = Color(1, 0.45, 0.4) if is_error else Color(1, 1, 1, 0.8)

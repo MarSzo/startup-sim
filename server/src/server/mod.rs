@@ -138,6 +138,8 @@ pub struct Config {
     pub start_cigarettes: bool,
     /// SQLite save file (None = nothing is saved).
     pub save_path: Option<std::path::PathBuf>,
+    /// Players without an account may join (dev, tests, bots).
+    pub allow_guests: bool,
 }
 
 impl Config {
@@ -163,6 +165,7 @@ impl Config {
             cleaning_spread: crate::cleaning::ROUND_SPREAD,
             start_cigarettes: false,
             save_path: None,
+            allow_guests: true,
         }
     }
 }
@@ -258,6 +261,8 @@ pub struct Server {
     offline: save::Offline,
     /// Save at the next tick (money / hiring changed).
     save_soon: bool,
+    /// Accounts (tickets from the HTTPS login); None = guests only.
+    auth: Option<crate::auth::Auth>,
     /// Packets queued this tick (kept to reuse the allocation).
     outbox: Vec<Outgoing>,
     net: Net,
@@ -338,6 +343,7 @@ impl Server {
             store: None,
             offline: Default::default(),
             save_soon: false,
+            auth: None,
             outbox: Vec::new(),
             building,
             net,
@@ -416,6 +422,11 @@ impl Server {
             }
             self.net.recv(deadline.saturating_duration_since(Instant::now()));
         }
+    }
+
+    /// Accounts: tickets from the HTTPS login let players in.
+    pub fn set_auth(&mut self, auth: crate::auth::Auth) {
+        self.auth = Some(auth);
     }
 
     /// One simulation step, in phases.

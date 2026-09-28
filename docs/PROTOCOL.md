@@ -359,6 +359,16 @@ Dym papierosowy na piętrze odbiorcy (co 1 s, tylko w budynku): `floor u8`, n
 u8 (≤ 64) × {`room u16`, `level u8` 1–255}. Pokoi spoza listy nie ma dymu.
 Czujki dymu są w danych mapy (`room_defs.*.detector`), klient rysuje je sam.
 
+### Logowanie (HTTPS, port gry + 1)
+
+Poza UDP, JSON: `POST /api/register` i `/api/login` `{nick, password}`,
+`/api/password` `{nick, password, new_password}`, `/api/refresh` `{refresh}`,
+`/api/logout` `{refresh}` → `{ok, nick, ticket, refresh, character, error}`
+(`character` = postać już istnieje). `GET /api/cert` — PEM własnego
+certyfikatu serwera (404 przy prawdziwym certyfikacie); klient przypina go
+przy pierwszym kontakcie i weryfikuje z nazwą `startup-sim`. `ticket` idzie
+potem w `Connect`.
+
 ### 52 `Voice` (C→S), 53 `VoiceFrom` (S→C)
 
 `Voice`: token u32, seq u16, whisper u8 (0 pokój, 1 szept), n u16 (≤ 800) ×
@@ -495,6 +505,7 @@ szyfrowaniem.
 
 ## Historia wersji
 
+- **33** — konta: `Connect` + `ticket` str16 (≤ 64 B, z logowania HTTPS; pusty = gość); `Reject` 5 (bilet wygasł), 6 (serwer wymaga konta), 7 (nick ma konto).
 - **32** — czat głosowy: `Voice` (52, C→S), `VoiceFrom` (53, S→C).
 - **31** — firmowy komputer: `TaskAction` (46, C→S), `TaskBoard` (47), `TaskDetail` (48), `MailAction` (49, C→S), `WorkMail` (50), `MailState` (51).
 - **30** — dźwięki: `Sound` (45, S→C): n u8 (≤ 64) × {kind u8, x i32, y i32} — zdarzenia słyszalne na piętrze odbiorcy w promieniu 28 kafli (1 ekspres, 2 kasa, 3 bramka sklepu, 4 winda, 5 zamek kabiny, 6 włącznik, 7 spłuczka, 8 kran, 9 zapalniczka, 10 zmywarka, 11 lodówka, 12 szafka, 13 podniesienie, 14 upuszczenie, 15 jedzenie, 16 picie, 17 gwizdek).

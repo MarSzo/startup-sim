@@ -67,7 +67,7 @@ fn long_speech_is_truncated_on_char_boundary() {
 
 #[test]
 fn nick_is_truncated_on_char_boundary() {
-    let p = Packet::Connect { nonce: 1, nick: "ąąąąąąąąąą".into(), profile: Profile::default() }; // 20 bytes
+    let p = Packet::Connect { nonce: 1, nick: "ąąąąąąąąąą".into(), profile: Profile::default(), ticket: String::new() }; // 20 bytes
     match Packet::decode(&p.encode()).unwrap() {
         Packet::Connect { nick, .. } => assert_eq!(nick, "ąąąąąąąą"),
         _ => unreachable!(),

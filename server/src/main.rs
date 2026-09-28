@@ -4,6 +4,8 @@ use std::process::ExitCode;
 use std::time::Duration;
 
 use game::args::Args;
+use game::auth::Auth;
+use game::http::{self, Tls};
 use game::building::{default_building_path, Building};
 use game::net::LinkConditions;
 use game::recruitment::{default_recruitment_path, Recruitment};
@@ -38,7 +40,14 @@ OPTIONS:
   --recruitment <path>  recruitment JSON  [default: data/recruitment.json]
   --save <path>         save file (SQLite): characters, company, desks, boards, mail,
                         clock; a daily backup in <dir>/backups   [default: saves/world.db]
-  --no-save             don't load or save anything (dev / tests)
+  --no-save             don't load or save anything (dev / tests; everyone plays as a guest)
+  --allow-guests        players without an account may join (nothing of theirs is saved)
+  --auth-bind <addr>    login API (HTTPS)                  [default: the game port + 1]
+  --tls-cert <pem>      certificate for the login API (e.g. Let's Encrypt fullchain.pem)
+  --tls-key <pem>       its private key       [default: a self-made one in <save dir>/tls,
+                                               pinned by the clients on first contact]
+  --reset-password <nick>  admin: set a new one-time password for an account, print it
+                        and exit (its remember-me logins stop working)
 ";
 
 const PORT: u16 = 7777;
@@ -68,6 +77,20 @@ fn main() -> ExitCode {
     // Ctrl+C / SIGTERM: save, then stop.
     if let Err(e) = ctrlc::set_handler(|| game::server::STOP.store(true, std::sync::atomic::Ordering::Relaxed)) {
         eprintln!("no Ctrl+C handler: {e}");
+    }
+    // Admin: reset an account's password and quit.
+    if let Some(nick) = args.str("reset-password") {
+        let path = args.str("save").map_or_else(|| PathBuf::from("saves/world.db"), PathBuf::from);
+        return match Auth::open(&path).map_err(|e| e.to_string()).and_then(|a| a.reset_password(nick).map_err(|e| e.message())) {
+            Ok(pw) => {
+                println!("New password for '{nick}': {pw}\n(tell them to change it after logging in)");
+                ExitCode::SUCCESS
+            }
+            Err(e) => {
+                eprintln!("{e}");
+                ExitCode::FAILURE
+            }
+        };
     }
     match start(&args) {
         Ok(mut server) => server.run(),
@@ -118,6 +141,7 @@ fn start(args: &Args) -> Result<Server, StartError> {
         None => dual_stack(),
     };
     let cleaning_fixed = args.str("cleaning-at").is_some();
+    let save_path = if args.flag("no-save") { None } else { Some(args.str("save").map_or_else(|| PathBuf::from("saves/world.db"), PathBuf::from)) };
     let cfg = Config {
         bind,
         link,
@@ -137,11 +161,26 @@ fn start(args: &Args) -> Result<Server, StartError> {
         cleaning_at: time("cleaning-at", game::cleaning::ROUND_AT)?,
         cleaning_spread: if cleaning_fixed { 0 } else { game::cleaning::ROUND_SPREAD },
         weather,
-        save_path: if args.flag("no-save") { None } else { Some(args.str("save").map_or_else(|| PathBuf::from("saves/world.db"), PathBuf::from)) },
+        save_path: save_path.clone(),
+        allow_guests: args.flag("allow-guests") || save_path.is_none(),
     };
     let crc = building.crc;
     let floors = building.active_floors().count();
-    let server = Server::new(building, cfg).map_err(|e| StartError::Fatal(format!("failed to bind: {e}")))?;
+    let mut server = Server::new(building, cfg).map_err(|e| StartError::Fatal(format!("failed to start: {e}")))?;
+    // Accounts: the login API over HTTPS next to the game port.
+    if let Some(path) = &save_path {
+        let auth = Auth::open(path).map_err(StartError::Fatal)?;
+        let tls = match (args.str("tls-cert"), args.str("tls-key")) {
+            (Some(c), Some(k)) => Tls { cert: c.into(), key: k.into(), self_signed: false },
+            (None, None) => http::self_signed(&path.parent().unwrap_or(std::path::Path::new(".")).join("tls")).map_err(StartError::Fatal)?,
+            _ => return Err(StartError::Usage("--tls-cert and --tls-key go together".into())),
+        };
+        let game = server.local_addr();
+        let auth_bind = args.try_get("auth-bind", SocketAddr::new(bind.ip(), game.port().wrapping_add(1)))?;
+        http::spawn(auth.clone(), auth_bind, tls).map_err(StartError::Fatal)?;
+        server.set_auth(auth);
+        println!("login API (HTTPS) on {auth_bind}");
+    }
     println!(
         "server listening on {} | tick {} Hz | building crc {:08x}, {} active floors ({}) | link: lag {:?} jitter {:?} loss {:.1}%",
         server.local_addr(),

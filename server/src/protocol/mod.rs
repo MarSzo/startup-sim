@@ -23,7 +23,7 @@ pub use golden::{golden_samples, to_hex};
 pub use snapshot::{snapshot_fragments, SelfState};
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 32;
+pub const VERSION: u8 = 33;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
 pub const MAX_PACKET: usize = 1200;
@@ -149,7 +149,16 @@ pub mod reject {
     pub const BAD_NICK: u8 = 3;
     /// Invalid character profile (age, e-mail, city, appearance).
     pub const BAD_PROFILE: u8 = 4;
+    /// The login expired (log in again / refresh).
+    pub const BAD_TICKET: u8 = 5;
+    /// This server needs an account (no guests).
+    pub const GUESTS_OFF: u8 = 6;
+    /// A guest tried the nick of an account.
+    pub const NICK_TAKEN: u8 = 7;
 }
+
+/// A login ticket's length at most (bytes, hex).
+pub const MAX_TICKET_BYTES: usize = 64;
 
 /// Character appearance: indices into the client's palettes.
 pub mod appearance {
@@ -439,7 +448,9 @@ pub struct OfferInfo {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Packet {
-    Connect { nonce: u32, nick: String, profile: Profile },
+    /// `ticket` = from logging in over HTTPS (the account's nick wins over
+    /// `nick`); empty = a guest (only if the server allows guests).
+    Connect { nonce: u32, nick: String, profile: Profile, ticket: String },
     Welcome { nonce: u32, player_id: u16, token: u32, tick_hz: u8, input_hz: u8, map_crc: u32, server_tick: u32 },
     Reject { reason: u8 },
     /// `inputs` are consecutive, oldest first; the last one has seq `last_seq`.

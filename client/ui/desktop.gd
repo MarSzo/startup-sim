@@ -110,7 +110,7 @@ func _build_desktop() -> void:
 	add_child(bg)
 	_root.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(_root)
-	var logo := _label("StartOS", 64, Color(1, 1, 1, 0.08))
+	var logo := _label("StartOS", 64, Color(1, 1, 1, 0.08), false)
 	logo.set_anchors_preset(Control.PRESET_CENTER)
 	logo.position = Vector2(-130, -60)
 	_root.add_child(logo)

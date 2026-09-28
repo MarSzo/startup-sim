@@ -68,7 +68,7 @@ impl Packet {
         w.u8(VERSION);
         w.u8(self.type_id());
         match self {
-            Packet::Connect { nonce, nick, profile } => {
+            Packet::Connect { nonce, nick, profile, ticket } => {
                 w.u32(*nonce);
                 w.str8(nick);
                 w.u8(profile.gender);
@@ -76,6 +76,7 @@ impl Packet {
                 w.appearance(&profile.appearance);
                 w.str16(&profile.city, MAX_CITY_BYTES);
                 w.str16(&profile.email, MAX_EMAIL_BYTES);
+                w.str16(ticket, MAX_TICKET_BYTES);
             }
             Packet::Welcome { nonce, player_id, token, tick_hz, input_hz, map_crc, server_tick } => {
                 w.u32(*nonce);

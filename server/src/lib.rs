@@ -9,6 +9,7 @@
 //! - tools: [`args`]
 
 pub mod args;
+pub mod auth;
 pub mod board;
 pub mod building;
 pub mod cleaning;
@@ -19,6 +20,7 @@ pub mod company;
 pub mod computer;
 pub mod elevator;
 pub mod fire;
+pub mod http;
 pub mod inventory;
 pub mod kitchen;
 pub mod lights;

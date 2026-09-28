@@ -20,7 +20,8 @@ impl Packet {
                 let (gender, age, appearance) = (r.u8()?, r.u8()?, r.appearance()?);
                 let city = r.str16(MAX_CITY_BYTES)?;
                 let email = r.str16(MAX_EMAIL_BYTES)?;
-                Packet::Connect { nonce, nick, profile: Profile { gender, age, city, email, appearance } }
+                let ticket = r.str16(MAX_TICKET_BYTES)?;
+                Packet::Connect { nonce, nick, profile: Profile { gender, age, city, email, appearance }, ticket }
             }
             ty::WELCOME => Packet::Welcome {
                 nonce: r.u32()?,

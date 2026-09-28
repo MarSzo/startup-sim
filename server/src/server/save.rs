@@ -192,7 +192,12 @@ impl Server {
 
     pub(super) fn save_now(&mut self) {
         self.save_soon = false;
-        let online: Vec<Character> = self.players.values().filter(|p| !matches!(p.stage, Stage::Portal(_)) || p.day > 1 || p.money != 0).map(|p| self.capture(p)).collect();
+        let online: Vec<Character> = self
+            .players
+            .values()
+            .filter(|p| !p.guest && (!matches!(p.stage, Stage::Portal(_)) || p.day > 1 || p.money != 0))
+            .map(|p| self.capture(p))
+            .collect();
         for c in online {
             self.offline.characters.insert(c.nick.clone(), c);
         }
@@ -269,7 +274,7 @@ impl Server {
     /// Persistent world: someone leaves — remember them, keep their job,
     /// desk (laptop) and company.
     pub(super) fn remember_leaving(&mut self, p: &Player) {
-        if !self.persistent() {
+        if !self.persistent() || p.guest {
             return;
         }
         let c = self.capture(p);

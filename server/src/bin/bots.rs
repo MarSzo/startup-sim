@@ -170,7 +170,7 @@ fn main() {
             match b.state {
                 State::Connecting { nonce, next_send } => {
                     if now >= next_send {
-                        let _ = b.sock.send(&Packet::Connect { nonce, nick: b.nick.clone(), profile: bot_profile(&b.nick) }.encode());
+                        let _ = b.sock.send(&Packet::Connect { nonce, nick: b.nick.clone(), profile: bot_profile(&b.nick), ticket: String::new() }.encode());
                         b.state = State::Connecting { nonce, next_send: now + Duration::from_millis(500) };
                     }
                 }

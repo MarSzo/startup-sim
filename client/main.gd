@@ -4,6 +4,8 @@
 ##     several delays "5,12,20" save path_1.png, path_2.png, ... and quit after the last)
 ##   --record=/dir [--record-start=2 --record-length=6 --record-fps=30]  (dev:
 ##     JPG frames for a trailer, see dev_recorder.gd; quits when done)
+##   --login=Nick:haslo [--register] [--server=host:port]  (dev: log in / sign up
+##     through the login screen at once)
 ##   --commute=3  (dev: pick this way to work every morning; 1 foot .. 5 tram)
 ##   --auto-recruit=1 [--auto-recruit-delay=2]  (dev: apply for offer 1, answer
 ##     at random until hired, waiting N s before each click)
@@ -21,6 +23,8 @@ const TitleScreen = preload("res://ui/title_screen.gd")
 const PauseMenu = preload("res://ui/pause_menu.gd")
 const Settings = preload("res://ui/settings.gd")
 const Audio = preload("res://audio/audio.gd")
+const AuthClient = preload("res://net/auth_client.gd")
+const LoginScreen = preload("res://ui/login_screen.gd")
 
 const BUILDING_PATH := "res://maps/building.json"
 
@@ -40,6 +44,17 @@ var pause_layer := CanvasLayer.new()
 var pause := PauseMenu.new()
 var _leaving := false  # "Wyjdź do menu": the disconnect goes to the title
 var audio := Audio.new()
+var auth := AuthClient.new()
+var login_layer := CanvasLayer.new()
+var login := LoginScreen.new()
+## The logged-in account: {address, nick, ticket, refresh} ({} = a guest).
+var session := {}
+var _retry_login := false   # the ticket expired during a reconnect: refresh it
+var _to_login := ""         # refused (needs an account): back to the login screen
+## A character that exists on the server: any valid profile will do (the
+## server keeps and sends the real one).
+const STUB_PROFILE := {"gender": 2, "age": 25, "city": "Kraków", "email": "postac@startup.sim",
+	"appearance": {"skin": 0, "hair_style": 0, "hair_color": 0, "shirt": 1, "pants": 0}}
 var _last_place := -1
 
 
@@ -63,7 +78,9 @@ func _ready() -> void:
 			n.pressed.connect(func(): audio.play("ui_click", -6.0, 0.08)))
 	building = Building.new()
 	building.load_path(BUILDING_PATH)
+	add_child(auth)
 	add_child(net)
+	net.rejected.connect(_on_rejected)
 	net.connected.connect(_on_connected)
 	net.disconnected.connect(_on_disconnected)
 	net.reconnecting.connect(_on_reconnecting)
@@ -95,12 +112,21 @@ func _ready() -> void:
 	title_layer.add_child(title)
 	title.play.connect(func():
 		title_layer.visible = false
-		start.get_parent().visible = true)
+		login_layer.visible = true)
+	# Logging in (between the title and the game).
+	login_layer.layer = 36
+	login_layer.visible = false
+	add_child(login_layer)
+	login.auth = auth
+	login_layer.add_child(login)
+	login.back.connect(_show_title)
+	login.logged_in.connect(_on_logged_in)
 	title.quit.connect(_quit)
 	pause_layer.layer = 50
 	add_child(pause_layer)
 	pause_layer.add_child(pause)
 	pause.to_menu.connect(_leave_to_menu)
+	pause.logout.connect(_logout)
 	pause.quit.connect(_quit)
 	pause.settings_changed.connect(func(): if game: game.apply_settings())
 	portal.menu_requested.connect(func(): pause.open())
@@ -122,6 +148,18 @@ func _ready() -> void:
 			_on_connect_pressed(start.nick_edit.text.strip_edges(), start.profile(), start.addr_edit.text)
 		else:
 			start.set_status(err, true)
+	if args.has("login-screen"):  # dev: straight to the login screen
+		title_layer.visible = false
+		login_layer.visible = true
+	if args.has("login"):
+		var np: PackedStringArray = str(args["login"]).split(":", true, 1)
+		title_layer.visible = false
+		login_layer.visible = true
+		login._show_form()
+		login.addr_edit.text = args.get("server", "127.0.0.1:7777")
+		login.nick_edit.text = np[0]
+		login.pass_edit.text = np[1] if np.size() > 1 else ""
+		login._go.call_deferred("register" if args.has("register") else "login")
 	if args.has("record"):
 		var rec := preload("res://dev_recorder.gd").new()
 		rec.dir = args["record"]
@@ -149,9 +187,28 @@ func _take_screenshots(path: String, delays: PackedStringArray) -> void:
 	get_tree().quit()
 
 
+## Logged in: straight into the game with a saved character, else create one.
+func _on_logged_in(address: String, g: Dictionary, remember: bool) -> void:
+	session = {"address": address, "nick": g.nick, "ticket": g.ticket, "refresh": g.refresh}
+	if remember:
+		AuthClient.remember(address, g.nick, g.refresh)
+	else:
+		AuthClient.forget()
+	login_layer.visible = false
+	if g.get("character", false):
+		start.get_parent().visible = true
+		_on_connect_pressed(g.nick, STUB_PROFILE, address)
+	else:
+		start.get_parent().visible = true
+		start.set_busy(false)
+		start.for_account(g.nick, address)
+		if args.has("autocreate"):  # dev: accept the character as it is
+			start._submit.call_deferred()
+
+
 func _on_connect_pressed(nick: String, p_profile: Dictionary, address: String) -> void:
 	profile = p_profile
-	var err: String = net.connect_to_server(address, nick, p_profile)
+	var err: String = net.connect_to_server(address, nick, p_profile, session.get("ticket", ""))
 	if err != "":
 		start.set_status(err, true)
 		return
@@ -228,7 +285,37 @@ func _process(_d: float) -> void:
 
 func _show_title() -> void:
 	start.get_parent().visible = false
+	login_layer.visible = false
 	title_layer.visible = true
+
+
+func _show_login(message: String) -> void:
+	start.get_parent().visible = false
+	title_layer.visible = false
+	login_layer.visible = true
+	login.set_status(message, message != "")
+
+
+## The server refused us: an expired ticket gets refreshed (and we come
+## back in); "needs an account" sends us to the login screen.
+func _on_rejected(reason: int) -> void:
+	if reason == Protocol.REJECT_BAD_TICKET and session.get("refresh", "") != "":
+		_retry_login = true
+	elif reason in [Protocol.REJECT_BAD_TICKET, Protocol.REJECT_GUESTS_OFF, Protocol.REJECT_NICK_TAKEN]:
+		_to_login = Protocol.REJECT_REASONS.get(reason, "")
+
+
+func _logout() -> void:
+	if not session.is_empty():
+		auth.logout(session.address, session.refresh)
+	AuthClient.forget()
+	session = {}
+	_leaving = true
+	net.close()
+	_end_game()
+	_leaving = false
+	_show_login("")
+	login.set_status("Wylogowano.")
 
 
 ## Esc: the game menu (unless a game window wants the key to close itself).
@@ -275,6 +362,27 @@ func _on_disconnected(reason: String) -> void:
 	if _leaving:
 		return
 	_end_game()
+	if _retry_login:
+		# The login ticket expired while reconnecting: a fresh one, then back in.
+		_retry_login = false
+		var r: Dictionary = await auth.refresh(session.address, session.refresh)
+		if r.get("ok", false):
+			session.ticket = r.ticket
+			session.refresh = r.refresh
+			if AuthClient.remembered().get("nick", "") == session.nick:
+				AuthClient.remember(session.address, session.nick, r.refresh)
+			start.get_parent().visible = true
+			_on_connect_pressed(session.nick, STUB_PROFILE, session.address)
+			return
+		session = {}
+		_show_login(str(r.get("error", reason)))
+		return
+	if _to_login != "" or not session.is_empty():
+		var msg := _to_login if _to_login != "" else reason
+		_to_login = ""
+		start.set_busy(false)
+		_show_login(msg)
+		return
 	start.get_parent().visible = true
 	start.set_busy(false)
 	start.set_status(reason, true)

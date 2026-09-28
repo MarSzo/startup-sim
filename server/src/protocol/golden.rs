@@ -16,6 +16,7 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
                     email: "ola@poczta.pl".into(),
                     appearance: Appearance { skin: 1, hair_style: 4, hair_color: 2, shirt: 9, pants: 3 },
                 },
+                ticket: "0a1b2c".into(),
             },
         ),
         (

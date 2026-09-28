@@ -9,15 +9,20 @@ Etap 1: fundament sieci. Dokumentacja: [GDD](docs/GDD.md) ·
 Wymagania: Rust (rustup), Godot 4.7 (`godot` w PATH).
 
 ```bash
-cd server && cargo run --release            # serwer na [::]:7777 (IPv4 + IPv6); zapis gry w server/saves/world.db (--no-save wyłącza)
-godot --path client                         # klient (można odpalić kilka razy)
-cd server && cargo run --release -- --start-with-card   # wariant dla botów: wszyscy mają kartę
+cd server && cargo run --release            # gra na [::]:7777 (UDP) + logowanie HTTPS na :7778; zapis w server/saves/world.db
+godot --path client                         # klient (można odpalić kilka razy): Graj → zaloguj się / załóż konto
+cd server && cargo run --release -- --start-with-card --allow-guests   # wariant dla botów: goście z kartą
+cd server && cargo run --release -- --reset-password Ola                # administrator: nowe jednorazowe hasło
 cd server && cargo run --release --bin bots -- --count 50 --room "Chill room" --all-in-room
 ```
 
 Sterowanie: WASD / strzałki, **E** — rozmowa z NPC / winda (przy drzwiach — wezwij, w kabinie — wybierz piętro) / umywalka / płyn antybakteryjny / ekspres do kawy / podniesienie przedmiotu / biurko (połóż laptop, usiądź do komputera — pulpit z pocztą, przeglądarką z tablicą zadań działu i obiadami, komunikatorem, kalendarzem i koszem; Esc — wstań) / misa z owocami / sofa / toaleta / popielniczka (E ponownie — wstań), **1–3** — wyjmij / schowaj przedmiot z kieszeni, **Q** — upuść, **G** — podaj osobie obok, **F** — użyj (wypij kawę, zjedz / wypij coś ze sklepu, pokaż kartę); w sklepie na parterze **E** przy półce — lista towarów (1–9 weź), **E** przy kasie — zapłać, **L** — zamknij / otwórz kabinę toaletową (od środka), **E** przy włączniku przy drzwiach — zapal / zgaś światło, **kółko myszy** albo **+ / -** — przybliż / oddal kamerę, **Esc** — menu gry (ustawienia, wyjście do menu / z gry), w aneksie kuchennym **E** przy szafce (kubek), ekspresie (kawa do kubka), zlewie (umyj kubek), zmywarce (włóż / włącz / rozładuj) i lodówce (okno), **E** dwa razy przy swoim aucie / rowerze, na zachodnim końcu chodnika, przystanku tramwajowym lub postoju taksówek — powrót do domu przed końcem dnia (wypłata za przepracowany czas), **V** (trzymaj) — mów do osób w tym samym pomieszczeniu, **B** (trzymaj) — szept do osoby obok, **F3** — overlay debug. Głośność efektów, otoczenia i muzyki: Ustawienia (menu / Esc). Dźwięki generuje `python3 tools/sounds/gen_sounds.py`.
-Na starcie tworzysz postać (imię, płeć, wiek, miejscowość, e-mail postaci,
-wygląd z podglądem; zapamiętywana lokalnie). Po połączeniu siedzisz w domu przy komputerze: w **przeglądarce** jest portal z
+Na starcie logujesz się (nick = login i imię postaci, hasło; „Zapamiętaj mnie”
+trzyma na komputerze tylko token, nie hasło). Nowe konto tworzy postać (imię,
+płeć, wiek, miejscowość, e-mail postaci, wygląd z podglądem); kolejne
+logowania wchodzą prosto do gry. Serwer sam robi sobie certyfikat HTTPS —
+klient zapamiętuje go przy pierwszym połączeniu i ostrzega, jeśli się zmieni
+(własny certyfikat, np. Let's Encrypt: `--tls-cert` / `--tls-key`). Po połączeniu siedzisz w domu przy komputerze: w **przeglądarce** jest portal z
 ogłoszeniami (kilka firm; zatrudnia tylko nasz startup), wypełniasz formularz,
 po chwili w **Poczcie** czeka zaproszenie na **rozmowę online** (3 pytania,
 2 poprawne = przyjęcie), a potem zaproszenie na dzień próbny — „Idę do biura”.
@@ -37,7 +42,7 @@ domyślnie `server/data/recruitment.json`), oraz symulacja sieci:
 Np. RTT ~100 ms i 2% strat: `cargo run --release -- --lag-ms 50 --jitter-ms 10 --loss 0.02`.
 
 ### Klient — argumenty deweloperskie (po `--`)
-`--nick=Ala --server=127.0.0.1:7777 --autoconnect --debug`, `--commute=3` (co rano wybierz dojazd: 1 pieszo … 5 tramwaj), `--found="Nazwa firmy"` (załóż firmę z portalu), `--voice-tone` (czat głosowy nadaje ton testowy zamiast mikrofonu; goto `talk:N` / `whisper:N`), `--record=/katalog --record-start=2 --record-length=6` (klatki JPG do zwiastuna — patrz `tools/trailer/`), `--auto-recruit=1 [--auto-recruit-delay=2]`
+`--nick=Ala --server=127.0.0.1:7777 --autoconnect --debug` (gość — serwer z `--allow-guests` albo `--no-save`), `--login=Ola:haslo [--register] [--autocreate]` (logowanie / rejestracja przez ekran logowania), `--login-screen`, `--commute=3` (co rano wybierz dojazd: 1 pieszo … 5 tramwaj), `--found="Nazwa firmy"` (załóż firmę z portalu), `--voice-tone` (czat głosowy nadaje ton testowy zamiast mikrofonu; goto `talk:N` / `whisper:N`), `--record=/katalog --record-start=2 --record-length=6` (klatki JPG do zwiastuna — patrz `tools/trailer/`), `--auto-recruit=1 [--auto-recruit-delay=2]`
 (sam aplikuje na ofertę 1 i zgaduje odpowiedzi do skutku), (adres może być też IPv6: `--server=[::1]:7777`) (F3 od startu),
 `--autowalk` (losowy ruch), `--goto="27,29;E;wait:2;34,6;Recepcja"` (kolejne
 kroki: kafel / pokój na bieżącym piętrze, `E` = wciśnij E, `wait:N` = czekaj —

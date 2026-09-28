@@ -1076,6 +1076,34 @@ pełnym ekranie — zastąpiona stylem inspirowanym Don't Starve:
 - **Uwaga:** na razie postać rozpoznaje się po nicku (bez hasła) — hasła i
   konta to etap 2.
 
+### 10.42 Konta i logowanie (etap 2)
+
+- **Konto = nick postaci + hasło.** Hasło tylko jako skrót Argon2id; 5
+  złych prób (na nick i adres) = minuta przerwy; do 10 nowych kont na adres
+  na godzinę. Postać z etapu 1 (zapis po nicku) przejmuje pierwsza osoba,
+  która założy konto tym nickiem.
+- Logowanie idzie przez **HTTPS** (port gry + 1), nie przez UDP. Serwer sam
+  robi certyfikat; klient przypina go przy pierwszym połączeniu (jak SSH) i
+  ostrzega o zmianie („Zaufaj nowemu certyfikatowi”). Na VPS: `--tls-cert`
+  / `--tls-key` (np. Let's Encrypt) — wtedy zwykła weryfikacja.
+- Logowanie daje **bilet** do gry (10 min, starczy też na ponowne
+  połączenia) i **token odświeżania** (30 dni, jednorazowy, trzymany w bazie
+  jako skrót). „Zapamiętaj mnie” trzyma na komputerze tylko token.
+- Ekran logowania po „Graj”: adres serwera, nick, hasło, *Zaloguj*, *Załóż
+  konto*, *Zmień hasło*; z zapamiętanym logowaniem — *Graj* / *Zaloguj na
+  inne konto* / *Wyloguj*. Nowe konto → tworzenie postaci (nick już
+  ustalony); istniejąca postać → prosto do gry (wygląd przychodzi z serwera).
+  W menu gry (Esc) — *Wyloguj*.
+- Drugie logowanie na to samo konto wyrzuca poprzednią sesję. Gość nie może
+  użyć nicku, który ma konto.
+- **Zapomniane hasło**: administrator — `server --reset-password <nick>`
+  (jednorazowe hasło; „zapamiętaj mnie” przestaje działać), potem gracz
+  zmienia je sam.
+- **Goście** (bez konta, bez zapisu) tylko z `--allow-guests` (boty, testy,
+  zwiastun) albo na serwerze bez zapisu (`--no-save`).
+- Etap 3 (później): szyfrowanie pakietów UDP kluczem z logowania — dziś
+  bilet w pakiecie `Connect` da się podsłuchać w sieci.
+
 ### 10.6 Stan implementacji
 
 *Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie,
@@ -1173,12 +1201,12 @@ pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
 - **Sieć mobilna**: serwer dual-stack IPv4/IPv6; gracz identyfikowany tokenem
   (zmiana adresu w trakcie gry przenosi sesję); klient przepina gniazdo po
   ciszy/powrocie z tła i sam łączy się ponownie po utracie sesji.
-- **Testy**: 108 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
+- **Testy**: 111 jednostkowych w Rust (budynek i pokoje wg GDD, osiągalność
   zależna od uprawnień, bramki, ruch/kolizje, schody, winda, nawigacja,
   portier, recepcja, HR, rekrutacja, ekspres, komunikator, potrzeby, higiena, kabiny, winda, klatka schodowa, sklep, zegar, dojazd, pogoda, zarząd, słodycze, obiady, wakaty, firma, ochrona i policja, kubki, dym, balkon, tablica zadań, poczta służbowa, zapis gry, protokół), 2 golden, 33 e2e serwera
   (m.in. portal: odrzucenie → przyjęcie → spawn; całe wdrożenie aż do karty;
   niewidoczność między piętrami; zgodność stanu serwera z predykcją) —
-  łącznie 143 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 porannego dojazdu samochodem moknięcia w deszczu spotkania z Prezesem tacy ze słodyczami obiadu z odbiorem na recepcji, obsadzonego stanowiska, panelu założyciela kradzieży w sklepie z ochroną i policją , kubka zebranego przez sprzątaczkę oraz papierosa, który uruchamia alarm pożarowy, wcześniejszego powrotu do domu z przystanku i pomijania czekania, zatrzymania przez ochronę, dźwięku ekspresu słyszanego przez innych, tablicy zadań działu z przypisaniem i komentarzem oraz poczty z koszem, głosu słyszanego tylko w pokoju i szeptu do osoby obok, restartu serwera z zapisem — prawdziwa binarka, SIGINT i powrót postaci); 161 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
+  łącznie 146 (w tym e2e ekspresu, profilu postaci, pulpitu, przekazywania karty, komputera z komunikatorem, potrzeb, kabin, higieny, windy, sklepu, wypłaty o 22:00 porannego dojazdu samochodem moknięcia w deszczu spotkania z Prezesem tacy ze słodyczami obiadu z odbiorem na recepcji, obsadzonego stanowiska, panelu założyciela kradzieży w sklepie z ochroną i policją , kubka zebranego przez sprzątaczkę oraz papierosa, który uruchamia alarm pożarowy, wcześniejszego powrotu do domu z przystanku i pomijania czekania, zatrzymania przez ochronę, dźwięku ekspresu słyszanego przez innych, tablicy zadań działu z przypisaniem i komentarzem oraz poczty z koszem, głosu słyszanego tylko w pokoju i szeptu do osoby obok, restartu serwera z zapisem i kontami — prawdziwa binarka, rejestracja i logowanie przez HTTPS, odrzucenie gościa i złego biletu, SIGINT i powrót postaci); 161 sprawdzeń w Godocie (parytet protokołu i ruchu, parsowanie
   adresów).
 
 #### Pomiary (MacBook, wszystko lokalnie)

@@ -42,7 +42,7 @@ func test_protocol(path: String) -> void:
 	# Mirrors protocol::golden_samples() in server/src/protocol.rs.
 	var enc := {
 		"connect": Protocol.encode_connect(0xDEADBEEF, "Zażółć", {"gender": 0, "age": 27, "city": "Łódź", "email": "ola@poczta.pl",
-			"appearance": {"skin": 1, "hair_style": 4, "hair_color": 2, "shirt": 9, "pants": 3}}),
+			"appearance": {"skin": 1, "hair_style": 4, "hair_color": 2, "shirt": 9, "pants": 3}}, "0a1b2c"),
 		"input": Protocol.encode_input(0x01020304, 1200, 99, PackedByteArray([0, 1, 9, 6])),
 		"info_request": Protocol.encode_info_request(0x01020304, [3, 4, 500]),
 		"ping": Protocol.encode_ping(0x01020304, 777000),

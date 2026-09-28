@@ -84,6 +84,7 @@ fn start_server_at(start_access: u8, skip_recruitment: bool, start_employed: boo
         cleaning_spread: 0,
         start_cigarettes: false,
         save_path: None,
+        allow_guests: true,
     };
     let mut server = Server::new(map, cfg).unwrap();
     let port = server.local_addr().port();
@@ -111,8 +112,13 @@ impl Client {
     }
 
     fn connect(server: SocketAddr, nick: &str) -> (Client, u32) {
+        Client::connect_with(server, nick, "")
+    }
+
+    /// With a login ticket ("" = a guest).
+    fn connect_with(server: SocketAddr, nick: &str, ticket: &str) -> (Client, u32) {
         let sock = Client::socket_for(server);
-        sock.send(&Packet::Connect { nonce: 42, nick: nick.into(), profile: test_profile() }.encode()).unwrap();
+        sock.send(&Packet::Connect { nonce: 42, nick: nick.into(), profile: test_profile(), ticket: ticket.into() }.encode()).unwrap();
         let mut c = Client { sock, id: 0, token: 0, seq: 0 };
         let deadline = Instant::now() + Duration::from_secs(2);
         while Instant::now() < deadline {
@@ -269,12 +275,12 @@ fn rejects_empty_nick_and_bad_version() {
     let (addr, _) = start_server();
     let sock = UdpSocket::bind("127.0.0.1:0").unwrap();
     sock.set_read_timeout(Some(Duration::from_millis(500))).unwrap();
-    sock.send_to(&Packet::Connect { nonce: 1, nick: "   ".into(), profile: test_profile() }.encode(), addr).unwrap();
+    sock.send_to(&Packet::Connect { nonce: 1, nick: "   ".into(), profile: test_profile(), ticket: String::new() }.encode(), addr).unwrap();
     let mut buf = [0u8; 2048];
     let n = sock.recv(&mut buf).unwrap();
     assert_eq!(Packet::decode(&buf[..n]).unwrap(), Packet::Reject { reason: proto::reject::BAD_NICK });
 
-    let mut bad = Packet::Connect { nonce: 1, nick: "x".into(), profile: test_profile() }.encode();
+    let mut bad = Packet::Connect { nonce: 1, nick: "x".into(), profile: test_profile(), ticket: String::new() }.encode();
     bad[2] = 99;
     sock.send_to(&bad, addr).unwrap();
     let n = sock.recv(&mut buf).unwrap();
@@ -847,7 +853,7 @@ fn profile_is_checked_and_appearance_shared() {
     let sock = UdpSocket::bind("127.0.0.1:0").unwrap();
     sock.set_read_timeout(Some(Duration::from_millis(500))).unwrap();
     let bad = Profile { email: "nie-email".into(), ..test_profile() };
-    sock.send_to(&Packet::Connect { nonce: 1, nick: "Zly".into(), profile: bad }.encode(), addr).unwrap();
+    sock.send_to(&Packet::Connect { nonce: 1, nick: "Zly".into(), profile: bad, ticket: String::new() }.encode(), addr).unwrap();
     let mut buf = [0u8; 2048];
     let n = sock.recv(&mut buf).unwrap();
     assert_eq!(Packet::decode(&buf[..n]).unwrap(), Packet::Reject { reason: proto::reject::BAD_PROFILE });
@@ -1893,6 +1899,16 @@ fn progress_survives_a_server_restart() {
         let status = child.wait().unwrap();
         assert!(status.success(), "clean shutdown: {status}");
     };
+    // The login API (HTTPS, the server's own certificate) next to the game port.
+    let api = |path: &str, body: &str| -> serde_json::Value {
+        let out = Command::new("curl")
+            .args(["-sk", "-X", "POST", "-H", "content-type: application/json", "-d", body])
+            .arg(format!("https://127.0.0.1:{}/api/{path}", port + 1))
+            .output()
+            .unwrap();
+        serde_json::from_slice(&out.stdout).unwrap_or(serde_json::Value::Null)
+    };
+    let ticket = |v: &serde_json::Value| v["ticket"].as_str().unwrap_or_default().to_string();
     let wait = Duration::from_millis(1500);
     let nobody = Body::at(1, Pos::tile_center(0, 0));
     let said = |line: &'static str| move |p: &Packet| matches!(p, Packet::Say { text, .. } if text == line).then_some(());
@@ -1908,7 +1924,21 @@ fn progress_survives_a_server_restart() {
     // Day one: the laptop on the desk, a card on the board, a note-to-self.
     let b = building();
     let server = start();
-    let (mut ola, _) = Client::connect(addr, "Ola");
+    let reg = api("register", r#"{"nick":"Ola","password":"tajne-haslo"}"#);
+    assert_eq!(reg["ok"], true, "registered: {reg}");
+    assert_eq!(reg["character"], false);
+    // Guests are off on a server with accounts; a wrong ticket is refused.
+    let refused = |c: &Client| wait_for(c, &[], Duration::from_millis(500), |p| match p {
+        Packet::Reject { reason } => Some(*reason),
+        _ => None,
+    });
+    let s = Client::socket_for(addr);
+    let guest = Client { sock: s, id: 0, token: 0, seq: 0 };
+    guest.sock.send(&Packet::Connect { nonce: 1, nick: "Ola".into(), profile: test_profile(), ticket: String::new() }.encode()).unwrap();
+    assert_eq!(refused(&guest), Some(proto::reject::GUESTS_OFF));
+    guest.sock.send(&Packet::Connect { nonce: 2, nick: "Ola".into(), profile: test_profile(), ticket: "zly".into() }.encode()).unwrap();
+    assert_eq!(refused(&guest), Some(proto::reject::BAD_TICKET));
+    let (mut ola, _) = Client::connect_with(addr, "ktokolwiek", &ticket(&reg));
     ola.press_e(&b, nobody);
     assert!(wait_for(&ola, &[], wait, said(pc::PLACED)).is_some());
     ola.press_e(&b, nobody);
@@ -1922,9 +1952,12 @@ fn progress_survives_a_server_restart() {
     std::thread::sleep(Duration::from_millis(300));
     stop(server);
 
-    // The server comes back: Ola too.
+    // The server comes back: Ola logs in again (the account knows her
+    // character now) and is back.
     let server = start();
-    let (mut ola, _) = Client::connect(addr, "Ola");
+    let login = api("login", r#"{"nick":"ola","password":"tajne-haslo"}"#);
+    assert_eq!((login["ok"].as_bool(), login["nick"].as_str(), login["character"].as_bool()), (Some(true), Some("Ola"), Some(true)));
+    let (mut ola, _) = Client::connect_with(addr, "", &ticket(&login));
     let (money2, day2, place) = wait_for(&ola, &[], wait, clock).expect("clock after restart");
     assert_eq!((money2, day2, place), (money, day, proto::place::BUILDING), "the same character, at work");
     let inv = wait_for(&ola, &[], wait, |p| match p {

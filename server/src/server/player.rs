@@ -131,6 +131,8 @@ pub(super) struct Player {
     /// Voice rate limit: allowance (1/20 frame units) and when refilled.
     pub(super) voice_allowance: u32,
     pub(super) voice_tick: u32,
+    /// Playing without an account (nothing is saved).
+    pub(super) guest: bool,
     /// Salary, grosze per game hour (raises from the CEO).
     pub(super) pay_rate: i64,
     /// World day of the last raise request (cooldown).
@@ -204,6 +206,7 @@ impl Player {
             mail_nonce: 0,
             voice_allowance: 200,
             voice_tick: 0,
+            guest: true,
             pay_rate: clock::PAY_PER_MIN * 60,
             last_raise_day: None,
             talk: None,
