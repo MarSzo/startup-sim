@@ -1,0 +1,51 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 660 400" width="660" height="400">
+  <!-- The .dmg window: the icon's dusk over the city. Icons sit at (170,210)
+       and (490,210); their labels fall on the warm horizon band, which reads
+       with both Finder label colors (black in light mode, white in dark).
+       The title is drawn by make-dmg-background.sh (rsvg can't see the font). -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="400" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1f1a2e"/>
+      <stop offset="0.40" stop-color="#3d2c40"/>
+      <stop offset="0.62" stop-color="#7a4a52"/>
+      <stop offset="0.76" stop-color="#b8735f"/>
+      <stop offset="1" stop-color="#c98a6a"/>
+    </linearGradient>
+  </defs>
+  <rect width="660" height="400" fill="url(#sky)"/>
+
+  <g fill="#f4ead0">
+    <circle cx="48" cy="40" r="1.6" opacity="0.8"/><circle cx="118" cy="96" r="1.2" opacity="0.6"/>
+    <circle cx="190" cy="30" r="1.4" opacity="0.7"/><circle cx="262" cy="118" r="1" opacity="0.5"/>
+    <circle cx="410" cy="24" r="1.2" opacity="0.6"/><circle cx="452" cy="112" r="1.4" opacity="0.7"/>
+    <circle cx="530" cy="70" r="1" opacity="0.5"/><circle cx="626" cy="120" r="1.4" opacity="0.6"/>
+    <circle cx="84" cy="150" r="1" opacity="0.4"/><circle cx="600" cy="30" r="1.2" opacity="0.6"/>
+  </g>
+  <circle cx="578" cy="62" r="20" fill="#f4f1c9"/>
+  <circle cx="587" cy="56" r="17.5" fill="#262033"/>
+
+  <!-- hand-drawn arrow between the icons -->
+  <g fill="none" stroke="#f4ead0" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0.92">
+    <path d="M262 214 C300 196 356 194 396 208"/>
+    <path d="M378 192 L398 209 L374 222"/>
+  </g>
+
+  <!-- skyline below the labels -->
+  <g fill="#1c1622" stroke="#120d10" stroke-width="2">
+    <path d="M-2 402 V346 H40 V402 Z"/><path d="M36 402 V326 H84 V402 Z"/>
+    <path d="M80 402 V356 H112 V402 Z"/><path d="M108 402 V338 H150 V402 Z"/>
+    <path d="M226 402 V360 H262 V402 Z"/><path d="M258 402 V344 H298 V402 Z"/>
+    <path d="M362 402 V352 H398 V402 Z"/><path d="M394 402 V334 H436 V402 Z"/>
+    <path d="M512 402 V350 H548 V402 Z"/><path d="M544 402 V328 H594 V402 Z"/>
+    <path d="M590 402 V348 H626 V402 Z"/><path d="M622 402 V336 H662 V402 Z"/>
+  </g>
+  <g fill="#e8b85a">
+    <rect x="48" y="338" width="7" height="9"/><rect x="64" y="354" width="7" height="9"/>
+    <rect x="48" y="370" width="7" height="9"/><rect x="120" y="350" width="7" height="9"/>
+    <rect x="134" y="370" width="7" height="9"/><rect x="270" y="356" width="7" height="9"/>
+    <rect x="284" y="374" width="7" height="9"/><rect x="406" y="346" width="7" height="9"/>
+    <rect x="420" y="364" width="7" height="9"/><rect x="556" y="340" width="7" height="9"/>
+    <rect x="572" y="358" width="7" height="9"/><rect x="556" y="376" width="7" height="9"/>
+    <rect x="634" y="350" width="7" height="9"/><rect x="18" y="360" width="7" height="9"/>
+  </g>
+</svg>

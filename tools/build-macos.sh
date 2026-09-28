@@ -7,7 +7,9 @@
 #                                      yourself with tools/macos/entitlements.plist)
 #
 # Needs: Godot 4.7.2 + its export templates, the "Developer ID Application"
-# certificate in the keychain. Notarization (optional, once):
+# certificate in the keychain, and permission for the terminal to control
+# Finder (it lays out the .dmg window; the background is
+# tools/macos/dmg-background.tiff). Notarization (optional, once):
 #   xcrun notarytool store-credentials notarytoolclaude --apple-id <you> --team-id 45259QZBRQ
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -45,11 +47,45 @@ codesign --verify --strict --deep --verbose=2 "$APP"
 echo "== obraz dysku"
 DMG="$ROOT/build/StartupSim-$VERSION.dmg"
 STAGE="$ROOT/build/dmg"
-mkdir -p "$STAGE"
+RW="$ROOT/build/rw.dmg"
+mkdir -p "$STAGE/.background"
 cp -R "$APP" "$STAGE/"
 ln -s /Applications "$STAGE/Aplikacje"
-hdiutil create -volname "Startup Sim" -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
+cp "$ROOT/tools/macos/dmg-background.tiff" "$STAGE/.background/background.tiff"
+hdiutil create -volname "Startup Sim" -srcfolder "$STAGE" -fs HFS+ -ov -format UDRW "$RW" >/dev/null
 rm -rf "$STAGE"
+# The window layout lives in the volume's .DS_Store, which only Finder writes:
+# mount read-write, let Finder arrange it, then compress.
+MOUNT=$(hdiutil attach "$RW" -noautoopen | grep -o '/Volumes/.*$')
+osascript <<EOF
+tell application "Finder"
+  tell disk "$(basename "$MOUNT")"
+    open
+    set current view of container window to icon view
+    set toolbar visible of container window to false
+    set statusbar visible of container window to false
+    set bounds of container window to {200, 120, 860, 548}
+    set opts to icon view options of container window
+    set arrangement of opts to not arranged
+    set icon size of opts to 128
+    set text size of opts to 14
+    set background picture of opts to file ".background:background.tiff"
+    set extension hidden of item "Startup Sim.app" to true
+    set position of item "Startup Sim.app" of container window to {170, 210}
+    set position of item "Aplikacje" of container window to {490, 210}
+    update without registering applications
+    delay 1
+    close
+  end tell
+end tell
+EOF
+# After Finder: it drops a .VolumeIcon.icns that is already there.
+cp "$APP/Contents/Resources/icon.icns" "$MOUNT/.VolumeIcon.icns"
+SetFile -a C "$MOUNT"
+sync
+hdiutil detach "$MOUNT" -quiet
+hdiutil convert "$RW" -format UDZO -imagekey zlib-level=9 -ov -o "$DMG" >/dev/null
+rm -f "$RW"
 codesign --force --timestamp --sign "$IDENTITY" "$DMG"
 
 if xcrun notarytool history --keychain-profile "$PROFILE" >/dev/null 2>&1; then
