@@ -138,7 +138,7 @@ func _fill_servers() -> void:
 	_servers = AuthClient.servers()
 	for s in _servers:
 		server_opt.add_item(s.name)
-	server_opt.disabled = _servers.size() == 1  # nothing to choose (yet)
+
 
 
 ## The chosen server's address.
@@ -158,7 +158,6 @@ func set_address(a: String) -> void:
 		return
 	_servers.append({"name": AuthClient.server_name(a), "address": a})
 	server_opt.add_item(AuthClient.server_name(a))
-	server_opt.disabled = false
 	server_opt.select(_servers.size() - 1)
 
 

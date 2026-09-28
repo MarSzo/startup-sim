@@ -37,10 +37,14 @@ static var _boxes := {}
 
 static func font() -> FontFile:
 	if _font == null:
-		_font = FontFile.new()
-		# Read as a plain file (no import step; *.import is not in git): an
-		# export has to include fonts/*.ttf in its non-resource files filter.
-		_font.load_dynamic_font("res://fonts/PatrickHand-Regular.ttf")
+		# The imported font (what an exported game has); without an import
+		# yet (a fresh clone, *.import is not in git) the plain file.
+		var path := "res://fonts/PatrickHand-Regular.ttf"
+		if ResourceLoader.exists(path):
+			_font = (load(path) as FontFile).duplicate()
+		else:
+			_font = FontFile.new()
+			_font.load_dynamic_font(path)
 		_font.antialiasing = TextServer.FONT_ANTIALIASING_GRAY
 		_font.hinting = TextServer.HINTING_LIGHT
 		_font.oversampling = 1.0
