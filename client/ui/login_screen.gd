@@ -1,4 +1,5 @@
-## Logging in before the game: server address, nick (= the account and the
+## Logging in before the game: the server (picked from a list, by name —
+## the address stays hidden), nick (= the account and the
 ## character's name), password; "Załóż konto", "Zmień hasło", "Zapamiętaj
 ## mnie". With a remembered login: "Graj jako X" / "Wyloguj".
 extends Control
@@ -11,7 +12,8 @@ signal logged_in(address: String, grant: Dictionary, remember: bool)
 signal back
 
 var auth                         # AuthClient node (from main)
-var addr_edit := LineEdit.new()
+var server_opt := OptionButton.new()
+var _servers: Array = []     # [{name, address}] in the list
 var nick_edit := LineEdit.new()
 var pass_edit := LineEdit.new()
 var new_pass_edit := LineEdit.new()
@@ -79,8 +81,8 @@ func _ready() -> void:
 	# The form.
 	_form.add_theme_constant_override("separation", 6)
 	inner.add_child(_form)
-	addr_edit.placeholder_text = AuthClient.DEFAULT_SERVER
-	_field("Adres serwera", addr_edit)
+	_fill_servers()
+	_field("Serwer", server_opt)
 	nick_edit.max_length = 16
 	nick_edit.placeholder_text = "np. Ola"
 	_field("Nick (imię postaci)", nick_edit)
@@ -110,13 +112,13 @@ func _ready() -> void:
 	_change_btn = Ink.button("Zmień hasło")
 	_change_btn.pressed.connect(_toggle_change)
 	_form.add_child(_change_btn)
-	for e in [addr_edit, nick_edit, pass_edit, new_pass_edit]:
+	for e in [nick_edit, pass_edit, new_pass_edit]:
 		e.text_submitted.connect(func(_t): _go("password" if _changing else "login"))
 
 	_trust_btn = Ink.button("Zaufaj nowemu certyfikatowi serwera", false, true)
 	_trust_btn.visible = false
 	_trust_btn.pressed.connect(func():
-		AuthClient.forget_pin(addr_edit.text.strip_edges())
+		AuthClient.forget_pin(address())
 		_trust_btn.visible = false
 		set_status("Zapomniany. Spróbuj jeszcze raz."))
 	outer.add_child(_trust_btn)
@@ -129,6 +131,35 @@ func _ready() -> void:
 	outer.add_child(status)
 	_new_pass_row.visible = false
 	_load_defaults()
+
+
+func _fill_servers() -> void:
+	server_opt.clear()
+	_servers = AuthClient.servers()
+	for s in _servers:
+		server_opt.add_item(s.name)
+	server_opt.disabled = _servers.size() == 1  # nothing to choose (yet)
+
+
+## The chosen server's address.
+func address() -> String:
+	var i := server_opt.selected
+	return _servers[i].address if i >= 0 and i < _servers.size() else AuthClient.DEFAULT_SERVER
+
+
+## Choose a server by address (one not on the list — a dev --server — is added).
+func set_address(a: String) -> void:
+	for i in _servers.size():
+		if _servers[i].address == a:
+			server_opt.select(i)
+			return
+	if a == "" or not OS.has_feature("editor"):
+		server_opt.select(0)
+		return
+	_servers.append({"name": AuthClient.server_name(a), "address": a})
+	server_opt.add_item(AuthClient.server_name(a))
+	server_opt.disabled = false
+	server_opt.select(_servers.size() - 1)
 
 
 func _fit() -> void:
@@ -162,9 +193,7 @@ func _big_button(text: String, primary: bool) -> Button:
 
 func _load_defaults() -> void:
 	var r := AuthClient.remembered()
-	addr_edit.text = r.get("address", AuthClient.DEFAULT_SERVER)
-	if addr_edit.text == "":
-		addr_edit.text = AuthClient.DEFAULT_SERVER
+	set_address(r.get("address", AuthClient.DEFAULT_SERVER))
 	nick_edit.text = r.get("nick", "")
 
 
@@ -176,7 +205,7 @@ func _on_shown() -> void:
 	if r.is_empty():
 		_show_form()
 	else:
-		_quick_label.text = "Zalogowano jako %s\n(%s)" % [r.nick, r.address]
+		_quick_label.text = "Zalogowano jako %s\n(%s)" % [r.nick, AuthClient.server_name(r.address)]
 		_quick.visible = true
 		_form.visible = false
 
@@ -214,11 +243,11 @@ func _go(what: String) -> void:
 		return
 	if _changing and what == "login":
 		what = "password"
-	var addr := addr_edit.text.strip_edges()
+	var addr := address()
 	var nick := nick_edit.text.strip_edges()
 	var pw := pass_edit.text
 	if addr == "" or nick == "" or pw == "":
-		set_status("Wpisz adres serwera, nick i hasło.", true)
+		set_status("Wybierz serwer, wpisz nick i hasło.", true)
 		return
 	_set_busy(true)
 	set_status("Łączenie z serwerem logowania…")
@@ -254,7 +283,7 @@ func _quick_play() -> void:
 	_set_busy(false)
 	if not r.get("ok", false):
 		AuthClient.forget()
-		addr_edit.text = r0.address
+		set_address(r0.address)
 		nick_edit.text = r0.nick
 		_show_form()
 		set_status(str(r.get("error", "Zaloguj się ponownie.")), true)

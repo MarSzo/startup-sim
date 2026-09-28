@@ -150,15 +150,17 @@ func _ready() -> void:
 			_on_connect_pressed(start.nick_edit.text.strip_edges(), start.profile(), start.addr_edit.text)
 		else:
 			start.set_status(err, true)
-	if args.has("login-screen"):  # dev: straight to the login screen
+	if args.has("login-screen"):  # dev: straight to the login screen (=form: the form)
 		title_layer.visible = false
 		login_layer.visible = true
+		if args["login-screen"] == "form":
+			login._show_form.call_deferred()
 	if args.has("login"):
 		var np: PackedStringArray = str(args["login"]).split(":", true, 1)
 		title_layer.visible = false
 		login_layer.visible = true
 		login._show_form()
-		login.addr_edit.text = args.get("server", AuthClient.DEFAULT_SERVER)
+		login.set_address(args.get("server", AuthClient.DEFAULT_SERVER))
 		login.nick_edit.text = np[0]
 		login.pass_edit.text = np[1] if np.size() > 1 else ""
 		login._go.call_deferred("register" if args.has("register") else "login")

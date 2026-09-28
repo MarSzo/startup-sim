@@ -1089,7 +1089,9 @@ pełnym ekranie — zastąpiona stylem inspirowanym Don't Starve:
 - Logowanie daje **bilet** do gry (10 min, starczy też na ponowne
   połączenia) i **token odświeżania** (30 dni, jednorazowy, trzymany w bazie
   jako skrót). „Zapamiętaj mnie” trzyma na komputerze tylko token.
-- Ekran logowania po „Graj”: adres serwera, nick, hasło, *Zaloguj*, *Załóż
+- Ekran logowania po „Graj”: serwer z listy (po nazwie, np. „Serwer
+  testowy” — adresu gracz nie widzi ani nie wpisuje; z edytora dochodzi
+  „Serwer lokalny (dev)”), nick, hasło, *Zaloguj*, *Załóż
   konto*, *Zmień hasło*; z zapamiętanym logowaniem — *Graj* / *Zaloguj na
   inne konto* / *Wyloguj*. Nowe konto → tworzenie postaci (nick już
   ustalony); istniejąca postać → prosto do gry (wygląd przychodzi z serwera).

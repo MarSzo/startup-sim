@@ -21,6 +21,7 @@ var age_spin := SpinBox.new()
 var city_edit := LineEdit.new()
 var email_edit := LineEdit.new()
 var addr_edit := LineEdit.new()
+var _addr_row: Array = []   # separator, caption, field
 var button := Button.new()
 var status := Label.new()
 
@@ -136,6 +137,11 @@ func _build_form() -> VBoxContainer:
 	box.add_child(HSeparator.new())
 	addr_edit.placeholder_text = "127.0.0.1:7777"
 	_field(box, "Adres serwera", addr_edit)
+	# The address is only for development (guests); players pick a server when
+	# logging in and never see an address.
+	_addr_row = [box.get_child(box.get_child_count() - 3), box.get_child(box.get_child_count() - 2), addr_edit]
+	for c in _addr_row:
+		c.visible = OS.has_feature("editor")
 	return box
 
 
@@ -285,6 +291,8 @@ func for_account(nick: String, address: String) -> void:
 	nick_edit.editable = false
 	addr_edit.text = address
 	addr_edit.editable = false
+	for c in _addr_row:
+		c.visible = false
 	set_status("Konto %s gotowe — stwórz postać." % nick)
 
 

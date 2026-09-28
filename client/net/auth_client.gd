@@ -9,8 +9,27 @@ extends Node
 const NetClient = preload("res://net/net_client.gd")
 
 const PINS := "user://known_servers.cfg"
-## The game's server (the default in the login screen).
+## The game's servers, as the players see them (the address stays inside).
 const DEFAULT_SERVER := "178.105.233.184:7777"
+const SERVERS := [{"name": "Serwer testowy", "address": DEFAULT_SERVER}]
+## Run from the editor / `godot --path client`: a local server for development.
+const DEV_SERVER := {"name": "Serwer lokalny (dev)", "address": "127.0.0.1:7777"}
+
+
+## The servers to choose from (the local one only when developing).
+static func servers() -> Array:
+	var list: Array = SERVERS.duplicate()
+	if OS.has_feature("editor"):
+		list.append(DEV_SERVER)
+	return list
+
+
+## What to call a server in the UI (never its address).
+static func server_name(address: String) -> String:
+	for s in SERVERS + [DEV_SERVER]:
+		if s.address == address:
+			return s.name
+	return "Serwer lokalny" if address.begins_with("127.") or address.begins_with("localhost") else "Inny serwer"
 const SESSION := "user://auth.cfg"
 ## The name in the server's own certificate.
 const SELF_SIGNED_NAME := "startup-sim"
@@ -68,7 +87,7 @@ func _post(address: String, path: String, body: Dictionary) -> Dictionary:
 	var tls := await _tls_for(address, base)
 	if tls == null:
 		_busy = false
-		return {"ok": false, "error": "Brak połączenia z serwerem logowania (%s)" % base.trim_suffix("api/")}
+		return {"ok": false, "error": "Brak połączenia z serwerem (%s)" % server_name(address)}
 	_http.set_tls_options(tls)
 	var err := _http.request(base + path, ["Content-Type: application/json"], HTTPClient.METHOD_POST, JSON.stringify(body))
 	if err != OK:
