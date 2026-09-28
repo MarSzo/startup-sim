@@ -108,6 +108,8 @@ client/                 projekt Godota 4.7
   tests/run_tests.gd    testy headless (parytet z Rustem)
   tests/render_maps.gd  narzędzie: zapis grafiki pięter do PNG (headless)
 tools/build_maps.py     generator map z czytelnego opisu (wynik = JSON-y wyżej)
+deploy/                 wdrożenie na VPS (deploy.sh, remote-*.sh, Tailscale, unit systemd)
+.github/workflows/ci.yml testy (Rust + Godot) na każdy push
 docs/                   GDD, PROTOCOL, ARCHITECTURE
 ```
 
@@ -633,6 +635,25 @@ przez cały budynek, schodami między piętrami — `--room-share` z nich wybier
 cele tylko w `--room` (domyślnie „Chill room” na piętrze 1). Za bramki boty
 przejdą tylko, gdy serwer działa z `--start-with-card`. Log co 5 s:
 połączeni, liczba w docelowym pokoju, RTT, odbierany transfer, widoczni.
+
+## Wdrożenie (VPS)
+
+Serwer produkcyjny: VPS Hetzner (Ubuntu, x86_64), usługa systemd
+`startup-sim` jako osobny użytkownik, dane w `/var/lib/startup-sim`
+(`world.db`, `tls/`, `backups/`). Kod trafia tam z komputera dewelopera
+(`deploy/deploy.sh`: rsync źródeł i map → build na VPS → restart; SIGTERM
+zapisuje grę).
+
+| port | dostęp | po co |
+|------|--------|-------|
+| 7777/udp | publiczny | gra |
+| 7778/tcp | publiczny | logowanie HTTPS |
+| 22/tcp | **tylko tailnet** (`tailscale0`) | SSH: wdrożenia, kopie, administracja |
+
+SSH jest zamknięte dla internetu (ufw); maszyna jest w tailnecie Tailscale
+jako `startup-sim`, skrypty łączą się z `root@startup-sim`. Klucz węzła musi
+mieć wyłączone wygasanie (panel Tailscale); awaryjnie — konsola Hetznera. Szczegóły:
+`deploy/README.md`.
 
 ## Testy
 

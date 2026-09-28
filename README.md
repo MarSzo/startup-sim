@@ -71,6 +71,19 @@ godot --headless --path client -s tests/run_tests.gd
 Pliki golden (`server/tests/golden/`) pilnują, że protokół i ruch są identyczne
 w Rust i GDScript. Po celowej zmianie: `UPDATE_GOLDEN=1 cargo test --test golden`.
 
+## Wdrożenie na VPS
+
+Serwer testowy działa na VPS-ie (Hetzner). SSH jest otwarte **tylko z tailnetu**
+(Tailscale, maszyna `startup-sim`) — wdrażać można tylko z komputera w tailnecie:
+
+```bash
+deploy/deploy.sh          # kod → VPS, build, restart (gra zapisuje się przy restarcie)
+deploy/pull-backups.sh    # dzienne kopie bazy do vps-backups/
+```
+
+Porty gry (7777/udp, 7778/tcp) są publiczne. Pierwsza konfiguracja, zapora i
+Tailscale: [deploy/README.md](deploy/README.md).
+
 ## Czcionka
 
 Interfejs używa odręcznej czcionki **Patrick Hand** (© Patrick Wagesreiter), na
