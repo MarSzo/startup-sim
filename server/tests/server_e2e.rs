@@ -16,6 +16,10 @@ use game::recruitment::{default_recruitment_path, Recruitment};
 use game::server::{Config, Server};
 use game::sim::{self, Body, Pos, IN_RIGHT};
 
+/// The inventory comes with the change and again every 2 s; a wait for it
+/// right after another one may have missed the first (slow CI machines).
+const INVENTORY_WAIT: Duration = Duration::from_secs(3);
+
 fn test_profile() -> Profile {
     Profile {
         gender: proto::gender::FEMALE,
@@ -1112,7 +1116,7 @@ fn laptop_on_desk_messenger_lock_and_take() {
     ewa.send(&Packet::ItemAction { token: ewa.token, action: proto::item_action::DROP, slot: 0 });
     std::thread::sleep(Duration::from_millis(100));
     action(&ewa, ca::TAKE, 0, 0, "");
-    let hands = wait_for(&ewa, &[&ola, &kuba], wait, |p| match p {
+    let hands = wait_for(&ewa, &[&ola, &kuba], INVENTORY_WAIT, |p| match p {
         Packet::Inventory { slots } if slots[0].kind == item_kind::LAPTOP && slots[0].label.contains("Ola") => Some(()),
         _ => None,
     });
@@ -1159,7 +1163,7 @@ fn needs_fruit_sofa_and_the_wrong_bathroom() {
     body = ola.walk_to(&b, body, (1, Tile { x: 40, y: 27 }), &[]);
     body = ola.press_e(&b, body);
     assert!(wait_for(&ola, &[], wait, said(nl::FRUIT)).is_some());
-    let slot = wait_for(&ola, &[], wait, |p| match p {
+    let slot = wait_for(&ola, &[], INVENTORY_WAIT, |p| match p {
         Packet::Inventory { slots } => slots[1..].iter().position(|s| s.kind == item_kind::FRUIT),
         _ => None,
     })
@@ -1366,7 +1370,7 @@ fn shop_take_from_shelf_alarm_and_pay() {
     });
     assert_eq!(goods, Some(vec![item_kind::SANDWICH_CHEESE, item_kind::SANDWICH_HAM, item_kind::WRAP]));
     take(&ola, 1, item_kind::SANDWICH_HAM);
-    let slots = wait_for(&ola, &[], wait, |p| match p {
+    let slots = wait_for(&ola, &[], INVENTORY_WAIT, |p| match p {
         Packet::Inventory { slots } if slots.iter().any(|s| s.kind == item_kind::SANDWICH_HAM) => Some(slots.clone()),
         _ => None,
     })
