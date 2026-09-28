@@ -1,0 +1,25 @@
+[Unit]
+Description=Startup Sim — serwer gry
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=startup-sim
+Group=startup-sim
+# The server reads ../client/maps and data/ relative to here.
+WorkingDirectory=/opt/startup-sim/src/server
+ExecStart=/opt/startup-sim/bin/server --bind [::]:7777 --save /var/lib/startup-sim/world.db
+Restart=on-failure
+RestartSec=3
+# SIGTERM = save the game, then exit.
+KillSignal=SIGTERM
+TimeoutStopSec=30
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ReadWritePaths=/var/lib/startup-sim
+
+[Install]
+WantedBy=multi-user.target
