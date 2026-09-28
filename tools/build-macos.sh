@@ -8,11 +8,11 @@
 #
 # Needs: Godot 4.7.2 + its export templates, the "Developer ID Application"
 # certificate in the keychain. Notarization (optional, once):
-#   xcrun notarytool store-credentials notarytool --apple-id <you> --team-id 45259QZBRQ
+#   xcrun notarytool store-credentials notarytoolclaude --apple-id <you> --team-id 45259QZBRQ
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 IDENTITY=${IDENTITY:-"Developer ID Application: Mateusz Palak (45259QZBRQ)"}
-PROFILE=${NOTARY_PROFILE:-notarytool}
+PROFILE=${NOTARY_PROFILE:-notarytoolclaude}
 APP="$ROOT/build/Startup Sim.app"
 MIC="Czat głosowy w grze: mówisz do osób w tym samym pomieszczeniu, trzymając V (albo B — szept)."
 

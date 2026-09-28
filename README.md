@@ -9,7 +9,7 @@ Etap 1: fundament sieci. Dokumentacja: [GDD](docs/GDD.md) ·
 Wymagania: Rust (rustup), Godot 4.7 (`godot` w PATH).
 Klient na macOS jako jeden plik: `tools/build-macos.sh` → `build/StartupSim-<wersja>.dmg`
 (aplikacja uniwersalna Intel + Apple Silicon, podpisana Developer ID z hardened runtime i
-uprawnieniem do mikrofonu; z profilem `xcrun notarytool store-credentials notarytool …`
+uprawnieniem do mikrofonu; z profilem `xcrun notarytool store-credentials notarytoolclaude …`
 także notaryzowana). `--app-only` robi samą aplikację bez podpisu (do własnego
 podpisania z `tools/macos/entitlements.plist`). Wymaga szablonów eksportu Godota 4.7.2; wersja w `client/export_presets.cfg`.
 Testy uruchamia też GitHub Actions przy każdym pushu (`.github/workflows/ci.yml`: clippy + testy serwera, testy klienta w Godocie).
