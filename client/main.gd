@@ -52,6 +52,7 @@ var login := LoginScreen.new()
 var session := {}
 var _retry_login := false   # the ticket expired during a reconnect: refresh it
 var _to_login := ""         # refused (needs an account): back to the login screen
+var _to_char := ""          # refused (the e-mail / nick is taken): fix it on the character screen
 ## A character that exists on the server: any valid profile will do (the
 ## server keeps and sends the real one).
 const STUB_PROFILE := {"gender": 2, "age": 25, "city": "Kraków", "email": "postac@startup.sim",
@@ -300,10 +301,13 @@ func _show_login(message: String) -> void:
 ## The server refused us: an expired ticket gets refreshed (and we come
 ## back in); "needs an account" sends us to the login screen.
 func _on_rejected(reason: int) -> void:
+	var msg: String = Protocol.REJECT_REASONS.get(reason, "")
 	if reason == Protocol.REJECT_BAD_TICKET and session.get("refresh", "") != "":
 		_retry_login = true
+	elif reason == Protocol.REJECT_EMAIL_TAKEN or (reason == Protocol.REJECT_NICK_TAKEN and session.is_empty()):
+		_to_char = msg
 	elif reason in [Protocol.REJECT_BAD_TICKET, Protocol.REJECT_GUESTS_OFF, Protocol.REJECT_NICK_TAKEN]:
-		_to_login = Protocol.REJECT_REASONS.get(reason, "")
+		_to_login = msg
 
 
 func _logout() -> void:
@@ -363,6 +367,13 @@ func _on_disconnected(reason: String) -> void:
 	if _leaving:
 		return
 	_end_game()
+	if _to_char != "":
+		# Taken e-mail / nick: back to the character, the login still holds.
+		start.get_parent().visible = true
+		start.set_busy(false)
+		start.set_status(_to_char, true)
+		_to_char = ""
+		return
 	if _retry_login:
 		# The login ticket expired while reconnecting: a fresh one, then back in.
 		_retry_login = false

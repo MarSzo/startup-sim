@@ -105,6 +105,14 @@ impl Server {
         id
     }
 
+    /// Some other account character (online or saved) has this e-mail.
+    pub(super) fn email_taken(&self, email: &str, nick: &str) -> bool {
+        let email = email.to_lowercase();
+        let other = |n: &str| n.to_lowercase() != nick.to_lowercase();
+        self.players.values().any(|p| !p.guest && other(&p.nick) && p.profile.email.to_lowercase() == email)
+            || self.offline.characters.values().any(|c| other(&c.nick) && c.profile.email.to_lowercase() == email)
+    }
+
     /// A nick for a session id (online players, else "").
     fn nick_of(&self, id: u16) -> String {
         self.players.get(&id).map(|p| p.nick.clone()).unwrap_or_default()

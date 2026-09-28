@@ -156,8 +156,10 @@ pub mod reject {
     pub const BAD_TICKET: u8 = 5;
     /// This server needs an account (no guests).
     pub const GUESTS_OFF: u8 = 6;
-    /// A guest tried the nick of an account.
+    /// The nick is taken (an account, or someone playing under it now).
     pub const NICK_TAKEN: u8 = 7;
+    /// Another character already has this e-mail.
+    pub const EMAIL_TAKEN: u8 = 8;
 }
 
 /// A login ticket's length at most (bytes, hex).

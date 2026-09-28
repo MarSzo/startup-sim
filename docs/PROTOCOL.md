@@ -524,6 +524,7 @@ szyfrowaniem.
 
 ## Historia wersji
 
+- **34** (uzup.) — `Reject` 7 = nick zajęty (konto, zapisana postać albo ktoś w grze), 8 = e-mail postaci zajęty.
 - **34** — szyfrowanie: pakiety `0xF0` (sesja) i `0xF1` (Connect) dla zalogowanych; pakiet gry ≤ 1152 B (datagram ≤ 1200 B); klucz sesji w odpowiedzi logowania (`key`).
 - **33** — konta: `Connect` + `ticket` str16 (≤ 64 B, z logowania HTTPS; pusty = gość); `Reject` 5 (bilet wygasł), 6 (serwer wymaga konta), 7 (nick ma konto).
 - **32** — czat głosowy: `Voice` (52, C→S), `VoiceFrom` (53, S→C).

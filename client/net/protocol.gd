@@ -193,10 +193,12 @@ const DISCONNECT_SHUTDOWN := 3
 const DISCONNECT_SESSION_UNKNOWN := 4
 
 const REJECT_REASONS := {1: "Serwer pełny", 2: "Niezgodna wersja protokołu", 3: "Nieprawidłowe imię", 4: "Nieprawidłowe dane postaci",
-	5: "Logowanie wygasło — zaloguj się ponownie", 6: "Ten serwer wymaga konta — zaloguj się", 7: "Ten nick ma konto — zaloguj się"}
+	5: "Logowanie wygasło — zaloguj się ponownie", 6: "Ten serwer wymaga konta — zaloguj się", 7: "Ten nick jest zajęty — wybierz inny",
+	8: "Ten e-mail ma już inna postać — wpisz inny"}
 const REJECT_BAD_TICKET := 5
 const REJECT_GUESTS_OFF := 6
 const REJECT_NICK_TAKEN := 7
+const REJECT_EMAIL_TAKEN := 8
 const MAX_CITY_BYTES := 48
 const MAX_EMAIL_BYTES := 64
 const DISCONNECT_REASONS := {0: "Rozłączono", 1: "Przekroczono czas", 2: "Wyrzucono", 3: "Serwer wyłączony", 4: "Sesja wygasła"}

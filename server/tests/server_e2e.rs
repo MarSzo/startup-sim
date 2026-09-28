@@ -165,22 +165,34 @@ impl Client {
     /// A logged-in client: a sealed Connect with the ticket and the key
     /// from the login API.
     fn connect_sealed(server: SocketAddr, ticket: &str, key: &str) -> Client {
+        Client::connect_sealed_as(server, ticket, key, test_profile()).expect("Welcome")
+    }
+
+    /// A sealed Connect with this character; Err(reject reason).
+    fn connect_sealed_as(server: SocketAddr, ticket: &str, key: &str, profile: Profile) -> Result<Client, u8> {
         use game::crypto::{connect_prefix, from_hex, Dir, Keys, Session};
         let sock = Client::socket_for(server);
         let keys = Keys::derive(&from_hex::<32>(key).expect("key"));
         let raw = from_hex::<32>(ticket).expect("ticket");
-        let connect = Packet::Connect { nonce: 42, nick: String::new(), profile: test_profile(), ticket: ticket.into() }.encode();
-        sock.send(&keys.seal(Dir::ToServer, &connect_prefix(&raw), 1, &connect)).unwrap();
-        let mut c = Client { sock, id: 0, token: 0, seq: 0, crypto: Some(std::cell::RefCell::new(Session { keys, send_counter: 1, window: Default::default() })) };
+        let connect = Packet::Connect { nonce: 42, nick: String::new(), profile, ticket: ticket.into() }.encode();
+        // Like the real client: the counter only goes up (a repeated one is a replay).
+        static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+        let n = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        sock.send(&keys.seal(Dir::ToServer, &connect_prefix(&raw), n, &connect)).unwrap();
+        let mut c = Client { sock, id: 0, token: 0, seq: 0, crypto: Some(std::cell::RefCell::new(Session { keys, send_counter: n, window: Default::default() })) };
         let deadline = Instant::now() + Duration::from_secs(2);
         while Instant::now() < deadline {
-            if let Some(Packet::Welcome { player_id, token, .. }) = c.recv() {
-                c.id = player_id;
-                c.token = token;
-                return c;
+            match c.recv() {
+                Some(Packet::Welcome { player_id, token, .. }) => {
+                    c.id = player_id;
+                    c.token = token;
+                    return Ok(c);
+                }
+                Some(Packet::Reject { reason }) => return Err(reason),
+                _ => {}
             }
         }
-        panic!("no Welcome for the sealed Connect");
+        panic!("no answer to the sealed Connect");
     }
 
     fn send_inputs(&mut self, bits: u8, n: usize) {
@@ -2003,6 +2015,14 @@ fn progress_survives_a_server_restart() {
     // The server comes back: Ola logs in again (the account knows her
     // character now) and is back.
     let server = start();
+    // E-mails are unique: Ewa's new character can't take Ola's (Ola is
+    // offline, her saved character counts), another one is fine.
+    let ewa = api("register", r#"{"nick":"Ewa","password":"haslo-ewy-1"}"#);
+    let olas = Profile { email: "TEST@firma.pl".into(), ..test_profile() };
+    assert_eq!(Client::connect_sealed_as(addr, &ticket(&ewa), &key(&ewa), olas).err(), Some(proto::reject::EMAIL_TAKEN));
+    let own = Profile { email: "ewa@firma.pl".into(), ..test_profile() };
+    let ewa_client = Client::connect_sealed_as(addr, &ticket(&ewa), &key(&ewa), own).expect("Ewa with her own e-mail");
+    ewa_client.send(&Packet::Disconnect { token: ewa_client.token, reason: 0 });
     let login = api("login", r#"{"nick":"ola","password":"tajne-haslo"}"#);
     assert_eq!((login["ok"].as_bool(), login["nick"].as_str(), login["character"].as_bool()), (Some(true), Some("Ola"), Some(true)));
     let mut ola = Client::connect_sealed(addr, &ticket(&login), &key(&login));
@@ -2046,7 +2066,7 @@ fn progress_survives_a_server_restart() {
     // Walk in from the entrance to her desk: the laptop logs in as Ola.
     let ws = game::computer::find_workstations(&b);
     let desk = ws.iter().find(|w| w.room_name == "IT / Produkt").unwrap();
-    let s = b.spawns()[0];
+    let s = b.spawns()[1 % b.spawns().len()]; // Ewa came in first, at the first spot
     let body = Body { access: access::CARD, ..Body::at(s.0, Pos::tile_center(s.1.x, s.1.y)) };
     let at = ola.walk_to(&b, body, (desk.floor, Tile { x: desk.tile.x, y: desk.tile.y + 1 }), &[]);
     ola.press_e(&b, at);
@@ -2066,4 +2086,18 @@ fn progress_survives_a_server_restart() {
     assert_eq!(subject.as_deref(), Some("Notatka"));
     stop(server);
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn nicks_are_unique_for_guests_too() {
+    let (addr, _) = start_server();
+    let (ola, _) = Client::connect(addr, "Ola");
+    let sock = Client::socket_for(addr);
+    let other = Client { sock, id: 0, token: 0, seq: 0, crypto: None };
+    other.send(&Packet::Connect { nonce: 5, nick: "OLA".into(), profile: test_profile(), ticket: String::new() });
+    let reason = wait_for(&other, &[&ola], Duration::from_millis(500), |p| match p {
+        Packet::Reject { reason } => Some(*reason),
+        _ => None,
+    });
+    assert_eq!(reason, Some(proto::reject::NICK_TAKEN), "someone plays as Ola already");
 }

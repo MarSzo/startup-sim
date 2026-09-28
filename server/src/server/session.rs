@@ -196,14 +196,21 @@ impl Server {
             self.send(addr, &Packet::Reject { reason: proto::reject::BAD_NICK });
             return;
         }
-        if guest && self.auth.as_ref().is_some_and(|a| a.is_registered(&nick)) {
+        // Nicks are unique: a guest may not take an account's nick, a saved
+        // character's or one playing right now (not case-sensitive).
+        let same = |n: &str| n.to_lowercase() == nick.to_lowercase();
+        let nick_taken = guest
+            && (self.auth.as_ref().is_some_and(|a| a.is_registered(&nick))
+                || self.offline.characters.keys().any(|n| same(n))
+                || self.players.values().any(|p| same(&p.nick)));
+        if nick_taken {
             self.send(addr, &Packet::Reject { reason: proto::reject::NICK_TAKEN });
             return;
         }
         // The same account logged in again (another computer): the old
-        // session goes.
+        // session goes — and so does a guest playing under the account's nick.
         if !guest {
-            let old: Vec<u16> = self.players.values().filter(|p| !p.guest && p.nick == nick).map(|p| p.id).collect();
+            let old: Vec<u16> = self.players.values().filter(|p| p.nick.to_lowercase() == nick.to_lowercase()).map(|p| p.id).collect();
             for id in old {
                 self.remove_player(id, "logged in elsewhere");
             }
@@ -212,6 +219,12 @@ impl Server {
             self.send(addr, &Packet::Reject { reason: proto::reject::BAD_PROFILE });
             return;
         };
+        // A new account character: its e-mail must be unique (a saved one
+        // keeps its own).
+        if !guest && !self.offline.characters.contains_key(&nick) && self.email_taken(&profile.email, &nick) {
+            self.send(addr, &Packet::Reject { reason: proto::reject::EMAIL_TAKEN });
+            return;
+        }
         if self.players.len() >= self.cfg.max_players {
             self.send(addr, &Packet::Reject { reason: proto::reject::SERVER_FULL });
             return;
