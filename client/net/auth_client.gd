@@ -9,6 +9,8 @@ extends Node
 const NetClient = preload("res://net/net_client.gd")
 
 const PINS := "user://known_servers.cfg"
+## The game's server (the default in the login screen).
+const DEFAULT_SERVER := "178.105.233.184:7777"
 const SESSION := "user://auth.cfg"
 ## The name in the server's own certificate.
 const SELF_SIGNED_NAME := "startup-sim"
@@ -114,7 +116,13 @@ func _tls_for(address: String, base: String) -> TLSOptions:
 
 # ------------------------------------------------------------- storage
 
+## The certificate we trust for `address`: shipped with the game
+## (res://net/pins/<host>_<port>.pem, from deploy/pull-cert.sh) or pinned on
+## first contact.
 static func pinned(address: String) -> String:
+	var shipped := "res://net/pins/%s.pem" % address.replace(":", "_").replace("[", "").replace("]", "")
+	if FileAccess.file_exists(shipped):
+		return FileAccess.get_file_as_string(shipped)
 	var cfg := ConfigFile.new()
 	if cfg.load(PINS) != OK:
 		return ""

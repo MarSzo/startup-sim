@@ -158,7 +158,7 @@ func _ready() -> void:
 		title_layer.visible = false
 		login_layer.visible = true
 		login._show_form()
-		login.addr_edit.text = args.get("server", "127.0.0.1:7777")
+		login.addr_edit.text = args.get("server", AuthClient.DEFAULT_SERVER)
 		login.nick_edit.text = np[0]
 		login.pass_edit.text = np[1] if np.size() > 1 else ""
 		login._go.call_deferred("register" if args.has("register") else "login")

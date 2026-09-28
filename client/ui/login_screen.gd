@@ -79,7 +79,7 @@ func _ready() -> void:
 	# The form.
 	_form.add_theme_constant_override("separation", 6)
 	inner.add_child(_form)
-	addr_edit.placeholder_text = "127.0.0.1:7777"
+	addr_edit.placeholder_text = AuthClient.DEFAULT_SERVER
 	_field("Adres serwera", addr_edit)
 	nick_edit.max_length = 16
 	nick_edit.placeholder_text = "np. Ola"
@@ -162,9 +162,9 @@ func _big_button(text: String, primary: bool) -> Button:
 
 func _load_defaults() -> void:
 	var r := AuthClient.remembered()
-	addr_edit.text = r.get("address", "127.0.0.1:7777")
+	addr_edit.text = r.get("address", AuthClient.DEFAULT_SERVER)
 	if addr_edit.text == "":
-		addr_edit.text = "127.0.0.1:7777"
+		addr_edit.text = AuthClient.DEFAULT_SERVER
 	nick_edit.text = r.get("nick", "")
 
 

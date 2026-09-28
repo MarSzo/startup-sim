@@ -20,3 +20,10 @@ Na VPS:
   (i `--reset-password <nick>`).
 
 Zatrzymanie usługi zapisuje grę (SIGTERM), więc aktualizacja nic nie gubi.
+
+Klient: domyślny serwer to `178.105.233.184:7777` (`AuthClient.DEFAULT_SERVER`).
+Certyfikat logowania z `deploy/pull-cert.sh` leży w `client/net/pins/` — klient
+ufa mu od pierwszego połączenia. Przy eksporcie gry dodaj `*.pem` do „Filters
+to export non-resource files” (inaczej certyfikat nie trafi do paczki).
+Po zmianie certyfikatu na serwerze (np. nowy `tls/`) trzeba go ponownie
+ściągnąć i wydać nowego klienta.
