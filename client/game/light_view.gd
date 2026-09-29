@@ -3,17 +3,29 @@
 ## a room without windows is dark; a lamp switched on (the server's Lights)
 ## lights it up with a warm tone. Common areas are always lit. Also draws the
 ## light switches by the doors. Over the world, under the smoke.
+## Redrawn only when something changes (the hour, the weather, a lamp, a
+## fade), with each room drawn as a few merged rectangles.
 extends Node2D
 
 const Protocol = preload("res://net/protocol.gd")
+const TileRects = preload("res://game/tile_rects.gd")
 
 var building
 var floor_shown := 0
-var minute := 12 * 60
-var weather := Protocol.WEATHER_SUNNY
+var minute := 12 * 60:
+	set(v):
+		if v != minute:
+			minute = v
+			queue_redraw()
+var weather := Protocol.WEATHER_SUNNY:
+	set(v):
+		if v != weather:
+			weather = v
+			queue_redraw()
 var _on := {}        # room -> true (lamps on, this floor)
 var _tiles := {}     # floor -> {room: Array[Vector2i]}
-var _walls := {}     # floor -> Array[Vector2i]
+var _rects := {}     # floor -> {room: Array[Rect2]} (px, merged tiles)
+var _walls := {}     # floor -> Array[Rect2] (px, merged)
 var _shown := {}     # room -> eased darkness 0..1
 
 
@@ -39,7 +51,11 @@ func setup(b) -> void:
 					rooms[r] = []
 				rooms[r].append(Vector2i(x, y))
 		_tiles[f] = rooms
-		_walls[f] = walls
+		var rects := {}
+		for r in rooms:
+			rects[r] = TileRects.merge(rooms[r], m.tile_px)
+		_rects[f] = rects
+		_walls[f] = TileRects.merge(walls, m.tile_px)
 
 
 func set_floor(f: int) -> void:
@@ -47,6 +63,7 @@ func set_floor(f: int) -> void:
 		floor_shown = f
 		_on.clear()
 		_shown.clear()
+		queue_redraw()
 
 
 func on_lights(p: Dictionary) -> void:
@@ -55,6 +72,7 @@ func on_lights(p: Dictionary) -> void:
 	_on.clear()
 	for r in p.rooms:
 		_on[r] = true
+	queue_redraw()
 
 
 ## Daylight 0..1 at a minute of the day.
@@ -100,10 +118,16 @@ func _process(delta: float) -> void:
 	var m = building.get_floor(floor_shown) if building else null
 	if m == null:
 		return
+	var changed := false
 	for r in _tiles.get(floor_shown, {}):
 		var want := 1.0 - light_of(m, r)
-		_shown[r] = move_toward(_shown.get(r, want), want, delta * 3.0)
-	queue_redraw()
+		var was: float = _shown.get(r, -1.0)
+		var now := move_toward(was if was >= 0.0 else want, want, delta * 3.0)
+		if now != was:
+			_shown[r] = now
+			changed = true
+	if changed:
+		queue_redraw()
 
 
 func _draw() -> void:
@@ -112,13 +136,12 @@ func _draw() -> void:
 		return
 	var px: float = m.tile_px
 	var night := Color(0.03, 0.04, 0.1)
-	var rooms: Dictionary = _tiles.get(floor_shown, {})
+	var rooms: Dictionary = _rects.get(floor_shown, {})
 	for r in rooms:
 		var dark: float = _shown.get(r, 0.0)
 		var col := Color(night, dark * 0.9)
 		var warm: bool = lamp_on(m, r) and m.room_light.get(m.room_lit_by.get(r, r), "") == "switch"
-		for t in rooms[r]:
-			var rect := Rect2(Vector2(t) * px, Vector2(px, px))
+		for rect in rooms[r]:
 			if dark > 0.01:
 				draw_rect(rect, col)
 			if warm:
@@ -126,8 +149,8 @@ func _draw() -> void:
 	# Walls follow the sky (so the building sinks into the night too).
 	var sky_dark := 1.0 - maxf(daylight(minute) * weather_factor(weather), 0.15)
 	if sky_dark > 0.01:
-		for t in _walls.get(floor_shown, []):
-			draw_rect(Rect2(Vector2(t) * px, Vector2(px, px)), Color(night, sky_dark * 0.7))
+		for rect in _walls.get(floor_shown, []):
+			draw_rect(rect, Color(night, sky_dark * 0.7))
 	# Light switches: a small plate on the wall by the switch tile.
 	for r in m.room_switch:
 		var t: Vector2i = m.room_switch[r]

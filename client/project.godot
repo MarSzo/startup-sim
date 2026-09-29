@@ -11,6 +11,7 @@ config/features=PackedStringArray("4.7")
 config/icon="res://icons/icon.svg"
 config/macos_native_icon="res://icons/icon.icns"
 config/windows_native_icon="res://icons/icon.ico"
+run/max_fps=60
 boot_splash/bg_color=Color(0.12156863, 0.101960786, 0.18039216, 1)
 boot_splash/image="res://icons/splash.png"
 boot_splash/stretch_mode=1

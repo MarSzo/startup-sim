@@ -1,7 +1,10 @@
 ## Cigarette smoke in the rooms of the shown floor (the server's Smoke
 ## packets) and the smoke detectors on the ceilings, blinking red during a
-## fire alarm. Drawn over the world.
+## fire alarm. Drawn over the world; every frame only while there's smoke
+## (drifting puffs), otherwise just when a detector's LED blinks.
 extends Node2D
+
+const TileRects = preload("res://game/tile_rects.gd")
 
 var building
 var floor_shown := 0
@@ -9,6 +12,8 @@ var alarm := false
 var _target := {}   # room -> 0..1 (last packet)
 var _shown := {}    # room -> 0..1 (eased)
 var _tiles := {}    # floor -> {room: Array[Vector2i]}
+var _rects := {}    # floor -> {room: Array[Rect2]} (px, merged tiles)
+var _led := -1      # the detectors' LED last drawn (0 off, 1 on)
 var _detectors := {}  # floor -> Array[Vector2] (px)
 var _inner := {}    # floor -> {Vector2i: tiles to the room's edge (0 = at the wall)}
 
@@ -32,6 +37,10 @@ func setup(b) -> void:
 					rooms[r] = []
 				rooms[r].append(Vector2i(x, y))
 		_tiles[f] = rooms
+		var rects := {}
+		for r in rooms:
+			rects[r] = TileRects.merge(rooms[r], m.tile_px)
+		_rects[f] = rects
 		# How far each tile is from the room's edge: puffs stay inside.
 		var inner := {}
 		for r in rooms:
@@ -73,6 +82,7 @@ func set_floor(f: int) -> void:
 		floor_shown = f
 		_target.clear()
 		_shown.clear()
+		_led = -1  # redraw: the other floor's detectors
 
 
 func on_smoke(p: Dictionary) -> void:
@@ -92,7 +102,14 @@ func _process(delta: float) -> void:
 		_shown[r] = move_toward(_shown[r], want, delta * 0.5)
 		if _shown[r] <= 0.0 and want <= 0.0:
 			_shown.erase(r)
-	queue_redraw()  # drifting smoke, blinking detectors
+	var led := 1 if led_on(Time.get_ticks_msec() / 1000.0) else 0
+	if not _shown.is_empty() or led != _led:
+		_led = led
+		queue_redraw()  # drifting smoke, blinking detectors
+
+
+func led_on(t: float) -> bool:
+	return (int(t * 6.0) % 2 == 0) if alarm else (fmod(t, 3.0) < 0.15)
 
 
 ## How opaque the haze is for a smoke level 0..1: thin smoke is a light
@@ -116,8 +133,8 @@ func _draw() -> void:
 		var tiles: Array = rooms[r]
 		# The veil: every tile of the room.
 		var haze := Color(0.66, 0.63, 0.58, op)
-		for tile in tiles:
-			draw_rect(Rect2(Vector2(tile) * px, Vector2(px, px)), haze)
+		for rect in _rects[floor_shown][r]:
+			draw_rect(rect, haze)
 		# Billowing puffs (Don't Starve-like): one ink rim around the whole
 		# cloud (all rims first, then all fills), soft shading inside.
 		var puffs := []
@@ -151,5 +168,4 @@ func _draw() -> void:
 	for pos in _detectors.get(floor_shown, []):
 		draw_circle(pos, 3.5, Color("#6b6f78"))
 		draw_circle(pos, 3.0, Color("#eceef1"))
-		var on := (int(t * 6.0) % 2 == 0) if alarm else (fmod(t, 3.0) < 0.15)
-		draw_circle(pos, 1.0, Color("#ff2d2d") if on else Color("#7a2222"))
+		draw_circle(pos, 1.0, Color("#ff2d2d") if led_on(t) else Color("#7a2222"))

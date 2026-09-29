@@ -24,6 +24,13 @@ var dirty_hands := false
 var money := 0
 var have := false
 var _badges: Array[Control] = []
+# Each badge: the glass and the number (b), inside it a body scaled for the
+# pulse: the liquid (redrawn ~30 times a second, one polygon) and the top —
+# shine, ring, icon (only when the value changes).
+var _liquids: Array[Control] = []
+var _tops: Array[Control] = []
+var _bodies: Array[Control] = []
+var _slosh := 0.0
 var _hover := -1
 var _coin := Control.new()
 var _note := Label.new()
@@ -46,10 +53,27 @@ func _ready() -> void:
 		b.tooltip_text = ROWS[i][0]
 		var idx := i
 		b.draw.connect(func(): _draw_badge(b, idx))
-		b.mouse_entered.connect(func(): _hover = idx)
-		b.mouse_exited.connect(func(): if _hover == idx: _hover = -1)
+		b.mouse_entered.connect(func(): _set_hover(idx))
+		b.mouse_exited.connect(func(): if _hover == idx: _set_hover(-1))
 		_row.add_child(b)
 		_badges.append(b)
+		var body := Control.new()
+		body.size = Vector2(SIZE, SIZE)
+		body.pivot_offset = Vector2(SIZE / 2, SIZE / 2)
+		body.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		body.draw.connect(func(): _draw_glass(body))
+		b.add_child(body)
+		_bodies.append(body)
+		var liquid := Control.new()
+		var top := Control.new()
+		for layer in [liquid, top]:
+			layer.size = Vector2(SIZE, SIZE)
+			layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			body.add_child(layer)
+		liquid.draw.connect(func(): _draw_liquid(liquid, idx))
+		top.draw.connect(func(): _draw_top(top, idx))
+		_liquids.append(liquid)
+		_tops.append(top)
 	_note.add_theme_stylebox_override("normal", Ink.box("bubble"))
 	Ink.style_label(_note, 16, Ink.TEXT_INK)
 	_note.visible = false
@@ -86,6 +110,9 @@ func update_stats(p: Dictionary) -> void:
 	have = true
 	visible = true
 	_coin.queue_redraw()
+	for i in _badges.size():
+		_badges[i].queue_redraw()
+		_tops[i].queue_redraw()
 	_place()
 
 
@@ -94,10 +121,24 @@ func badness(i: int) -> int:
 	return values[i] if ROWS[i][1] else 100 - values[i]
 
 
-func _process(_d: float) -> void:
-	if visible:
-		for b in _badges:
-			b.queue_redraw()  # sloshing liquid, pulsing when critical
+func _set_hover(i: int) -> void:
+	_hover = i
+	for b in _badges:
+		b.queue_redraw()
+
+
+func _process(delta: float) -> void:
+	if not visible:
+		return
+	var t := Time.get_ticks_msec() / 1000.0
+	for i in _bodies.size():
+		var pulse := 1.0 + (0.06 * sin(t * 8.0) if badness(i) >= CRITICAL else 0.0)
+		_bodies[i].scale = Vector2(pulse, pulse)
+	_slosh += delta
+	if _slosh >= 1.0 / 30.0:  # the sloshing liquid
+		_slosh = 0.0
+		for l in _liquids:
+			l.queue_redraw()
 
 
 func _draw_coin() -> void:
@@ -118,57 +159,67 @@ func _draw_coin() -> void:
 	c.draw_string(f, pos, txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 24, Ink.TEXT)
 
 
-func _draw_badge(b: Control, i: int) -> void:
-	var t := Time.get_ticks_msec() / 1000.0
-	var bad := badness(i)
-	var level := clampf(1.0 - bad / 100.0, 0.0, 1.0)
-	var critical := bad >= CRITICAL
-	var pulse := 1.0 + (0.06 * sin(t * 8.0) if critical else 0.0)
+## Shadow and dark glass, under the liquid.
+func _draw_glass(body: Control) -> void:
 	var r := SIZE / 2 - 3
 	var c := Vector2(SIZE / 2, SIZE / 2)
-	# Shadow, dark glass.
-	b.draw_circle(c + Vector2(2, 3), r * pulse, Color(0, 0, 0, 0.35))
-	b.draw_circle(c, r * pulse, Color("#1e1712"))
-	# Liquid up to `level`, with a little wave on top.
-	var col: Color = ROWS[i][2]
-	if critical:
-		col = col.lerp(Ink.RED, 0.5 + 0.3 * sin(t * 8.0))
-	var inner := (r - 3) * pulse
-	var surface := c.y + inner - level * inner * 2
-	for y in range(int(c.y - inner), int(c.y + inner) + 1):
-		var fy := float(y) + 0.5
-		var dy := fy - c.y
-		var half := sqrt(maxf(inner * inner - dy * dy, 0.0))
-		if half <= 0:
-			continue
-		# Wave: the surface wobbles along x; draw in two halves.
-		var x0 := c.x - half
-		var x1 := c.x + half
-		var wave_l := surface + sin(t * 2.2 + x0 * 0.15) * 1.5
-		var wave_r := surface + sin(t * 2.2 + x1 * 0.15) * 1.5
-		if fy >= maxf(wave_l, wave_r):
-			b.draw_line(Vector2(x0, fy), Vector2(x1, fy), col if fy > surface + 3 else col.lightened(0.25), 1.0)
-		elif fy >= minf(wave_l, wave_r):
-			var mid := c.x
-			if wave_l < wave_r:
-				b.draw_line(Vector2(x0, fy), Vector2(mid, fy), col.lightened(0.25), 1.0)
-			else:
-				b.draw_line(Vector2(mid, fy), Vector2(x1, fy), col.lightened(0.25), 1.0)
-	# Glass shine and the ink ring.
-	b.draw_arc(c, inner - 4, PI * 1.1, PI * 1.45, 12, Color(1, 1, 1, 0.25), 3.0, true)
-	b.draw_arc(c, r * pulse, 0, TAU, 48, Ink.INK, 4.0, true)
-	b.draw_arc(c, r * pulse - 3, 0, TAU, 48, Color(Ink.DARK_HI, 0.8), 1.5, true)
-	_draw_icon(b, ROWS[i][3], c)
+	body.draw_circle(c + Vector2(2, 3), r, Color(0, 0, 0, 0.35))
+	body.draw_circle(c, r, Color("#1e1712"))
+
+
+## The number below the badge.
+func _draw_badge(b: Control, i: int) -> void:
+	var c := Vector2(SIZE / 2, SIZE / 2)
 	# The number: on hover, or when critical.
-	if _hover == i or critical:
+	if _hover == i or badness(i) >= CRITICAL:
 		var f := Ink.font()
 		var txt := str(values[i])
 		var w := f.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 20).x
 		var p := Vector2(c.x - w / 2, SIZE + 18)
 		b.draw_string_outline(f, p, txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, 5, Ink.INK)
 		b.draw_string(f, p, txt, HORIZONTAL_ALIGNMENT_LEFT, -1, 20, Ink.TEXT)
-	elif _hover == -1:
-		pass
+
+
+## Liquid up to the level, its surface wobbling: one polygon and a lighter
+## line along the top.
+func _draw_liquid(l: Control, i: int) -> void:
+	var t := Time.get_ticks_msec() / 1000.0
+	var bad := badness(i)
+	var level := clampf(1.0 - bad / 100.0, 0.0, 1.0)
+	var col: Color = ROWS[i][2]
+	if bad >= CRITICAL:
+		col = col.lerp(Ink.RED, 0.5 + 0.3 * sin(t * 8.0))
+	var c := Vector2(SIZE / 2, SIZE / 2)
+	var inner := SIZE / 2 - 6
+	var surface := c.y + inner - level * inner * 2
+	var tops := PackedVector2Array()
+	var bottoms := PackedVector2Array()
+	var steps := 24
+	for k in steps + 1:
+		var x := c.x - inner + inner * 2 * k / steps
+		var half := sqrt(maxf(inner * inner - (x - c.x) * (x - c.x), 0.0))
+		var y_top := maxf(surface + sin(t * 2.2 + x * 0.15) * 1.5, c.y - half)
+		var y_bottom := c.y + half
+		if y_top < y_bottom:
+			tops.append(Vector2(x, y_top))
+			bottoms.append(Vector2(x, y_bottom))
+	if tops.size() < 2:
+		return
+	var poly := tops.duplicate()
+	bottoms.reverse()
+	poly.append_array(bottoms)
+	l.draw_colored_polygon(poly, col)
+	l.draw_polyline(tops, col.lightened(0.25), 3.0)
+
+
+## Glass shine, the ink ring and the icon.
+func _draw_top(top: Control, i: int) -> void:
+	var r := SIZE / 2 - 3
+	var c := Vector2(SIZE / 2, SIZE / 2)
+	top.draw_arc(c, r - 7, PI * 1.1, PI * 1.45, 12, Color(1, 1, 1, 0.25), 3.0, true)
+	top.draw_arc(c, r, 0, TAU, 48, Ink.INK, 4.0, true)
+	top.draw_arc(c, r - 3, 0, TAU, 48, Color(Ink.DARK_HI, 0.8), 1.5, true)
+	_draw_icon(top, ROWS[i][3], c)
 
 
 ## Simple inked icons in the middle of a badge.

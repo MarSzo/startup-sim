@@ -964,7 +964,8 @@ pełnym ekranie — zastąpiona stylem inspirowanym Don't Starve:
   nowe).
 - **Menu startowe**: ekran tytułowy (miasto o zmierzchu, zapalające się okna,
   chmury) — Graj (→ tworzenie postaci), Ustawienia (pełny ekran, efekt tuszu,
-  przybliżenie kamery; zapisywane w `user://settings.cfg`), Autorzy, Wyjdź.
+  oszczędzanie baterii, przybliżenie kamery; zapisywane w
+  `user://settings.cfg`), Autorzy, Wyjdź.
   Z tworzenia postaci — „Wróć do menu”.
 - **Menu gry pod Esc** (gdy nie jest otwarte żadne okno): Wróć do gry,
   Ustawienia, Wyjdź do menu (rozłącza), Wyjdź z gry. Gra na serwerze toczy się
@@ -1136,6 +1137,18 @@ pełnym ekranie — zastąpiona stylem inspirowanym Don't Starve:
 - Pakiet gry ma do 1152 B (zaszyfrowany ≤ 1200 B).
 - Administracja: `--list-accounts` (nick, od kiedy, ostatnie logowanie),
   `--reset-password <nick>`; kopie zapasowe są logowane (`* save: backup …`).
+
+### 10.44 Wydajność klienta
+
+- Klient rysuje najwyżej **60 klatek/s** (także na ekranach 120 Hz); w
+  Ustawieniach „Oszczędzanie baterii” — **30 klatek/s**; gdy okno gry jest w
+  tle — **20 klatek/s** (gra, sieć i czat głosowy działają dalej).
+- Koszt CPU rośnie z liczbą klatek, więc to główne pokrętło: w biurze na
+  MacBooku Pro (M-series) ok. 32% jednego rdzenia przy 60 kl./s, ok. 20% przy
+  30 kl./s; ekran tytułowy ok. 16% (wcześniej ok. 43%).
+- Zasada rysowania: to, co się nie zmienia, rysuje się raz; animacja przez
+  przesunięcie / przezroczystość gotowego rysunku, nie przez rysowanie od
+  nowa co klatkę (szczegóły: ARCHITECTURE, „Wydajność rysowania”).
 
 ### 10.6 Stan implementacji
 

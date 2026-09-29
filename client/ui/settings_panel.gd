@@ -1,5 +1,5 @@
 ## The settings (title screen and the Esc menu): full screen, the ink
-## effect over the world, the camera zoom, sound volumes. Changes apply and
+## effect over the world, battery saving, the camera zoom, sound volumes. Changes apply and
 ## save at once.
 extends VBoxContainer
 
@@ -11,6 +11,7 @@ signal back
 
 var _full := CheckButton.new()
 var _mood := CheckButton.new()
+var _battery := CheckButton.new()
 var _zoom := HSlider.new()
 var _zoom_label := Label.new()
 
@@ -19,7 +20,8 @@ func _ready() -> void:
 	Settings.load_once()
 	add_theme_constant_override("separation", 10)
 	add_child(Ink.label("Ustawienia", 28, Ink.TEXT_INK))
-	for pair in [[_full, "Pełny ekran"], [_mood, "Efekt „tuszu i papieru” na świecie"]]:
+	for pair in [[_full, "Pełny ekran"], [_mood, "Efekt „tuszu i papieru” na świecie"],
+			[_battery, "Oszczędzanie baterii (30 klatek/s)"]]:
 		var cb: CheckButton = pair[0]
 		cb.text = pair[1]
 		cb.add_theme_font_override("font", Ink.font())
@@ -29,6 +31,11 @@ func _ready() -> void:
 		add_child(cb)
 	_full.button_pressed = Settings.fullscreen
 	_mood.button_pressed = Settings.mood
+	_battery.button_pressed = Settings.battery
+	_battery.toggled.connect(func(on: bool):
+		Settings.battery = on
+		Settings.apply_fps()
+		_save())
 	_full.toggled.connect(func(on: bool):
 		Settings.fullscreen = on
 		Settings.apply_window()

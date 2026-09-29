@@ -72,6 +72,7 @@ func _ready() -> void:
 	get_tree().auto_accept_quit = false
 	Settings.load_once()
 	Settings.apply_window()
+	Settings.apply_fps()
 	add_child(audio)
 	Settings.apply_audio()
 	# Every button in the game clicks.
@@ -275,6 +276,8 @@ func _on_packet(p: Dictionary) -> void:
 
 
 func _process(_d: float) -> void:
+	if args.has("perf"):
+		_perf_report()
 	if game:
 		game.input_blocked = portal.visible or day_screen.blocking() or pause.visible  # no walking under the menu
 	# Music: the menu tune on the title / character screens, a calm one at
@@ -285,6 +288,51 @@ func _process(_d: float) -> void:
 		audio.music("music_home")
 	else:
 		audio.music("")
+
+
+var _perf_at := 0
+var _perf_frames := 0
+var _perf_proc := 0.0
+var _perf_phys := 0.0
+var _perf_draws := {}   # script / class -> redraws in this period
+var _perf_hooked := {}  # instance id -> true
+
+
+func _perf_hook(n: Node) -> void:
+	if n is CanvasItem and not _perf_hooked.has(n.get_instance_id()):
+		_perf_hooked[n.get_instance_id()] = true
+		var key: String = n.get_script().resource_path.get_file() if n.get_script() else n.get_class()
+		n.draw.connect(func(): _perf_draws[key] = _perf_draws.get(key, 0) + 1)
+	for c in n.get_children():
+		_perf_hook(c)
+
+
+## --perf: every 2 s, the frame's script and engine cost (for benchmarks).
+func _perf_report() -> void:
+	_perf_frames += 1
+	_perf_proc += Performance.get_monitor(Performance.TIME_PROCESS)
+	_perf_phys += Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS)
+	var now := Time.get_ticks_msec()
+	if now - _perf_at < 2000:
+		return
+	_perf_hook(self)
+	if _perf_at > 0:
+		var top := _perf_draws.keys()
+		top.sort_custom(func(a, b): return _perf_draws[a] > _perf_draws[b])
+		var parts := []
+		for k in top.slice(0, 6):
+			parts.append("%s %.0f/s" % [k, _perf_draws[k] / ((now - _perf_at) / 1000.0)])
+		print("perf: redraws  " + ", ".join(parts))
+		print("perf: fps %d  process %.2f ms  physics %.2f ms  draw calls %d  items %d  nodes %d" % [
+			Engine.get_frames_per_second(), 1000.0 * _perf_proc / _perf_frames, 1000.0 * _perf_phys / _perf_frames,
+			Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),
+			Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME),
+			Performance.get_monitor(Performance.OBJECT_NODE_COUNT)])
+	_perf_at = now
+	_perf_draws.clear()
+	_perf_frames = 0
+	_perf_proc = 0.0
+	_perf_phys = 0.0
 
 
 func _show_title() -> void:
@@ -404,6 +452,11 @@ func _on_disconnected(reason: String) -> void:
 
 
 func _notification(what: int) -> void:
-	if what == NOTIFICATION_WM_CLOSE_REQUEST:
-		net.close()
-		get_tree().quit()
+	match what:
+		NOTIFICATION_WM_CLOSE_REQUEST:
+			net.close()
+			get_tree().quit()
+		NOTIFICATION_APPLICATION_FOCUS_OUT:
+			Settings.apply_fps(false)  # in the background: draw less
+		NOTIFICATION_APPLICATION_FOCUS_IN:
+			Settings.apply_fps(true)

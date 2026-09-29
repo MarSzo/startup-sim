@@ -26,6 +26,9 @@ func _fit() -> void:
 	size = get_viewport_rect().size
 
 
+var _drawn := []  # weather, outdoors, size of the last picture
+
+
 func set_state(p_weather: int, p_outdoors: bool) -> void:
 	weather = p_weather
 	outdoors = p_outdoors
@@ -61,8 +64,13 @@ func _process(delta: float) -> void:
 			_flash = 0.85
 			lightning.emit()
 			_next_flash = randf_range(3.0, 9.0)
+	var was_flash := _flash > 0.0
 	_flash = maxf(0.0, _flash - delta * 2.5)
-	queue_redraw()
+	# Nothing moving (sun, clouds, indoors): the last picture stays.
+	var busy := not _drops.is_empty() or _flash > 0.0 or was_flash or (outdoors and weather == Protocol.WEATHER_FOG)
+	if busy or _drawn != [weather, outdoors, size]:
+		_drawn = [weather, outdoors, size]
+		queue_redraw()
 
 
 func _draw() -> void:
