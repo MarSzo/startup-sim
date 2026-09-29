@@ -43,6 +43,9 @@ var legend := {}      # char -> {type, solid, color, access?, free_dir?}
 ## [{kind: "stairs"|"elevator", rect: Rect2i, id, to_floor, to: Vector2i}]
 var links: Array = []
 var spawns: Array[Vector2i] = []
+## Named spots (the map's "places", see server/src/outside.rs): e.g.
+## "walk_home", "taxi", "tram_stop" -> Vector2i.
+var places := {}
 var error := ""
 
 
@@ -69,6 +72,11 @@ func parse(bytes: PackedByteArray) -> void:
 		links.append(link)
 	for sp in data.get("spawns", []):
 		spawns.append(Vector2i(int(sp[0]), int(sp[1])))
+	var pl: Dictionary = data.get("places", {})
+	for k in pl:
+		var v = pl[k]
+		if v is Array and v.size() == 2 and not v[0] is Array:
+			places[k] = Vector2i(int(v[0]), int(v[1]))
 	var defs: Dictionary = data["room_defs"]
 	var room_ids := {}
 	for key in defs:

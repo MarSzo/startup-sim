@@ -102,8 +102,11 @@ impl Server {
             let m = self.building.floor(f)?;
             // By the meeting table (where the laptop goes), else anywhere free.
             let tiles = m.room_tiles(r);
-            let by_table = crate::map::Tile { x: 50, y: 18 };
-            let t = if tiles.contains(&by_table) { Some(by_table) } else { tiles.into_iter().find(|t| !m.is_blocked(t.x, t.y)) };
+            let by_table = self.building.founder.filter(|&(ff, _)| ff == f).map(|(_, t)| t);
+            let t = match by_table {
+                Some(t) if tiles.contains(&t) => Some(t),
+                _ => tiles.into_iter().find(|t| !m.is_blocked(t.x, t.y)),
+            };
             t.map(|t| (f, t))
         });
         if let Some((f, t)) = pos {
@@ -306,10 +309,12 @@ impl Server {
     /// in front of a desk of the department.
     pub(super) fn employ(&mut self, id: u16) {
         let dept = if id % 2 == 1 { 1 } else { 2 };
-        let Some(dept_name) = self.cfg.recruitment.department_name(dept).map(str::to_string) else { return };
+        if self.cfg.recruitment.department_name(dept).is_none() {
+            return;
+        }
         let seat = {
             let n = self.players.values().filter(|p| p.contract && p.department == dept).count();
-            let desks: Vec<&Workstation> = self.workstations.iter().filter(|w| w.room_name == dept_name).collect();
+            let desks: Vec<&Workstation> = self.workstations.iter().filter(|w| w.department == dept).collect();
             desks.get(n % desks.len().max(1)).and_then(|w| {
                 let m = self.building.floor(w.floor)?;
                 [1, -1].iter().map(|dy| (w.tile.x, w.tile.y + dy)).find(|&(x, y)| !m.is_blocked(x, y)).map(|(x, y)| (w.floor, x, y))

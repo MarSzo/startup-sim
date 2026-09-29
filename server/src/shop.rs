@@ -86,17 +86,30 @@ pub struct Shelf {
     pub goods: &'static [u8],
 }
 
-pub fn shelves() -> Vec<Shelf> {
+/// What each shelf holds (where it stands comes from the map's places).
+const SHELF_GOODS: [(u8, &str, &[u8]); 6] = {
     use kind::*;
-    let r = |x: i32, y: i32, w: i32, h: i32| Rect { x, y, w, h };
-    vec![
-        Shelf { id: 1, title: "Kanapki", floor: 0, area: r(45, 24, 5, 1), goods: &[SANDWICH_CHEESE, SANDWICH_HAM, WRAP] },
-        Shelf { id: 2, title: "Fast food", floor: 0, area: r(50, 24, 5, 1), goods: &[BURGER, FRIES] },
-        Shelf { id: 3, title: "Przekąski", floor: 0, area: r(45, 27, 5, 1), goods: &[BUN, BAR, CHIPS] },
-        Shelf { id: 4, title: "Napoje", floor: 0, area: r(50, 27, 5, 1), goods: &[WATER, ENERGY_DRINK, JUICE, MILK] },
-        Shelf { id: 5, title: "Alkohol i papierosy", floor: 0, area: r(56, 23, 1, 5), goods: &[BEER, WINE, CIGARETTES] },
-        Shelf { id: 6, title: "Parasole", floor: 0, area: r(43, 31, 1, 2), goods: &[UMBRELLA] },
+    [
+        (1, "Kanapki", &[SANDWICH_CHEESE, SANDWICH_HAM, WRAP]),
+        (2, "Fast food", &[BURGER, FRIES]),
+        (3, "Przekąski", &[BUN, BAR, CHIPS]),
+        (4, "Napoje", &[WATER, ENERGY_DRINK, JUICE, MILK]),
+        (5, "Alkohol i papierosy", &[BEER, WINE, CIGARETTES]),
+        (6, "Parasole", &[UMBRELLA]),
     ]
+};
+
+/// The shop's shelves, placed where the map says.
+pub fn shelves(b: &Building) -> Vec<Shelf> {
+    let mut out = Vec::new();
+    for (f, m) in b.active_floors() {
+        for (id, area) in crate::outside::shelf_areas(&m.places) {
+            if let Some(&(_, title, goods)) = SHELF_GOODS.iter().find(|g| g.0 == id) {
+                out.push(Shelf { id, title, floor: f, area, goods });
+            }
+        }
+    }
+    out
 }
 
 /// Shelf nearest to `body` within reach.
@@ -137,9 +150,15 @@ pub mod lines {
     }
 }
 
-/// Every shelf stands on shelf tiles of its floor (catches map edits).
+/// Every shelf is on the map, on shelf tiles (catches map edits).
 pub fn check(b: &Building) -> Result<(), String> {
-    for s in shelves() {
+    let all = shelves(b);
+    for (id, title, _) in SHELF_GOODS {
+        if !all.iter().any(|s| s.id == id) {
+            return Err(format!("shelf {id} ({title}) is not on the map"));
+        }
+    }
+    for s in all {
         let m = b.floor(s.floor).ok_or("shop floor missing")?;
         for y in s.area.y..s.area.y + s.area.h {
             for x in s.area.x..s.area.x + s.area.w {
@@ -161,7 +180,7 @@ mod tests {
     fn shelves_are_on_the_map_and_every_product_is_sold_once() {
         let b = Building::load(&default_building_path()).unwrap();
         check(&b).unwrap();
-        let mut sold: Vec<u8> = shelves().iter().flat_map(|s| s.goods.iter().copied()).collect();
+        let mut sold: Vec<u8> = shelves(&b).iter().flat_map(|s| s.goods.iter().copied()).collect();
         sold.sort();
         let lunch: Vec<u8> = crate::lunch::MENU.iter().map(|m| m.0).collect();
         let mut all: Vec<u8> = PRODUCTS.iter().filter(|p| p.price > 0 && !lunch.contains(&p.kind)).map(|p| p.kind).collect();
@@ -178,10 +197,10 @@ mod tests {
 
     #[test]
     fn reach_picks_the_shelf_in_front() {
-        let s = shelves();
-        let body = Body::at(0, Pos::tile_center(47, 25)); // between the two shelf rows
+        let s = shelves(&Building::load(&default_building_path()).unwrap());
+        let body = Body::at(0, Pos::tile_center(22, 47)); // under the sandwiches
         let got = shelf_in_reach(&s, &body).map(|s| s.id);
         assert!(matches!(got, Some(1)), "{got:?}");
-        assert!(shelf_in_reach(&s, &Body::at(0, Pos::tile_center(47, 29))).is_none());
+        assert!(shelf_in_reach(&s, &Body::at(0, Pos::tile_center(24, 55))).is_none());
     }
 }

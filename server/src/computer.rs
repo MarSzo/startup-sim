@@ -31,8 +31,10 @@ pub const MAX_MESSAGE_CHARS: usize = 200;
 pub struct Workstation {
     pub floor: u8,
     pub tile: Tile,
-    /// Name of the department room (= department name).
+    /// Name of the room the desk is in.
     pub room_name: String,
+    /// Whose desk it is: the room's department (0 = nobody's).
+    pub department: u8,
 }
 
 pub fn find_workstations(b: &Building) -> Vec<Workstation> {
@@ -49,7 +51,7 @@ pub fn find_workstations(b: &Building) -> Vec<Workstation> {
                     _ => false,
                 };
                 if ok {
-                    out.push(Workstation { floor: f, tile: Tile { x, y }, room_name: r.name.clone() });
+                    out.push(Workstation { floor: f, tile: Tile { x, y }, room_name: r.name.clone(), department: r.department });
                 }
             }
         }

@@ -31,6 +31,7 @@ pub mod nav;
 pub mod needs;
 pub mod net;
 pub mod npc;
+pub mod outside;
 pub mod persist;
 pub mod protocol;
 pub mod recruitment;

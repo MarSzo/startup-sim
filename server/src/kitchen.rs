@@ -190,12 +190,12 @@ mod tests {
     use crate::building::default_building_path;
 
     #[test]
-    fn the_kitchenette_is_in_the_chill_room_and_the_dishwasher_cycles() {
+    fn the_kitchenette_has_it_all_and_the_dishwasher_cycles() {
         let b = Building::load(&default_building_path()).unwrap();
         let mut k = Kitchen::find(&b).expect("kitchenette");
         let m = b.floor(k.floor).unwrap();
         for t in [k.cupboard, k.dishwasher, k.sink, k.fridge] {
-            assert_eq!(m.room_name(m.room_at_tile(t.x, t.y)), "Chill room");
+            assert_eq!(m.room_name(m.room_at_tile(t.x, t.y)), "Aneks kuchenny");
         }
         assert_eq!(k.mugs, MUGS);
         k.mugs = 5;

@@ -292,119 +292,186 @@ graczy; testy jednostkowe serializacji i ruchu/kolizji.
 
 ### 10.5 Budynek (mapy)
 
-Obie kondygnacje 60×48 kafli po 16 px; pliki `client/maps/building.json`,
-`floor0.json`, `floor1.json` generuje `tools/build_maps.py`. Piętro 2 jest w
-`building.json` jako zablokowane (bez pliku).
+Układ wg odręcznego planu (numery w nawiasach to numery z rysunku). Mapy
+70×72 kafli po 16 px (1 kafel ≈ 1 m; skala: pokój 18 mieści 8 biurek);
+pliki `client/maps/building.json`, `floor0.json`, `floor1.json`, `floor3.json`
+(klatka schodowa) generuje `tools/build_maps.py` — jedyne miejsce, gdzie się je
+zmienia. Piętro 2 jest w `building.json` jako zablokowane (bez pliku).
 
 **Parter + teren zewnętrzny** — gracz startuje na chodniku przed wejściem.
+Wiatrołap (2) → hol (3) z ladą portiera (5, portier siedzi na 6), toaletą (7)
+i bramkami na kartę; za bramkami windy (8, 9 — druga na razie nieczynna),
+klatka schodowa (4) i drzwi na parking wewnętrzny (12, brama od północy,
+dojazd wzdłuż zachodniej ściany). Sklep (1) z wejściem od ulicy, strefa
+zamknięta (11) za zablokowanymi drzwiami, sprzątaczka siedzi w holu (10).
+Na zewnątrz: chodnik, ulica, parking zewnętrzny, postój taksówek, przystanek
+tramwaju, stojak na rowery, strefa palenia i popielniczka przy wejściu.
 
 ```
-FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
-FvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvF
-Fv###############################################vvvvvvvvvvF
-Fv#================#####################::::::::#vvvvvvvvvvF
-Fv#================#####################:TTTTTT:#vvvvvvvvvvF
-Fv#==XXX======XXX==#####################::::::::#vvvvvvvvvvF
-Fv#==XXX======XXX==############.SSSSSS.#::::::::#vvvvvvvvvvF
-Fv#================############.SSSSSS.#::::::::#vvvvvvvvvvF
-Fv#================#####eeeee##........#:TT:::::#vvvvvvvvvvF
-Fv#================#####eeeee##........#:TT:::::#vvvvvvvvvvF
-Fv#================#####eeeee##........#:TT:::::#vvvvvvvvvvF
-Fv#==XXX======XXX==#####eeeee##........#:TT:::::#vvvvvvvvvvF
-Fv#==XXX======XXX==#####eeeee##........#::::::::#vvvvvvvvvvF
-Fv#================######EEE######DD#######LL#############vF
-Fv#================#.....................................#vF
-Fv#================#.....................................#vF
-Fv#================D.....................................#vF
-Fv#==XXX======XXX==D.....................................#vF
-Fv#==XXX======XXX==#.....................................#vF
-Fv#================#.....................................#vF
-Fv#================#.....................................#vF
-Fv#================#########B#B#B#B#B#B###################vF
-Fv#================#......#______________#...............#vF
-Fv#==XXX======XXX==#......#______________#...............#vF
-Fv#==XXX======XXX==#......#______________#...TTTTTTTTTT..#vF
-Fv#================#......#______________#...............#vF
-Fv#================#......#______________#...............#vF
-Fv#================#.T....#______________#...TTTTTTTTTT..#vF
-Fv#================#.T....D______________#...............#vF
-Fv#==XXX======XXX==#.T....D______________D...............#vF
-Fv#==XXX======XXX==#.T....#______________D...............#vF
-Fv#================#......#______________#.........TTTTT.#vF
-Fv#================#......#______________#...............#vF
-Fv######ggggg##################GGGGG######################vF
-Fpppppp=======pppppppppppppppppppppppppppppppppppppppppppppF
-Fpppppp=======pppppppppppppppppppppppppppppppppppppppppppppF
-Fpppppp=======pppppppppppppppppppppppppppppppppppppppppppppF
-Fvvvvvv=======vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvF
-Fvv============================vvvvvvvvvvvvvvvvvvvvvvvvvvvvF
-Fvv=XXX==XXX==XXX==XXX==XXX====vvvvvvvvvvvzzzzzzzzzzzzzvvvvF
-Fvv=XXX==XXX==XXX==XXX==XXX====vvvvvvvvvvvzzzzzzzzzzzzzvvvvF
-Fvv============================vvvvvvvvvvvzzTTTzzzzzzzzvvvvF
-Fvv============================vvvvvvvvvvvzzzzzzzzzzzzzvvvvF
-Fvv=XXX==XXX==XXX==XXX==XXX====vvvvvvvvvvvzzzzzzzzTzzzzvvvvF
-Fvv=XXX==XXX==XXX==XXX==XXX====vvvvvvvvvvvzzzzzzzzzzzzzvvvvF
-Fvv============================vvvvvvvvvvvzzzzzzzzzzzzzvvvvF
-FvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvF
-FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+FvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=============================vvvvvvvvvvvvvvvvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=============================vvvvvvvvvvvvvvvvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=============================vvvvvvvvvvvvvvvvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=============================vvvvvvvvvvvvvvvvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v###############gggggg################vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#===================================#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#XXX=============================XXX#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#XXX====XXX===============XXX====XXX#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#=======XXX===============XXX=======#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#===================================#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#XXX=============================XXX#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#XXX=============================XXX#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#===================================#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#===================================#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#XXX=============================XXX#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#XXX=============================XXX#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#===================================#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#===================================#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#XXX=============================XXX#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#XXX=============================XXX#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#===================================#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#===================================#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#XXX=============================XXX#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#XXX=============================XXX#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#===================================#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#===================================#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#XXX=============================XXX#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#XXX=============================XXX#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#===================================#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#===================================#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#===================================#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#############DD######################vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#SSS.....#P______#eee#eee#..........#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#SSS.....D_______#eee#eee#..........#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#........#_______#EEE#####..........#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v##########_______________#..........#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#........#_______________x..........#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#H.HHH..H#BBBBBBB#########..........#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#H......H#_______K___#:U:#..........#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#H......H#_______K___#:::#..........#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#H.HHH..H#_______K___#:::#..........#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#........#_______K___#::V#..........#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#..HHH...#_______K___#:::#..........#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#.......H#___________##k##..........#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#.......H####DD###_______#..........#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#KKK.....#_______#_______#..........#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#........#_______#_______x..........#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#........#P______#______P#..........#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v####GG######GGG######################vvvvvvvvvvvvvvF
+FpppppppppppppppppppppppApppppppppppbbbbpppppppppppppppppppppppppppppF
+FppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppF
+FppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppF
+FrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrF
+Fvv============================vvvvvvvvvvvzzzzzzzzzzzzzvvvvvvvvvvvvvvF
+Fvv=XXX==XXX==XXX==XXX==XXX====vvvvvvvvvvvzzzzzzzzzzzzzvvvvvvvvvvvvvvF
+Fvv=XXX==XXX==XXX==XXX==XXX====vvvvvvvvvvvzzNNNzzzzzzzzvvvvvvvvvvvvvvF
+Fvv============================vvvvvvvvvvvzzzzzzzzzzzzzvvvvvvvvvvvvvvF
+Fvv============================vvvvvvvvvvvzzzzzzzzAzzzzvvvvvvvvvvvvvvF
+Fvv============================vvvvvvvvvvvzzzzzzzzzzzzzvvvvvvvvvvvvvvF
+Fvv============================vvvvvvvvvvvzzzzzzzzzzzzzvvvvvvvvvvvvvvF
+Fvv============================vpppppppppvvvvvvvvvvvvvvvvvvvvvvvvvvvvF
+FttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttF
+FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
 ```
 
-**Piętro 1** (dolna część to pustka poza obrysem budynku)
+**Piętro 1** — z klatki schodowej (24) na korytarz zachodni (17), hol windowy
+(13, nad windami 14/15 zamknięta szafa 58) i główny korytarz (33) z wyspą:
+WC damskie (54), łazienka damska (53), WC męskie (52) przez łazienkę męską (51),
+przejście, WC dla niepełnosprawnych (50), szafa (55), lada recepcji (49,
+recepcjonistka na 56), kosz (57). Na górze chill room (34) otwarty na aneks
+kuchenny (35) z wyjściem na balkon (48, można palić). Lewa kolumna: serwerownia
+(36, zamknięta), Zarząd / pokój prezesa (37), Produkt/IT (38), sale spotkań
+(39, 40). Prawa: sala spotkań (47), HR (46), Marketing (44) ze składzikiem
+sprzątaczki (45), Sales (43), Obsługa klienta (42), magazynek (41). Skrzydło:
+Mobile (20), łazienka damska (21) z kabinami (22, 23), Produkt/IT (19, 18),
+Finanse (16), korytarz wschodni (25), pokój z jednym biurkiem (26), Biznes (27),
+AI team (28), DevOps „Mordor” (32), łazienka męska (29) z pisuarami (30) i
+kabiną (31).
 
 ```
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-~~###############################################~~~~~~~~~~~
-~~#,,,,,,,,,,,,,,,,#####################,,,,,,,,#~~~~~~~~~~~
-~~#,,,,,,,,,,,,,,,,#####################,,,,,,,,#~~~~~~~~~~~
-~~#,,TTTTT,,TTTTT,,#####################,,,,,,,,#~~~~~~~~~~~
-~~#,,,,,,,,,,,,,,,,############.SSSSSS.#,,TTTT,,#~~~~~~~~~~~
-~~#,,,,,,,,,,,,,,,,############.SSSSSS.#,,,,,,,,#~~~~~~~~~~~
-~~#,,,,,,,,,,,,,,,,#####eeeee##........#,,,,,,,,#~~~~~~~~~~~
-~~#,,TTTTT,,TTTTT,,#####eeeee##........#,,,,,,,,#~~~~~~~~~~~
-~~#,,,,,,,,,,,,,,,,#####eeeee##........#,,,,,,,,#~~~~~~~~~~~
-~~#,,,,,,,,,,,,,,,,#####eeeee##........#,,,,,,,,#~~~~~~~~~~~
-~~#,,,,,,,,,,,,,,,,#####eeeee##........#,,,,,,,,#~~~~~~~~~~~
-~~#,,TTTTT,,TTTTT,,######EEE######DD#######DD#############~~
-~~#,,,,,,,,,,,,,,,,#.........................#,,,,,,,,,,,#~~
-~~#,,,,,,,,,,,,,,,,#.........................#,,,,,,,,,,,#~~
-~~#,,,,,,,,,,,,,,,,#.........................#,,,TTTTT,,,#~~
-~~#,,TTTTT,,TTTTT,,#..........TTTTT..........#,,,TTTTT,,,#~~
-~~#,,,,,,,,,,,,,,,,#.........................#,,,,,,,,,,,#~~
-~~#,,,,,,,,,,,,,,,,#.........................#,,,,,,,,,,,#~~
-~~#,,,,,,,,,,,,,,,,#.........................#,,,,,,,,,,,#~~
-~~########DD##################DDDDD################DD#####~~
-~~#......................................................#~~
-~~#......................................................#~~
-~~#......................................................#~~
-~~##########DD##################DDD###########D######D####~~
-~~#,,,,,,,,,,,,,,,,,,,,#,,,,,,,,,,,,,,,,,,,#::::::#::::::#~~
-~~#,,,,,,,,,,,,,,,,,,,,#,,,,,,,,,,,,,,,,,,,#::::::#::::::#~~
-~~#,,TTTTT,,,TTTTT,,,,,#,,,TTT,,,,,,,,,,,,,#::::::#::::::#~~
-~~#,,,,,,,,,,,,,,,,,,,,#,,,TTT,,,,,,,,,,,,,#::::::#::::::#~~
-~~#,,,,,,,,,,,,,,,,,,,,#,,,,,,,,,,,,TTTT,,,#::::::#::::::#~~
-~~#,,TTTTT,,,TTTTT,,,,,#,,,,,,,,,,,,,,,,,,,#::::::#::::::#~~
-~~#,,,,,,,,,,,,,,,,,,,,#,,,,,,,,,,,,,,,,,,,#::::::#::::::#~~
-~~########################################################~~
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~hhhhhhhhhhhhhhhh~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~hnNNNnnnnnnnnAnh~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~hnnnnnnnnnnnnnnh~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~hnnnnnnnnnnnnnnh~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~hnnnnnnnnnnnnnnh~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~#####GG#############################~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~#fccJ::CJid,,,,,,,,,,,,OY#,,,,,,,,,#~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~#::::::::::,,QQQ,,,QQQ,,,#,,TTTTT,,#~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~#::::::::::,,QQQ,,,QQQ,,,D,,TTTTT,,#~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~#:TTT::::::,,,,,,,,,,,,,,#,,,,,,,,,#~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~#:TTT::::::,,,,,,TTT,,,,,###########~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~#::::#######,,,,,,,,,,,,,#,,,,,,,,,#~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~#::::#RRRRR#,,,,,,,,,,,,,#,,WWWW,,,#~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~#::::#:::::#P....#####...D,,,,,,,,,#~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~#::::#:::::x.....#:::#...###########~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~#::::#RRR::#.....#U::k...#,,,,,,,,,#~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~############.....#####...#,,,,WWWW,#~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~#,,,,,,,,,,#.....D::V#...#####,,,,,#~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~#,,TTTTT,,,Z.....#::Y#...#HH:#,,,,,#~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~#,,TTTTT,,,#.....#####...L:::#,,,,,#~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~#,,,,,,,,,,#.....#U::#...#####WWWW,#~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~############.....#:::#...#,,,,,,,,,#~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~#,,,,,,,,,,#.....##k##...D,,,,,,,,,#~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~#,,WWWW,,,,#.....#V:Y#...###########~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~#,,,,,,,,,,#.....#:::#...#,,,,,,,,,#~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~#,,,,,,,,,,#.....##D##...#,,WWWW,,,#~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~#,,WWWW,,,,D.............#,,,,,,,,,#~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~#,,,,,,,,,,#.....##k##...#,,,,,,,,,#~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~#,,,,,,,,,,#.....#V::#...D,,,,,,,,,#~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~############.....#:::#...#,,WWWW,,,#~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~#,,,,,,,,,,#.....#::U#...#,,,,,,,,,#~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~#,,TTTTT,,,D.....#####...###########~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~#,,,,,,,,,,#......www....#,,,,,,,,,#~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~############.............#,,WWWW,,,#~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~#,,,,,,,,,,#....KKKKK....D,,,,,,,,,#~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~#,,TTTTT,,,D............o#,,,,,,,,,#~~~~~~~~~~~~~
+~~#################,,,,,,,,,,#P............#,,,,,,,,,#############~
+~~#,,,,,,,,,,,,,,,##############DD####################,,,,,,,,,,,#~
+~~#,,WWWWWW,,WWW,,#SSS.......#P....x:::::::#HHHH:HHHH#,,,,,,,,,,,#~
+~~#,,,,,,,,,,,,,,,#SSS.......#.....#########:::::::::#,,WWWW,WWW,#~
+~~#,,,,,,,,,,,,,,,#..........#.....#eee#eee#:::::::::#,,,,,,,,,,,#~
+~~#,,,,,,,,,,,,,,,#..........#.....#eee#eee#:::::::::#,,,,,,,,,,,#~
+~~###########DD#######DD######.....#EEE#########D#####,,,,,,,,,,,#~
+~~#|||::::V#.................#.............#.........#,,WWWW,WWW,#~
+~~#U:k::::V#.................D.............D.........D,,,,,,,,,,,#~
+~~#|||:::::D.................D.............D.........D,,,,,,,,,,,#~
+~~#U:k:::::#.................#.............#.........#,,,,,,,,,,,#~
+~~#|||::::Y#.................#............P#.........#,,,,,,,,,,,#~
+~~##########DD#######DD##########DD#############.....#############~
+~~#,,,,,,,,,,,#,,,,,,,,,,,,#,,,,,,,,,,,,,,,#,,,#..........#VV:uuu#~
+~~#,,,,,,,,,,,#,,,,,,,,,,,,#,,,,,,,,,,,,,,,#W,,D..........D::::::#~
+~~#,,WWWW,WWW,#,,,WWWW,,,,,#,,WWWWW,,WWWW,,#,,,#..........#:::|||#~
+~~#,,,,,,,,,,,#,,,,,,,,,,,,#,,,,,,,,,,,,,,,#,,,#..........#Y::k:U#~
+~~#,,,,,,,,,,,#,,,,,,,,,,,,#,,,,,,,,,,,,,,,######DD####DD#########~
+~~#,,,,,,,,,,,#,,,,,,,,,,,,#,,,,,,,,,,,,,,,#,,,,,,,,,#,,,,,,,,,,,#~
+~~#,,WWWW,WWW,#,,,WWWW,,,,,#,,WWWWW,,WWWW,,#,,,,,,,,,#,,,,,,,,,,,#~
+~~#,,,,,,,,,,,#,,,,,,,,,,,,#,,,,,,,,,,,,,,,#,,WWWWW,,#,,WWWWWWW,,#~
+~~#,,,,,,,,,,,#,,,,,,,,,,,,#,,,,,,,,,,,,,,,#,,,,,,,,,#,,,,,,,,,,,#~
+~~#,,,,,,,,,,,#,,,,,,,,,,,,#,,,,,,,,,,,,,,,#,,,,,,,,,#,,,,,,,,,,,#~
+~~################################################################~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ```
 
 Legenda: `#` ściana, `.` podłoga, `,` wykładzina, `:` płytki, `_` posadzka holu,
-`=` parking, `v` trawa, `p` chodnik, `z` strefa palenia, `F` ogrodzenie,
-`~` pustka, `D` drzwi, `G` szklane drzwi wejściowe, `B` bramka na kartę
-(otwarta), `L` drzwi zamknięte (zaplecze), `g` brama garażowa, `E` drzwi windy,
-`e` kabina windy, `S` biegi schodów, `T` meble / regały / lady, `X` samochody.
+`=` parking / podjazd, `v` trawa, `p` chodnik, `r` ulica, `t` tory, `z` strefa
+palenia, `F` ogrodzenie, `~` pustka, `n`/`h` balkon i barierka, `D` drzwi, `G`
+szklane drzwi, `B` bramka na kartę, `L` drzwi obsługi (składzik), `x` drzwi
+zablokowane, `Z` drzwi zarządu (tylko na spotkanie), `k` drzwi kabiny WC, `g`
+brama garażowa, `E`/`e` drzwi i kabina windy, `S` biegi schodów, `W` biurka,
+`T` stoły, `K` lady, `H` regały / półki, `Q` sofy, `P` rośliny, `X` samochody,
+`U`/`u` toalety / pisuary, `V` umywalki, `Y` płyn do rąk, `C` ekspres, `c`
+szafka z kubkami, `i` zlew, `d` zmywarka, `f` lodówka, `O` owoce, `w` szafa,
+`o` kosz, `R` szafy serwerowe, `A` popielniczki, `N` ławki, `b` stojak rowerowy.
+
 Bramki (`B`) i brama garażowa (`g`) wymagają przepustki lub karty przy
-wejściu, wyjście jest wolne; drzwi zaplecza (`L`) — uprawnień obsługi.
-
-| Piętro | Pomieszczenia (id) |
-|--------|--------------------|
-| Parter | Na zewnątrz (1), Parking wewnętrzny (2), Hol (3), Portiernia (4), Wejście (5), Sklep (6), Parking zewnętrzny (7), Strefa palenia (8), Zaplecze techniczne (9, zamknięte), Winda (20), Klatka schodowa (21) |
-| Piętro 1 | Recepcja (1), Zarząd (2), IT / Produkt (3), HR (4), Korytarz (5), Biznes (6), Chill room (7), Łazienka damska (8), Łazienka męska (9), Winda (20), Klatka schodowa (21) |
-
-Ustalenia: sklep i portiernia są przed bramkami (dostępne bez karty); parking
-wewnętrzny duży, z bramą garażową na zewnątrz (też na kartę); wolne miejsce nad
-holem to zamknięte „Zaplecze techniczne”.
+wejściu, wyjście jest wolne; składzik (`L`) — uprawnień obsługi; drzwi `x`
+nie przepuszczają nikogo. Biurka należą do działu pokoju (pole `department`
+w definicji pokoju): Produkt/IT (18, 19, 38), Mobile, DevOps i AI na razie w
+dziale IT / Produkt; Biznes, Finanse, Sales, Marketing, Obsługa klienta w
+dziale Biznes; stół w pokoju prezesa to miejsce Zarządu. Punkty otoczenia
+(ulica, przystanki, miejsca parkingowe, stojak, gdzie staje policja i straż),
+taca ze słodyczami, miejsce założyciela i półki sklepu są w `places` mapy.
 
 **Poruszanie między piętrami:** schody — wejście na biegi schodów przenosi do
 klatki schodowej (osobny widok: bieg, półpiętro, drugi bieg), a jej koniec
@@ -1156,7 +1223,9 @@ pełnym ekranie — zastąpiona stylem inspirowanym Don't Starve:
 automatyczne ponowne łączenie, budynek wg GDD (parter z terenem zewnętrznym,
 piętro 1, schody, winda), uprawnienia (bramki) oraz cała ścieżka nowego
 gracza: portal z ofertami → rekrutacja → portier → recepcja → HR → karta
-pracownika z działem; oprawa graficzna w pixel arcie (10.9).*
+pracownika z działem; oprawa graficzna w pixel arcie (10.9). 2026-09-30:
+nowy układ budynku wg odręcznego planu (10.5) — generator map znów jest
+jedynym źródłem, otoczenie i stałe punkty w `places` mapy.*
 
 #### Zrobione
 - **Serwer Rust** (`server/`): tick 20 Hz bez dryfu z liczeniem zgubionych

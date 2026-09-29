@@ -41,7 +41,7 @@ impl Server {
 
     /// E at the tray: one piece.
     pub(super) fn take_treat(&mut self, pid: u16, body: &Body) -> Option<String> {
-        if !treats::in_reach(body) {
+        if !treats::in_reach(&self.building, body) {
             return None;
         }
         let tray = self.tray.as_mut()?;

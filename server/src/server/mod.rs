@@ -310,7 +310,7 @@ impl Server {
             spots: needs::find_spots(&building),
             stalls: stalls::find_stalls(&building),
             elevators: elevator::find_elevators(&building),
-            shelves: crate::shop::shelves(),
+            shelves: crate::shop::shelves(&building),
             shop_rooms,
             lift_was_moving: false,
             clock: Clock::new(cfg.start_minute, cfg.time_scale),

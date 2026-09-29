@@ -125,12 +125,12 @@ mod tests {
     }
 
     #[test]
-    fn one_machine_in_the_chill_room() {
+    fn one_machine_in_the_kitchenette() {
         let (b, m) = setup();
         assert_eq!(m.len(), 1);
         let map = b.floor(m[0].floor).unwrap();
         assert_eq!(m[0].floor, 1);
-        assert_eq!(map.room_name(map.room_at_tile(m[0].tile.x, m[0].tile.y + 1)), "Chill room");
+        assert_eq!(map.room_name(map.room_at_tile(m[0].tile.x, m[0].tile.y + 1)), "Aneks kuchenny");
     }
 
     #[test]

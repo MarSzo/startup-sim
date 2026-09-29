@@ -25,7 +25,7 @@ impl Server {
             return None;
         }
         let own_vehicle = self.vehicles.iter().position(|v| v.owner == pid && v.parked() && near(v.pos, body.pos, 2));
-        let at_spot = commute::home_spot(p.commute_mode).is_some_and(|(spot, r)| near(spot, body.pos, r));
+        let at_spot = commute::home_spot(&self.building.outside, p.commute_mode).is_some_and(|(spot, r)| near(spot, body.pos, r));
         let by_vehicle = matches!(p.commute_mode, mode::CAR | mode::BIKE);
         if !(own_vehicle.is_some() || (!by_vehicle && at_spot)) {
             return None;
@@ -38,7 +38,7 @@ impl Server {
         let minutes = (p.worked_ds / crate::clock::DS_PER_MIN as u64) as u32;
         // The car / bike drives off (without its owner-bound removal).
         if let Some(i) = own_vehicle {
-            self.vehicles[i].depart();
+            self.vehicles[i].depart(&self.building.outside);
         }
         self.says.push(Say::new(pid, commute::lines::went_home(minutes)));
         self.go_home(pid);

@@ -43,7 +43,7 @@ impl Server {
         if !p.contract || dept.is_empty() {
             return Some(Some(computer::lines::NO_DEPARTMENT.into()));
         }
-        if self.workstations[ws].room_name != dept {
+        if self.workstations[ws].department != p.department {
             return Some(Some(computer::lines::NOT_MY_DEPARTMENT.into()));
         }
         let handle = self.alloc_handle();

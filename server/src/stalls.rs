@@ -57,14 +57,17 @@ mod tests {
     use crate::sim::{self, Body, IN_RIGHT, IN_LEFT};
 
     #[test]
-    fn six_stalls_each_its_own_room_that_sees_the_bathroom() {
+    fn every_stall_is_its_own_room_and_one_in_a_bathroom_sees_it() {
         let b = Building::load(&default_building_path()).unwrap();
         let stalls = find_stalls(&b);
-        assert_eq!(stalls.len(), 6);
-        let m = b.floor(1).unwrap();
+        assert_eq!(stalls.len(), 7, "the hall toilet, 3 in the corridor, 3 in the wing bathrooms");
         for s in &stalls {
+            let m = b.floor(s.floor).unwrap();
             let def = m.rooms.iter().find(|r| r.id == s.room).unwrap();
             assert_eq!(def.kind, "stall");
+            if def.see.is_empty() {
+                continue; // a toilet of its own, straight off the corridor / hall
+            }
             assert_eq!(m.visible_from(s.room).len(), 1, "a stall sees its bathroom");
             let bath = m.visible_from(s.room)[0];
             assert!(!m.visible_from(bath).contains(&s.room), "...but not the other way round");
@@ -74,18 +77,18 @@ mod tests {
     #[test]
     fn a_locked_door_is_solid_for_everyone() {
         let mut b = Building::load(&default_building_path()).unwrap();
-        let s = find_stalls(&b).into_iter().find(|s| s.door.x == 46 && s.door.y == 27).expect("women's stall 1");
-        // From the walkway right of the door, walk left into the stall.
-        let start = Body { access: access::CARD, ..Body::at(1, Pos::tile_center(48, 27)) };
+        let s = find_stalls(&b).into_iter().find(|s| s.floor == 1 && s.door.x == 5 && s.door.y == 45).expect("women's stall 1");
+        // From the washbasins right of the door, walk left into the stall.
+        let start = Body { access: access::CARD, ..Body::at(1, Pos::tile_center(7, 45)) };
         let walk = |b: &Building| (0..60).fold(start, |body, _| sim::step(b, body, IN_LEFT));
-        assert!(walk(&b).pos.x < Pos::tile_center(46, 27).x, "open: walks in");
+        assert!(walk(&b).pos.x < Pos::tile_center(5, 45).x, "open: walks in");
         b.floor_mut(1).unwrap().set_closed(s.door.x, s.door.y, true);
         let stopped = walk(&b);
-        assert_eq!(stopped.pos.x, 47 * TILE_UNITS + HALF_W, "locked: stops at the door");
+        assert_eq!(stopped.pos.x, 6 * TILE_UNITS + HALF_W, "locked: stops at the door");
         assert!(!touches(stopped.pos, s.door));
         // And from inside you can't get out either.
-        let inside = Body { access: access::CARD, ..Body::at(1, Pos::tile_center(45, 27)) };
+        let inside = Body { access: access::CARD, ..Body::at(1, Pos::tile_center(4, 45)) };
         let out = (0..60).fold(inside, |body, _| sim::step(&b, body, IN_RIGHT));
-        assert!(out.pos.x < 46 * TILE_UNITS, "stays inside");
+        assert!(out.pos.x < 5 * TILE_UNITS, "stays inside");
     }
 }

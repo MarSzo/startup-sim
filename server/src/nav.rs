@@ -78,7 +78,8 @@ mod tests {
         let b = Building::load(&default_building_path()).unwrap();
         let spawn = b.spawns()[0];
         let m1 = b.floor(1).unwrap();
-        for room in &m1.rooms {
+        // Staff-only (service) rooms and the walled-up second lift aside.
+        for room in m1.rooms.iter().filter(|r| !matches!(r.kind.as_str(), "service" | "elevator")) {
             // A tile off the stairs flight (standing there would teleport you).
             let tiles: Vec<_> = m1
                 .room_tiles(room.id)
@@ -89,7 +90,7 @@ mod tests {
             let mut body = Body::at(spawn.0, Pos::tile_center(spawn.1.x, spawn.1.y));
             // A guest; the board room needs a meeting (BOARD) on top.
             body.access = crate::map::access::GUEST | crate::map::access::BOARD;
-            let mut w = Walker::to(&b, &body, (1, goal)).expect("path");
+            let mut w = Walker::to(&b, &body, (1, goal)).unwrap_or_else(|| panic!("no path to {}", room.name));
             let mut steps = 0;
             while !w.done() && steps < 20_000 {
                 body = step(&b, body, w.next_input(&body));

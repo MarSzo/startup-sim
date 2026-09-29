@@ -1023,7 +1023,10 @@ func _update_hint() -> void:
 		# The way home (like the server): our car / bike, or the spot on foot /
 		# at the tram stop / taxi stand.
 		var me_p := Movement.to_px(pred.pos)
-		var spots := {1: Vector2i(2, 35), 4: Vector2i(34, 36), 5: Vector2i(36, 45)}
+		var spots := {}
+		for pair in [[1, "walk_home"], [4, "taxi"], [5, "tram_stop"]]:
+			if map.places.has(pair[1]):
+				spots[pair[0]] = map.places[pair[1]]
 		if spots.has(commute_mode):
 			var sp: Vector2 = (Vector2(spots[commute_mode]) + Vector2(0.5, 0.5)) * map.tile_px
 			if sp.distance_to(me_p) <= map.tile_px * 2:

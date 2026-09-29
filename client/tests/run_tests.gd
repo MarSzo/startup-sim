@@ -224,13 +224,13 @@ func test_movement(path: String) -> void:
 	# Locked stall door (dynamic overlay): same result as stalls.rs in Rust.
 	var m = building.get_floor(1)
 	var walk_left := func() -> Dictionary:
-		var bd := Movement.body(1, Movement.tile_center(48, 27), 0, Movement.LOCK_NONE, MapData.ACCESS_CARD)
+		var bd := Movement.body(1, Movement.tile_center(7, 45), 0, Movement.LOCK_NONE, MapData.ACCESS_CARD)
 		for i in 60:
 			bd = Movement.step(building, bd, Movement.IN_LEFT)
 		return bd
-	expect(walk_left.call().pos.x < Movement.tile_center(46, 27).x, "open stall door: walks in")
-	m.set_closed_tiles([Vector2i(46, 27)])
-	expect(walk_left.call().pos.x == 47 * 256 + 5 * 16, "locked stall door stops at the door (%d)" % walk_left.call().pos.x)
+	expect(walk_left.call().pos.x < Movement.tile_center(5, 45).x, "open stall door: walks in")
+	m.set_closed_tiles([Vector2i(5, 45)])
+	expect(walk_left.call().pos.x == 6 * 256 + 5 * 16, "locked stall door stops at the door (%d)" % walk_left.call().pos.x)
 	m.set_closed_tiles([])
 
 

@@ -35,6 +35,15 @@ fn building() -> Building {
 }
 
 /// Server on a random port, dual-stack. Returns (IPv4 loopback addr, building crc).
+// Where to stand in the kitchenette (floor 1, appliances along row 7) and at
+// the shop's till (floor 0).
+const CUPBOARD: Tile = Tile { x: 21, y: 8 };
+const COFFEE: Tile = Tile { x: 25, y: 8 };
+const SINK: Tile = Tile { x: 27, y: 8 };
+const DISHWASHER: Tile = Tile { x: 28, y: 8 };
+const FRIDGE: Tile = Tile { x: 19, y: 8 };
+const TILL: Tile = Tile { x: 20, y: 53 };
+
 fn start_server() -> (SocketAddr, u32) {
     start_server_with(0)
 }
@@ -279,7 +288,7 @@ fn handshake_interest_and_timeout() {
     let (addr, crc) = start_server();
     let b0 = building();
     let outside = b0.floor(0).unwrap().room_by_name("Na zewnątrz").unwrap().id;
-    let lobby = b0.floor(0).unwrap().room_by_name("Wejście").unwrap().id;
+    let lobby = b0.floor(0).unwrap().room_by_name("Wiatrołap").unwrap().id;
 
     let (a, a_crc) = Client::connect(addr, "Ala");
     let (mut b, _) = Client::connect(addr, "Bob");
@@ -307,7 +316,7 @@ fn handshake_interest_and_timeout() {
     // B walks in through the glass doors into the lobby.
     let spawn = b0.spawns()[1];
     let b_body = Body::at(spawn.0, Pos::tile_center(spawn.1.x, spawn.1.y));
-    b.walk_to(&b0, b_body, (0, Tile { x: 33, y: 28 }), &[&a]);
+    b.walk_to(&b0, b_body, (0, Tile { x: 31, y: 55 }), &[&a]);
     a.ping();
     let (_, b_room, _, _, b_ack) = b.latest_snapshot(Duration::from_millis(300)).unwrap();
     a.ping();
@@ -420,8 +429,8 @@ fn other_floors_are_invisible_and_state_matches_prediction() {
     let (mut b, _) = Client::connect(addr, "upstairs");
     let spawn = b0.spawns()[1];
     let start = Body { access: access::CARD, ..Body::at(spawn.0, Pos::tile_center(spawn.1.x, spawn.1.y)) };
-    // Up the stairs to the reception on floor 1: A stays outside.
-    let predicted = b.walk_to(&b0, start, (1, Tile { x: 25, y: 18 }), &[&a]);
+    // Up the stairs to the corridor on floor 1: A stays outside.
+    let predicted = b.walk_to(&b0, start, (1, Tile { x: 32, y: 20 }), &[&a]);
     assert_eq!(predicted.floor, 1);
 
     let deadline = Instant::now() + Duration::from_millis(400);
@@ -436,7 +445,7 @@ fn other_floors_are_invisible_and_state_matches_prediction() {
     assert_eq!(ack, b.seq);
     let server = Body { floor, pos: Pos { x, y }, prev_input: prev, lock, access: access::CARD, slow: false };
     assert_eq!(server, predicted, "server state == client prediction, bit for bit");
-    assert_eq!(b0.floor(1).unwrap().room_name(room), "Recepcja");
+    assert_eq!(b0.floor(1).unwrap().room_name(room), "Korytarz");
 
     assert!(!visible_ids(&a, &[&b], Duration::from_millis(200)).contains(&b.id), "A (floor 0) can't see B");
     assert!(!visible_ids(&b, &[&a], Duration::from_millis(200)).contains(&a.id), "B (floor 1) can't see A");
@@ -451,10 +460,10 @@ fn onboarding_porter_reception_hr_card() {
     let start = Body::at(spawn.0, Pos::tile_center(spawn.1.x, spawn.1.y));
 
     // Without a pass the gates stop you: walking to the hall ends in the lobby.
-    assert!(Walker::to(&b0, &start, (0, Tile { x: 34, y: 17 })).is_none(), "no path without a pass");
+    assert!(Walker::to(&b0, &start, (0, Tile { x: 31, y: 44 })).is_none(), "no path without a pass");
 
-    // Walk to the lodge door and press E next to the porter.
-    let body = g.walk_to(&b0, start, (0, Tile { x: 27, y: 29 }), &[]);
+    // Walk to the porter's desk and press E across it.
+    let body = g.walk_to(&b0, start, (0, Tile { x: 34, y: 49 }), &[]);
     let body = g.press_e(&b0, body);
 
     let (mut welcomed, mut got_pass, mut porter_named) = (false, false, false);
@@ -477,14 +486,14 @@ fn onboarding_porter_reception_hr_card() {
 
     // Follow him up to the reception; he announces the arrival there.
     let body = Body { access: access::GUEST, ..body };
-    let end = g.walk_to(&b0, body, (1, Tile { x: 32, y: 18 }), &[]);
+    let end = g.walk_to(&b0, body, (1, Tile { x: 36, y: 36 }), &[]);
     assert_eq!(end.floor, 1);
     assert!(g.wait_for_line(lines::ARRIVED, Duration::from_secs(8)).is_some(), "porter reached the reception");
 
     // Reception takes us to HR.
     let body = g.press_e(&b0, end);
     assert!(g.wait_for_line(lines::RECEPTION_WELCOME, Duration::from_secs(1)).is_some(), "reception greets");
-    let at_hr = g.walk_to(&b0, body, (1, Tile { x: 43, y: 8 }), &[]);
+    let at_hr = g.walk_to(&b0, body, (1, Tile { x: 47, y: 14 }), &[]);
     assert!(g.wait_for_line(lines::RECEPTION_ARRIVED, Duration::from_secs(6)).is_some(), "receptionist reached HR");
 
     // HR: contract signed, the card replaces the guest pass.
@@ -612,7 +621,7 @@ fn a_mug_left_in_the_chill_room_is_collected_by_the_cleaner() {
     let b = building();
     let (mut ola, _) = Client::connect(addr, "Ola");
     let ws = game::computer::find_workstations(&b);
-    let w = ws.iter().find(|w| w.room_name == "IT / Produkt").unwrap();
+    let w = ws.iter().find(|w| w.department == 1).unwrap();
     let body = Body { access: access::CARD, ..Body::at(w.floor, Pos::tile_center(w.tile.x, w.tile.y + 1)) };
     let action = |c: &Client, a: u8| c.send(&Packet::ItemAction { token: c.token, action: a, slot: 0 });
     let hands = |c: &Client, k: u8| {
@@ -626,20 +635,20 @@ fn a_mug_left_in_the_chill_room_is_collected_by_the_cleaner() {
     // laptop stays at the desk).
     action(&ola, act::DROP);
     std::thread::sleep(Duration::from_millis(100));
-    let at = ola.walk_to(&b, body, (1, Tile { x: 35, y: 27 }), &[]);
+    let at = ola.walk_to(&b, body, (1, CUPBOARD), &[]);
     let at = ola.press_e(&b, at);
     assert!(hands(&ola, item_kind::CUP), "a clean mug from the cupboard");
-    let at = ola.walk_to(&b, at, (1, Tile { x: 36, y: 27 }), &[]);
+    let at = ola.walk_to(&b, at, (1, COFFEE), &[]);
     let at = ola.press_e(&b, at);
     assert!(ola.wait_for_line(coffee_lines::READY, Duration::from_secs(5)).is_some());
     action(&ola, act::USE);
     assert!(hands(&ola, item_kind::EMPTY_CUP), "dirty mug after the coffee");
     // Washed up at the kitchen sink, another coffee, the mug left on the floor.
-    let at = ola.walk_to(&b, at, (1, Tile { x: 38, y: 27 }), &[]);
+    let at = ola.walk_to(&b, at, (1, SINK), &[]);
     let at = ola.press_e(&b, at);
     assert!(ola.wait_for_line(game::kitchen::lines::WASHED, Duration::from_millis(800)).is_some());
     assert!(hands(&ola, item_kind::CUP));
-    let at = ola.walk_to(&b, at, (1, Tile { x: 36, y: 27 }), &[]);
+    let at = ola.walk_to(&b, at, (1, COFFEE), &[]);
     let at = ola.press_e(&b, at);
     assert!(ola.wait_for_line(coffee_lines::READY, Duration::from_secs(5)).is_some());
     action(&ola, act::USE);
@@ -661,7 +670,7 @@ fn smoking_inside_sets_off_the_fire_alarm_and_the_smoker_pays() {
     let (mut ola, _) = Client::connect(addr, "Ola");
     let wait = Duration::from_millis(1500);
     let ws = game::computer::find_workstations(&b);
-    let w = ws.iter().find(|w| w.room_name == "IT / Produkt").unwrap();
+    let w = ws.iter().find(|w| w.department == 1).unwrap();
     let body = Body { access: access::CARD, ..Body::at(w.floor, Pos::tile_center(w.tile.x, w.tile.y + 1)) };
     let action = |c: &Client, a: u8, slot: u8| c.send(&Packet::ItemAction { token: c.token, action: a, slot });
     let said = |line: String| move |p: &Packet| matches!(p, Packet::Say { text, .. } if *text == line).then_some(());
@@ -671,15 +680,15 @@ fn smoking_inside_sets_off_the_fire_alarm_and_the_smoker_pays() {
     action(&ola, act::DROP, 0); // the laptop stays at the desk
     std::thread::sleep(Duration::from_millis(100));
     // A pack of cigarettes from the shop, paid for.
-    let body = ola.walk_to(&b, body, (0, Tile { x: 55, y: 25 }), &[]);
+    let body = ola.walk_to(&b, body, (0, Tile { x: 20, y: 47 }), &[]);
     ola.send(&Packet::ShopTake { token: ola.token, shelf: 5, kind: item_kind::CIGARETTES });
     std::thread::sleep(Duration::from_millis(150));
-    let body = ola.walk_to(&b, body, (0, Tile { x: 53, y: 30 }), &[]);
+    let body = ola.walk_to(&b, body, (0, TILL), &[]);
     while ola.recv().is_some() {}
     let body = ola.press_e(&b, body);
     assert!(wait_for(&ola, &[], wait, said("Razem 18,00 zł. Dziękuję! Zostało Ci 182,00 zł.".into())).is_some());
     // Into the hall by the lifts (it has a smoke detector) and light up.
-    let _body = ola.walk_to(&b, body, (0, Tile { x: 30, y: 17 }), &[]);
+    let _body = ola.walk_to(&b, body, (0, Tile { x: 31, y: 44 }), &[]);
     let slot = wait_for(&ola, &[], Duration::from_millis(2500), |p| match p {
         Packet::Inventory { slots } => slots[1..].iter().position(|s| s.kind == item_kind::CIGARETTES),
         _ => None,
@@ -708,9 +717,9 @@ fn the_light_switch_turns_the_room_lamp_on_and_off_for_everybody() {
     let b = building();
     let (mut ola, _) = Client::connect(addr, "Ola");
     let ws = game::computer::find_workstations(&b);
-    let w = ws.iter().find(|w| w.room_name == "IT / Produkt").unwrap();
+    let w = ws.iter().find(|w| w.department == 1).unwrap();
     let body = Body { access: access::CARD, ..Body::at(w.floor, Pos::tile_center(w.tile.x, w.tile.y + 1)) };
-    let it = b.floor(1).unwrap().room_by_name("IT / Produkt").unwrap();
+    let it = b.floor(1).unwrap().room_by_name("Produkt / IT").unwrap();
     let [sx, sy] = it.switch.unwrap();
     let lamps = |c: &Client| {
         wait_for(c, &[], Duration::from_millis(2500), |p| match p {
@@ -743,7 +752,7 @@ fn kitchenette_mugs_dishwasher_and_fridge() {
     let b = building();
     let (mut ola, _) = Client::connect(addr, "Ola");
     let ws = game::computer::find_workstations(&b);
-    let w = ws.iter().find(|w| w.room_name == "IT / Produkt").unwrap();
+    let w = ws.iter().find(|w| w.department == 1).unwrap();
     let body = Body { access: access::CARD, ..Body::at(w.floor, Pos::tile_center(w.tile.x, w.tile.y + 1)) };
     let action = |c: &Client, a: u8| c.send(&Packet::ItemAction { token: c.token, action: a, slot: 0 });
     let hands = |c: &Client, k: u8| {
@@ -757,33 +766,33 @@ fn kitchenette_mugs_dishwasher_and_fridge() {
     action(&ola, act::DROP); // the laptop stays at the desk
     std::thread::sleep(Duration::from_millis(100));
     // No mug, no coffee.
-    let at = ola.walk_to(&b, body, (1, Tile { x: 36, y: 27 }), &[]);
+    let at = ola.walk_to(&b, body, (1, COFFEE), &[]);
     let at = ola.press_e(&b, at);
     assert!(ola.wait_for_line(kl::NEED_MUG, Duration::from_millis(800)).is_some());
     // Mug -> coffee -> dirty mug -> dishwasher, switched on.
-    let at = ola.walk_to(&b, at, (1, Tile { x: 35, y: 27 }), &[]);
+    let at = ola.walk_to(&b, at, (1, CUPBOARD), &[]);
     let at = ola.press_e(&b, at);
     assert!(hands(&ola, item_kind::CUP));
-    let at = ola.walk_to(&b, at, (1, Tile { x: 36, y: 27 }), &[]);
+    let at = ola.walk_to(&b, at, (1, COFFEE), &[]);
     let at = ola.press_e(&b, at);
     assert!(ola.wait_for_line(coffee_lines::READY, Duration::from_secs(5)).is_some());
     action(&ola, act::USE);
     assert!(hands(&ola, item_kind::EMPTY_CUP));
     let at = ola.press_e(&b, at);
     assert!(ola.wait_for_line(kl::DIRTY_MUG, Duration::from_millis(800)).is_some(), "no coffee into a dirty mug");
-    let at = ola.walk_to(&b, at, (1, Tile { x: 39, y: 27 }), &[]);
+    let at = ola.walk_to(&b, at, (1, DISHWASHER), &[]);
     let at = ola.press_e(&b, at);
     assert!(ola.wait_for_line(&kl::loaded(1), Duration::from_millis(800)).is_some());
     let at = ola.press_e(&b, at);
     assert!(ola.wait_for_line(kl::DW_STARTED, Duration::from_millis(800)).is_some());
     // Another coffee, with milk from the fridge; a free water.
-    let at = ola.walk_to(&b, at, (1, Tile { x: 35, y: 27 }), &[]);
+    let at = ola.walk_to(&b, at, (1, CUPBOARD), &[]);
     let at = ola.press_e(&b, at);
     assert!(hands(&ola, item_kind::CUP));
-    let at = ola.walk_to(&b, at, (1, Tile { x: 36, y: 27 }), &[]);
+    let at = ola.walk_to(&b, at, (1, COFFEE), &[]);
     let at = ola.press_e(&b, at);
     assert!(ola.wait_for_line(coffee_lines::READY, Duration::from_secs(5)).is_some());
-    let at = ola.walk_to(&b, at, (1, Tile { x: 41, y: 27 }), &[]);
+    let at = ola.walk_to(&b, at, (1, FRIDGE), &[]);
     while ola.recv().is_some() {}
     ola.press_e(&b, at);
     let opened = wait_for(&ola, &[], Duration::from_millis(800), |p| match p {
@@ -809,10 +818,10 @@ fn going_home_early_from_the_tram_stop_pays_and_speeds_the_day_up() {
     let b = building();
     let (mut ola, _) = Client::connect(addr, "Ola");
     let ws = game::computer::find_workstations(&b);
-    let w = ws.iter().find(|w| w.room_name == "IT / Produkt").unwrap();
+    let w = ws.iter().find(|w| w.department == 1).unwrap();
     let body = Body { access: access::CARD, ..Body::at(w.floor, Pos::tile_center(w.tile.x, w.tile.y + 1)) };
     // E anywhere else: nothing about going home.
-    let at = ola.walk_to(&b, body, (0, Tile { x: 36, y: 45 }), &[]);
+    let at = ola.walk_to(&b, body, (0, Tile { x: 36, y: 69 }), &[]);
     while ola.recv().is_some() {}
     let at = ola.press_e(&b, at);
     assert!(ola.wait_for_line(cl::GO_HOME_ASK, Duration::from_millis(800)).is_some(), "asked first");
@@ -844,15 +853,15 @@ fn coffee_machine_brews_one_cup_at_a_time() {
         let s = b.spawns()[i];
         Body { access: access::CARD, ..Body::at(s.0, Pos::tile_center(s.1.x, s.1.y)) }
     };
-    // Both take a mug from the cupboard (35,26) and go to the machine (36,26).
-    let at_a = a.walk_to(&b, spawn(0), (1, Tile { x: 35, y: 27 }), &[&c]);
+    // Both take a mug from the cupboard and go to the machine.
+    let at_a = a.walk_to(&b, spawn(0), (1, CUPBOARD), &[&c]);
     let at_a = a.press_e(&b, at_a);
     assert!(a.wait_for_line(&game::kitchen::lines::took_mug(7), Duration::from_millis(800)).is_some());
-    let at_a = a.walk_to(&b, at_a, (1, Tile { x: 36, y: 27 }), &[&c]);
-    let at_c = c.walk_to(&b, spawn(1), (1, Tile { x: 35, y: 27 }), &[&a]);
+    let at_a = a.walk_to(&b, at_a, (1, COFFEE), &[&c]);
+    let at_c = c.walk_to(&b, spawn(1), (1, CUPBOARD), &[&a]);
     let at_c = c.press_e(&b, at_c);
     assert!(c.wait_for_line(&game::kitchen::lines::took_mug(6), Duration::from_millis(800)).is_some());
-    let at_c = c.walk_to(&b, at_c, (1, Tile { x: 37, y: 27 }), &[&a]);
+    let at_c = c.walk_to(&b, at_c, (1, Tile { x: 24, y: 8 }), &[&a]);
 
     // A presses E: brewing starts; A's own bubble says so.
     a.press_e(&b, at_a);
@@ -1076,7 +1085,7 @@ fn laptop_on_desk_messenger_lock_and_take() {
     // Kuba goes out in Ola's name.
     let seat = |id: u16| -> Body {
         let ws = game::computer::find_workstations(&b);
-        let it: Vec<_> = ws.iter().filter(|w| w.room_name == "IT / Produkt").collect();
+        let it: Vec<_> = ws.iter().filter(|w| w.department == 1).collect();
         let w = it[(id as usize - 1) / 2];
         Body { access: access::CARD, ..Body::at(w.floor, Pos::tile_center(w.tile.x, w.tile.y + 1)) }
     };
@@ -1154,13 +1163,13 @@ fn needs_fruit_sofa_and_the_wrong_bathroom() {
         last
     };
     let ws = game::computer::find_workstations(&b);
-    let w = ws.iter().find(|w| w.room_name == "IT / Produkt").unwrap();
+    let w = ws.iter().find(|w| w.department == 1).unwrap();
     let mut body = Body { access: access::CARD, ..Body::at(w.floor, Pos::tile_center(w.tile.x, w.tile.y + 1)) };
 
     // Laptop down first (hands free), then fruit from the bowl in the chill room.
     body = ola.press_e(&b, body);
     assert!(wait_for(&ola, &[], wait, said(game::computer::lines::PLACED)).is_some());
-    body = ola.walk_to(&b, body, (1, Tile { x: 40, y: 27 }), &[]);
+    body = ola.walk_to(&b, body, (1, Tile { x: 41, y: 8 }), &[]);
     body = ola.press_e(&b, body);
     assert!(wait_for(&ola, &[], wait, said(nl::FRUIT)).is_some());
     let slot = wait_for(&ola, &[], INVENTORY_WAIT, |p| match p {
@@ -1185,7 +1194,7 @@ fn needs_fruit_sofa_and_the_wrong_bathroom() {
     assert!(after.is_some(), "fruit lowers hunger (was {before})");
 
     // Sofa: sitting shows as an activity; stepping away ends it.
-    body = ola.walk_to(&b, body, (1, Tile { x: 30, y: 28 }), &[]);
+    body = ola.walk_to(&b, body, (1, Tile { x: 32, y: 10 }), &[]);
     body = ola.press_e(&b, body);
     assert!(wait_for(&ola, &[], wait, said(nl::SOFA)).is_some());
     assert_eq!(activity(&ola), Some(proto::activity::SOFA));
@@ -1194,7 +1203,7 @@ fn needs_fruit_sofa_and_the_wrong_bathroom() {
     assert_eq!(activity(&ola), Some(proto::activity::NONE), "got up");
 
     // Ola is female: the men's room works, but it's embarrassing.
-    body = ola.walk_to(&b, body, (1, Tile { x: 55, y: 27 }), &[]); // men's stall 1
+    body = ola.walk_to(&b, body, (1, Tile { x: 37, y: 22 }), &[]); // the men's WC
     ola.press_e(&b, body);
     assert!(wait_for(&ola, &[], wait, said(nl::WRONG_BATHROOM)).is_some());
     assert_eq!(activity(&ola), Some(proto::activity::TOILET));
@@ -1208,9 +1217,9 @@ fn toilet_stall_hides_who_is_inside_and_locks() {
     let (mut ola, _) = Client::connect(addr, "Ola"); // IT
     let (mut kuba, _) = Client::connect(addr, "Kuba"); // Biznes
     let wait = Duration::from_millis(800);
-    let seat = |dept: &str| {
+    let seat = |dept: u8| {
         let ws = game::computer::find_workstations(&b);
-        let w = ws.iter().find(|w| w.room_name == dept).unwrap();
+        let w = ws.iter().find(|w| w.department == dept).unwrap();
         Body { access: access::CARD, ..Body::at(w.floor, Pos::tile_center(w.tile.x, w.tile.y + 1)) }
     };
     let said = |line: &'static str| move |p: &Packet| matches!(p, Packet::Say { text, .. } if text == line).then_some(());
@@ -1220,13 +1229,13 @@ fn toilet_stall_hides_who_is_inside_and_locks() {
     };
 
     // Ola goes into women's stall 1 (without locking), Kuba waits by the sinks.
-    let o = ola.walk_to(&b, seat("IT / Produkt"), (1, Tile { x: 45, y: 27 }), &[&kuba]);
-    let k = kuba.walk_to(&b, seat("Biznes"), (1, Tile { x: 47, y: 27 }), &[&ola]);
+    let o = ola.walk_to(&b, seat(1), (1, Tile { x: 4, y: 45 }), &[&kuba]);
+    let k = kuba.walk_to(&b, seat(2), (1, Tile { x: 7, y: 45 }), &[&ola]);
     assert!(!visible_ids(&kuba, &[&ola], wait).contains(&ola.id), "nobody sees who is in the stall");
     assert!(visible_ids(&ola, &[&kuba], wait).contains(&kuba.id), "from the stall you see the bathroom");
 
     // Kuba opens the unlocked door (steps into the doorway): now he sees her.
-    let k_door = kuba.walk_to(&b, k, (1, Tile { x: 46, y: 27 }), &[&ola]);
+    let k_door = kuba.walk_to(&b, k, (1, Tile { x: 5, y: 45 }), &[&ola]);
     assert!(visible_ids(&kuba, &[&ola], wait).contains(&ola.id), "an open door shows who is inside");
     // Too late to lock with Kuba in the doorway.
     // (Drain first: during Kuba's walk Ola's socket buffer filled up with
@@ -1236,24 +1245,24 @@ fn toilet_stall_hides_who_is_inside_and_locks() {
     assert!(wait_for(&ola, &[&kuba], wait, said(sl::IN_DOORWAY)).is_some());
 
     // Kuba steps back, Ola locks: the door is solid, Kuba can't get in or see her.
-    kuba.walk_to(&b, k_door, (1, Tile { x: 47, y: 27 }), &[&ola]);
+    kuba.walk_to(&b, k_door, (1, Tile { x: 7, y: 45 }), &[&ola]);
     while ola.recv().is_some() {}
     door_action(&ola);
     assert!(wait_for(&ola, &[&kuba], wait, said(sl::LOCKED)).is_some());
-    assert!(locked_doors(&kuba, &ola).is_some_and(|t| t.contains(&(46, 27))));
+    assert!(locked_doors(&kuba, &ola).is_some_and(|t| t.contains(&(5, 45))));
     kuba.send_inputs(sim::IN_LEFT, 6);
     std::thread::sleep(Duration::from_millis(60));
     kuba.send_inputs(sim::IN_LEFT, 6);
     let (_, room, (x, _), ids, _) = kuba.latest_snapshot(Duration::from_millis(300)).unwrap();
-    assert!(x >= 47 * sim::TILE_UNITS, "stopped at the locked door (x = {x})");
+    assert!(x >= 6 * sim::TILE_UNITS, "stopped at the locked door (x = {x})");
     assert!(!ids.contains(&ola.id));
-    assert_eq!(b.floor(1).unwrap().room_name(room), "Łazienka damska");
+    assert_eq!(b.floor(1).unwrap().room_name(room), "Łazienka damska (zachód)");
     let _ = o;
 
     // Ola leaves the game while locked in: the stall opens by itself.
     ola.send(&Packet::Disconnect { token: ola.token, reason: proto::disconnect::CLIENT_QUIT });
     let opened = wait_for(&kuba, &[], wait, |p| match p {
-        Packet::Doors { tiles, .. } if !tiles.contains(&(46, 27)) => Some(()),
+        Packet::Doors { tiles, .. } if !tiles.contains(&(5, 45)) => Some(()),
         _ => None,
     });
     assert!(opened.is_some(), "unlocked when the person inside left");
@@ -1268,30 +1277,30 @@ fn elevator_is_called_waited_for_and_ridden() {
     let wait = Duration::from_millis(800);
     let said = |pred: fn(&str) -> bool| move |p: &Packet| matches!(p, Packet::Say { text, .. } if pred(text)).then_some(());
     let ws = game::computer::find_workstations(&b);
-    let w = ws.iter().find(|w| w.room_name == "IT / Produkt").unwrap();
+    let w = ws.iter().find(|w| w.department == 1).unwrap();
     let start = Body { access: access::CARD, ..Body::at(w.floor, Pos::tile_center(w.tile.x, w.tile.y + 1)) };
 
     // In front of the elevator on floor 1: the car is downstairs, doors shut.
-    let body = ola.walk_to(&b, start, (1, Tile { x: 26, y: 14 }), &[]);
+    let body = ola.walk_to(&b, start, (1, Tile { x: 37, y: 44 }), &[]);
     let doors = |c: &Client| wait_for(c, &[], wait, |p| if let Packet::Doors { tiles, lift_floor, lift_target, .. } = p { Some((tiles.clone(), *lift_floor, *lift_target)) } else { None });
     let (tiles, lift, _) = doors(&ola).unwrap();
-    assert!(tiles.contains(&(26, 13)) && lift == 0);
+    assert!(tiles.contains(&(37, 43)) && lift == 0);
     let body = ola.press_e(&b, body);
     assert!(wait_for(&ola, &[], wait, said(|t| t == el::CALLED)).is_some());
     // Walking into the closed doors doesn't work.
     while ola.recv().is_some() {}
     ola.send_inputs(sim::IN_UP, 6);
     let (_, _, (_, y), _, _) = ola.latest_snapshot(Duration::from_millis(200)).unwrap();
-    assert!(y >= 14 * sim::TILE_UNITS, "doors closed while the car is away");
+    assert!(y >= 44 * sim::TILE_UNITS, "doors closed while the car is away");
     // ~3 s later it arrives and opens.
     let opened = wait_for(&ola, &[], Duration::from_millis(4000), |p| match p {
-        Packet::Doors { tiles, lift_floor: 1, .. } if !tiles.contains(&(26, 13)) => Some(()),
+        Packet::Doors { tiles, lift_floor: 1, .. } if !tiles.contains(&(37, 43)) => Some(()),
         _ => None,
     });
     assert!(opened.is_some(), "the car came up and opened");
     // Step in, choose the floor (the other one: ground floor), ride.
-    let body = Body { pos: Pos { x: body.pos.x, y: 14 * sim::TILE_UNITS + sim::HALF_H }, ..body };
-    let body = ola.walk_to(&b, body, (1, Tile { x: 26, y: 12 }), &[]);
+    let body = Body { pos: Pos { x: body.pos.x, y: 44 * sim::TILE_UNITS + sim::HALF_H }, ..body };
+    let body = ola.walk_to(&b, body, (1, Tile { x: 37, y: 42 }), &[]);
     ola.press_e(&b, body);
     assert!(wait_for(&ola, &[], wait, said(|t| t.starts_with("Jedziemy na: Parter"))).is_some());
     let arrived = wait_for(&ola, &[], Duration::from_millis(5000), |p| match p {
@@ -1299,7 +1308,7 @@ fn elevator_is_called_waited_for_and_ridden() {
         _ => None,
     });
     let (x, y) = arrived.expect("arrived at the ground floor");
-    assert_eq!(Pos { x, y }.tile(), (26, 12), "same spot in the cabin, other floor");
+    assert_eq!(Pos { x, y }.tile(), (37, 42), "same spot in the cabin, other floor");
 }
 
 #[test]
@@ -1310,9 +1319,9 @@ fn toilet_dirty_hands_witness_and_washing() {
     let (mut ola, _) = Client::connect(addr, "Ola"); // IT
     let (mut kuba, _) = Client::connect(addr, "Kuba"); // Biznes
     let wait = Duration::from_millis(800);
-    let seat = |dept: &str| {
+    let seat = |dept: u8| {
         let ws = game::computer::find_workstations(&b);
-        let w = ws.iter().find(|w| w.room_name == dept).unwrap();
+        let w = ws.iter().find(|w| w.department == dept).unwrap();
         Body { access: access::CARD, ..Body::at(w.floor, Pos::tile_center(w.tile.x, w.tile.y + 1)) }
     };
     let said = |line: String| move |p: &Packet| matches!(p, Packet::Say { text, .. } if *text == line).then_some(());
@@ -1325,16 +1334,16 @@ fn toilet_dirty_hands_witness_and_washing() {
     };
 
     // Kuba waits in the women's bathroom by the stalls; Ola uses a toilet.
-    let k = kuba.walk_to(&b, seat("Biznes"), (1, Tile { x: 47, y: 29 }), &[&ola]);
-    let o = ola.walk_to(&b, seat("IT / Produkt"), (1, Tile { x: 45, y: 27 }), &[&kuba]);
+    let k = kuba.walk_to(&b, seat(2), (1, Tile { x: 7, y: 47 }), &[&ola]);
+    let o = ola.walk_to(&b, seat(1), (1, Tile { x: 4, y: 45 }), &[&kuba]);
     let o = ola.press_e(&b, o);
     assert!(dirty(&ola, &kuba, true), "toilet -> dirty hands");
     // Out of the bathroom without washing: Kuba notices.
     while ola.recv().is_some() {}
-    let o = ola.walk_to(&b, o, (1, Tile { x: 46, y: 23 }), &[&kuba]);
+    let o = ola.walk_to(&b, o, (1, Tile { x: 13, y: 46 }), &[&kuba]);
     assert!(wait_for(&ola, &[&kuba], wait, said("Ej, Ola, a ręce?!".into())).is_some());
     // Back to the sink: 5 s of washing, clean hands.
-    let o = ola.walk_to(&b, o, (1, Tile { x: 48, y: 27 }), &[&kuba]);
+    let o = ola.walk_to(&b, o, (1, Tile { x: 9, y: 45 }), &[&kuba]);
     ola.press_e(&b, o);
     assert!(wait_for(&ola, &[&kuba], wait, said(nl::WASHING.into())).is_some());
     assert!(wait_for(&ola, &[&kuba], Duration::from_millis(6000), said(nl::WASHED.into())).is_some());
@@ -1356,12 +1365,12 @@ fn shop_take_from_shelf_alarm_and_pay() {
     let inventory = |c: &Client| wait_for(c, &[], Duration::from_millis(2500), |p| if let Packet::Inventory { slots } = p { Some(slots.clone()) } else { None });
     let take = |c: &Client, shelf: u8, kind: u8| c.send(&Packet::ShopTake { token: c.token, shelf, kind });
     let ws = game::computer::find_workstations(&b);
-    let w = ws.iter().find(|w| w.room_name == "IT / Produkt").unwrap();
+    let w = ws.iter().find(|w| w.department == 1).unwrap();
     let body = Body { access: access::CARD, ..Body::at(w.floor, Pos::tile_center(w.tile.x, w.tile.y + 1)) };
     assert_eq!(money(&ola), Some(200_00));
 
     // Downstairs to the sandwich shelf: E shows what's on it.
-    let body = ola.walk_to(&b, body, (0, Tile { x: 47, y: 25 }), &[]);
+    let body = ola.walk_to(&b, body, (0, Tile { x: 22, y: 47 }), &[]);
     while ola.recv().is_some() {}
     let body = ola.press_e(&b, body);
     let goods = wait_for(&ola, &[], wait, |p| match p {
@@ -1379,7 +1388,7 @@ fn shop_take_from_shelf_alarm_and_pay() {
 
     // Walking out without paying: beep, the guard comes after Ola and the
     // sandwich goes back.
-    let out = ola.walk_to(&b, body, (0, Tile { x: 39, y: 29 }), &[]);
+    let out = ola.walk_to(&b, body, (0, Tile { x: 22, y: 59 }), &[]);
     assert!(wait_for(&ola, &[], wait, said(|t| t == sl::ALARM)).is_some());
     assert!(wait_for(&ola, &[], Duration::from_millis(3000), said(|t| t == security::lines::GUARD_CAUGHT)).is_some());
     assert!(inventory(&ola).is_some_and(|s| s.iter().all(|s| s.kind != item_kind::SANDWICH_HAM)));
@@ -1399,10 +1408,10 @@ fn shop_take_from_shelf_alarm_and_pay() {
     let out = Body { pos: Pos { x: held_at.0, y: held_at.1 }, ..out };
 
     // Back in, take it again, pay at the till, eat it.
-    let body = ola.walk_to(&b, out, (0, Tile { x: 47, y: 25 }), &[]);
+    let body = ola.walk_to(&b, out, (0, Tile { x: 22, y: 47 }), &[]);
     take(&ola, 1, item_kind::SANDWICH_HAM);
     std::thread::sleep(Duration::from_millis(150));
-    let body = ola.walk_to(&b, body, (0, Tile { x: 53, y: 30 }), &[]);
+    let body = ola.walk_to(&b, body, (0, TILL), &[]);
     while ola.recv().is_some() {}
     let body = ola.press_e(&b, body);
     assert!(wait_for(&ola, &[], wait, said(|t| t.starts_with("Razem 14,00 zł. Dziękuję!"))).is_some());
@@ -1413,10 +1422,10 @@ fn shop_take_from_shelf_alarm_and_pay() {
 
     // Once more without paying the same day: the guard calls the police, a
     // patrol car pulls up and the officer fines Ola (all she has left).
-    let body = ola.walk_to(&b, body, (0, Tile { x: 47, y: 25 }), &[]);
+    let body = ola.walk_to(&b, body, (0, Tile { x: 22, y: 47 }), &[]);
     take(&ola, 1, item_kind::WRAP);
     std::thread::sleep(Duration::from_millis(150));
-    let _out = ola.walk_to(&b, body, (0, Tile { x: 39, y: 29 }), &[]);
+    let _out = ola.walk_to(&b, body, (0, Tile { x: 22, y: 59 }), &[]);
     assert!(wait_for(&ola, &[], Duration::from_millis(3000), said(|t| t == security::lines::GUARD_POLICE_AGAIN)).is_some());
     let fine = security::lines::police_fine(186_00);
     assert!(wait_for(&ola, &[], Duration::from_millis(8000), |p| matches!(p, Packet::Say { text, .. } if *text == fine).then_some(())).is_some());
@@ -1485,14 +1494,15 @@ fn morning_commute_choice_ride_and_arrival() {
         _ => None,
     });
     assert!(riding.is_some(), "rides in the car");
-    let out = wait_for(&ola, &[], Duration::from_millis(8000), |p| match p {
+    // (Along the whole street from the east edge: ~7 s.)
+    let out = wait_for(&ola, &[], Duration::from_millis(12000), |p| match p {
         Packet::Snapshot { self_activity, self_x, self_y, floor: 0, .. } if *self_activity != proto::activity::RIDING => {
             Some(Pos { x: *self_x, y: *self_y }.tile())
         }
         _ => None,
     });
     let (tx, ty) = out.expect("got out");
-    assert!((41..=43).contains(&ty) && tx < 31, "on the outside car park: ({tx},{ty})");
+    assert!((65..=67).contains(&ty) && tx < 31, "on the outside car park: ({tx},{ty})");
 }
 
 #[test]
@@ -1528,7 +1538,7 @@ fn calendar_meeting_with_the_ceo() {
     let wait = Duration::from_millis(800);
     let access = |c: &Client| wait_for(c, &[], wait, |p| if let Packet::Snapshot { self_access, .. } = p { Some(*self_access) } else { None });
     let ws = game::computer::find_workstations(&b);
-    let w = ws.iter().find(|w| w.room_name == "IT / Produkt").unwrap();
+    let w = ws.iter().find(|w| w.department == 1).unwrap();
     let body = Body { access: access::CARD, ..Body::at(w.floor, Pos::tile_center(w.tile.x, w.tile.y + 1)) };
     // Laptop on the desk, sit down: the calendar comes with the screen.
     let body = ola.press_e(&b, body);
@@ -1555,7 +1565,7 @@ fn calendar_meeting_with_the_ceo() {
     });
     assert!(open.is_some(), "door open around the meeting");
     let body = Body { access: access::CARD | access::BOARD, ..body };
-    let body = ola.walk_to(&b, body, (1, Tile { x: 49, y: 19 }), &[]);
+    let body = ola.walk_to(&b, body, (1, Tile { x: 20, y: 18 }), &[]); // by the CEO
     while ola.recv().is_some() {}
     ola.press_e(&b, body);
     let dialog = wait_for(&ola, &[], wait, |p| match p {
@@ -1577,9 +1587,9 @@ fn sweets_tray_in_the_chill_room() {
     let (mut ola, _) = Client::connect(addr, "Ola");
     let wait = Duration::from_millis(800);
     let ws = game::computer::find_workstations(&b);
-    let w = ws.iter().find(|w| w.room_name == "IT / Produkt").unwrap();
+    let w = ws.iter().find(|w| w.department == 1).unwrap();
     let body = Body { access: access::CARD, ..Body::at(w.floor, Pos::tile_center(w.tile.x, w.tile.y + 1)) };
-    let body = ola.walk_to(&b, body, (1, Tile { x: 37, y: 31 }), &[]);
+    let body = ola.walk_to(&b, body, (1, Tile { x: 36, y: 12 }), &[]);
     while ola.recv().is_some() {}
     let tray = |c: &Client| {
         wait_for(c, &[], wait, |p| match p {
@@ -1611,7 +1621,7 @@ fn lunch_ordered_in_the_app_and_picked_up_at_the_reception() {
     let b = building();
     let (mut ola, _) = Client::connect(addr, "Ola"); // IT, at her desk, 200 zł
     let ws = game::computer::find_workstations(&b);
-    let w = ws.iter().find(|w| w.room_name == "IT / Produkt").unwrap();
+    let w = ws.iter().find(|w| w.department == 1).unwrap();
     let body = Body { access: access::CARD, ..Body::at(w.floor, Pos::tile_center(w.tile.x, w.tile.y + 1)) };
     let body = ola.press_e(&b, body);
     std::thread::sleep(Duration::from_millis(150));
@@ -1631,7 +1641,7 @@ fn lunch_ordered_in_the_app_and_picked_up_at_the_reception() {
     assert_eq!(money, Some(200_00 - 25_00));
     ola.send(&Packet::ComputerAction { token: ola.token, action: ca::CLOSE, conv: 0, arg: 0, text: String::new() });
     // To the reception while the courier is on the way; told when it's there.
-    let body = ola.walk_to(&b, body, (1, Tile { x: 32, y: 18 }), &[]);
+    let body = ola.walk_to(&b, body, (1, Tile { x: 36, y: 36 }), &[]);
     let told = wait_for(&ola, &[], Duration::from_millis(8000), |p| {
         matches!(p, Packet::Say { text, .. } if text.starts_with("Kurier był! Kebab")).then_some(())
     });
@@ -1964,9 +1974,11 @@ fn voice_reaches_the_room_and_whispers_only_the_one_next_to_you() {
     // Ewa walks to the far end of the room: the room still hears Ola, a
     // whisper doesn't reach anyone.
     let ws = game::computer::find_workstations(&b);
-    let it: Vec<_> = ws.iter().filter(|w| w.room_name == "IT / Produkt").collect();
+    let it: Vec<_> = ws.iter().filter(|w| w.department == 1).collect();
     let seat = |i: usize| Body { access: access::CARD, ..Body::at(it[i].floor, Pos::tile_center(it[i].tile.x, it[i].tile.y + 1)) };
-    let far = it.last().unwrap();
+    let m1 = b.floor(1).unwrap();
+    let room_of = |w: &&game::computer::Workstation| m1.room_at_tile(w.tile.x, w.tile.y);
+    let far = it.iter().rfind(|w| room_of(w) == room_of(&it[0])).unwrap(); // same room, far end
     ewa.walk_to(&b, seat(1), (1, Tile { x: far.tile.x, y: far.tile.y + 1 }), &[&ola, &kuba]);
     std::thread::sleep(Duration::from_millis(200));
     say(&ola, 5, 1);
@@ -2116,7 +2128,7 @@ fn progress_survives_a_server_restart() {
     assert!(inv.contains(&item_kind::EMPLOYEE_CARD) && !inv.contains(&item_kind::LAPTOP), "card kept, laptop still on the desk: {inv:?}");
     // Walk in from the entrance to her desk: the laptop logs in as Ola.
     let ws = game::computer::find_workstations(&b);
-    let desk = ws.iter().find(|w| w.room_name == "IT / Produkt").unwrap();
+    let desk = ws.iter().find(|w| w.department == 1).unwrap();
     let s = b.spawns()[1 % b.spawns().len()]; // Ewa came in first, at the first spot
     let body = Body { access: access::CARD, ..Body::at(s.0, Pos::tile_center(s.1.x, s.1.y)) };
     let at = ola.walk_to(&b, body, (desk.floor, Tile { x: desk.tile.x, y: desk.tile.y + 1 }), &[]);

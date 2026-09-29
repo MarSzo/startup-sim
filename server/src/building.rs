@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use serde::Deserialize;
 
 use crate::map::{dir, LinkKind, Map, NpcDef, RoomDef, Tile};
+use crate::outside::Outside;
 use crate::sim::Pos;
 
 #[derive(Debug, Deserialize)]
@@ -38,6 +39,11 @@ pub struct Building {
     /// CRC32 over building.json followed by every floor file, in floor order.
     /// Sent in `Welcome`; the client computes the same over its copies.
     pub crc: u32,
+    /// Street, stops, parking (from the ground floor's places).
+    pub outside: Outside,
+    /// Where the treats tray stands; where a new founder appears.
+    pub tray: Option<Place>,
+    pub founder: Option<Place>,
 }
 
 /// A position in the building: (floor, tile).
@@ -77,7 +83,16 @@ impl Building {
             };
             floors.push(Floor { name: f.name.clone(), locked: f.locked, map });
         }
-        let b = Building { floors, crc: hasher.finalize() };
+        let ground = floors.first().and_then(|f| f.map.as_ref()).ok_or("building has no ground floor")?;
+        let outside = Outside::from_map(ground)?;
+        let place = |pick: fn(&crate::map::Places) -> Option<[i32; 2]>| {
+            floors.iter().enumerate().find_map(|(i, f)| {
+                f.map.as_ref().and_then(|m| pick(&m.places)).map(|[x, y]| (i as u8, Tile { x, y }))
+            })
+        };
+        let tray = place(|p| p.tray);
+        let founder = place(|p| p.founder);
+        let b = Building { floors, crc: hasher.finalize(), outside, tray, founder };
         if b.spawns().is_empty() {
             return Err("building has no spawns".into());
         }
@@ -246,7 +261,7 @@ mod tests {
         assert_eq!(floors, [0, 3, 1]);
         let i = path.iter().position(|p| p.0 == 1).unwrap();
         assert_eq!(b.floor(3).unwrap().tile_char(path[i - 1].1.x, path[i - 1].1.y), Some('S'));
-        assert_eq!(path[i].1, Tile { x: 34, y: 10 }, "arrival tile");
+        assert_eq!(path[i].1, Tile { x: 25, y: 41 }, "arrival tile (the stairwell upstairs)");
         for w in path.windows(2) {
             if w[0].0 == w[1].0 {
                 let d = (w[0].1.x - w[1].1.x).abs() + (w[0].1.y - w[1].1.y).abs();
@@ -256,19 +271,19 @@ mod tests {
     }
 
     #[test]
-    fn the_balcony_is_off_the_chill_room_outdoors_and_looks_down_on_the_street() {
+    fn the_balcony_is_off_the_kitchenette_outdoors_and_looks_down_outside() {
         let b = Building::load(&default_building_path()).unwrap();
         let m = b.floor(1).unwrap();
         let balcony = m.room_by_name("Balkon").unwrap();
         assert!(balcony.outdoor);
-        let chill = m.room_by_name("Chill room").unwrap().id;
-        let t = m.room_tiles(chill)[0];
-        let path = b.find_path((1, t), (1, Tile { x: 33, y: 35 }), 0).expect("from the chill room to the balcony");
+        let kitchen = m.room_by_name("Aneks kuchenny").unwrap().id;
+        let t = m.room_tiles(kitchen)[0];
+        let path = b.find_path((1, t), (1, Tile { x: 25, y: 4 }), 0).expect("from the kitchenette to the balcony");
         assert!(!path.is_empty());
         let below = b.below(1, balcony.id);
         let street = b.floor(0).unwrap().room_by_name("Na zewnątrz").unwrap().id;
-        assert!(below.contains(&(0, street)) && below.len() == 3, "{below:?}");
-        assert!(b.below(1, chill).is_empty());
+        assert_eq!(below, vec![(0, street)]);
+        assert!(b.below(1, kitchen).is_empty());
     }
 
 }

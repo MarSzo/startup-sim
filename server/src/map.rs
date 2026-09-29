@@ -121,6 +121,45 @@ pub struct RoomDef {
     /// Has windows (daylight comes in).
     #[serde(default)]
     pub windows: bool,
+    /// The desks here belong to this department (0 = nobody's).
+    #[serde(default)]
+    pub department: u8,
+}
+
+/// Named spots of a floor (the map's "places"): the street, stops and
+/// parking outside, a few fixed points inside. See `crate::outside`.
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct Places {
+    #[serde(default)]
+    pub street_y: Option<i32>,
+    #[serde(default)]
+    pub tram_y: Option<i32>,
+    #[serde(default)]
+    pub walk_home: Option<[i32; 2]>,
+    #[serde(default)]
+    pub walk_arrival: Option<[i32; 2]>,
+    #[serde(default)]
+    pub taxi: Option<[i32; 2]>,
+    #[serde(default)]
+    pub tram_stop: Option<[i32; 2]>,
+    #[serde(default)]
+    pub police: Option<[i32; 2]>,
+    #[serde(default)]
+    pub fire: Option<[i32; 2]>,
+    /// Parking bays: x and the top row of a 2-tile-deep bay.
+    #[serde(default)]
+    pub car_bays: Vec<[i32; 2]>,
+    #[serde(default)]
+    pub bike_rack: Vec<[i32; 2]>,
+    /// The chill-room table where the treats tray stands.
+    #[serde(default)]
+    pub tray: Option<[i32; 2]>,
+    /// Where a new founder appears (by the board table).
+    #[serde(default)]
+    pub founder: Option<[i32; 2]>,
+    /// Shop shelves by id: x, y, w, h.
+    #[serde(default)]
+    pub shelves: std::collections::BTreeMap<String, [i32; 4]>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -183,6 +222,8 @@ struct MapFile {
     spawns: Vec<[i32; 2]>,
     #[serde(default)]
     npcs: Vec<NpcFile>,
+    #[serde(default)]
+    places: Places,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -209,6 +250,7 @@ pub struct Map {
     pub links: Vec<Link>,
     pub spawns: Vec<Tile>,
     pub npcs: Vec<NpcDef>,
+    pub places: Places,
     /// Room id -> other room ids visible from it (from `RoomDef::see`).
     see: HashMap<u16, Vec<u16>>,
     /// Doors locked right now (toilet stalls): solid for everyone. Changed
@@ -309,6 +351,7 @@ impl Map {
                     escort_to: n.escort_to.map(|e| (e[0] as u8, Tile { x: e[1], y: e[2] })),
                 })
                 .collect(),
+            places: file.places,
             see,
             closed: vec![false; w * h],
         };
@@ -465,23 +508,26 @@ mod tests {
         Building::load(&default_building_path()).expect("building loads")
     }
 
+    /// Rooms behind locked doors (or walled up): nobody gets in.
+    const SEALED: [&str; 3] = ["Strefa zamknięta", "Serwerownia", "Szafa"];
+
     #[test]
-    fn ground_floor_has_gdd_rooms() {
+    fn ground_floor_has_the_planned_rooms() {
         let b = b();
         let m = b.floor(0).unwrap();
-        assert_eq!((m.width, m.height), (60, 48));
+        assert_eq!((m.width, m.height), (70, 72));
         for name in [
             "Na zewnątrz",
             "Parking zewnętrzny",
             "Strefa palenia",
-            "Wejście",
-            "Portiernia",
+            "Wiatrołap",
+            "Hol",
+            "Toaleta",
             "Parking wewnętrzny",
             "Sklep",
-            "Hol",
             "Winda",
             "Klatka schodowa",
-            "Zaplecze techniczne",
+            "Strefa zamknięta",
         ] {
             assert!(m.room_by_name(name).is_some(), "floor 0 missing {name}");
         }
@@ -493,25 +539,48 @@ mod tests {
     }
 
     #[test]
-    fn first_floor_has_gdd_rooms() {
+    fn first_floor_has_the_planned_rooms() {
         let b = b();
         let m = b.floor(1).unwrap();
         for name in [
-            "Recepcja",
-            "IT / Produkt",
+            "Korytarz",
+            "Hol windowy",
+            "Korytarz zachodni",
+            "Korytarz wschodni",
+            "Produkt / IT",
+            "Mobile",
+            "DevOps (Mordor)",
+            "AI team",
             "Biznes",
+            "Finanse",
+            "Sales",
+            "Marketing",
+            "Obsługa klienta",
             "Zarząd",
             "HR",
-            "Korytarz",
             "Chill room",
+            "Aneks kuchenny",
+            "Balkon",
+            "Sala spotkań 1",
+            "Sala spotkań 2",
+            "Sala spotkań 3",
+            "Magazynek",
+            "Składzik",
+            "Serwerownia",
             "Łazienka damska",
             "Łazienka męska",
+            "WC dla niepełnosprawnych",
             "Winda",
             "Klatka schodowa",
         ] {
             assert!(m.room_by_name(name).is_some(), "floor 1 missing {name}");
         }
         assert!(m.spawns.is_empty());
+        // Desks belong to departments through their rooms.
+        assert_eq!(m.room_by_name("Produkt / IT").unwrap().department, 1);
+        assert_eq!(m.room_by_name("Biznes").unwrap().department, 2);
+        assert_eq!(m.room_by_name("Zarząd").unwrap().department, 3);
+        assert_eq!(m.room_by_name("HR").unwrap().department, 0);
     }
 
     #[test]
@@ -520,7 +589,7 @@ mod tests {
         let m = b.floor(0).unwrap();
         assert!(m.is_blocked(0, 0), "fence");
         assert!(m.is_blocked(-1, 5));
-        assert!(m.is_blocked(60, 5));
+        assert!(m.is_blocked(70, 5));
         assert!(!m.is_blocked(1, 1), "grass");
         assert!(b.floor(1).unwrap().is_blocked(1, 1), "void around floor 1");
     }
@@ -530,14 +599,17 @@ mod tests {
         use super::{access, dir};
         let b = b();
         let m = b.floor(0).unwrap();
-        assert_eq!(m.tile_char(28, 21), Some('B'));
-        assert!(m.blocks(28, 21, 0, dir::UP), "no pass: can't enter");
-        assert!(!m.blocks(28, 21, 0, dir::DOWN), "no pass: can always leave");
-        assert!(!m.blocks(28, 21, access::GUEST, dir::UP), "guest pass opens");
-        assert!(!m.blocks(28, 21, access::CARD, dir::UP), "employee card opens");
-        assert_eq!(m.tile_char(43, 13), Some('L'));
-        assert!(m.blocks(43, 13, access::GUEST | access::CARD, dir::UP), "service room stays closed");
-        assert!(!m.blocks(43, 13, access::SERVICE, dir::UP));
+        assert_eq!(m.tile_char(28, 46), Some('B'));
+        assert!(m.blocks(28, 46, 0, dir::UP), "no pass: can't enter");
+        assert!(!m.blocks(28, 46, 0, dir::DOWN), "no pass: can always leave");
+        assert!(!m.blocks(28, 46, access::GUEST, dir::UP), "guest pass opens");
+        assert!(!m.blocks(28, 46, access::CARD, dir::UP), "employee card opens");
+        assert_eq!(m.tile_char(43, 45), Some('x'));
+        assert!(m.blocks(43, 45, 0xff, dir::RIGHT), "the locked door stays locked");
+        let m1 = b.floor(1).unwrap();
+        assert_eq!(m1.tile_char(43, 20), Some('L'));
+        assert!(m1.blocks(43, 20, access::GUEST | access::CARD, dir::RIGHT), "the cleaning cupboard stays closed");
+        assert!(!m1.blocks(43, 20, access::SERVICE, dir::RIGHT));
         assert!(m.blocks(0, 0, 0xff, dir::UP), "walls block everyone");
     }
 
@@ -546,15 +618,20 @@ mod tests {
         use super::access;
         let b = b();
         let spawn = (0, b.floor(0).unwrap().spawns[0]);
-        let public = ["outside", "parking", "entrance", "reception", "shop", "smoking"];
+        let public = ["outside", "parking", "entrance", "shop", "smoking", "stall"];
         for f in [0u8, 1] {
             let m = b.floor(f).unwrap();
-            for r in &m.rooms {
-                let tile = m.room_tiles(r.id).into_iter().find(|t| m.need(t.x, t.y) == 0).unwrap();
+            // (The lift cabins are reached by riding, not walking.)
+            for r in m.rooms.iter().filter(|r| r.kind != "elevator") {
+                let tile = m.room_tiles(r.id).into_iter().find(|t| m.need(t.x, t.y) == 0 && !m.is_blocked(t.x, t.y) && m.link_at(t.x, t.y).is_none()).unwrap();
                 let target = (f, tile);
                 let guest = b.find_path(spawn, target, access::GUEST).is_some();
                 let nobody = b.find_path(spawn, target, 0).is_some();
                 let staff = b.find_path(spawn, target, access::CARD | access::SERVICE | access::BOARD).is_some();
+                if SEALED.contains(&r.name.as_str()) {
+                    assert!(!staff, "floor {f} {} should be locked for everyone", r.name);
+                    continue;
+                }
                 assert!(staff, "floor {f} {} unreachable even for staff", r.name);
                 // Board room: only with a meeting (BOARD), service rooms: staff.
                 assert_eq!(guest, !matches!(r.kind.as_str(), "service" | "management"), "floor {f} {} with a guest pass", r.name);
@@ -565,37 +642,37 @@ mod tests {
     }
 
     #[test]
-    fn lodge_and_lobby_see_each_other() {
+    fn the_street_and_the_car_park_see_each_other() {
         let b = b();
         let m = b.floor(0).unwrap();
-        let lobby = m.room_by_name("Wejście").unwrap().id;
-        let lodge = m.room_by_name("Portiernia").unwrap().id;
-        assert_eq!(m.visible_from(lobby), &[lodge]);
-        assert_eq!(m.visible_from(lodge), &[lobby]);
+        let street = m.room_by_name("Na zewnątrz").unwrap().id;
+        let park = m.room_by_name("Parking zewnętrzny").unwrap().id;
+        assert_eq!(m.visible_from(street), &[park]);
+        assert_eq!(m.visible_from(park), &[street]);
         assert!(m.visible_from(m.room_by_name("Hol").unwrap().id).is_empty());
     }
 
     #[test]
-    fn porter_is_placed_in_the_lodge() {
+    fn porter_sits_in_the_hall_and_takes_guests_up() {
         let b = b();
         let m = b.floor(0).unwrap();
         assert_eq!(m.npcs.len(), 4, "porter + shop cashier + shop guard + cleaner");
         let p = &m.npcs[0];
         assert_eq!((p.kind.as_str(), p.name.as_str()), ("porter", "Portier"));
-        assert_eq!(m.room_name(m.room_at_tile(p.home.x, p.home.y)), "Portiernia");
+        assert_eq!(m.room_name(m.room_at_tile(p.home.x, p.home.y)), "Hol");
         let (f, t) = p.escort_to.unwrap();
         let m1 = b.floor(f).unwrap();
-        assert_eq!(m1.room_name(m1.room_at_tile(t.x, t.y)), "Recepcja");
+        assert_eq!(m1.room_name(m1.room_at_tile(t.x, t.y)), "Korytarz", "in front of the reception desk");
     }
 
     #[test]
-    fn floors_share_elevator_and_stairs_geometry() {
+    fn floors_share_the_elevator_geometry() {
         let b = b();
         let (a, c) = (b.floor(0).unwrap(), b.floor(1).unwrap());
         assert_eq!(a.links.len(), 2);
-        for (la, lc) in a.links.iter().zip(&c.links) {
-            assert_eq!(la.area, lc.area);
-        }
+        assert_eq!(c.links.len(), 2);
+        let lift = |m: &super::Map| m.links.iter().find(|l| matches!(l.kind, super::LinkKind::Elevator { .. })).unwrap().area;
+        assert_eq!(lift(a), lift(c));
     }
 
     #[test]

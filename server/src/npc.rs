@@ -569,7 +569,7 @@ mod tests {
                 arrived = Some(t);
                 let m = b.floor(porter.body.floor).unwrap();
                 assert_eq!(porter.body.floor, 1);
-                assert_eq!(m.room_name(porter.room), "Recepcja");
+                assert_eq!(m.room_name(porter.room), "Korytarz", "in front of the reception desk");
                 break;
             }
         }
@@ -590,8 +590,8 @@ mod tests {
     fn keeps_walking_when_the_guest_runs_ahead() {
         let (b, mut porter) = setup();
         porter.interact(&b, 7, 0, None, true);
-        // Guest already waiting at the reception (in a corner, off his route).
-        let ahead = Body::at(1, Pos::tile_center(21, 15));
+        // Guest already waiting upstairs (in a corner, off his route).
+        let ahead = Body::at(1, Pos::tile_center(31, 16));
         let players = HashMap::from([(7u16, ahead)]);
         let arrived = (0..3000).any(|_| says(&porter.tick(&b, &players)).contains(&lines::ARRIVED));
         assert!(arrived);
@@ -601,7 +601,7 @@ mod tests {
     fn waits_for_a_lagging_guest_then_gives_up() {
         let (b, mut porter) = setup();
         porter.interact(&b, 7, 0, None, true);
-        let far_away = Body::at(0, Pos::tile_center(33, 35)); // stays outside
+        let far_away = Body::at(0, Pos::tile_center(30, 59)); // stays outside
         let players = HashMap::from([(7u16, far_away)]);
         let start = porter.body.pos;
         let mut nags = 0;
@@ -641,9 +641,9 @@ mod tests {
     #[test]
     fn talking_needs_to_be_close() {
         let (_, porter) = setup();
-        let at_door = Body::at(0, Pos::tile_center(27, 29)); // lobby, next to the lodge door
-        assert!(porter.in_talk_range(&at_door));
-        assert!(!porter.in_talk_range(&Body::at(0, Pos::tile_center(33, 29))));
+        let at_desk = Body::at(0, Pos::tile_center(34, 49)); // across the porter's desk
+        assert!(porter.in_talk_range(&at_desk));
+        assert!(!porter.in_talk_range(&Body::at(0, Pos::tile_center(29, 49))));
         assert!(!porter.in_talk_range(&Body::at(1, porter.body.pos)), "other floor");
     }
 
@@ -652,8 +652,8 @@ mod tests {
         let (b, mut npcs) = everyone();
         let guard = by_role(&mut npcs, Role::Guard);
         let home = guard.body;
-        // A thief standing in the lobby: caught.
-        let thief = Body::at(0, Pos::tile_center(34, 29));
+        // A thief standing on the sidewalk by the shop: caught.
+        let thief = Body::at(0, Pos::tile_center(22, 59));
         guard.chase(9);
         let mut caught = false;
         for _ in 0..400 {
@@ -673,8 +673,8 @@ mod tests {
         guard.chase(9);
         let ev = guard.tick(&b, &HashMap::new());
         assert!(ev.contains(&Event::Escaped { npc: guard.id, player: 9 }));
-        // Somewhere the guard can't follow (the server room): gives up.
-        let far = Body::at(0, Pos::tile_center(44, 6));
+        // Somewhere the guard can't follow (the closed zone): gives up.
+        let far = Body::at(0, Pos::tile_center(48, 48));
         guard.chase(9);
         let mut escaped = false;
         for _ in 0..GUARD_GIVE_UP_TICKS + 5 {
@@ -710,12 +710,12 @@ mod tests {
     #[test]
     fn guest_arriving_with_the_porter_can_talk_to_reception_and_hr_from_the_drop_off_spots() {
         let (b, mut npcs) = everyone();
-        let porter_drop = Body::at(1, Pos::tile_center(32, 18));
+        let porter_drop = Body::at(1, Pos::tile_center(36, 36));
         assert!(by_role(&mut npcs, Role::Receptionist).in_talk_range(&porter_drop));
-        let reception_drop = Body::at(1, Pos::tile_center(43, 8));
+        let reception_drop = Body::at(1, Pos::tile_center(47, 14));
         assert!(by_role(&mut npcs, Role::Hr).in_talk_range(&reception_drop));
         let m = b.floor(1).unwrap();
-        assert_eq!(m.room_name(m.room_at_tile(43, 8)), "HR");
+        assert_eq!(m.room_name(m.room_at_tile(47, 14)), "HR");
     }
 
     #[test]

@@ -53,9 +53,9 @@ Np. RTT ~100 ms i 2% strat: `cargo run --release -- --lag-ms 50 --jitter-ms 10 -
 ### Klient — argumenty deweloperskie (po `--`)
 `--nick=Ala --server=127.0.0.1:7777 --autoconnect --debug` (gość — serwer z `--allow-guests` albo `--no-save`), `--login=Ola:haslo [--register] [--autocreate]` (logowanie / rejestracja przez ekran logowania), `--login-screen`, `--commute=3` (co rano wybierz dojazd: 1 pieszo … 5 tramwaj), `--found="Nazwa firmy"` (załóż firmę z portalu), `--voice-tone` (czat głosowy nadaje ton testowy zamiast mikrofonu; goto `talk:N` / `whisper:N`), `--record=/katalog --record-start=2 --record-length=6` (klatki JPG do zwiastuna — patrz `tools/trailer/`), `--auto-recruit=1 [--auto-recruit-delay=2]`
 (sam aplikuje na ofertę 1 i zgaduje odpowiedzi do skutku), (adres może być też IPv6: `--server=[::1]:7777`) (F3 od startu),
-`--autowalk` (losowy ruch), `--goto="27,29;E;wait:2;34,6;Recepcja"` (kolejne
+`--autowalk` (losowy ruch), `--goto="34,49;E;wait:2;31,44;Sklep"` (kolejne
 kroki: kafel / pokój na bieżącym piętrze, `E` = wciśnij E, `wait:N` = czekaj —
-tu: rozmowa z portierem, potem schodami do recepcji; też `item:take0|put|drop|give|use` i
+tu: rozmowa z portierem, za bramki, potem do sklepu; też `item:take0|put|drop|give|use` i
 `L` = zamknij/otwórz kabinę, ekran komputera: `pc:say:general|dept|dm:<imię>:<tekst>`, `pc:open:…`, `pc:win:mail|trash|browser|tasks|lunch|calendar|company|chat`, `pc:task:<tytuł>`, `pc:card:<n>`, `pc:comment:<tekst>`, `pc:take-card`, `pc:mail:<nick>:<temat>`, `pc:read:<n>`, `pc:lock`, `pc:unlock`,
 `pc:take`, `pc:close`, kalendarz `pc:cal:<minuta>:<temat>`, obiad `pc:lunch:<danie>`, panel firmy `pc:company` / `pc:company:hire` (pierwszy kandydat) / `pc:company:<akcja>:<cel>:<wartość>[:<tekst>]`; `dlg:<nr>` — odpowiedz w oknie rozmowy),
 `--perf` (co 2 s: FPS, wywołania rysowania, elementy, co się najczęściej przerysowuje — pomiar wydajności),
@@ -99,7 +99,7 @@ Budynek jest w `client/maps/` (`building.json` + `floorN.json`) — to jedno
 
 ```bash
 python3 tools/build_maps.py --preview   # podgląd ASCII
-godot --headless --path client -s tests/render_maps.gd -- /tmp   # grafika pięter do PNG
+godot --path client -s tests/render_maps.gd -- /tmp   # grafika pięter do PNG (bez --headless)
 python3 tools/build_maps.py             # zapis JSON-ów
 cd server && UPDATE_GOLDEN=1 cargo test --test golden   # nowe wektory testowe
 ```

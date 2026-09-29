@@ -8,6 +8,8 @@
 //! waypoints; the arriving player rides inside (hidden, the camera follows)
 //! and gets out at the vehicle's stop.
 
+use crate::map::Tile;
+use crate::outside::Outside;
 use crate::sim::{Pos, TILE_UNITS};
 
 pub mod mode {
@@ -72,11 +74,12 @@ pub fn mode(id: u8) -> Option<&'static Mode> {
 /// Where you go home from without a vehicle of your own: on foot the west
 /// end of the sidewalk, the tram stop, the taxi stand (floor 0 tiles), with
 /// how far from it (tiles).
-pub fn home_spot(mode_id: u8) -> Option<(Pos, i32)> {
+pub fn home_spot(o: &Outside, mode_id: u8) -> Option<(Pos, i32)> {
+    let at = |t: Tile| tile(t.x, t.y);
     match mode_id {
-        mode::WALK => Some((tile(2, 35), 2)),
-        mode::TAXI => Some((tile(34, 36), 2)),
-        mode::TRAM => Some((tile(36, 45), 2)),
+        mode::WALK => Some((at(o.walk_home), 2)),
+        mode::TAXI => Some((at(o.taxi), 2)),
+        mode::TRAM => Some((at(o.tram_stop), 2)),
         _ => None,
     }
 }
@@ -132,28 +135,30 @@ pub enum VehicleEvent {
 impl Vehicle {
     /// The vehicle for commuting `mode_id`; `slot` picks a free parking
     /// space / rack place. None for walking.
-    pub fn for_mode(mode_id: u8, handle: u16, owner: u16, slot: usize) -> Option<Vehicle> {
+    pub fn for_mode(o: &Outside, mode_id: u8, handle: u16, owner: u16, slot: usize) -> Option<Vehicle> {
+        let street = o.street_y;
         let (kind, path, stop, dwell, alight, parks, speed) = match mode_id {
             mode::CAR => {
-                // In from the right along the street, into the car park, park
-                // in one of the free bays (row 43-44).
-                let x = 5 + 5 * (slot as i32 % 5);
-                let x = if slot >= 5 { 28 } else { x };
-                let path = vec![tile(58, 37), tile(x, 37), tile(x, 41), Pos { x: tile(x, 43).x, y: 44 * TILE_UNITS }];
-                (vehicle::CAR, path, 3, 0, tile(x + 2, 42), true, 128)
+                // In from the east along the street, into the car park, park
+                // in one of the free bays (the extra cars share the last one).
+                let bay = o.car_bays[slot.min(o.car_bays.len() - 1)];
+                let x = bay.x;
+                let path = vec![o.street_east(), tile(x, street), tile(x, bay.y - 2), Pos { x: tile(x, bay.y).x, y: (bay.y + 1) * TILE_UNITS }];
+                (vehicle::CAR, path, 3, 0, tile(x + 2, bay.y - 1), true, 128)
             }
             mode::BIKE => {
-                let x = 40 + (slot as i32 % 4);
-                let path = vec![tile(18, 37), tile(x, 37), tile(x, 35), tile(x, 34)];
-                (vehicle::BIKE, path, 3, 0, tile(x, 35), true, 64)
+                let rack = o.bike_rack[slot % o.bike_rack.len()];
+                let path = vec![tile(18, street), tile(rack.x, street), tile(rack.x, rack.y + 1), tile(rack.x, rack.y)];
+                (vehicle::BIKE, path, 3, 0, tile(rack.x, rack.y + 1), true, 64)
             }
             mode::TAXI => {
-                let path = vec![tile(58, 37), tile(34, 37), tile(1, 37)];
-                (vehicle::TAXI, path, 1, 30, tile(34, 36), false, 128)
+                let path = vec![o.street_east(), tile(o.taxi.x, street), tile(1, street)];
+                (vehicle::TAXI, path, 1, 30, tile(o.taxi.x, o.taxi.y), false, 128)
             }
             mode::TRAM => {
-                let path = vec![Pos { x: 62 * TILE_UNITS, y: tile(0, 46).y }, tile(36, 46), Pos { x: -6 * TILE_UNITS, y: tile(0, 46).y }];
-                (vehicle::TRAM, path, 1, 40, tile(36, 45), false, 96)
+                let y = tile(0, o.tram_y).y;
+                let path = vec![Pos { x: (o.width + 2) * TILE_UNITS, y }, tile(o.tram_stop.x, o.tram_y), Pos { x: -6 * TILE_UNITS, y }];
+                (vehicle::TRAM, path, 1, 40, tile(o.tram_stop.x, o.tram_stop.y), false, 96)
             }
             _ => return None,
         };
@@ -176,13 +181,13 @@ impl Vehicle {
     }
 
     /// A patrol car: drives up to the entrance and waits there (`leave`).
-    pub fn police(handle: u16) -> Vehicle {
-        Vehicle::emergency(handle, vehicle::POLICE, crate::security::car_path())
+    pub fn police(o: &Outside, handle: u16) -> Vehicle {
+        Vehicle::emergency(handle, vehicle::POLICE, crate::security::car_path(o))
     }
 
     /// A fire engine: to the building, waits (`leave`).
-    pub fn fire_engine(handle: u16) -> Vehicle {
-        Vehicle::emergency(handle, vehicle::FIRE_ENGINE, crate::fire::truck_path())
+    pub fn fire_engine(o: &Outside, handle: u16) -> Vehicle {
+        Vehicle::emergency(handle, vehicle::FIRE_ENGINE, crate::fire::truck_path(o))
     }
 
     fn emergency(handle: u16, kind: u8, path: Vec<Pos>) -> Vehicle {
@@ -205,10 +210,10 @@ impl Vehicle {
     }
 
     /// A parked car / bike drives home: out onto the street, then west.
-    pub fn depart(&mut self) {
-        let street = tile(0, 37).y;
+    pub fn depart(&mut self, o: &Outside) {
+        let street = o.street(0).y;
         self.path.push(Pos { x: self.pos.x, y: street });
-        self.leave(Pos { x: -6 * TILE_UNITS, y: street });
+        self.leave(o.street_west_off(6));
         self.owner = 0;
     }
 
@@ -269,11 +274,11 @@ mod tests {
     #[test]
     fn every_mode_has_a_price_time_and_way_in() {
         assert_eq!(MODES.len(), 5);
-        assert!(Vehicle::for_mode(mode::WALK, 1, 1, 0).is_none(), "on foot: no vehicle");
         let b = Building::load(&default_building_path()).unwrap();
+        assert!(Vehicle::for_mode(&b.outside, mode::WALK, 1, 1, 0).is_none(), "on foot: no vehicle");
         let m = b.floor(0).unwrap();
         for id in [mode::CAR, mode::BIKE, mode::TAXI, mode::TRAM] {
-            let mut v = Vehicle::for_mode(id, 1, 7, 0).unwrap();
+            let mut v = Vehicle::for_mode(&b.outside, id, 1, 7, 0).unwrap();
             let ev = run(&mut v, 3000);
             let (rider, alight) = match ev.first() {
                 Some(VehicleEvent::Arrived { rider, alight }) => (*rider, *alight),
@@ -292,8 +297,9 @@ mod tests {
 
     #[test]
     fn cars_take_different_bays() {
-        let a = Vehicle::for_mode(mode::CAR, 1, 1, 0).unwrap().alight;
-        let b = Vehicle::for_mode(mode::CAR, 2, 2, 1).unwrap().alight;
+        let o = Building::load(&default_building_path()).unwrap().outside;
+        let a = Vehicle::for_mode(&o, mode::CAR, 1, 1, 0).unwrap().alight;
+        let b = Vehicle::for_mode(&o, mode::CAR, 2, 2, 1).unwrap().alight;
         assert_ne!(a, b);
     }
 }

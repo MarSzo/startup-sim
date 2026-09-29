@@ -243,7 +243,7 @@ mod tests {
     fn moves_at_constant_speed() {
         let b = building();
         let m = b.floor(0).unwrap();
-        let p = Pos::tile_center(33, 27); // lobby
+        let p = Pos::tile_center(31, 49); // the hall, by the gates
         assert_eq!(move_on(m, p, IN_RIGHT, 0), Pos { x: p.x + SPEED, y: p.y });
         assert_eq!(move_on(m, p, IN_UP, 0), Pos { x: p.x, y: p.y - SPEED });
         assert_eq!(move_on(m, p, IN_UP | IN_LEFT, 0), Pos { x: p.x - SPEED_DIAG, y: p.y - SPEED_DIAG });
@@ -255,12 +255,12 @@ mod tests {
     fn stops_flush_against_wall() {
         let b = building();
         let m = b.floor(0).unwrap();
-        // Lobby spans x 27..=40; wall at x=41 (door only at rows 29, 30).
-        let p = run(m, Pos::tile_center(35, 24), IN_RIGHT, 200);
-        assert_eq!(p.x, 41 * TILE_UNITS - HALF_W);
-        // Row 21 is wall at odd x (gates at even x).
-        let p = run(m, Pos::tile_center(35, 24), IN_UP, 200);
-        assert_eq!(p.y, 22 * TILE_UNITS + HALF_H);
+        // The hall by the gates: the porter's desk (x=35) on the right.
+        let p = run(m, Pos::tile_center(31, 49), IN_RIGHT, 200);
+        assert_eq!(p.x, 35 * TILE_UNITS - HALF_W);
+        // The gates (row 46) stop you without a pass.
+        let p = run(m, Pos::tile_center(31, 49), IN_UP, 200);
+        assert_eq!(p.y, 47 * TILE_UNITS + HALF_H);
         assert!(box_is_free(m, p));
     }
 
@@ -272,20 +272,20 @@ mod tests {
             let m = b.floor(body.floor).unwrap();
             m.room_name(m.room_at(body.pos.x, body.pos.y)).to_string()
         };
-        let lobby = Body::at(0, Pos::tile_center(34, 24)); // below gate x=34
+        let lobby = Body::at(0, Pos::tile_center(31, 48)); // below the gates (row 46)
         let stuck = walk(&b, lobby, IN_UP, 100);
-        assert_eq!(stuck.pos.y, 22 * TILE_UNITS + HALF_H, "no pass: stopped at the gate");
+        assert_eq!(stuck.pos.y, 47 * TILE_UNITS + HALF_H, "no pass: stopped at the gate");
         let guest = walk(&b, Body { access: access::GUEST, ..lobby }, IN_UP, 100);
-        assert_eq!(room(&guest), "Hol", "guest pass opens the gate");
+        assert!(guest.pos.y < 46 * TILE_UNITS, "guest pass opens the gate");
         let employee = walk(&b, Body { access: access::CARD, ..lobby }, IN_UP, 100);
-        assert_eq!(room(&employee), "Hol", "employee card opens the gate");
-        // Leaving: from the hall, without any pass, down through the gate.
-        let out = walk(&b, Body::at(0, Pos::tile_center(34, 18)), IN_DOWN, 100);
-        assert_eq!(room(&out), "Wejście", "exit is free");
-        // Garage gate: same rules.
-        let garage = walk(&b, Body::at(0, Pos::tile_center(10, 36)), IN_UP, 100);
+        assert!(employee.pos.y < 46 * TILE_UNITS, "employee card opens the gate");
+        // Leaving: from the lifts, without any pass, down through the gate.
+        let out = walk(&b, Body::at(0, Pos::tile_center(31, 44)), IN_DOWN, 100);
+        assert!(out.pos.y > 47 * TILE_UNITS, "exit is free");
+        // Garage gate (row 13, from the drive to the north): same rules.
+        let garage = walk(&b, Body::at(0, Pos::tile_center(35, 11)), IN_DOWN, 100);
         assert_eq!(room(&garage), "Na zewnątrz", "no pass: can't drive in");
-        let car = walk(&b, Body { access: access::CARD, ..Body::at(0, Pos::tile_center(10, 36)) }, IN_UP, 100);
+        let car = walk(&b, Body { access: access::CARD, ..Body::at(0, Pos::tile_center(35, 11)) }, IN_DOWN, 100);
         assert_eq!(room(&car), "Parking wewnętrzny");
     }
 
@@ -293,9 +293,9 @@ mod tests {
     fn slides_along_wall_on_diagonal() {
         let b = building();
         let m = b.floor(0).unwrap();
-        let start = Pos::tile_center(45, 23); // shop, solid wall above
+        let start = Pos::tile_center(24, 45); // shop, wall above
         let p = run(m, start, IN_UP | IN_RIGHT, 20);
-        assert_eq!(p.y, 22 * TILE_UNITS + HALF_H, "pinned to top wall");
+        assert_eq!(p.y, 45 * TILE_UNITS + HALF_H, "pinned to top wall");
         assert!(p.x > start.x, "still slides right");
     }
 
@@ -303,20 +303,20 @@ mod tests {
     fn passes_through_door() {
         let b = building();
         let m = b.floor(0).unwrap();
-        // Lobby -> shop door at x=41, rows 29..30.
-        let p = run(m, Pos { x: 39 * TILE_UNITS, y: 30 * TILE_UNITS }, IN_RIGHT, 100);
-        assert!(p.x > 42 * TILE_UNITS, "entered the shop: {p:?}");
-        assert_eq!(m.room_name(m.room_at(p.x, p.y)), "Sklep");
+        // Hall -> the draught lobby, door at x 31..32, row 53.
+        let p = run(m, Pos { x: 32 * TILE_UNITS, y: 51 * TILE_UNITS }, IN_DOWN, 40);
+        assert!(p.y > 54 * TILE_UNITS, "went through: {p:?}");
+        assert_eq!(m.room_name(m.room_at(p.x, p.y)), "Wiatrołap");
     }
 
     #[test]
     fn furniture_and_locked_door_block() {
         let b = building();
         let m = b.floor(0).unwrap();
-        let p = run(m, Pos::tile_center(48, 22), IN_DOWN, 100); // shop shelf at row 24
-        assert_eq!(p.y, 24 * TILE_UNITS - HALF_H);
-        let p = run(m, Pos::tile_center(43, 16), IN_UP, 100); // locked service door at row 13
-        assert_eq!(p.y, 14 * TILE_UNITS + HALF_H);
+        let p = run(m, Pos::tile_center(22, 48), IN_UP, 100); // shop shelf at row 46
+        assert_eq!(p.y, 47 * TILE_UNITS + HALF_H);
+        let p = run(m, Pos::tile_center(40, 45), IN_RIGHT, 100); // locked door at x=43
+        assert_eq!(p.x, 43 * TILE_UNITS - HALF_W);
     }
 
     /// Stairwell map (between floors 0 and 1).
@@ -325,8 +325,8 @@ mod tests {
     #[test]
     fn stairs_go_through_the_stairwell_and_landing() {
         let b = building();
-        // Hall below the stairwell door (x 34..35, row 13); hold UP.
-        let body = until_floor_change(&b, Body::at(0, Pos::tile_center(34, 16)), IN_UP, 200);
+        // From the hall through the stairwell door (27,42), left onto the flight.
+        let body = until_floor_change(&b, Body::at(0, Pos::tile_center(29, 42)), IN_LEFT, 300);
         assert_eq!(body.floor, MID, "into the stairwell");
         assert_eq!(body.pos, Pos::tile_center(32, 13), "bottom of the first flight");
         assert_eq!(body.lock, LOCK_HELD);
@@ -340,23 +340,25 @@ mod tests {
         let body = walk(&b, body, IN_RIGHT, 60);
         let body = until_floor_change(&b, body, IN_DOWN, 300);
         assert_eq!(body.floor, 1, "the second flight leads to floor 1");
-        assert_eq!(body.pos, Pos::tile_center(34, 10));
-        // Keep holding DOWN: out of the stairwell, no bouncing back.
+        assert_eq!(body.pos, Pos::tile_center(25, 41));
+        // Keep holding DOWN: no bouncing back.
         let body = walk(&b, body, IN_DOWN, 60);
         assert_eq!(body.floor, 1);
         // And back: floor 1's flight -> stairwell (second flight) -> ground floor.
-        let body = until_floor_change(&b, body, IN_UP, 300);
+        let body = walk(&b, body, IN_UP, 40);
+        let body = until_floor_change(&b, body, IN_LEFT, 300);
         assert_eq!((body.floor, body.pos), (MID, Pos::tile_center(36, 13)));
         let body = walk(&b, body, IN_UP, 200);
         let body = walk(&b, body, IN_LEFT, 60);
         let body = until_floor_change(&b, body, IN_DOWN, 300);
-        assert_eq!((body.floor, body.pos), (0, Pos::tile_center(34, 10)), "down to the ground floor");
+        assert_eq!((body.floor, body.pos), (0, Pos::tile_center(24, 42)), "down to the ground floor");
     }
 
     #[test]
     fn interact_in_the_elevator_cabin_changes_nothing_in_the_simulation() {
         let b = building();
-        let body = walk(&b, Body::at(0, Pos::tile_center(26, 16)), IN_UP, 60); // towards the cabin
+        let body = walk(&b, Body::at(0, Pos::tile_center(37, 45)), IN_UP, 60); // into the cabin
+        assert_eq!(b.floor(0).unwrap().tile_type(body.pos.tile().0, body.pos.tile().1), Some("elevator"));
         let after = step(&b, step(&b, body, 0), IN_INTERACT);
         assert_eq!(after.floor, 0, "the server moves the cabin, not the simulation");
     }
@@ -365,7 +367,7 @@ mod tests {
     fn never_ends_inside_walls_random_walk() {
         let b = building();
         let mut rng = fastrand::Rng::with_seed(7);
-        let mut body = Body::at(0, Pos::tile_center(33, 35));
+        let mut body = Body::at(0, Pos::tile_center(30, 59));
         let mut floors_seen = [false; 2];
         let mut held = 0;
         for _ in 0..200_000 {

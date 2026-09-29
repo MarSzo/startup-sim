@@ -77,8 +77,7 @@ impl Server {
             let pos = Pos::tile_center(w.tile.x, w.tile.y);
             put(at(w.floor, pos), entity(c.handle, proto::kind::COMPUTER, pos, computer::entity_flags(c), c.item.kind, 0));
         }
-        if let Some(t) = &self.tray {
-            let (floor, pos) = treats::tray_pos();
+        if let (Some(t), Some((floor, pos))) = (&self.tray, treats::tray_pos(&self.building)) {
             put(at(floor, pos), entity(t.handle, proto::kind::TRAY, pos, 0, t.kind, t.pieces));
         }
         for d in &self.dropped {

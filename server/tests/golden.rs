@@ -74,21 +74,21 @@ fn movement_vectors() {
     // Random walks from interesting spots (walls, furniture, doors, gates).
     let guest = |b: Body| Body { access: access::GUEST, ..b };
     let starts = [
-        Body::at(0, Pos::tile_center(33, 35)),                     // spawn, sidewalk
-        Body::at(0, Pos::tile_center(34, 23)),                     // gates without a pass
-        Body::at(0, Pos::tile_center(34, 18)),                     // gates from the hall (free exit)
-        Body::at(0, Pos::tile_center(10, 36)),                     // garage gate, no card
-        Body::at(0, Pos::tile_center(33, 27)),                     // lobby
-        guest(Body::at(0, Pos::tile_center(34, 23))),              // below the gates with a pass
-        Body::at(0, Pos::tile_center(45, 23)),                     // shop, shelves
-        Body::at(0, Pos { x: 41 * 256 + 3, y: 30 * 256 - 1 }),     // odd offsets in a door
-        Body::at(0, Pos::tile_center(6, 8)),                       // parking between cars
-        Body::at(0, Pos::tile_center(34, 11)),                     // stairwell below the flight
-        Body::at(0, Pos::tile_center(26, 10)),                     // elevator cabin
-        Body::at(1, Pos::tile_center(34, 10)),                     // stairs arrival upstairs
-        Body::at(1, Pos::tile_center(10, 22)),                     // corridor upstairs
-        Body { slow: true, ..Body::at(1, Pos::tile_center(30, 28)) }, // exhausted, chill room
-        Body { slow: true, ..Body::at(0, Pos::tile_center(34, 11)) }, // slow on the stairs
+        Body::at(0, Pos::tile_center(30, 59)),                     // spawn, sidewalk
+        Body::at(0, Pos::tile_center(31, 48)),                     // gates without a pass
+        Body::at(0, Pos::tile_center(31, 44)),                     // gates from the lifts (free exit)
+        Body::at(0, Pos::tile_center(35, 11)),                     // garage gate, no card
+        Body::at(0, Pos::tile_center(31, 55)),                     // the draught lobby
+        guest(Body::at(0, Pos::tile_center(31, 48))),              // below the gates with a pass
+        Body::at(0, Pos::tile_center(22, 47)),                     // shop, shelves
+        Body::at(0, Pos { x: 31 * 256 + 3, y: 53 * 256 - 1 }),     // odd offsets in a door
+        Body::at(0, Pos::tile_center(23, 18)),                     // parking between cars
+        Body::at(0, Pos::tile_center(24, 42)),                     // stairwell by the flight
+        Body::at(0, Pos::tile_center(37, 41)),                     // elevator cabin
+        Body::at(1, Pos::tile_center(25, 41)),                     // stairs arrival upstairs
+        Body::at(1, Pos::tile_center(32, 20)),                     // corridor upstairs
+        Body { slow: true, ..Body::at(1, Pos::tile_center(34, 10)) }, // exhausted, chill room
+        Body { slow: true, ..Body::at(0, Pos::tile_center(24, 42)) }, // slow on the stairs
     ];
     for start in starts {
         let mut body = start;
@@ -106,7 +106,7 @@ fn movement_vectors() {
     }
 
     // Scripted (with a guest pass): spawn -> gates -> stairs up -> chill room -> back down.
-    let mut body = guest(Body::at(0, Pos::tile_center(33, 35)));
+    let mut body = guest(Body::at(0, Pos::tile_center(30, 59)));
     let start = body;
     let (mut inputs, mut states) = (Vec::new(), Vec::new());
     let mut record = |body: &mut Body, input: u8| {

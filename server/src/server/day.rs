@@ -131,12 +131,15 @@ impl Server {
             p.skip_wait = false;
         }
         let handle = self.alloc_handle();
-        let kind_of = |m: u8| Vehicle::for_mode(m, 0, 0, 0).map(|v| v.kind);
+        let kind_of = |m: u8| Vehicle::for_mode(&self.building.outside, m, 0, 0, 0).map(|v| v.kind);
         let slot = self.vehicles.iter().filter(|v| v.parks && Some(v.kind) == kind_of(mode)).count();
-        let vehicle = Vehicle::for_mode(mode, handle, pid, slot);
+        let vehicle = Vehicle::for_mode(&self.building.outside, mode, handle, pid, slot);
         let (pos, riding) = match &vehicle {
             Some(v) => (v.pos, Some(v.handle)),
-            None => (Pos::tile_center(1, 35), None), // walking in from the west
+            None => {
+                let w = self.building.outside.walk_arrival;
+                (Pos::tile_center(w.x, w.y), None) // walking in from the west
+            }
         };
         if let Some(v) = vehicle {
             self.vehicles.push(v);

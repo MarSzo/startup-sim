@@ -85,8 +85,8 @@ mod tests {
         }
         let m1 = b.floor(1).unwrap();
         assert!(!m1.room_by_name("Łazienka męska").unwrap().windows);
-        assert!(m1.room_by_name("IT / Produkt").unwrap().windows);
-        assert_eq!(m1.room_by_name("Kabina 1 (męska)").unwrap().lit_by.as_deref(), Some("Łazienka męska"));
+        assert!(m1.room_by_name("Produkt / IT").unwrap().windows);
+        assert_eq!(m1.room_by_name("WC męskie").unwrap().lit_by.as_deref(), Some("Łazienka męska"));
         let mut l = Lights::default();
         assert!(l.toggle((1, 5)));
         assert_eq!(l.floor_on(1), vec![5]);

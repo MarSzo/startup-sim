@@ -5,6 +5,7 @@
 //! (Also here: fruit from the bowl is sometimes past its best - see
 //! `STALE_FRUIT_PERCENT`; eating it sends you running to the toilet.)
 
+use crate::building::Building;
 use crate::inventory::kind;
 use crate::sim::{Body, Pos, TILE_UNITS};
 
@@ -21,10 +22,9 @@ pub const REACH: i32 = TILE_UNITS * 3 / 2;
 /// Chance that fruit from the bowl is stale.
 pub const STALE_FRUIT_PERCENT: u32 = 15;
 
-/// Where the tray stands: the middle of the chill-room table (floor 1,
-/// tiles 36..39 x 30).
-pub fn tray_pos() -> (u8, Pos) {
-    (1, Pos { x: 38 * TILE_UNITS, y: 30 * TILE_UNITS + TILE_UNITS / 2 })
+/// Where the tray stands: on the chill-room table (the map's "tray" place).
+pub fn tray_pos(b: &Building) -> Option<(u8, Pos)> {
+    b.tray.map(|(f, t)| (f, Pos::tile_center(t.x, t.y)))
 }
 
 pub const KINDS: [u8; 3] = [kind::DONUT, kind::COOKIE, kind::CHEESECAKE];
@@ -52,9 +52,8 @@ pub struct Tray {
     pub pieces: u8,
 }
 
-pub fn in_reach(body: &Body) -> bool {
-    let (floor, p) = tray_pos();
-    body.floor == floor && (p.x - body.pos.x).pow(2) + (p.y - body.pos.y).pow(2) <= REACH * REACH
+pub fn in_reach(b: &Building, body: &Body) -> bool {
+    tray_pos(b).is_some_and(|(floor, p)| body.floor == floor && (p.x - body.pos.x).pow(2) + (p.y - body.pos.y).pow(2) <= REACH * REACH)
 }
 
 #[cfg(test)]
@@ -65,13 +64,13 @@ mod tests {
     #[test]
     fn the_tray_stands_on_the_chill_room_table_and_can_be_reached() {
         let b = Building::load(&default_building_path()).unwrap();
-        let (f, p) = tray_pos();
+        let (f, p) = tray_pos(&b).unwrap();
         let m = b.floor(f).unwrap();
         let (tx, ty) = p.tile();
         assert_eq!(m.tile_type(tx, ty), Some("table"));
         assert_eq!(m.room_name(m.room_at(p.x, p.y)), "Chill room");
         // From the free tile below the table.
-        assert!(in_reach(&Body::at(1, Pos::tile_center(37, 31))));
-        assert!(!in_reach(&Body::at(1, Pos::tile_center(30, 28))));
+        assert!(in_reach(&b, &Body::at(f, Pos::tile_center(tx, ty + 1))));
+        assert!(!in_reach(&b, &Body::at(f, Pos::tile_center(tx - 5, ty + 2))));
     }
 }

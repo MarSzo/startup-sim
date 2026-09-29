@@ -61,7 +61,7 @@ impl Server {
             }
         };
         let truck = self.alloc_handle();
-        self.vehicles.push(Vehicle::fire_engine(truck));
+        self.vehicles.push(Vehicle::fire_engine(&self.building.outside, truck));
         self.alarm = Some(Alarm { place, smoker, spot, truck, firefighter: None, checking_until: None, done: false });
         self.clock_dirty = true;
         let room = self.room_name(place);
@@ -87,7 +87,7 @@ impl Server {
             if self.vehicles.iter().any(|v| v.handle == alarm.truck && v.parked()) {
                 let id = npc::NPC_ID_BASE + 0x0E00 + self.next_crew_id % 0x100;
                 self.next_crew_id = self.next_crew_id.wrapping_add(1);
-                let mut n = Npc::firefighter(&self.building, id, fire::crew_spawn());
+                let mut n = Npc::firefighter(&self.building, id, fire::crew_spawn(&self.building.outside));
                 let (x, y) = alarm.spot.tile();
                 let sent = n.go_to(&self.building, (alarm.place.0, Tile { x, y }));
                 self.npcs.push(n);
@@ -102,7 +102,7 @@ impl Server {
             if self.npcs[i].at_home() {
                 self.npcs.remove(i);
                 if let Some(v) = self.vehicles.iter_mut().find(|v| v.handle == alarm.truck) {
-                    v.leave(fire::truck_exit());
+                    v.leave(fire::truck_exit(&self.building.outside));
                 }
                 self.clock_dirty = true;
                 self.log("* fire alarm over");

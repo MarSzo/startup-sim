@@ -142,7 +142,7 @@ func _ground(x: int, y: int) -> void:
 	if t == "fence":
 		_floor(x, y, "grass")
 		return
-	if _solid(c) or t in ["door", "glass_door", "card_gate", "garage_gate", "board_door", "stall_door", "service_door"]:
+	if _solid(c) or t in ["door", "glass_door", "card_gate", "garage_gate", "board_door", "stall_door", "service_door", "locked_door"]:
 		t = _type_of(_floor_under(x, y))
 	_floor(x, y, t)
 
@@ -240,7 +240,7 @@ func _floor(x: int, y: int, t: String) -> void:
 
 func _is_floorish(x: int, y: int) -> bool:
 	var c := _ch(x, y)
-	return c != "#" and _type_of(c) not in ["void", "fence", "service_door"] and map.legend.has(c)
+	return c != "#" and _type_of(c) not in ["void", "fence", "service_door", "locked_door"] and map.legend.has(c)
 
 
 ## Outside: beyond the map, open air, a hedge, or an outdoor room.
@@ -383,6 +383,11 @@ func _tile_object(x: int, y: int) -> void:
 			_box(r.grow(-0.3), Color("#6b4128"))
 			_box(Rect2(o + Vector2(4, 4), Vector2(8, 3)), Color("#a8402f"), true, 0.3, 0.45)
 			draw_circle(o + Vector2(11, 9), 0.8, Color("#d4b870"))
+		"locked_door":  # shut for good: dark door, red band, a padlock
+			_box(r.grow(-0.3), Color("#4a2f24"))
+			_box(Rect2(o + Vector2(2, 6.5), Vector2(12, 3)), Color("#b0382c"), true, 0.3, 0.45)
+			_box(Rect2(o + Vector2(6, 9.5), Vector2(4, 3.5)), Color("#d4b870"), true, 0.3, 0.45)
+			draw_arc(o + Vector2(8, 9.5), 1.6, PI, TAU, 8, INK, 0.7)
 		"fence":
 			for i in 3:
 				var c := o + Vector2(3 + i * 5.0, 8 + (i % 2) * 2.0)
@@ -403,7 +408,7 @@ func _tile_object(x: int, y: int) -> void:
 
 const PROP_TYPES := ["desk", "counter", "shelf", "sofa", "table", "plant", "rack", "bench", "ashtray", "toilet", "sink",
 	"car", "coffee_machine", "kitchen_counter", "fruit_bowl", "partition", "sanitizer", "bike_rack",
-	"cupboard", "dishwasher", "kitchen_sink", "fridge"]
+	"cupboard", "dishwasher", "kitchen_sink", "fridge", "urinal", "wardrobe", "bin"]
 
 
 ## Connected tiles of the same furniture char = one object.
@@ -462,6 +467,9 @@ func _prop(t: String, tr: Rect2i, index: int) -> void:
 		"dishwasher": _dishwasher(r)
 		"kitchen_sink": _kitchen_sink(r)
 		"fridge": _fridge(r)
+		"urinal": _urinal(tr, r)
+		"wardrobe": _wardrobe(r)
+		"bin": _bin(r)
 
 
 func _chair(c: Vector2, facing_up: bool) -> void:
@@ -740,3 +748,37 @@ func _fridge(r: Rect2) -> void:
 	draw_line(body.position + Vector2(1.5, 5), Vector2(body.end.x - 1.5, body.position.y + 5), Color("#b9b8b0"), 0.6)
 	_box(Rect2(body.end.x - 3.2, body.position.y + 6.5, 1.2, 5), Color("#9aa3a8"), true, 0.3, 0.35)  # handle
 	_disc(body.position + Vector2(4, 9), 1.2, Color("#d98a3e"), true, 0.35)  # a magnet
+
+
+## Urinals on the wall: white bowls seen from above, a flush button.
+func _urinal(tr: Rect2i, r: Rect2) -> void:
+	var up := _is_wall(tr.position.x, tr.position.y - 1)
+	var x := r.position.x
+	while x < r.end.x:
+		var y0 := r.position.y + (1.0 if up else 7.0)
+		_box(Rect2(x + 3, y0, 10, 8), Color("#f4f4ee"), true, 2.2)
+		draw_set_transform(Vector2(x + 8, y0 + 4.5), 0.0, Vector2(1.0, 0.7))
+		draw_circle(Vector2.ZERO, 2.6, Color("#c4d8e0"))
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+		draw_circle(Vector2(x + 8, y0 + (0.8 if up else 7.2)), 0.7, Color("#8f959b"))
+		x += TP
+
+
+## A tall wardrobe: two doors with handles.
+func _wardrobe(r: Rect2) -> void:
+	_shadow(r.grow(-1))
+	var b := r.grow(-1)
+	_box(b, Color("#8a6a4a"), true, 0.6)
+	var mid := b.position.x + b.size.x / 2
+	draw_line(Vector2(mid, b.position.y + 1), Vector2(mid, b.end.y - 1), INK, 0.6)
+	draw_circle(Vector2(mid - 1.6, b.position.y + b.size.y / 2), 0.6, Color("#d4b870"))
+	draw_circle(Vector2(mid + 1.6, b.position.y + b.size.y / 2), 0.6, Color("#d4b870"))
+
+
+## A waste bin: a grey drum with a lid.
+func _bin(r: Rect2) -> void:
+	var c := r.get_center()
+	_disc(c + Vector2(0.8, 1.0), 5.2, Color(0, 0, 0, 0.2), false)
+	_disc(c, 5.0, Color("#5a5f66"))
+	draw_circle(c, 3.4, Color("#72787f"))
+	draw_line(c + Vector2(-2, 0), c + Vector2(2, 0), INK, 0.7)

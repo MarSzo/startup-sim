@@ -106,7 +106,7 @@ pub fn find_spots(b: &Building) -> Vec<Spot> {
             for x in 0..m.width {
                 let kind = match m.tile_type(x, y) {
                     Some("sofa") => SpotKind::Sofa,
-                    Some("toilet") => SpotKind::Toilet,
+                    Some("toilet" | "urinal") => SpotKind::Toilet,
                     Some("ashtray") => SpotKind::Ashtray,
                     Some("fruit_bowl") => SpotKind::FruitBowl,
                     Some("sink") | Some("kitchen_sink") => SpotKind::Sink,
@@ -475,7 +475,7 @@ mod tests {
         let spots = find_spots(&b);
         let count = |k| spots.iter().filter(|s| s.kind == k).count();
         assert!(count(SpotKind::Sofa) >= 1 && count(SpotKind::Ashtray) >= 1 && count(SpotKind::FruitBowl) == 1);
-        assert!(count(SpotKind::Sink) >= 4 && count(SpotKind::Sanitizer) == 3);
+        assert!(count(SpotKind::Sink) >= 4 && count(SpotKind::Sanitizer) >= 3);
         let toilets: Vec<_> = spots.iter().filter(|s| s.kind == SpotKind::Toilet).collect();
         assert!(toilets.iter().any(|t| t.gender.as_deref() == Some("female")));
         assert!(toilets.iter().any(|t| t.gender.as_deref() == Some("male")));

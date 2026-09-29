@@ -9,7 +9,8 @@
 use std::collections::HashMap;
 
 use crate::building::Building;
-use crate::sim::{Pos, TILE_UNITS};
+use crate::outside::Outside;
+use crate::sim::Pos;
 
 /// Smoke concentration of a room: 0..=MAX (amount of smoke per floor tile).
 pub const MAX: u16 = 1000;
@@ -178,14 +179,14 @@ pub struct Alarm {
 }
 
 /// Where the firefighter gets off the engine; the engine's street stop.
-pub fn crew_spawn() -> Pos {
-    Pos::tile_center(28, 36)
+pub fn crew_spawn(o: &Outside) -> Pos {
+    Pos::tile_center(o.fire.x, o.fire.y)
 }
-pub fn truck_path() -> Vec<Pos> {
-    vec![Pos::tile_center(58, 37), Pos::tile_center(28, 37)]
+pub fn truck_path(o: &Outside) -> Vec<Pos> {
+    vec![o.street_east(), o.street(o.fire.x)]
 }
-pub fn truck_exit() -> Pos {
-    Pos { x: -8 * TILE_UNITS, y: Pos::tile_center(0, 37).y }
+pub fn truck_exit(o: &Outside) -> Pos {
+    o.street_west_off(8)
 }
 
 pub mod lines {
@@ -235,14 +236,14 @@ mod tests {
     #[test]
     fn smoke_fills_a_room_drifts_next_door_and_clears() {
         let (b, mut s) = setup();
-        let stall = room(&b, 1, "Kabina 1 (męska)");
+        let stall = room(&b, 1, "WC męskie");
         let bath = room(&b, 1, "Łazienka męska");
         let corridor = room(&b, 1, "Korytarz");
         for t in 0..600 {
             if t == 40 {
                 assert!(s.get(stall) >= ALARM, "a stall is thick at once: {:?}", s.levels());
             }
-            s.puff(stall, 7, Pos::tile_center(54, 27));
+            s.puff(stall, 7, Pos::tile_center(37, 22));
             s.tick(t);
         }
         assert!(s.get(stall) > s.get(bath) && s.get(bath) >= NOTICEABLE, "into the bathroom: {:?}", s.levels());
@@ -260,16 +261,17 @@ mod tests {
     fn open_air_takes_the_smoke_away_and_detectors_are_where_expected() {
         let (b, mut s) = setup();
         let outside = room(&b, 0, "Strefa palenia");
-        s.puff(outside, 1, Pos::tile_center(45, 41));
+        s.puff(outside, 1, Pos::tile_center(45, 65));
         assert_eq!(s.get(outside), 0);
         let m1 = b.floor(1).unwrap();
         let has = |name: &str| m1.room_by_name(name).unwrap().detector;
-        assert!(has("Korytarz") && has("IT / Produkt") && has("Zarząd"));
-        assert!(!has("Łazienka męska") && !has("Kabina 1 (męska)") && !has("Chill room"));
-        for (f, x, y) in [(0u8, 58, 37), (0, 28, 37)] {
-            assert_eq!(b.floor(f).unwrap().tile_type(x, y), Some("street"));
+        assert!(has("Korytarz") && has("Produkt / IT") && has("Zarząd"));
+        assert!(!has("Łazienka męska") && !has("WC męskie") && !has("Chill room"));
+        for p in truck_path(&b.outside) {
+            let (x, y) = p.tile();
+            assert_eq!(b.floor(0).unwrap().tile_type(x, y), Some("street"));
         }
-        let (x, y) = crew_spawn().tile();
+        let (x, y) = crew_spawn(&b.outside).tile();
         assert_eq!(b.floor(0).unwrap().tile_type(x, y), Some("sidewalk"));
     }
 }

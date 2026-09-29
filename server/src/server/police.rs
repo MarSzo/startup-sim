@@ -42,7 +42,7 @@ impl Server {
             return;
         }
         let car = self.alloc_handle();
-        self.vehicles.push(Vehicle::police(car));
+        self.vehicles.push(Vehicle::police(&self.building.outside, car));
         self.police_calls.push(PoliceCall { target: pid, car, officer: None });
         let nick = self.players.get(&pid).map_or("?", |p| p.nick.as_str());
         self.log(format!("* police called for {nick}"));
@@ -59,7 +59,7 @@ impl Server {
                     if self.vehicles.iter().any(|v| v.handle == car && v.parked()) {
                         let id = npc::NPC_ID_BASE + 0x0F00 + self.next_officer_id % 0x100;
                         self.next_officer_id = self.next_officer_id.wrapping_add(1);
-                        let mut n = Npc::police(&self.building, id, security::officer_spawn());
+                        let mut n = Npc::police(&self.building, id, security::officer_spawn(&self.building.outside));
                         n.chase(target);
                         self.npcs.push(n);
                         self.police_calls[i].officer = Some(id);
@@ -69,7 +69,7 @@ impl Server {
                     if self.npcs.iter().any(|n| n.id == id && n.is_idle()) {
                         self.npcs.retain(|n| n.id != id);
                         if let Some(v) = self.vehicles.iter_mut().find(|v| v.handle == car) {
-                            v.leave(security::car_exit());
+                            v.leave(security::car_exit(&self.building.outside));
                         }
                         done.push(car);
                     }

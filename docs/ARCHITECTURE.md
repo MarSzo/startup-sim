@@ -615,15 +615,28 @@ generator, nie JSON-y ręcznie), który też sprawdza, czy drzwi gdzieś prowadz
 Format piętra:
 - `tiles`: wiersze znaków; `legend` mapuje znak →
   `{type, solid, color, access?, free_dir?}`. `access`: „card” (przepustka gościa
-  lub karta) dla bramek i bramy garażowej, „service” dla zaplecza;
-  `free_dir`: kierunek, w którym kafel zawsze przepuszcza.
+  lub karta) dla bramek i bramy garażowej, „service” dla składzika sprzątaczki;
+  `free_dir`: kierunek, w którym kafel zawsze przepuszcza. Drzwi zablokowane
+  (`locked_door`) są po prostu stałe (`solid`).
 - `rooms`: druga warstwa znaków tej samej wielkości; `room_defs` mapuje znak →
-  `{id, name, type, see?}`, `-` = brak pokoju (ściany). Id są unikalne w obrębie
-  piętra; `see` — klucze pokoi, których ludzi też widać (interest management).
+  `{id, name, type, see?, gender?, outdoor?, detector?, below?, light?, switch?,
+  lit_by?, windows?, department?}`, `-` = brak pokoju (ściany). Id są unikalne w
+  obrębie piętra; `see` — klucze pokoi, których ludzi też widać (interest
+  management); `department` — czyje są biurka w pokoju (`computer::Workstation`
+  bierze dział z pokoju, nie z nazwy).
 - `links`: `{kind: "stairs", area: [x,y,w,h], to_floor, to: [x,y]}` albo
   `{kind: "elevator", id, area}`.
 - `spawns`: kafle startowe (tylko parter: chodnik przed wejściem).
-- `npcs`: `{kind, name, home: [x,y], escort_to?: [piętro,x,y]}` — na razie portier.
+- `npcs`: `{kind, name, home: [x,y], escort_to?: [piętro,x,y]}` — portier,
+  kasjer, ochrona, sprzątaczka, recepcja, HR, prezes, wspólniczka.
+- `places`: nazwane punkty (`map::Places`). Na parterze otoczenie
+  (`crate::outside::Outside`, wczytywane z budynkiem): `street_y`, `tram_y`,
+  `walk_home`, `walk_arrival`, `taxi`, `tram_stop`, `car_bays`, `bike_rack`,
+  `police`, `fire` — z nich dojazdy (`commute`), radiowóz (`security`) i wóz
+  strażacki (`fire`); `shelves` (id półki → prostokąt, towary w `shop`). Na
+  piętrze `tray` (słodycze) i `founder` (miejsce nowego założyciela). Dzięki
+  temu przebudowa mapy nie wymaga zmian w kodzie; klient bierze z `places`
+  miejsca powrotu do domu.
 
 Kafle drzwi należą do pokoju po stronie „publicznej” (korytarz / hol), więc
 stojąc w drzwiach widzisz korytarz.
