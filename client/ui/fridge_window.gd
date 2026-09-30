@@ -39,7 +39,9 @@ func _row(kind: int, text: String, button: String, act: int, arg: int, enabled :
 	row.add_theme_constant_override("separation", 10)
 	var icon := Control.new()
 	icon.custom_minimum_size = Vector2(32, 32)
-	icon.draw.connect(func(): if kind != 0: ItemArt.draw(icon, kind, Vector2.ZERO, 2.0))
+	icon.draw.connect(func():
+			if kind != 0:
+				ItemArt.draw(icon, kind, Vector2.ZERO, 2.0))
 	row.add_child(icon)
 	var l := Ink.label(text, 16, Ink.TEXT_INK)
 	l.custom_minimum_size = Vector2(300, 0)

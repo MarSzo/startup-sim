@@ -792,7 +792,9 @@ func _toast_msg(text: String) -> void:
 	_toast.visible = true
 	_root.move_child(_toast, -1)
 	var my := text
-	get_tree().create_timer(4.0).timeout.connect(func(): if _toast.text == my: _toast.visible = false)
+	get_tree().create_timer(4.0).timeout.connect(func():
+			if _toast.text == my:
+				_toast.visible = false)
 
 
 func _label(text: String, size: int, color := Ink.TEXT_INK, wrap := true) -> Label:

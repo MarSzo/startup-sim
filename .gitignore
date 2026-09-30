@@ -6,3 +6,9 @@
 /server/saves
 /vps-backups
 /build
+# Not in the repository: the official servers, their pinned certificates,
+# who signs the macOS build.
+/client/net/servers.cfg
+/client/net/pins/*.pem
+/tools/macos/signing.env
+__pycache__/

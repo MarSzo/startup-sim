@@ -73,7 +73,7 @@ def lowpass(x, cutoff):
 
 def highpass(x, cutoff):
     lp = lowpass(x, cutoff)
-    return [v - l for v, l in zip(x, lp)]
+    return [v - low for v, low in zip(x, lp)]
 
 
 def bandpass(x, lo, hi):

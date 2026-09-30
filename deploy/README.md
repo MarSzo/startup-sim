@@ -35,11 +35,13 @@ Na VPS:
 
 Zatrzymanie usługi zapisuje grę (SIGTERM), więc aktualizacja nic nie gubi.
 
-Klient: lista serwerów w `AuthClient.SERVERS` (gracz widzi tylko nazwę,
-„Serwer testowy”; adres `178.105.233.184:7777` zostaje w kodzie). Z edytora
-dochodzi „Serwer lokalny (dev)” (`127.0.0.1:7777`).
-Certyfikat logowania z `deploy/pull-cert.sh` leży w `client/net/pins/` — klient
-ufa mu od pierwszego połączenia. Przy eksporcie gry dodaj `*.pem` do „Filters
-to export non-resource files” (inaczej certyfikat nie trafi do paczki).
+Klient: lista serwerów w `client/net/servers.cfg` (poza repozytorium — wzór
+w `servers.example.cfg`; gracz widzi tylko nazwę, np. „Serwer testowy”, adres
+zostaje w środku). Bez tego pliku, a zawsze z edytora, dochodzi „Serwer
+lokalny (dev)” (`127.0.0.1:7777`).
+Certyfikat logowania z `deploy/pull-cert.sh <host:port>` leży w
+`client/net/pins/` (też poza repozytorium) — klient ufa mu od pierwszego
+połączenia. Profil eksportu ma już `net/servers.cfg` i `net/pins/*.pem` w
+„Filters to export non-resource files”.
 Po zmianie certyfikatu na serwerze (np. nowy `tls/`) trzeba go ponownie
 ściągnąć i wydać nowego klienta.

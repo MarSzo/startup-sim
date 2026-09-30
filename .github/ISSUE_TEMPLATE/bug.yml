@@ -1,0 +1,32 @@
+name: Błąd
+description: Coś nie działa jak powinno
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: Co się stało
+      description: Co robiłeś i co zobaczyłeś (zrzut ekranu mile widziany).
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Czego oczekiwałeś
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Jak odtworzyć
+      placeholder: "1. …\n2. …"
+  - type: input
+    id: version
+    attributes:
+      label: Wersja klienta i system
+      placeholder: "0.1.0, macOS 15 (Apple Silicon)"
+  - type: dropdown
+    id: where
+    attributes:
+      label: Gdzie
+      options: [Gra (klient), Serwer, Logowanie / konta, Mapa, Inne]

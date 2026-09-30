@@ -1,7 +1,11 @@
 """A small lo-fi loop for the trailer, synthesized from scratch (no samples):
 soft electric-piano chords, a plucked melody, bass, a dusty kick/snare/hat.
 Usage: python3 music.py out.wav seconds"""
-import array, math, random, sys, wave
+import array
+import math
+import random
+import sys
+import wave
 
 SR = 44100
 BPM = 88

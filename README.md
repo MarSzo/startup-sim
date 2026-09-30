@@ -1,8 +1,13 @@
 # Startup Sim
 
 2D multiplayer „symulator pracy w startupie IT” — serwer Rust + klient Godot 4.
-Etap 1: fundament sieci. Dokumentacja: [GDD](docs/GDD.md) ·
-[Protokół](docs/PROTOCOL.md) · [Architektura](docs/ARCHITECTURE.md).
+Dokumentacja: [GDD](docs/GDD.md) · [Protokół](docs/PROTOCOL.md) ·
+[Architektura](docs/ARCHITECTURE.md) · [Jak pomóc](CONTRIBUTING.md).
+
+*English: a 2D multiplayer "working at an IT startup" simulator — an
+authoritative Rust server (UDP, 20 Hz) and a Godot 4 client. The game and the
+docs are in Polish; contributions in English are welcome too
+([CONTRIBUTING](CONTRIBUTING.md)). License: AGPL-3.0-or-later.*
 
 ## Pobierz
 
@@ -18,10 +23,14 @@ Nowe wydanie: zbuduj dmg (`tools/build-macos.sh`), potem
 Wymagania: Rust (rustup), Godot 4.7 (`godot` w PATH).
 Klient na macOS jako jeden plik: `tools/build-macos.sh` → `build/StartupSim-<wersja>.dmg`
 (aplikacja uniwersalna Intel + Apple Silicon, podpisana Developer ID z hardened runtime i
-uprawnieniem do mikrofonu; z profilem `xcrun notarytool store-credentials notarytoolclaude …`
-także notaryzowana). `--app-only` robi samą aplikację bez podpisu (do własnego
-podpisania z `tools/macos/entitlements.plist`). Wymaga szablonów eksportu Godota 4.7.2; wersja w `client/export_presets.cfg`.
-Testy uruchamia też GitHub Actions przy każdym pushu (`.github/workflows/ci.yml`: clippy + testy serwera, testy klienta w Godocie).
+uprawnieniem do mikrofonu, a z profilem `notarytool` także notaryzowana). Kto podpisuje:
+`IDENTITY` / `NOTARY_PROFILE` w środowisku albo w `tools/macos/signing.env` (poza repozytorium).
+`--app-only` robi samą aplikację bez podpisu (do własnego podpisania z
+`tools/macos/entitlements.plist`). Wymaga szablonów eksportu Godota 4.7.2; wersja w `client/export_presets.cfg`.
+Serwery w kliencie: `client/net/servers.cfg` (poza repozytorium, wzór `servers.example.cfg`) —
+bez niego klient zna tylko serwer lokalny.
+CI (GitHub Actions, `.github/workflows/ci.yml`) przy każdym pull requeście i pushu na `main`: rustfmt, clippy i testy serwera,
+cargo-deny (podatności i licencje zależności), gdlint i testy klienta w Godocie, ruff i zgodność map z generatorem, gitleaks.
 
 ```bash
 cd server && cargo run --release            # gra na [::]:7777 (UDP) + logowanie HTTPS na :7778; zapis w server/saves/world.db
@@ -113,3 +122,11 @@ python3 tools/build_maps.py             # zapis JSON-ów
 cd server && UPDATE_GOLDEN=1 cargo test --test golden   # nowe wektory testowe
 ```
 
+
+## Licencja
+
+Kod: [GNU AGPL-3.0-or-later](LICENSE) — możesz go używać, zmieniać i
+udostępniać, ale zmienioną wersję (także uruchomioną jako serwer w sieci)
+trzeba udostępnić na tej samej licencji. Czcionka Patrick Hand: SIL OFL 1.1
+(`client/fonts/OFL-PatrickHand.txt`). Dźwięki i grafika są generowane kodem z
+tego repozytorium.

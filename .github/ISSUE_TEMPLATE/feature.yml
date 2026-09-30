@@ -1,0 +1,22 @@
+name: Pomysł
+description: Nowa funkcja albo zmiana w grze
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: Pomysł
+      description: Co ma się dziać w grze i po co (jak to zmienia zabawę).
+    validations:
+      required: true
+  - type: textarea
+    id: how
+    attributes:
+      label: Jak to widzisz
+      description: Szczegóły, szkice, przykłady z innych gier.
+  - type: checkboxes
+    id: pr
+    attributes:
+      label: Chcesz to zrobić sam?
+      options:
+        - label: Tak, przygotuję pull request

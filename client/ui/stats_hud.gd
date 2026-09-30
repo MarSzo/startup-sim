@@ -54,7 +54,9 @@ func _ready() -> void:
 		var idx := i
 		b.draw.connect(func(): _draw_badge(b, idx))
 		b.mouse_entered.connect(func(): _set_hover(idx))
-		b.mouse_exited.connect(func(): if _hover == idx: _set_hover(-1))
+		b.mouse_exited.connect(func():
+				if _hover == idx:
+					_set_hover(-1))
 		_row.add_child(b)
 		_badges.append(b)
 		var body := Control.new()

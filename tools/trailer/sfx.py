@@ -7,7 +7,6 @@ Times match the clips in build.sh (title 0-4.5, rain 4.5-9.5, office
 9.5-14.5, coffee 14.5-19.5, smoke 19.5-24.5, commute 24.5-28, end 28-32).
 """
 import array
-import math
 import os
 import random
 import sys

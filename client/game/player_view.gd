@@ -246,7 +246,9 @@ func _process(delta: float) -> void:
 	if _tag.get_parent() == self and label_root and is_instance_valid(label_root) \
 			and label_root.get_parent() and label_root.get_parent().is_ancestor_of(self):
 		_tag.reparent(label_root, false)
-		tree_exiting.connect(func(): if is_instance_valid(_tag): _tag.queue_free())
+		tree_exiting.connect(func():
+				if is_instance_valid(_tag):
+					_tag.queue_free())
 	if _tag.get_parent() != self:
 		_tag.global_position = global_position
 		_tag.visible = is_visible_in_tree()

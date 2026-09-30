@@ -131,7 +131,9 @@ func _ready() -> void:
 	pause.to_menu.connect(_leave_to_menu)
 	pause.logout.connect(_logout)
 	pause.quit.connect(_quit)
-	pause.settings_changed.connect(func(): if game: game.apply_settings())
+	pause.settings_changed.connect(func():
+			if game:
+				game.apply_settings())
 	portal.menu_requested.connect(func(): pause.open())
 	if args.has("nick") or args.has("autoconnect"):
 		title_layer.visible = false
@@ -161,7 +163,7 @@ func _ready() -> void:
 		title_layer.visible = false
 		login_layer.visible = true
 		login._show_form()
-		login.set_address(args.get("server", AuthClient.DEFAULT_SERVER))
+		login.set_address(args.get("server", AuthClient.default_server()))
 		login.nick_edit.text = np[0]
 		login.pass_edit.text = np[1] if np.size() > 1 else ""
 		login._go.call_deferred("register" if args.has("register") else "login")

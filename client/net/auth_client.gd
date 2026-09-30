@@ -9,24 +9,46 @@ extends Node
 const NetClient = preload("res://net/net_client.gd")
 
 const PINS := "user://known_servers.cfg"
-## The game's servers, as the players see them (the address stays inside).
-const DEFAULT_SERVER := "178.105.233.184:7777"
-const SERVERS := [{"name": "Serwer testowy", "address": DEFAULT_SERVER}]
+## The game's servers, as the players see them (the address stays inside):
+## read from res://net/servers.cfg, which is not in the repository (see
+## servers.example.cfg) - an official build ships it, a build without it
+## only knows the local server.
+const SERVERS_FILE := "res://net/servers.cfg"
+static var _configured = null
 ## Run from the editor / `godot --path client`: a local server for development.
 const DEV_SERVER := {"name": "Serwer lokalny (dev)", "address": "127.0.0.1:7777"}
 
 
-## The servers to choose from (the local one only when developing).
+## Servers from servers.cfg: one section per server, `name` and `address`.
+static func configured() -> Array:
+	if _configured == null:
+		_configured = []
+		var cfg := ConfigFile.new()
+		if cfg.load(SERVERS_FILE) == OK:
+			for section in cfg.get_sections():
+				var address := str(cfg.get_value(section, "address", ""))
+				if address != "":
+					_configured.append({"name": str(cfg.get_value(section, "name", section)), "address": address})
+	return _configured
+
+
+## The servers to choose from (the local one when developing, or when the
+## build has no servers.cfg).
 static func servers() -> Array:
-	var list: Array = SERVERS.duplicate()
-	if OS.has_feature("editor"):
+	var list: Array = configured().duplicate()
+	if OS.has_feature("editor") or list.is_empty():
 		list.append(DEV_SERVER)
 	return list
 
 
+## The server picked when nothing else is known.
+static func default_server() -> String:
+	return servers()[0].address
+
+
 ## What to call a server in the UI (never its address).
 static func server_name(address: String) -> String:
-	for s in SERVERS + [DEV_SERVER]:
+	for s in configured() + [DEV_SERVER]:
 		if s.address == address:
 			return s.name
 	return "Serwer lokalny" if address.begins_with("127.") or address.begins_with("localhost") else "Inny serwer"

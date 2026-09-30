@@ -1,0 +1,5 @@
+# Python tools (map generator, sounds, trailer): the usual errors, sorted imports.
+line-length = 140
+
+[lint]
+select = ["E4", "E7", "E9", "F", "I"]

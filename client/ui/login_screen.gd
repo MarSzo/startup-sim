@@ -144,7 +144,7 @@ func _fill_servers() -> void:
 ## The chosen server's address.
 func address() -> String:
 	var i := server_opt.selected
-	return _servers[i].address if i >= 0 and i < _servers.size() else AuthClient.DEFAULT_SERVER
+	return _servers[i].address if i >= 0 and i < _servers.size() else AuthClient.default_server()
 
 
 ## Choose a server by address (one not on the list — a dev --server — is added).
@@ -192,7 +192,7 @@ func _big_button(text: String, primary: bool) -> Button:
 
 func _load_defaults() -> void:
 	var r := AuthClient.remembered()
-	set_address(r.get("address", AuthClient.DEFAULT_SERVER))
+	set_address(r.get("address", AuthClient.default_server()))
 	nick_edit.text = r.get("nick", "")
 
 

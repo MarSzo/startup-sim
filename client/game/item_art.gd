@@ -63,7 +63,7 @@ const INK := Color("#2a2118")
 static func draw(c: CanvasItem, kind: int, o: Vector2, s: float) -> void:
 	var w := maxf(0.9 * s, 0.35)  # ink width
 	# Helpers in box units (0..16).
-	var P := func(x: float, y: float) -> Vector2: return o + Vector2(x, y) * s
+	var pt := func(x: float, y: float) -> Vector2: return o + Vector2(x, y) * s
 	var poly := func(pts: Array, fill: Color) -> void:
 		var pp := PackedVector2Array()
 		for q in pts:
@@ -97,7 +97,7 @@ static func draw(c: CanvasItem, kind: int, o: Vector2, s: float) -> void:
 		GUEST_PASS, EMPLOYEE_CARD:
 			var guest := kind == GUEST_PASS
 			rr.call(1.2, 3.4, 13.6, 10, Color("#f1d15a") if guest else Color("#f2eee4"), 1.4)
-			c.draw_rect(Rect2(P.call(1.9, 4.1), Vector2(12.2, 2.2) * s), Color("#d98a3e") if guest else Color("#4f7fb0"))
+			c.draw_rect(Rect2(pt.call(1.9, 4.1), Vector2(12.2, 2.2) * s), Color("#d98a3e") if guest else Color("#4f7fb0"))
 			if not guest:
 				rr.call(3, 7.4, 4, 4.4, Color("#c9a37a"), 0.6)
 				dot.call(5, 9, 1.0, Color("#6b4a2e"))
@@ -106,19 +106,19 @@ static func draw(c: CanvasItem, kind: int, o: Vector2, s: float) -> void:
 			rr.call(6.8, 1.0, 2.4, 3.4, Color("#aab0b3"), 0.5)
 		LAPTOP:
 			poly.call([Vector2(2.6, 2.4), Vector2(13.4, 2.4), Vector2(13.4, 10.6), Vector2(2.6, 10.6)], Color("#4d5359"))
-			c.draw_rect(Rect2(P.call(3.6, 3.4), Vector2(8.8, 6.2) * s), Color("#8fb9d3"))
+			c.draw_rect(Rect2(pt.call(3.6, 3.4), Vector2(8.8, 6.2) * s), Color("#8fb9d3"))
 			ln.call(4.4, 4.4, 7.4, 4.4, Color(1, 1, 1, 0.6), 0.7)
 			poly.call([Vector2(1.2, 11), Vector2(14.8, 11), Vector2(15.6, 13.8), Vector2(0.4, 13.8)], Color("#9aa1a6"))
 		COFFEE, EMPTY_CUP, CUP, LATTE:
 			poly.call([Vector2(3.4, 5.6), Vector2(11.6, 5.6), Vector2(10.8, 14.4), Vector2(4.2, 14.4)], Color("#f1ece2"))
-			c.draw_arc(P.call(12.2, 9.6), 2.2 * s, -PI / 2, PI / 2, 10, INK, 1.6 * s, true)
-			c.draw_arc(P.call(12.2, 9.6), 2.2 * s, -PI / 2, PI / 2, 10, Color("#f1ece2"), 0.8 * s, true)
+			c.draw_arc(pt.call(12.2, 9.6), 2.2 * s, -PI / 2, PI / 2, 10, INK, 1.6 * s, true)
+			c.draw_arc(pt.call(12.2, 9.6), 2.2 * s, -PI / 2, PI / 2, 10, Color("#f1ece2"), 0.8 * s, true)
 			if kind == COFFEE or kind == LATTE:
 				c.draw_set_transform(o + Vector2(7.5, 6.3) * s, 0.0, Vector2(1.0, 0.35))
 				c.draw_circle(Vector2.ZERO, 3.6 * s, Color("#6b4a2e") if kind == COFFEE else Color("#c49a6c"))
 				c.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 				for k in 2:
-					c.draw_arc(P.call(6 + k * 3, 3.2), 1.0 * s, PI * 0.6, PI * 1.6, 6, Color(INK, 0.5), 0.6 * s, true)
+					c.draw_arc(pt.call(6 + k * 3, 3.2), 1.0 * s, PI * 0.6, PI * 1.6, 6, Color(INK, 0.5), 0.6 * s, true)
 			elif kind == EMPTY_CUP:
 				ln.call(5.2, 12.6, 9.8, 12.6, Color("#9c7b5b"), 0.8)
 				dot.call(6.5, 10, 0.5, Color("#9c7b5b"))
@@ -127,7 +127,7 @@ static func draw(c: CanvasItem, kind: int, o: Vector2, s: float) -> void:
 				ln.call(4.5, 9.5, 7.5, 9.5, Color(1, 1, 1, 0.8), 0.7)
 		MILK:
 			poly.call([Vector2(4, 5), Vector2(8, 1.4), Vector2(12, 5), Vector2(12, 14.6), Vector2(4, 14.6)], Color("#f4f4ee"))
-			c.draw_rect(Rect2(P.call(4.5, 8), Vector2(7, 3.5) * s), Color("#4f86c0"))
+			c.draw_rect(Rect2(pt.call(4.5, 8), Vector2(7, 3.5) * s), Color("#4f86c0"))
 			dot.call(8, 3.8, 0.7, Color("#4f86c0"))
 		FRUIT:
 			circ.call(8, 9.5, 5.4, Color("#c9463a"))
@@ -159,8 +159,8 @@ static func draw(c: CanvasItem, kind: int, o: Vector2, s: float) -> void:
 			ln.call(5.5, 9.5, 10.5, 9.5, Color("#f4ead0"), 0.8)
 		BUN:
 			circ.call(8, 9, 6, Color("#d6a45e"))
-			c.draw_arc(P.call(8, 9), 3.4 * s, 0.2, TAU - 0.4, 16, Color("#f4ead0"), 1.1 * s, true)
-			c.draw_arc(P.call(8, 9), 1.4 * s, 0.4, TAU - 0.6, 10, Color("#f4ead0"), 0.9 * s, true)
+			c.draw_arc(pt.call(8, 9), 3.4 * s, 0.2, TAU - 0.4, 16, Color("#f4ead0"), 1.1 * s, true)
+			c.draw_arc(pt.call(8, 9), 1.4 * s, 0.4, TAU - 0.6, 10, Color("#f4ead0"), 0.9 * s, true)
 		BAR:
 			poly.call([Vector2(1.4, 6), Vector2(14.6, 5), Vector2(14.6, 11), Vector2(1.4, 12)], Color("#8e4a2e"))
 			rr.call(5, 5.6, 6, 6, Color("#e0b84a"), 0.6)
@@ -184,7 +184,7 @@ static func draw(c: CanvasItem, kind: int, o: Vector2, s: float) -> void:
 			bottle.call(Color("#5a1f2a"), Color("#efe6d2"), Color("#8e2a3a"))
 		DONUT:
 			circ.call(8, 8.5, 6.2, Color("#d9a15a"))
-			c.draw_arc(P.call(8, 8.5), 3.8 * s, 0, TAU, 24, Color("#e889a8"), 3.6 * s, true)
+			c.draw_arc(pt.call(8, 8.5), 3.8 * s, 0, TAU, 24, Color("#e889a8"), 3.6 * s, true)
 			circ.call(8, 8.5, 1.8, Color("#3a2a20"))
 			for q in [Vector2(5.4, 6.2), Vector2(10.4, 7), Vector2(7.2, 12), Vector2(11, 11)]:
 				dot.call(q.x, q.y, 0.45, [Color("#f4ead0"), Color("#6fb0d8"), Color("#e0c24a")][int(q.x) % 3])
@@ -238,10 +238,10 @@ static func draw(c: CanvasItem, kind: int, o: Vector2, s: float) -> void:
 			pts.append(Vector2(14.6, 8.6))
 			poly.call(pts, Color("#3a5f9e"))
 			ln.call(8, 8.6, 8, 14, INK, 1.2)
-			c.draw_arc(P.call(9.2, 14), 1.2 * s, 0, PI, 6, INK, 1.2 * s, true)
+			c.draw_arc(pt.call(9.2, 14), 1.2 * s, 0, PI, 6, INK, 1.2 * s, true)
 		CIGARETTES:
 			rr.call(3.6, 3, 8.8, 11.6, Color("#f1ece2"), 0.8)
-			c.draw_rect(Rect2(P.call(4.2, 3.6), Vector2(7.6, 3.4) * s), Color("#c9463a"))
+			c.draw_rect(Rect2(pt.call(4.2, 3.6), Vector2(7.6, 3.4) * s), Color("#c9463a"))
 			for k in 3:
 				rr.call(4.6 + k * 2.4, 1.2, 1.8, 2.6, Color("#e0b86a"), 0.3)
 		_:

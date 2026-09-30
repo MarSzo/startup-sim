@@ -9,14 +9,26 @@
 # Needs: Godot 4.7.2 + its export templates, the "Developer ID Application"
 # certificate in the keychain, and permission for the terminal to control
 # Finder (it lays out the .dmg window; the background is
-# tools/macos/dmg-background.tiff). Notarization (optional, once):
-#   xcrun notarytool store-credentials notarytoolclaude --apple-id <you> --team-id 45259QZBRQ
+# tools/macos/dmg-background.tiff).
+#
+# Who signs: IDENTITY (and optionally NOTARY_PROFILE) from the environment or
+# from tools/macos/signing.env (not in the repository), e.g.
+#   IDENTITY="Developer ID Application: Jan Kowalski (TEAMID1234)"
+#   NOTARY_PROFILE=notarytool   # xcrun notarytool store-credentials notarytool --apple-id <you> --team-id <TEAMID>
+# The servers the build offers: client/net/servers.cfg (see servers.example.cfg).
 set -euo pipefail
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-IDENTITY=${IDENTITY:-"Developer ID Application: Mateusz Palak (45259QZBRQ)"}
-PROFILE=${NOTARY_PROFILE:-notarytoolclaude}
+[ -f "$ROOT/tools/macos/signing.env" ] && . "$ROOT/tools/macos/signing.env"
+IDENTITY=${IDENTITY:-}
+PROFILE=${NOTARY_PROFILE:-}
 APP="$ROOT/build/Startup Sim.app"
 MIC="Czat głosowy w grze: mówisz do osób w tym samym pomieszczeniu, trzymając V (albo B — szept)."
+
+if [ "${1:-}" != "--app-only" ] && [ -z "$IDENTITY" ]; then
+  echo "brak IDENTITY (Developer ID) — ustaw w środowisku albo w tools/macos/signing.env, albo użyj --app-only"
+  exit 1
+fi
+[ -f "$ROOT/client/net/servers.cfg" ] || echo "uwaga: brak client/net/servers.cfg — klient będzie znał tylko serwer lokalny"
 
 rm -rf "$ROOT/build" && mkdir -p "$ROOT/build"
 echo "== eksport z Godota"
@@ -88,7 +100,7 @@ hdiutil convert "$RW" -format UDZO -imagekey zlib-level=9 -ov -o "$DMG" >/dev/nu
 rm -f "$RW"
 codesign --force --timestamp --sign "$IDENTITY" "$DMG"
 
-if xcrun notarytool history --keychain-profile "$PROFILE" >/dev/null 2>&1; then
+if [ -n "$PROFILE" ] && xcrun notarytool history --keychain-profile "$PROFILE" >/dev/null 2>&1; then
   echo "== notaryzacja (profil $PROFILE)"
   xcrun notarytool submit "$DMG" --keychain-profile "$PROFILE" --wait
   xcrun stapler staple "$DMG"

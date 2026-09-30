@@ -30,7 +30,9 @@ func setup(title: String, body: Control, pad := 12) -> void:
 	x.pressed.connect(func(): closed.emit())
 	row.add_child(x)
 	bar.gui_input.connect(_drag)
-	gui_input.connect(func(ev): if ev is InputEventMouseButton and ev.pressed: focused.emit())
+	gui_input.connect(func(ev):
+			if ev is InputEventMouseButton and ev.pressed:
+				focused.emit())
 	content.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	for side in ["left", "right", "top", "bottom"]:
 		content.add_theme_constant_override("margin_" + side, pad)

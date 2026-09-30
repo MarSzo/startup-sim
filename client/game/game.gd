@@ -315,8 +315,12 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 	weather_fx.lightning.connect(func(): sounds.on_lightning(weather_fx.outdoors))
 	status_layer.add_child(shelf_window)
 	status_layer.add_child(fridge_window)
-	fridge_window.action.connect(func(act: int, arg: int): if net.is_playing(): net.send(Protocol.encode_fridge_action(net.token, act, arg)))
-	shelf_window.take.connect(func(shelf: int, kind: int): if net.is_playing(): net.send(Protocol.encode_shop_take(net.token, shelf, kind)))
+	fridge_window.action.connect(func(act: int, arg: int):
+			if net.is_playing():
+				net.send(Protocol.encode_fridge_action(net.token, act, arg)))
+	shelf_window.take.connect(func(shelf: int, kind: int):
+			if net.is_playing():
+				net.send(Protocol.encode_shop_take(net.token, shelf, kind)))
 	screen_layer.layer = 12
 	add_child(screen_layer)
 	screen.my_id = net.player_id
@@ -331,11 +335,17 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 	screen.company_action.connect(func(act: int, target: int, value: int, text: String):
 		if net.is_playing():
 			net.send(Protocol.encode_company_action(net.token, act, target, value, text)))
-	screen.order.connect(func(dish: int): if net.is_playing(): net.send(Protocol.encode_lunch_order(net.token, dish)))
-	screen.book.connect(func(start: int, topic: int): if net.is_playing(): net.send(Protocol.encode_calendar_book(net.token, start, topic)))
+	screen.order.connect(func(dish: int):
+			if net.is_playing():
+				net.send(Protocol.encode_lunch_order(net.token, dish)))
+	screen.book.connect(func(start: int, topic: int):
+			if net.is_playing():
+				net.send(Protocol.encode_calendar_book(net.token, start, topic)))
 	status_layer.add_child(dialog)
 	dialog.name_of = func(id: int) -> String: return nicks.get(id, "?")
-	dialog.answer.connect(func(id: int, choice: int): if net.is_playing(): net.send(Protocol.encode_dialog_answer(net.token, id, choice)))
+	dialog.answer.connect(func(id: int, choice: int):
+			if net.is_playing():
+				net.send(Protocol.encode_dialog_answer(net.token, id, choice)))
 	screen_layer.add_child(screen)
 	_show_floor(0)
 	set_zoom_level.call_deferred(float(args["zoom"]) if args.has("zoom") else Settings.zoom)

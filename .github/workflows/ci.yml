@@ -1,11 +1,16 @@
-# Tests on every push and pull request: the Rust server (clippy + unit,
-# golden and end-to-end tests) and the Godot client (protocol / movement
-# parity with the server's golden files).
-name: Testy
+# Checks on every push and pull request: the Rust server (format, clippy,
+# unit / golden / end-to-end tests, dependencies), the Godot client (lint,
+# protocol / movement parity with the server's golden files), the Python
+# tools and the maps they generate, and no secrets in the repository.
+name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
+
+permissions:
+  contents: read
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -23,16 +28,28 @@ jobs:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy
+          components: clippy, rustfmt
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: server
+      - name: Formatowanie (rustfmt)
+        run: cargo fmt --check
       - name: Clippy
         run: cargo clippy --all-targets -- -D warnings
       - name: Testy (jednostkowe, golden, e2e)
         run: cargo test
       - name: Golden bez zmian
         run: git diff --exit-code -- tests/golden
+
+  dependencies:
+    name: Zależności (cargo-deny)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          manifest-path: server/Cargo.toml
 
   client:
     name: Klient (Godot)
@@ -42,6 +59,10 @@ jobs:
       GODOT_VERSION: 4.7.2
     steps:
       - uses: actions/checkout@v7
+      - name: Lint GDScript (gdlint)
+        run: |
+          pipx install "gdtoolkit==4.*"
+          cd client && gdlint .
       - name: Cache Godota
         id: godot-cache
         uses: actions/cache@v6
@@ -61,3 +82,30 @@ jobs:
         run: |
           ~/godot/godot --headless --path client -s tests/run_tests.gd 2>&1 | tee /tmp/godot.log
           grep -q ", 0 failures" /tmp/godot.log
+
+  tools:
+    name: Narzędzia i mapy (Python)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - name: Lint (ruff)
+        run: |
+          pipx install ruff
+          ruff check tools
+      - name: Mapy zgodne z generatorem
+        run: |
+          python3 tools/build_maps.py
+          git diff --exit-code -- client/maps
+
+  secrets:
+    name: Sekrety (gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

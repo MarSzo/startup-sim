@@ -803,7 +803,7 @@ func _update_badges() -> void:
 			_badges[k].visible = counts[k] > 0 and k != "trash"
 
 
-func _on_new_mail(m: Dictionary) -> void:
+func _on_new_mail(_m: Dictionary) -> void:
 	var audio = preload("res://audio/audio.gd").inst
 	if audio:
 		audio.play("notify", -4.0)
