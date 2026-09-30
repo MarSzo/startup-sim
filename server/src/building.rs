@@ -86,9 +86,7 @@ impl Building {
         let ground = floors.first().and_then(|f| f.map.as_ref()).ok_or("building has no ground floor")?;
         let outside = Outside::from_map(ground)?;
         let place = |pick: fn(&crate::map::Places) -> Option<[i32; 2]>| {
-            floors.iter().enumerate().find_map(|(i, f)| {
-                f.map.as_ref().and_then(|m| pick(&m.places)).map(|[x, y]| (i as u8, Tile { x, y }))
-            })
+            floors.iter().enumerate().find_map(|(i, f)| f.map.as_ref().and_then(|m| pick(&m.places)).map(|[x, y]| (i as u8, Tile { x, y })))
         };
         let tray = place(|p| p.tray);
         let founder = place(|p| p.founder);
@@ -148,10 +146,9 @@ impl Building {
     /// Next active floor (cyclically, going up) with an elevator cabin `id`.
     pub fn next_elevator_floor(&self, from: u8, id: &str) -> Option<u8> {
         let n = self.floors.len() as u8;
-        (1..n).map(|k| (from + k) % n).find(|&f| {
-            self.floor(f)
-                .is_some_and(|m| m.links.iter().any(|l| matches!(&l.kind, LinkKind::Elevator { id: i } if i == id)))
-        })
+        (1..n)
+            .map(|k| (from + k) % n)
+            .find(|&f| self.floor(f).is_some_and(|m| m.links.iter().any(|l| matches!(&l.kind, LinkKind::Elevator { id: i } if i == id))))
     }
 
     pub fn find_room(&self, name: &str) -> Option<(u8, &RoomDef)> {
@@ -200,9 +197,7 @@ impl Building {
                     continue;
                 }
                 let (next, via) = match m.link_at(nt.x, nt.y).map(|l| &l.kind) {
-                    Some(LinkKind::Stairs { to_floor, to }) if self.floor(*to_floor).is_some() => {
-                        ((*to_floor, *to), Some((f, nt)))
-                    }
+                    Some(LinkKind::Stairs { to_floor, to }) if self.floor(*to_floor).is_some() => ((*to_floor, *to), Some((f, nt))),
                     _ => ((f, nt), None),
                 };
                 if let std::collections::hash_map::Entry::Vacant(e) = prev.entry(next) {
@@ -287,5 +282,4 @@ mod tests {
         assert_eq!(below, vec![(0, street)]);
         assert!(b.below(1, kitchen).is_empty());
     }
-
 }

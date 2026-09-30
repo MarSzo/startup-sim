@@ -215,12 +215,7 @@ impl Needs {
         self.energy -= if pts(self.hunger) >= 100 { 2 * ENERGY_DOWN } else { ENERGY_DOWN };
         self.bladder += BLADDER_UP + if self.upset { UPSET_RATE } else { 0 };
         self.hygiene -= HYGIENE_DOWN;
-        let neglected = [
-            pts(self.hunger) >= HUNGRY,
-            pts(self.energy) <= TIRED,
-            pts(self.bladder) >= MUST_GO,
-            pts(self.hygiene) < SMELLY,
-        ]
+        let neglected = [pts(self.hunger) >= HUNGRY, pts(self.energy) <= TIRED, pts(self.bladder) >= MUST_GO, pts(self.hygiene) < SMELLY]
             .iter()
             .filter(|&&b| b)
             .count() as i32;

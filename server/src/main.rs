@@ -5,8 +5,8 @@ use std::time::Duration;
 
 use game::args::Args;
 use game::auth::Auth;
-use game::http::{self, Tls};
 use game::building::{default_building_path, Building};
+use game::http::{self, Tls};
 use game::net::LinkConditions;
 use game::recruitment::{default_recruitment_path, Recruitment};
 use game::server::{Config, Server, DEFAULT_CLIENT_TIMEOUT, TICK_HZ};
@@ -152,8 +152,7 @@ fn start(args: &Args) -> Result<Server, StartError> {
     let weather = match args.str("weather") {
         None => None,
         Some(w) => Some(
-            game::weather::parse(w)
-                .ok_or_else(|| StartError::Usage(format!("invalid --weather {w} (sun, clouds, rain, storm, fog)")))?,
+            game::weather::parse(w).ok_or_else(|| StartError::Usage(format!("invalid --weather {w} (sun, clouds, rain, storm, fog)")))?,
         ),
     };
     let bind = match args.str("bind") {
@@ -163,7 +162,8 @@ fn start(args: &Args) -> Result<Server, StartError> {
         None => dual_stack(),
     };
     let cleaning_fixed = args.str("cleaning-at").is_some();
-    let save_path = if args.flag("no-save") { None } else { Some(args.str("save").map_or_else(|| PathBuf::from("saves/world.db"), PathBuf::from)) };
+    let save_path =
+        if args.flag("no-save") { None } else { Some(args.str("save").map_or_else(|| PathBuf::from("saves/world.db"), PathBuf::from)) };
     let cfg = Config {
         bind,
         link,
@@ -194,7 +194,9 @@ fn start(args: &Args) -> Result<Server, StartError> {
         let auth = Auth::open(path).map_err(StartError::Fatal)?;
         let tls = match (args.str("tls-cert"), args.str("tls-key")) {
             (Some(c), Some(k)) => Tls { cert: c.into(), key: k.into(), self_signed: false },
-            (None, None) => http::self_signed(&path.parent().unwrap_or(std::path::Path::new(".")).join("tls")).map_err(StartError::Fatal)?,
+            (None, None) => {
+                http::self_signed(&path.parent().unwrap_or(std::path::Path::new(".")).join("tls")).map_err(StartError::Fatal)?
+            }
             _ => return Err(StartError::Usage("--tls-cert and --tls-key go together".into())),
         };
         let game = server.local_addr();

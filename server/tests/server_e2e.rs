@@ -7,12 +7,12 @@ use std::time::{Duration, Instant};
 
 use game::building::{default_building_path, Building, Place};
 use game::map::{access, Tile};
-use game::npc::{lines, NPC_ID_BASE};
 use game::nav::Walker;
-use game::security;
 use game::net::LinkConditions;
+use game::npc::{lines, NPC_ID_BASE};
 use game::protocol::{self as proto, Appearance, Packet, Profile};
 use game::recruitment::{default_recruitment_path, Recruitment};
+use game::security;
 use game::server::{Config, Server};
 use game::sim::{self, Body, Pos, IN_RIGHT};
 
@@ -70,7 +70,13 @@ fn start_server_cfg(start_access: u8, skip_recruitment: bool, start_employed: bo
 }
 
 /// ... with the game clock starting at `start_minute`, `time_scale` faster.
-fn start_server_at(start_access: u8, skip_recruitment: bool, start_employed: bool, start_minute: u32, time_scale: u32) -> (SocketAddr, u32) {
+fn start_server_at(
+    start_access: u8,
+    skip_recruitment: bool,
+    start_employed: bool,
+    start_minute: u32,
+    time_scale: u32,
+) -> (SocketAddr, u32) {
     let map = building();
     let crc = map.crc;
     let cfg = Config {
@@ -192,7 +198,13 @@ impl Client {
         static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
         let n = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         sock.send(&keys.seal(Dir::ToServer, &connect_prefix(&raw), n, &connect)).unwrap();
-        let mut c = Client { sock, id: 0, token: 0, seq: 0, crypto: Some(std::cell::RefCell::new(Session { keys, send_counter: n, window: Default::default() })) };
+        let mut c = Client {
+            sock,
+            id: 0,
+            token: 0,
+            seq: 0,
+            crypto: Some(std::cell::RefCell::new(Session { keys, send_counter: n, window: Default::default() })),
+        };
         let deadline = Instant::now() + Duration::from_secs(2);
         while Instant::now() < deadline {
             match c.recv() {
@@ -415,10 +427,7 @@ fn unknown_token_is_told_to_reconnect() {
     sock.send(&Packet::Ping { token: 12345, client_time: 0 }.encode()).unwrap();
     let mut buf = [0u8; 2048];
     let n = sock.recv(&mut buf).unwrap();
-    assert_eq!(
-        Packet::decode(&buf[..n]).unwrap(),
-        Packet::Disconnect { token: 12345, reason: proto::disconnect::SESSION_UNKNOWN }
-    );
+    assert_eq!(Packet::decode(&buf[..n]).unwrap(), Packet::Disconnect { token: 12345, reason: proto::disconnect::SESSION_UNKNOWN });
 }
 
 #[test]
@@ -573,7 +582,8 @@ fn desktop_portal_mail_interview_and_office() {
     // Our startup: application -> invitation mail -> online interview.
     let interview = |want_correct: bool| -> Packet {
         apply(1);
-        let Packet::Mail { action, arg, .. } = recv_until(&|p| matches!(p, Packet::Mail { action, .. } if *action == act::JOIN_INTERVIEW), false)
+        let Packet::Mail { action, arg, .. } =
+            recv_until(&|p| matches!(p, Packet::Mail { action, .. } if *action == act::JOIN_INTERVIEW), false)
         else {
             unreachable!()
         };
@@ -905,9 +915,7 @@ fn coffee_machine_brews_one_cup_at_a_time() {
         }
         while let Some(p) = c.recv() {
             if let Packet::Snapshot { entities, .. } = p {
-                others_see |= entities
-                    .iter()
-                    .any(|e| e.id == a.id && e.held == item_kind::COFFEE);
+                others_see |= entities.iter().any(|e| e.id == a.id && e.held == item_kind::COFFEE);
             }
         }
     }
@@ -1050,10 +1058,7 @@ fn laptop_on_desk_messenger_lock_and_take() {
         _ => None,
     };
     let at_computer = |c: &Client, keep: &[&Client], want: bool| {
-        wait_for(c, keep, Duration::from_millis(800), |p| {
-            status(p).filter(|s| (*s == proto::activity::COMPUTER) == want)
-        })
-        .is_some()
+        wait_for(c, keep, Duration::from_millis(800), |p| status(p).filter(|s| (*s == proto::activity::COMPUTER) == want)).is_some()
     };
     let wait = Duration::from_millis(800);
     let nobody = Body::at(1, Pos::tile_center(0, 0)); // E doesn't move anyone
@@ -1283,7 +1288,15 @@ fn elevator_is_called_waited_for_and_ridden() {
     // In front of the elevator on floor 1: the car is downstairs, doors shut.
     let body = ola.walk_to(&b, start, (1, Tile { x: 37, y: 44 }), &[]);
     // (Lift A: the left one, doors at x 36..38.)
-    let doors = |c: &Client| wait_for(c, &[], wait, |p| if let Packet::Doors { tiles, lifts, .. } = p { Some((tiles.clone(), lifts[0].floor, lifts[0].target)) } else { None });
+    let doors = |c: &Client| {
+        wait_for(c, &[], wait, |p| {
+            if let Packet::Doors { tiles, lifts, .. } = p {
+                Some((tiles.clone(), lifts[0].floor, lifts[0].target))
+            } else {
+                None
+            }
+        })
+    };
     let (tiles, lift, _) = doors(&ola).unwrap();
     assert!(tiles.contains(&(37, 43)) && lift == 0);
     let body = ola.press_e(&b, body);
@@ -1388,9 +1401,13 @@ fn shop_take_from_shelf_alarm_and_pay() {
     let (mut ola, _) = Client::connect(addr, "Ola");
     let wait = Duration::from_millis(800);
     let said = |pred: fn(&str) -> bool| move |p: &Packet| matches!(p, Packet::Say { text, .. } if pred(text)).then_some(());
-    let money = |c: &Client| wait_for(c, &[], Duration::from_millis(1200), |p| if let Packet::Stats { money, .. } = p { Some(*money) } else { None });
+    let money = |c: &Client| {
+        wait_for(c, &[], Duration::from_millis(1200), |p| if let Packet::Stats { money, .. } = p { Some(*money) } else { None })
+    };
     // (Resent every 2 s, so a missed one comes again.)
-    let inventory = |c: &Client| wait_for(c, &[], Duration::from_millis(2500), |p| if let Packet::Inventory { slots } = p { Some(slots.clone()) } else { None });
+    let inventory = |c: &Client| {
+        wait_for(c, &[], Duration::from_millis(2500), |p| if let Packet::Inventory { slots } = p { Some(slots.clone()) } else { None })
+    };
     let take = |c: &Client, shelf: u8, kind: u8| c.send(&Packet::ShopTake { token: c.token, shelf, kind });
     let ws = game::computer::find_workstations(&b);
     let w = ws.iter().find(|w| w.department == 1).unwrap();
@@ -1456,7 +1473,8 @@ fn shop_take_from_shelf_alarm_and_pay() {
     let _out = ola.walk_to(&b, body, (0, Tile { x: 22, y: 59 }), &[]);
     assert!(wait_for(&ola, &[], Duration::from_millis(3000), said(|t| t == security::lines::GUARD_POLICE_AGAIN)).is_some());
     let fine = security::lines::police_fine(186_00);
-    assert!(wait_for(&ola, &[], Duration::from_millis(8000), |p| matches!(p, Packet::Say { text, .. } if *text == fine).then_some(())).is_some());
+    assert!(wait_for(&ola, &[], Duration::from_millis(8000), |p| matches!(p, Packet::Say { text, .. } if *text == fine).then_some(()))
+        .is_some());
     assert_eq!(money(&ola), Some(0));
 }
 
@@ -1539,13 +1557,16 @@ fn rain_soaks_you_outdoors() {
     WEATHER.with(|w| w.set(Some(game::weather::kind::RAIN)));
     let (addr, _) = start_server_with(0); // spawns on the sidewalk: outdoors
     let (ola, _) = Client::connect(addr, "Ola");
-    let hygiene = |c: &Client| wait_for(c, &[], Duration::from_millis(1200), |p| if let Packet::Stats { hygiene, .. } = p { Some(*hygiene) } else { None });
+    let hygiene = |c: &Client| {
+        wait_for(c, &[], Duration::from_millis(1200), |p| if let Packet::Stats { hygiene, .. } = p { Some(*hygiene) } else { None })
+    };
     let soaked = wait_for(&ola, &[], Duration::from_millis(1500), |p| {
         matches!(p, Packet::Say { text, .. } if text == game::weather::lines::SOAKED).then_some(())
     });
     assert!(soaked.is_some(), "told it's pouring");
     let before = hygiene(&ola).unwrap();
-    let weather = wait_for(&ola, &[], Duration::from_millis(1500), |p| if let Packet::Clock { weather, .. } = p { Some(*weather) } else { None });
+    let weather =
+        wait_for(&ola, &[], Duration::from_millis(1500), |p| if let Packet::Clock { weather, .. } = p { Some(*weather) } else { None });
     assert_eq!(weather, Some(game::weather::kind::RAIN));
     std::thread::sleep(Duration::from_millis(100));
     ola.ping();
@@ -1565,7 +1586,8 @@ fn calendar_meeting_with_the_ceo() {
     let b = building();
     let (mut ola, _) = Client::connect(addr, "Ola"); // IT, at her desk upstairs
     let wait = Duration::from_millis(800);
-    let access = |c: &Client| wait_for(c, &[], wait, |p| if let Packet::Snapshot { self_access, .. } = p { Some(*self_access) } else { None });
+    let access =
+        |c: &Client| wait_for(c, &[], wait, |p| if let Packet::Snapshot { self_access, .. } = p { Some(*self_access) } else { None });
     let ws = game::computer::find_workstations(&b);
     let w = ws.iter().find(|w| w.department == 1).unwrap();
     let body = Body { access: access::CARD, ..Body::at(w.floor, Pos::tile_center(w.tile.x, w.tile.y + 1)) };
@@ -2076,10 +2098,12 @@ fn progress_survives_a_server_restart() {
     assert_eq!(reg["ok"], true, "registered: {reg}");
     assert_eq!(reg["character"], false);
     // Guests are off on a server with accounts; a wrong ticket is refused.
-    let refused = |c: &Client| wait_for(c, &[], Duration::from_millis(500), |p| match p {
-        Packet::Reject { reason } => Some(*reason),
-        _ => None,
-    });
+    let refused = |c: &Client| {
+        wait_for(c, &[], Duration::from_millis(500), |p| match p {
+            Packet::Reject { reason } => Some(*reason),
+            _ => None,
+        })
+    };
     let s = Client::socket_for(addr);
     let guest = Client { sock: s, id: 0, token: 0, seq: 0, crypto: None };
     guest.send(&Packet::Connect { nonce: 1, nick: "Ola".into(), profile: test_profile(), ticket: String::new() });
@@ -2097,7 +2121,15 @@ fn progress_survives_a_server_restart() {
     assert_eq!(wait_for(&ola, &[], wait, computer), Some(ola.id));
     let task = Packet::TaskAction { token: ola.token, nonce: 1, action: ta::CREATE, task: 0, arg: 2, text: "Przetrwać restart".into() };
     ola.send(&task);
-    let mail = Packet::MailAction { token: ola.token, nonce: 1, action: ma::SEND, id: 0, to: "Ola".into(), subject: "Notatka".into(), body: "Nie zapomnij.".into() };
+    let mail = Packet::MailAction {
+        token: ola.token,
+        nonce: 1,
+        action: ma::SEND,
+        id: 0,
+        to: "Ola".into(),
+        subject: "Notatka".into(),
+        body: "Nie zapomnij.".into(),
+    };
     ola.send(&mail);
     assert!(wait_for(&ola, &[], wait, |p| matches!(p, Packet::MailState { done: 1, .. }).then_some(())).is_some());
     let (money, day, _) = wait_for(&ola, &[], wait, clock).expect("clock");
@@ -2145,7 +2177,10 @@ fn progress_survives_a_server_restart() {
         spy.set_read_timeout(Some(Duration::from_millis(200))).unwrap();
         assert!(spy.recv(&mut buf).is_err(), "no Welcome for a replayed Connect");
         ola.ping();
-        assert!(wait_for(&ola, &[], Duration::from_millis(500), |p| matches!(p, Packet::Pong { .. }).then_some(())).is_some(), "Ola still in");
+        assert!(
+            wait_for(&ola, &[], Duration::from_millis(500), |p| matches!(p, Packet::Pong { .. }).then_some(())).is_some(),
+            "Ola still in"
+        );
     }
     let (money2, day2, place) = wait_for(&ola, &[], wait, clock).expect("clock after restart");
     assert_eq!((money2, day2, place), (money, day, proto::place::BUILDING), "the same character, at work");
@@ -2169,7 +2204,15 @@ fn progress_survives_a_server_restart() {
         _ => None,
     });
     assert_eq!(titles, Some(vec!["Przetrwać restart".to_string()]));
-    let sync = Packet::MailAction { token: ola.token, nonce: 0, action: ma::SYNC, id: 0, to: String::new(), subject: String::new(), body: String::new() };
+    let sync = Packet::MailAction {
+        token: ola.token,
+        nonce: 0,
+        action: ma::SYNC,
+        id: 0,
+        to: String::new(),
+        subject: String::new(),
+        body: String::new(),
+    };
     ola.send(&sync);
     let subject = wait_for(&ola, &[], wait, |p| match p {
         Packet::WorkMail { subject, .. } => Some(subject.clone()),

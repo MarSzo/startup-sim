@@ -3,8 +3,8 @@
 use crate::inventory::{self, kind as item_kind, Item};
 use crate::needs::{self, Rest, SpotKind};
 use crate::protocol as proto;
-use crate::sim::Body;
 use crate::shop;
+use crate::sim::Body;
 
 use super::player::refresh;
 use super::Server;

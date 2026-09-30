@@ -236,7 +236,8 @@ impl Server {
 
     /// Mugs somebody took away (left the game): back to the cupboard.
     pub(super) fn return_mugs_of(&mut self, items: &[Item]) {
-        let n = items.iter().filter(|i| matches!(i.kind, item_kind::CUP | item_kind::EMPTY_CUP | item_kind::COFFEE | item_kind::LATTE)).count();
+        let n =
+            items.iter().filter(|i| matches!(i.kind, item_kind::CUP | item_kind::EMPTY_CUP | item_kind::COFFEE | item_kind::LATTE)).count();
         if let Some(k) = self.kitchen.as_mut() {
             k.return_mugs(u8::try_from(n).unwrap_or(u8::MAX));
         }

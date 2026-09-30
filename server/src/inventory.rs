@@ -325,7 +325,17 @@ mod tests {
     #[test]
     fn coffee_goes_cold() {
         let mut inv = Inventory::default();
-        inv.add(Item { id: 1, kind: kind::COFFEE, label: String::new(), expires: Some(100), owner: 0, count: 1, unpaid: false, stale: false }).unwrap();
+        inv.add(Item {
+            id: 1,
+            kind: kind::COFFEE,
+            label: String::new(),
+            expires: Some(100),
+            owner: 0,
+            count: 1,
+            unpaid: false,
+            stale: false,
+        })
+        .unwrap();
         assert!(inv.expire(99).is_empty());
         assert_eq!(inv.expire(100).len(), 1);
         assert!(inv.hands_free());

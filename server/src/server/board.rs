@@ -29,9 +29,10 @@ impl Server {
             .find(|m| m.day == day && m.owner == account && matches!(m.state, board::State::Booked | board::State::Talking(_)));
         let slots = board::slots()
             .map(|start| {
-                let taken = self.meetings.iter().find(|m| {
-                    m.day == day && m.start == start && matches!(m.state, board::State::Booked | board::State::Talking(_))
-                });
+                let taken = self
+                    .meetings
+                    .iter()
+                    .find(|m| m.day == day && m.start == start && matches!(m.state, board::State::Booked | board::State::Talking(_)));
                 let state = match taken {
                     Some(m) if m.owner == account => proto::slot::MINE,
                     Some(_) => proto::slot::TAKEN,
@@ -113,12 +114,8 @@ impl Server {
         }
         // Leaving the board room ends the conversation.
         let board_room = self.board_room;
-        let left: Vec<u16> = self
-            .players
-            .values()
-            .filter(|p| p.talk.is_some() && Some((p.body.floor, p.room)) != board_room)
-            .map(|p| p.id)
-            .collect();
+        let left: Vec<u16> =
+            self.players.values().filter(|p| p.talk.is_some() && Some((p.body.floor, p.room)) != board_room).map(|p| p.id).collect();
         for pid in left {
             self.end_talk(pid, None);
         }

@@ -392,11 +392,7 @@ impl Map {
     pub fn blocks(&self, tx: i32, ty: i32, access: u8, d: u8) -> bool {
         match self.idx(tx, ty) {
             None => true,
-            Some(i) => {
-                self.solid[i]
-                    || self.closed[i]
-                    || (self.need[i] != 0 && access & self.need[i] == 0 && self.free_dir[i] != d)
-            }
+            Some(i) => self.solid[i] || self.closed[i] || (self.need[i] != 0 && access & self.need[i] == 0 && self.free_dir[i] != d),
         }
     }
 
@@ -623,7 +619,11 @@ mod tests {
             let m = b.floor(f).unwrap();
             // (The lift cabins are reached by riding, not walking.)
             for r in m.rooms.iter().filter(|r| r.kind != "elevator") {
-                let tile = m.room_tiles(r.id).into_iter().find(|t| m.need(t.x, t.y) == 0 && !m.is_blocked(t.x, t.y) && m.link_at(t.x, t.y).is_none()).unwrap();
+                let tile = m
+                    .room_tiles(r.id)
+                    .into_iter()
+                    .find(|t| m.need(t.x, t.y) == 0 && !m.is_blocked(t.x, t.y) && m.link_at(t.x, t.y).is_none())
+                    .unwrap();
                 let target = (f, tile);
                 let guest = b.find_path(spawn, target, access::GUEST).is_some();
                 let nobody = b.find_path(spawn, target, 0).is_some();
@@ -669,7 +669,9 @@ mod tests {
     fn floors_share_the_elevator_geometry() {
         let b = b();
         let (a, c) = (b.floor(0).unwrap(), b.floor(1).unwrap());
-        let lifts = |m: &super::Map| m.links.iter().filter(|l| matches!(l.kind, super::LinkKind::Elevator { .. })).map(|l| l.area).collect::<Vec<_>>();
+        let lifts = |m: &super::Map| {
+            m.links.iter().filter(|l| matches!(l.kind, super::LinkKind::Elevator { .. })).map(|l| l.area).collect::<Vec<_>>()
+        };
         assert_eq!(lifts(a).len(), 2, "two lifts side by side");
         assert_eq!(lifts(a), lifts(c));
     }

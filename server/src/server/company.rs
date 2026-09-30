@@ -4,8 +4,8 @@ use crate::company;
 use crate::computer::Workstation;
 use crate::inventory::kind as item_kind;
 use crate::protocol::{self as proto, Packet};
-use crate::sim::{Body, Pos};
 use crate::shop;
+use crate::sim::{Body, Pos};
 
 use super::player::{refresh, Desk, Stage};
 use super::portal::MAX_VACANCIES;

@@ -54,7 +54,7 @@ mod tests {
     use super::*;
     use crate::building::default_building_path;
     use crate::map::access;
-    use crate::sim::{self, Body, IN_RIGHT, IN_LEFT};
+    use crate::sim::{self, Body, IN_LEFT, IN_RIGHT};
 
     #[test]
     fn every_stall_is_its_own_room_and_one_in_a_bathroom_sees_it() {

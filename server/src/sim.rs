@@ -145,7 +145,6 @@ pub fn box_is_free(map: &Map, p: Pos) -> bool {
     true
 }
 
-
 /// Full simulated state of a character. Everything `step` depends on is
 /// here, and the server sends all of it back in each snapshot so the client
 /// can replay unacknowledged inputs from exactly the same state.

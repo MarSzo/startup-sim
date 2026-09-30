@@ -35,7 +35,11 @@ pub enum Who {
 }
 
 pub fn who(t: u8) -> Who {
-    if t == topic::IDEA { Who::CoFounder } else { Who::Ceo }
+    if t == topic::IDEA {
+        Who::CoFounder
+    } else {
+        Who::Ceo
+    }
 }
 
 /// Calendar: 30-minute slots, 10:00 - 17:30.
@@ -100,11 +104,7 @@ pub fn steps(t: u8) -> &'static [Step] {
     match t {
         topic::RAISE => &[Step {
             text: "Podwyżka? Proszę mnie przekonać.",
-            options: [
-                "Pracuję tu od początku i robię więcej, niż widać.",
-                "Bo kawa w automacie podrożała.",
-                "Konkurencja płaci więcej…",
-            ],
+            options: ["Pracuję tu od początku i robię więcej, niż widać.", "Bo kawa w automacie podrożała.", "Konkurencja płaci więcej…"],
             good: 0,
             replies: ["Hm, to prawda, widać Cię często w biurze.", "Kawa jest u nas za darmo.", "To niech płaci. Ale rozumiem."],
         }],
@@ -121,11 +121,7 @@ pub fn steps(t: u8) -> &'static [Step] {
             },
             Step {
                 text: "A jak sprawdzimy, czy to działa?",
-                options: [
-                    "Zapytamy kilku klientów i zrobimy prototyp.",
-                    "Wypuścimy w piątek o 17:00 i zobaczymy.",
-                    "Zaufajmy intuicji.",
-                ],
+                options: ["Zapytamy kilku klientów i zrobimy prototyp.", "Wypuścimy w piątek o 17:00 i zobaczymy.", "Zaufajmy intuicji."],
                 good: 0,
                 replies: ["Dokładnie tak.", "Tylko nie w piątek…", "Intuicja to nie plan."],
             },

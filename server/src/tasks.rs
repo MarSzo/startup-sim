@@ -196,7 +196,10 @@ mod tests {
         // Kuba takes it himself: nobody to tell; Ola assigns Kuba: Kuba hears.
         assert_eq!(b.assign(1, id, "Kuba", "Kuba"), None);
         assert_eq!(b.assign(1, id, "", "Kuba"), None);
-        assert_eq!(b.assign(1, id, "Kuba", "Ola"), Some(Notice::Assigned { to: "Kuba".into(), by: "Ola".into(), title: "Naprawić logowanie".into() }));
+        assert_eq!(
+            b.assign(1, id, "Kuba", "Ola"),
+            Some(Notice::Assigned { to: "Kuba".into(), by: "Ola".into(), title: "Naprawić logowanie".into() })
+        );
         match b.comment(1, id, "Kuba", "Zrobione, do sprawdzenia") {
             Some(Notice::Commented { to, .. }) => assert_eq!(to, vec!["Ola".to_string()]),
             n => panic!("{n:?}"),

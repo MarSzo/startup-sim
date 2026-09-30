@@ -6,16 +6,16 @@ use std::time::Instant;
 
 use crate::coffee;
 use crate::commute;
+use crate::crypto;
 use crate::inventory::{kind as item_kind, Item};
 use crate::map::access;
 use crate::net::canonical;
-use crate::crypto;
 use crate::protocol::{self as proto, DecodeError, Packet, PlayerInfoEntry, Profile};
 use crate::shop;
 use crate::sim::{self, Body, Pos};
 
-use super::player::{clean_text, refresh, validate_profile, Player, Stage};
 use super::items::DROP_HANDLE_BASE;
+use super::player::{clean_text, refresh, validate_profile, Player, Stage};
 use super::portal::MAX_VACANCIES;
 use super::snapshot::INFO_PER_PACKET;
 use super::{Server, MAX_INPUT_QUEUE, TICK_HZ};
@@ -164,7 +164,16 @@ impl Server {
     }
 
     #[allow(clippy::too_many_arguments)]
-    fn handle_connect(&mut self, addr: SocketAddr, nonce: u32, nick: &str, profile: Profile, ticket: &str, keys: Option<crypto::Keys>, now: Instant) {
+    fn handle_connect(
+        &mut self,
+        addr: SocketAddr,
+        nonce: u32,
+        nick: &str,
+        profile: Profile,
+        ticket: &str,
+        keys: Option<crypto::Keys>,
+        now: Instant,
+    ) {
         if let Some(&id) = self.by_addr.get(&addr) {
             if self.players.get(&id).is_some_and(|p| p.nonce == nonce) {
                 // Our Welcome was lost; resend it.
@@ -310,12 +319,8 @@ impl Server {
     /// Players silent for longer than the timeout are dropped.
     pub(super) fn drop_timed_out(&mut self, now: Instant) {
         let timeout = self.cfg.client_timeout;
-        let stale: Vec<(u16, SocketAddr, u32)> = self
-            .players
-            .values()
-            .filter(|p| now.duration_since(p.last_heard) > timeout)
-            .map(|p| (p.id, p.addr, p.token))
-            .collect();
+        let stale: Vec<(u16, SocketAddr, u32)> =
+            self.players.values().filter(|p| now.duration_since(p.last_heard) > timeout).map(|p| (p.id, p.addr, p.token)).collect();
         for (id, addr, token) in stale {
             self.send(addr, &Packet::Disconnect { token, reason: proto::disconnect::TIMEOUT });
             self.remove_player(id, "timed out");

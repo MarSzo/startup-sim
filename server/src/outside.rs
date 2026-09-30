@@ -78,8 +78,5 @@ impl Outside {
 
 /// Shop shelves (id -> area) from the floor's places.
 pub fn shelf_areas(p: &Places) -> Vec<(u8, Rect)> {
-    p.shelves
-        .iter()
-        .filter_map(|(k, a)| k.parse().ok().map(|id| (id, Rect { x: a[0], y: a[1], w: a[2], h: a[3] })))
-        .collect()
+    p.shelves.iter().filter_map(|(k, a)| k.parse().ok().map(|id| (id, Rect { x: a[0], y: a[1], w: a[2], h: a[3] }))).collect()
 }

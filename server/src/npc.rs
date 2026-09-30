@@ -178,13 +178,27 @@ pub enum Event {
 
 enum State {
     Idle,
-    Escorting { guest: u16, walker: Walker, waited: u32 },
+    Escorting {
+        guest: u16,
+        walker: Walker,
+        waited: u32,
+    },
     /// Brought the guest; stands there for a moment, then goes back.
-    Lingering { ticks: u32 },
-    Returning { walker: Walker },
-    Chasing { target: u16, walker: Option<Walker>, ticks: u32 },
+    Lingering {
+        ticks: u32,
+    },
+    Returning {
+        walker: Walker,
+    },
+    Chasing {
+        target: u16,
+        walker: Option<Walker>,
+        ticks: u32,
+    },
     /// Walking somewhere for the server (`go_to`); then idle there.
-    Errand { walker: Walker },
+    Errand {
+        walker: Walker,
+    },
 }
 
 pub struct Npc {
@@ -313,14 +327,7 @@ impl Npc {
 
     /// A player pressed E next to this NPC. `department`: the position the
     /// player was recruited for (HR puts it on the contract).
-    pub fn interact(
-        &mut self,
-        b: &Building,
-        player: u16,
-        player_access: u8,
-        department: Option<&str>,
-        hands_free: bool,
-    ) -> Vec<Event> {
+    pub fn interact(&mut self, b: &Building, player: u16, player_access: u8, department: Option<&str>, hands_free: bool) -> Vec<Event> {
         let say = |text: &str| Event::Say { npc: self.id, text: text.to_string(), to: Some(player) };
         let has_card = player_access & access::CARD != 0;
         let has_pass = player_access & access::GUEST != 0;
@@ -405,9 +412,9 @@ impl Npc {
                     Some(g) => {
                         let r2 = FOLLOW_RADIUS * FOLLOW_RADIUS;
                         let close = |f: u8, p: Pos| g.floor == f && dist2(g.pos, p) <= r2;
-                        let in_goal_room = self.escort_room.is_some_and(|(f, r)| {
-                            g.floor == f && b.floor(f).is_some_and(|m| m.room_at(g.pos.x, g.pos.y) == r)
-                        });
+                        let in_goal_room = self
+                            .escort_room
+                            .is_some_and(|(f, r)| g.floor == f && b.floor(f).is_some_and(|m| m.room_at(g.pos.x, g.pos.y) == r));
                         let near = in_goal_room
                             || close(self.body.floor, self.body.pos)
                             || walker.remaining().iter().any(|&(f, t)| close(f, Pos::tile_center(t.x, t.y)));
@@ -508,7 +515,15 @@ impl Npc {
             let before = self.body.pos;
             self.body = sim::step(b, self.body, input);
             let (dx, dy) = sim::input_dir(input);
-            facing = if dy > 0 { 0 } else if dy < 0 { 1 } else if dx < 0 { 2 } else { 3 };
+            facing = if dy > 0 {
+                0
+            } else if dy < 0 {
+                1
+            } else if dx < 0 {
+                2
+            } else {
+                3
+            };
             moved |= self.body.pos != before;
         }
         self.set_flags(facing, moved);
@@ -753,7 +768,10 @@ mod tests {
         assert_eq!(says(&hr.interact(&b, 1, 0, None, true)), vec![lines::NO_PASS]);
         assert_eq!(says(&hr.interact(&b, 1, access::GUEST, None, false)), vec![lines::HR_HANDS_FULL], "laptop needs free hands");
         let ev = hr.interact(&b, 1, access::GUEST, Some("IT / Produkt"), true);
-        assert_eq!(says(&ev), vec!["Umowa podpisana — witamy w dziale IT / Produkt! Oto karta pracownika, Twój laptop i 200 zł zaliczki na start."]);
+        assert_eq!(
+            says(&ev),
+            vec!["Umowa podpisana — witamy w dziale IT / Produkt! Oto karta pracownika, Twój laptop i 200 zł zaliczki na start."]
+        );
         assert!(ev.contains(&Event::Contract { player: 1 }));
         assert!(ev.contains(&Event::Give { player: 1, item: item::EMPLOYEE_CARD }));
         assert!(ev.contains(&Event::Give { player: 1, item: item::LAPTOP }));

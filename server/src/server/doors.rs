@@ -37,10 +37,7 @@ impl Server {
             });
         }
         // Between two lifts: the call button of the nearer one.
-        let i = (0..self.elevators.len())
-            .filter_map(|i| self.elevators[i].door_distance(body).map(|d| (i, d)))
-            .min_by_key(|&(_, d)| d)?
-            .0;
+        let i = (0..self.elevators.len()).filter_map(|i| self.elevators[i].door_distance(body).map(|d| (i, d))).min_by_key(|&(_, d)| d)?.0;
         self.doors_dirty = true; // show where the car is heading at once
         Some(self.elevators[i].call(body.floor, tick).to_string())
     }
@@ -138,9 +135,7 @@ impl Server {
             .iter()
             .enumerate()
             .filter(|(_, s)| {
-                s.locked_by.is_some_and(|pid| {
-                    self.players.get(&pid).is_none_or(|p| p.body.floor != s.floor || p.room != s.room)
-                })
+                s.locked_by.is_some_and(|pid| self.players.get(&pid).is_none_or(|p| p.body.floor != s.floor || p.room != s.room))
             })
             .map(|(i, _)| i)
             .collect();
@@ -150,10 +145,8 @@ impl Server {
     }
 
     pub(super) fn doors_packet(&self, floor: u8) -> Packet {
-        let tiles = self
-            .building
-            .floor(floor)
-            .map_or_else(Vec::new, |m| m.closed_tiles().into_iter().map(|(x, y)| (x as u8, y as u8)).collect());
+        let tiles =
+            self.building.floor(floor).map_or_else(Vec::new, |m| m.closed_tiles().into_iter().map(|(x, y)| (x as u8, y as u8)).collect());
         let lifts = self
             .elevators
             .iter()

@@ -18,11 +18,7 @@ pub struct SelfState {
 
 /// Split a room's entity list into snapshot fragments that each fit in `MAX_PACKET`.
 pub fn snapshot_fragments(tick: u32, last_input_seq: u32, me: SelfState, entities: &[EntityState]) -> Vec<Packet> {
-    let chunks: Vec<&[EntityState]> = if entities.is_empty() {
-        vec![&[]]
-    } else {
-        entities.chunks(MAX_ENTITIES_PER_SNAPSHOT).collect()
-    };
+    let chunks: Vec<&[EntityState]> = if entities.is_empty() { vec![&[]] } else { entities.chunks(MAX_ENTITIES_PER_SNAPSHOT).collect() };
     let cnt = chunks.len().min(255) as u8;
     chunks
         .into_iter()
@@ -46,4 +42,3 @@ pub fn snapshot_fragments(tick: u32, last_input_seq: u32, me: SelfState, entitie
         })
         .collect()
 }
-

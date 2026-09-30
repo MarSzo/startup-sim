@@ -1,10 +1,10 @@
 //! Lunch orders from the computer, delivered to the reception.
 
 use crate::clock;
+use crate::lunch;
 use crate::npc;
 use crate::protocol::{self as proto, Packet};
 use crate::shop;
-use crate::lunch;
 use crate::weather;
 
 use super::{Say, Server};

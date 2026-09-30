@@ -3,8 +3,8 @@
 use crate::clock;
 use crate::computer;
 use crate::npc;
-use crate::sim::Body;
 use crate::shop;
+use crate::sim::Body;
 use crate::treats::{self, Tray};
 
 use super::Server;
@@ -17,10 +17,7 @@ impl Server {
         let day0 = (self.clock.day - 1) * clock::MIN_PER_DAY;
         let now = self.clock.total_minutes();
         let n = self.rng.u32(treats::DROPS_MIN..=treats::DROPS_MAX);
-        let mut drops: Vec<u32> = (0..n)
-            .map(|_| day0 + self.rng.u32(treats::DROP_FROM..=treats::DROP_TO))
-            .filter(|&t| t > now)
-            .collect();
+        let mut drops: Vec<u32> = (0..n).map(|_| day0 + self.rng.u32(treats::DROP_FROM..=treats::DROP_TO)).filter(|&t| t > now).collect();
         drops.sort();
         self.treat_drops = drops;
     }

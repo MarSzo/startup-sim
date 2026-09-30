@@ -123,8 +123,7 @@ impl Server {
 
     /// NPCs walk and react to the players in the building.
     pub(super) fn tick_npcs(&mut self) -> Vec<npc::Event> {
-        let bodies: HashMap<u16, Body> =
-            self.players.values().filter(|p| p.in_building()).map(|p| (p.id, p.body)).collect();
+        let bodies: HashMap<u16, Body> = self.players.values().filter(|p| p.in_building()).map(|p| (p.id, p.body)).collect();
         let mut events = Vec::new();
         for n in &mut self.npcs {
             events.extend(n.tick(&self.building, &bodies));

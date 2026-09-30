@@ -60,7 +60,15 @@ impl Packet {
                 let n = r.u8()? as usize;
                 let mut entities = Vec::with_capacity(n);
                 for _ in 0..n {
-                    entities.push(EntityState { id: r.u16()?, kind: r.u8()?, x: r.i32()?, y: r.i32()?, flags: r.u8()?, held: r.u8()?, activity: r.u8()? });
+                    entities.push(EntityState {
+                        id: r.u16()?,
+                        kind: r.u8()?,
+                        x: r.i32()?,
+                        y: r.i32()?,
+                        flags: r.u8()?,
+                        held: r.u8()?,
+                        activity: r.u8()?,
+                    });
                 }
                 Packet::Snapshot {
                     tick,
@@ -182,13 +190,9 @@ impl Packet {
                 }
                 Packet::Computer { handle, owner, locked, convs }
             }
-            ty::COMPUTER_ACTION => Packet::ComputerAction {
-                token: r.u32()?,
-                action: r.u8()?,
-                conv: r.u16()?,
-                arg: r.u32()?,
-                text: r.str16(MAX_CHAT_BYTES)?,
-            },
+            ty::COMPUTER_ACTION => {
+                Packet::ComputerAction { token: r.u32()?, action: r.u8()?, conv: r.u16()?, arg: r.u32()?, text: r.str16(MAX_CHAT_BYTES)? }
+            }
             ty::DOORS => {
                 let floor = r.u8()?;
                 let n = r.u8()? as usize;
@@ -439,13 +443,9 @@ impl Packet {
                 }
                 Packet::CompanyPeople { candidates, staff }
             }
-            ty::COMPANY_ACTION => Packet::CompanyAction {
-                token: r.u32()?,
-                action: r.u8()?,
-                target: r.u16()?,
-                value: r.u8()?,
-                text: r.str16(MAX_TEXT_BYTES)?,
-            },
+            ty::COMPANY_ACTION => {
+                Packet::CompanyAction { token: r.u32()?, action: r.u8()?, target: r.u16()?, value: r.u8()?, text: r.str16(MAX_TEXT_BYTES)? }
+            }
             ty::COMMUTE_CHOICE => Packet::CommuteChoice { token: r.u32()?, mode: r.u8()? },
             ty::CALENDAR => {
                 let (mine_start, mine_topic) = (r.u16()?, r.u8()?);

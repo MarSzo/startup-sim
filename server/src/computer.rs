@@ -354,9 +354,8 @@ mod tests {
         let mut m = Messenger::default();
         m.post(&all[0], conv::DM | 2, "cześć!", &all).unwrap();
         m.post(&all[0], conv::DM | 2, "masz chwilę?", &all).unwrap();
-        let unread = |m: &Messenger, a: &Account, c: u16| {
-            m.conversations(a, &all, |_| None).into_iter().find(|i| i.conv == c).unwrap().unread
-        };
+        let unread =
+            |m: &Messenger, a: &Account, c: u16| m.conversations(a, &all, |_| None).into_iter().find(|i| i.conv == c).unwrap().unread;
         assert_eq!(unread(&m, &all[1], conv::DM | 1), 2);
         assert_eq!(unread(&m, &all[0], conv::DM | 2), 0, "own messages aren't unread");
         let got = m.sync(&all[1], conv::DM | 1, 0, &all).unwrap();

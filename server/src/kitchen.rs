@@ -66,7 +66,10 @@ impl Kitchen {
     pub fn find(b: &Building) -> Option<Kitchen> {
         for (f, m) in b.active_floors() {
             let find = |t: &str| -> Option<Tile> {
-                (0..m.height).flat_map(|y| (0..m.width).map(move |x| (x, y))).find(|&(x, y)| m.tile_type(x, y) == Some(t)).map(|(x, y)| Tile { x, y })
+                (0..m.height)
+                    .flat_map(|y| (0..m.width).map(move |x| (x, y)))
+                    .find(|&(x, y)| m.tile_type(x, y) == Some(t))
+                    .map(|(x, y)| Tile { x, y })
             };
             if let (Some(cupboard), Some(dishwasher), Some(sink), Some(fridge)) =
                 (find("cupboard"), find("dishwasher"), find("kitchen_sink"), find("fridge"))

@@ -51,8 +51,8 @@ impl Server {
     pub(super) fn update_fast_forward(&mut self) {
         let waiting = |p: &super::player::Player| matches!(p.stage, Stage::Home { .. });
         let all_home = !self.players.is_empty() && self.players.values().all(waiting);
-        self.clock.fast = all_home
-            && self.players.values().all(|p| matches!(p.stage, Stage::Home { arrive_at: None }) && p.depart_at.is_none());
+        self.clock.fast =
+            all_home && self.players.values().all(|p| matches!(p.stage, Stage::Home { arrive_at: None }) && p.depart_at.is_none());
         // "Skip the waiting": everybody is at home (or on the way) and asked.
         let skip = all_home && self.players.values().all(|p| p.skip_wait);
         if skip != self.clock.skip {

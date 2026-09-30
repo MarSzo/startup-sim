@@ -101,12 +101,8 @@ impl Server {
 
     fn send_board(&mut self, pid: u16, desk: &Seat, detail: u16) {
         let done = self.players.get(&pid).map_or(0, |p| p.task_nonce);
-        let mut members: Vec<String> = self
-            .players
-            .values()
-            .filter(|p| p.contract && p.department == desk.dept)
-            .map(|p| p.nick.clone())
-            .collect();
+        let mut members: Vec<String> =
+            self.players.values().filter(|p| p.contract && p.department == desk.dept).map(|p| p.nick.clone()).collect();
         members.sort();
         members.truncate(proto::MAX_MEMBERS);
         let mut cards: Vec<&tasks::Task> = self.boards.board(desk.dept).iter().collect();

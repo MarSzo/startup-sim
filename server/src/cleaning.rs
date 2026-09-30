@@ -45,10 +45,8 @@ pub mod lines {
     }
     /// The #ogólny post; `record`: (nick, mugs) of the worst offender.
     pub fn post(n: u32, record: Option<(&str, u32)>) -> String {
-        let mut s = format!(
-            "Kochani, dziś zebrałam z biura {} po kawie. Pusty kubek można umyć przy umywalce albo odnieść do ekspresu!",
-            mugs(n)
-        );
+        let mut s =
+            format!("Kochani, dziś zebrałam z biura {} po kawie. Pusty kubek można umyć przy umywalce albo odnieść do ekspresu!", mugs(n));
         if let Some((nick, k)) = record {
             s.push_str(&format!(" Rekordzista dnia: {nick} ({}).", mugs(k)));
         }

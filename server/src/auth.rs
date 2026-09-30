@@ -138,9 +138,8 @@ fn verify_password(password: &str, hash: &str) -> bool {
 /// spaces, `_`, `-`, `.`.
 pub fn clean_nick(nick: &str) -> Option<String> {
     let n = nick.trim();
-    let ok = n.len() >= NICK_MIN
-        && n.len() <= MAX_NICK_BYTES
-        && n.chars().all(|c| c.is_alphanumeric() || matches!(c, ' ' | '_' | '-' | '.'));
+    let ok =
+        n.len() >= NICK_MIN && n.len() <= MAX_NICK_BYTES && n.chars().all(|c| c.is_alphanumeric() || matches!(c, ' ' | '_' | '-' | '.'));
     ok.then(|| n.to_string())
 }
 
@@ -169,7 +168,9 @@ fn open_db(path: &Path) -> rusqlite::Result<Connection> {
 impl Auth {
     pub fn open(path: &Path) -> Result<Auth, String> {
         let db = open_db(path).map_err(|e| format!("{}: {e}", path.display()))?;
-        Ok(Auth { inner: Arc::new(Mutex::new(Inner { db, tickets: HashMap::new(), fails: HashMap::new(), registrations: HashMap::new() })) })
+        Ok(Auth {
+            inner: Arc::new(Mutex::new(Inner { db, tickets: HashMap::new(), fails: HashMap::new(), registrations: HashMap::new() })),
+        })
     }
 
     fn lock(&self) -> std::sync::MutexGuard<'_, Inner> {
@@ -227,7 +228,8 @@ impl Auth {
         }
         let row: Option<(i64, String, String)> = {
             let g = self.lock();
-            g.db.query_row("SELECT id, nick, pass FROM accounts WHERE nick = ?1", [nick.trim()], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?))).optional()?
+            g.db.query_row("SELECT id, nick, pass FROM accounts WHERE nick = ?1", [nick.trim()], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+                .optional()?
         };
         // Verify even for unknown nicks (the same time either way).
         let fake = "$argon2id$v=19$m=19456,t=2,p=1$c29tZXNhbHRzb21lc2FsdA$Zl7r9zDgwQn0DkI1eD5dmWmJb2Sv7kR5x3VtCmfkUNI";
@@ -269,9 +271,8 @@ impl Auth {
         let hash = sha256(refresh);
         let row: Option<(i64, String)> = {
             let g = self.lock();
-            let row = g
-                .db
-                .query_row(
+            let row =
+                g.db.query_row(
                     "SELECT a.id, a.nick FROM refresh_tokens t JOIN accounts a ON a.id = t.account WHERE t.hash = ?1 AND t.expires_at > ?2",
                     params![hash, now_secs()],
                     |r| Ok((r.get(0)?, r.get(1)?)),
@@ -299,7 +300,10 @@ impl Auth {
         let character = g.db.query_row("SELECT 1 FROM characters WHERE nick = ?1", [nick], |_| Ok(())).optional()?.is_some();
         g.tickets.retain(|_, t| t.expires > Instant::now());
         let key_bytes = crate::crypto::from_hex::<32>(&key).ok_or_else(|| AuthError::Internal("key".into()))?;
-        g.tickets.insert(ticket.clone(), Ticket { nick: nick.to_string(), key: key_bytes, expires: Instant::now() + TICKET_TTL, last_connect: 0 });
+        g.tickets.insert(
+            ticket.clone(),
+            Ticket { nick: nick.to_string(), key: key_bytes, expires: Instant::now() + TICKET_TTL, last_connect: 0 },
+        );
         Ok(Granted { nick: nick.to_string(), ticket, refresh, character, key })
     }
 

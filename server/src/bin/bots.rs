@@ -78,21 +78,14 @@ fn main() {
         print!("{HELP}");
         return;
     }
-    let server: SocketAddr = args
-        .str("server")
-        .unwrap_or("127.0.0.1:7777")
-        .to_socket_addrs()
-        .ok()
-        .and_then(|mut a| a.next())
-        .expect("valid --server address");
+    let server: SocketAddr =
+        args.str("server").unwrap_or("127.0.0.1:7777").to_socket_addrs().ok().and_then(|mut a| a.next()).expect("valid --server address");
     let count: usize = args.get("count", 50);
     let map_path = args.str("map").map(PathBuf::from).unwrap_or_else(default_building_path);
     let building = Building::load(&map_path).expect("building loads");
     let room_name = args.str("room").unwrap_or("Chill room").to_string();
-    let (target_floor, target) = building
-        .find_room(&room_name)
-        .map(|(f, r)| (f, r.id))
-        .unwrap_or_else(|| panic!("no room named '{room_name}'"));
+    let (target_floor, target) =
+        building.find_room(&room_name).map(|(f, r)| (f, r.id)).unwrap_or_else(|| panic!("no room named '{room_name}'"));
     let share: f64 = if args.flag("all-in-room") { 1.0 } else { args.get("room-share", 0.5) };
     let duration: u64 = args.get("duration", 0);
     let nicks: Vec<String> = args.get::<String>("nicks", String::new()).split(',').filter(|s| !s.is_empty()).map(str::to_string).collect();
@@ -170,7 +163,9 @@ fn main() {
             match b.state {
                 State::Connecting { nonce, next_send } => {
                     if now >= next_send {
-                        let _ = b.sock.send(&Packet::Connect { nonce, nick: b.nick.clone(), profile: bot_profile(&b.nick), ticket: String::new() }.encode());
+                        let _ = b.sock.send(
+                            &Packet::Connect { nonce, nick: b.nick.clone(), profile: bot_profile(&b.nick), ticket: String::new() }.encode(),
+                        );
                         b.state = State::Connecting { nonce, next_send: now + Duration::from_millis(500) };
                     }
                 }
@@ -376,4 +371,3 @@ fn bot_profile(nick: &str) -> game::protocol::Profile {
         },
     }
 }
-

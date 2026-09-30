@@ -36,7 +36,13 @@ impl Server {
             self.players
                 .values()
                 .filter(|o| o.id != pid && o.in_building() && o.body.floor == floor)
-                .map(|o| (o, (o.body.pos.x - pos.x) as i64 * (o.body.pos.x - pos.x) as i64 + (o.body.pos.y - pos.y) as i64 * (o.body.pos.y - pos.y) as i64))
+                .map(|o| {
+                    (
+                        o,
+                        (o.body.pos.x - pos.x) as i64 * (o.body.pos.x - pos.x) as i64
+                            + (o.body.pos.y - pos.y) as i64 * (o.body.pos.y - pos.y) as i64,
+                    )
+                })
                 .filter(|(_, d)| *d <= (WHISPER_RADIUS as i64) * (WHISPER_RADIUS as i64))
                 .min_by_key(|(o, d)| (*d, o.id))
                 .map(|(o, _)| o.addr)

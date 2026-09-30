@@ -192,7 +192,9 @@ impl Server {
             item_kind::COFFEE | item_kind::LATTE => Some(crate::protocol::sound::DRINK),
             item_kind::FRUIT if !p.needs.is_full() => Some(crate::protocol::sound::EAT),
             item_kind::CIGARETTES if !held.unpaid => Some(crate::protocol::sound::LIGHTER),
-            item_kind::WATER | item_kind::ENERGY_DRINK | item_kind::JUICE | item_kind::BEER | item_kind::WINE | item_kind::MILK if !held.unpaid => {
+            item_kind::WATER | item_kind::ENERGY_DRINK | item_kind::JUICE | item_kind::BEER | item_kind::WINE | item_kind::MILK
+                if !held.unpaid =>
+            {
                 Some(crate::protocol::sound::DRINK)
             }
             k if !held.unpaid && k != item_kind::UMBRELLA => crate::shop::product(k).map(|_| crate::protocol::sound::EAT),

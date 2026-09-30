@@ -83,7 +83,11 @@ impl Clock {
         let mut add = self.rate();
         let to_boundary = |ds: u32, b: u32| {
             let bd = b * DS_PER_MIN;
-            if ds < bd { bd - ds } else { MIN_PER_DAY * DS_PER_MIN - ds + bd }
+            if ds < bd {
+                bd - ds
+            } else {
+                MIN_PER_DAY * DS_PER_MIN - ds + bd
+            }
         };
         add = add.min(to_boundary(self.ds, CLOSE_MIN)).min(to_boundary(self.ds, OPEN_MIN));
         self.ds += add;

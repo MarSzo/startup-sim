@@ -5,8 +5,8 @@ use crate::commute::{self, Vehicle, VehicleEvent};
 use crate::inventory::kind as item_kind;
 use crate::needs;
 use crate::protocol::{self as proto, Packet};
-use crate::sim::{Body, Pos};
 use crate::shop;
+use crate::sim::{Body, Pos};
 use crate::weather;
 
 use super::player::{refresh, Player, Stage};
@@ -94,12 +94,8 @@ impl Server {
             p.stage = Stage::Home { arrive_at: Some(now + minutes) };
             self.clock_dirty = true;
         }
-        let arriving: Vec<u16> = self
-            .players
-            .values()
-            .filter(|p| matches!(p.stage, Stage::Home { arrive_at: Some(t) } if now >= t))
-            .map(|p| p.id)
-            .collect();
+        let arriving: Vec<u16> =
+            self.players.values().filter(|p| matches!(p.stage, Stage::Home { arrive_at: Some(t) } if now >= t)).map(|p| p.id).collect();
         for pid in arriving {
             self.arrive(pid);
         }

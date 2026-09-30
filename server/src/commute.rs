@@ -143,7 +143,8 @@ impl Vehicle {
                 // in one of the free bays (the extra cars share the last one).
                 let bay = o.car_bays[slot.min(o.car_bays.len() - 1)];
                 let x = bay.x;
-                let path = vec![o.street_east(), tile(x, street), tile(x, bay.y - 2), Pos { x: tile(x, bay.y).x, y: (bay.y + 1) * TILE_UNITS }];
+                let path =
+                    vec![o.street_east(), tile(x, street), tile(x, bay.y - 2), Pos { x: tile(x, bay.y).x, y: (bay.y + 1) * TILE_UNITS }];
                 (vehicle::CAR, path, 3, 0, tile(x + 2, bay.y - 1), true, 128)
             }
             mode::BIKE => {

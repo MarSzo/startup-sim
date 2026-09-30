@@ -83,7 +83,18 @@ type Answer = (StatusCode, Json<Reply>);
 
 fn answer(r: Result<Granted, AuthError>) -> Answer {
     match r {
-        Ok(g) => (StatusCode::OK, Json(Reply { ok: true, nick: g.nick, ticket: g.ticket, refresh: g.refresh, character: g.character, key: g.key, error: String::new() })),
+        Ok(g) => (
+            StatusCode::OK,
+            Json(Reply {
+                ok: true,
+                nick: g.nick,
+                ticket: g.ticket,
+                refresh: g.refresh,
+                character: g.character,
+                key: g.key,
+                error: String::new(),
+            }),
+        ),
         Err(e) => {
             if let AuthError::Internal(msg) = &e {
                 eprintln!("auth: {msg}");
@@ -158,7 +169,8 @@ pub fn spawn(auth: Auth, bind: SocketAddr, tls: Tls) -> Result<(), String> {
                     .route("/api/logout", post(logout))
                     .route("/api/cert", get(cert))
                     .with_state(AppState { auth, cert: cert_pem });
-                if let Err(e) = axum_server::bind_rustls(bind, config).serve(app.into_make_service_with_connect_info::<SocketAddr>()).await {
+                if let Err(e) = axum_server::bind_rustls(bind, config).serve(app.into_make_service_with_connect_info::<SocketAddr>()).await
+                {
                     eprintln!("https: {e}");
                 }
             });

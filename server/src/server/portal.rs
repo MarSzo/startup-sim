@@ -172,11 +172,8 @@ impl Server {
                 p.stage = if self.clock.is_night() { Stage::Home { arrive_at: None } } else { Stage::Working };
                 p.department = dept;
                 self.clock_dirty = true;
-                let msg = format!(
-                    "* player {id} '{}' goes to the office: {}",
-                    p.nick,
-                    self.cfg.recruitment.department_name(dept).unwrap_or("?")
-                );
+                let msg =
+                    format!("* player {id} '{}' goes to the office: {}", p.nick, self.cfg.recruitment.department_name(dept).unwrap_or("?"));
                 self.log(msg);
                 if self.cfg.start_access & crate::map::access::CARD != 0 {
                     self.give_new(id, item_kind::EMPLOYEE_CARD); // load tests: straight in with a card
@@ -203,7 +200,9 @@ impl Server {
         let r = &self.cfg.recruitment;
         let (score, total, offer) = (a.score(), a.total(), a.offer);
         // First come, first served: the place may have gone meanwhile.
-        let Some((free, department, title)) = self.positions.iter().find(|p| p.id == offer).map(|p| (p.places, p.department, p.title.clone())) else {
+        let Some((free, department, title)) =
+            self.positions.iter().find(|p| p.id == offer).map(|p| (p.places, p.department, p.title.clone()))
+        else {
             return; // the position is gone (its applicants were told)
         };
         let filled_meanwhile = score >= r.pass_score && free == 0;
@@ -253,7 +252,13 @@ impl Server {
                 self.company.candidates.push(company::Candidate { player: id, offer, score: small(score), total: small(total), since });
                 if let Some(Stage::Portal(desk)) = self.players.get_mut(&id).map(|p| &mut p.stage) {
                     desk.awaiting = Some(offer);
-                    desk.mail(&from, "Decyzja zarządu wkrótce".into(), company::lines::awaiting(&nick, &company), proto::portal_action::NONE, 0);
+                    desk.mail(
+                        &from,
+                        "Decyzja zarządu wkrótce".into(),
+                        company::lines::awaiting(&nick, &company),
+                        proto::portal_action::NONE,
+                        0,
+                    );
                 }
             } else {
                 self.hire(id, offer);

@@ -70,9 +70,11 @@ impl Server {
         let mut gone = Vec::new();
         for p in self.players.values() {
             let Some(h) = p.at_computer else { continue };
-            let ok = self.computers.iter().find(|c| c.handle == h).is_some_and(|c| {
-                c.user == Some(p.id) && computer::in_leave_range(&self.workstations[c.station], &p.body)
-            });
+            let ok = self
+                .computers
+                .iter()
+                .find(|c| c.handle == h)
+                .is_some_and(|c| c.user == Some(p.id) && computer::in_leave_range(&self.workstations[c.station], &p.body));
             if !ok {
                 gone.push(p.id);
             }

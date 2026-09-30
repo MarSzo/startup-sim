@@ -489,11 +489,31 @@ pub struct OfferInfo {
 pub enum Packet {
     /// `ticket` = from logging in over HTTPS (the account's nick wins over
     /// `nick`); empty = a guest (only if the server allows guests).
-    Connect { nonce: u32, nick: String, profile: Profile, ticket: String },
-    Welcome { nonce: u32, player_id: u16, token: u32, tick_hz: u8, input_hz: u8, map_crc: u32, server_tick: u32 },
-    Reject { reason: u8 },
+    Connect {
+        nonce: u32,
+        nick: String,
+        profile: Profile,
+        ticket: String,
+    },
+    Welcome {
+        nonce: u32,
+        player_id: u16,
+        token: u32,
+        tick_hz: u8,
+        input_hz: u8,
+        map_crc: u32,
+        server_tick: u32,
+    },
+    Reject {
+        reason: u8,
+    },
     /// `inputs` are consecutive, oldest first; the last one has seq `last_seq`.
-    Input { token: u32, ack_tick: u32, last_seq: u32, inputs: Vec<u8> },
+    Input {
+        token: u32,
+        ack_tick: u32,
+        last_seq: u32,
+        inputs: Vec<u8>,
+    },
     Snapshot {
         tick: u32,
         last_input_seq: u32,
@@ -515,44 +535,131 @@ pub enum Packet {
         self_activity: u8,
         entities: Vec<EntityState>,
     },
-    PlayerInfo { players: Vec<PlayerInfoEntry> },
-    InfoRequest { token: u32, ids: Vec<u16> },
-    Ping { token: u32, client_time: u32 },
-    Pong { client_time: u32, server_tick: u32 },
-    Disconnect { token: u32, reason: u8 },
+    PlayerInfo {
+        players: Vec<PlayerInfoEntry>,
+    },
+    InfoRequest {
+        token: u32,
+        ids: Vec<u16>,
+    },
+    Ping {
+        token: u32,
+        client_time: u32,
+    },
+    Pong {
+        client_time: u32,
+        server_tick: u32,
+    },
+    Disconnect {
+        token: u32,
+        reason: u8,
+    },
     /// Something an entity (NPC) says; shown as a speech bubble.
-    Say { id: u16, text: String },
+    Say {
+        id: u16,
+        text: String,
+    },
     /// Job portal: the offers (resent every second while on the portal).
-    JobOffers { offers: Vec<OfferInfo> },
+    JobOffers {
+        offers: Vec<OfferInfo>,
+    },
     /// Application form sent for an offer (`motivation`: free text).
-    Apply { token: u32, offer: u8, motivation: String },
+    Apply {
+        token: u32,
+        offer: u8,
+        motivation: String,
+    },
     /// Current recruitment question (resent every second until answered).
-    Question { attempt: u8, index: u8, total: u8, text: String, options: Vec<String> },
-    Answer { token: u32, attempt: u8, index: u8, choice: u8 },
+    Question {
+        attempt: u8,
+        index: u8,
+        total: u8,
+        text: String,
+        options: Vec<String>,
+    },
+    Answer {
+        token: u32,
+        attempt: u8,
+        index: u8,
+        choice: u8,
+    },
     /// Outcome of an interview (a mail follows).
-    RecruitResult { attempt: u8, passed: bool, score: u8, total: u8, department: u8 },
+    RecruitResult {
+        attempt: u8,
+        passed: bool,
+        score: u8,
+        total: u8,
+        department: u8,
+    },
     /// A message in the in-game mailbox (resent while on the desktop; the
     /// client dedupes by `id`). `action`: `portal_action::*` button.
-    Mail { id: u8, from: String, subject: String, body: String, action: u8, arg: u8 },
+    Mail {
+        id: u8,
+        from: String,
+        subject: String,
+        body: String,
+        action: u8,
+        arg: u8,
+    },
     /// Desktop button pressed (join interview / go to the office).
-    PortalAction { token: u32, action: u8, arg: u8 },
+    PortalAction {
+        token: u32,
+        action: u8,
+        arg: u8,
+    },
     /// Owner's inventory: hands first, then the pockets (sent on change and
     /// every 2 s).
-    Inventory { slots: Vec<SlotInfo> },
+    Inventory {
+        slots: Vec<SlotInfo>,
+    },
     /// Do something with an item (`item_action::*`).
-    ItemAction { token: u32, action: u8, slot: u8 },
+    ItemAction {
+        token: u32,
+        action: u8,
+        slot: u8,
+    },
     /// Screen of the computer the receiver sits at (resent while seated).
-    Computer { handle: u16, owner: u16, locked: bool, convs: Vec<ConvEntry> },
-    ComputerAction { token: u32, action: u8, conv: u16, arg: u32, text: String },
+    Computer {
+        handle: u16,
+        owner: u16,
+        locked: bool,
+        convs: Vec<ConvEntry>,
+    },
+    ComputerAction {
+        token: u32,
+        action: u8,
+        conv: u16,
+        arg: u32,
+        text: String,
+    },
     /// Messages of a conversation (sync reply or live push).
-    Chat { conv: u16, messages: Vec<ChatEntry> },
+    Chat {
+        conv: u16,
+        messages: Vec<ChatEntry>,
+    },
     /// Character needs, 0..=100 each (sent to the owner twice a second).
     /// ... and the wallet (`money`, grosze).
-    Stats { hunger: u8, energy: u8, stress: u8, bladder: u8, hygiene: u8, flags: u8, money: u32 },
+    Stats {
+        hunger: u8,
+        energy: u8,
+        stress: u8,
+        bladder: u8,
+        hygiene: u8,
+        flags: u8,
+        money: u32,
+    },
     /// A shop shelf the receiver pressed E at: what's on it.
-    Shelf { shelf: u8, title: String, goods: Vec<ShelfItem> },
+    Shelf {
+        shelf: u8,
+        title: String,
+        goods: Vec<ShelfItem>,
+    },
     /// Take one `kind` off shelf `shelf` (unpaid, into the inventory).
-    ShopTake { token: u32, shelf: u8, kind: u8 },
+    ShopTake {
+        token: u32,
+        shelf: u8,
+        kind: u8,
+    },
     /// Game time (shared) + the receiver's day: personal day number, minute
     /// of the day (0..1439), night (office closed), where they are
     /// (`place`), arrival time (minute of the day or `NO_TIME`), last payday
@@ -584,84 +691,202 @@ pub enum Packet {
         skip: u8,
     },
     /// Morning choice of how to get to work (before the departure).
-    CommuteChoice { token: u32, mode: u8 },
+    CommuteChoice {
+        token: u32,
+        mode: u8,
+    },
     /// The board's calendar for today, as seen by the account of the computer
     /// the receiver sits at: its own booking (`mine_start` / `mine_topic`,
     /// `NO_TIME` = none) and every slot (`slot::*`).
-    Calendar { mine_start: u16, mine_topic: u8, slots: Vec<(u16, u8)> },
+    Calendar {
+        mine_start: u16,
+        mine_topic: u8,
+        slots: Vec<(u16, u8)>,
+    },
     /// Book `start` (minute of today) for `topic` (`board::topic`); topic 0
     /// cancels the booking.
-    CalendarBook { token: u32, start: u16, topic: u8 },
+    CalendarBook {
+        token: u32,
+        start: u16,
+        topic: u8,
+    },
     /// A conversation with an NPC (meeting): question and answers. `id` 0 =
     /// no conversation (close the window). Resent while open.
-    Dialog { id: u8, npc: u16, text: String, options: Vec<String> },
-    DialogAnswer { token: u32, id: u8, choice: u8 },
+    Dialog {
+        id: u8,
+        npc: u16,
+        text: String,
+        options: Vec<String>,
+    },
+    DialogAnswer {
+        token: u32,
+        id: u8,
+        choice: u8,
+    },
     /// Lunch app (for the account of the computer the receiver sits at):
     /// order state (`lunch::state`), the dish ordered, its arrival (minute
     /// of the day or `NO_TIME`), and the menu.
-    LunchMenu { state: u8, dish: u8, arrives: u16, dishes: Vec<Dish> },
-    LunchOrder { token: u32, dish: u8 },
+    LunchMenu {
+        state: u8,
+        dish: u8,
+        arrives: u16,
+        dishes: Vec<Dish>,
+    },
+    LunchOrder {
+        token: u32,
+        dish: u8,
+    },
     /// Company panel (the founder's computer): the name, the question sets
     /// to choose from (id, name; part 0) and the positions, in parts of at
     /// most `MAX_PACKET` (the client puts them together).
-    CompanyOffers { name: String, part: u8, parts: u8, sets: Vec<(String, String)>, offers: Vec<CompanyOffer> },
+    CompanyOffers {
+        name: String,
+        part: u8,
+        parts: u8,
+        sets: Vec<(String, String)>,
+        offers: Vec<CompanyOffer>,
+    },
     /// Company panel: candidates (player, offer, score, total, nick) and
     /// staff (player, department, hired on day, nick).
-    CompanyPeople { candidates: Vec<(u16, u8, u8, u8, String)>, staff: Vec<(u16, u8, u16, String)> },
+    CompanyPeople {
+        candidates: Vec<(u16, u8, u8, u8, String)>,
+        staff: Vec<(u16, u8, u16, String)>,
+    },
     /// Found the company (from the portal) / run it (panel): `company::action`.
-    CompanyAction { token: u32, action: u8, target: u16, value: u8, text: String },
+    CompanyAction {
+        token: u32,
+        action: u8,
+        target: u16,
+        value: u8,
+        text: String,
+    },
     /// Smoke on the receiver's floor: (room, level 1..=255); rooms not listed
     /// are clear. Every second.
-    Smoke { floor: u8, rooms: Vec<(u16, u8)> },
+    Smoke {
+        floor: u8,
+        rooms: Vec<(u16, u8)>,
+    },
     /// Lamps switched on on the receiver's floor (rooms); every second.
-    Lights { floor: u8, rooms: Vec<u16> },
+    Lights {
+        floor: u8,
+        rooms: Vec<u16>,
+    },
     /// The fridge (E at it, and after every change while open): what's
     /// stored (item kind, label), portions of milk, free water and juice.
-    Fridge { items: Vec<(u8, String)>, milk: u8, water: u8, juice: u8 },
+    Fridge {
+        items: Vec<(u8, String)>,
+        milk: u8,
+        water: u8,
+        juice: u8,
+    },
     /// Take / put / pour milk (`kitchen::action`), `arg` = stored item index.
-    FridgeAction { token: u32, action: u8, arg: u8 },
+    FridgeAction {
+        token: u32,
+        action: u8,
+        arg: u8,
+    },
     /// At home: "skip the waiting" (to the morning / departure; once
     /// everybody at home asked).
-    SkipWait { token: u32 },
+    SkipWait {
+        token: u32,
+    },
     /// Sounds heard this tick on the receiver's floor: (kind, x, y) in
     /// sub-pixels (`sound::*`), at most `MAX_SOUNDS`.
-    Sound { sounds: Vec<(u8, i32, i32)> },
+    Sound {
+        sounds: Vec<(u8, i32, i32)>,
+    },
     /// The task board of the computer owner's department (`task_action`),
     /// acting as the owner. `nonce` dedupes retries (0 = none); `task` = the
     /// card (SYNC: whose details to send), `arg` = column / priority, `text`
     /// = title + "\n" + description, a nick or a comment.
-    TaskAction { token: u32, nonce: u16, action: u8, task: u16, arg: u8, text: String },
+    TaskAction {
+        token: u32,
+        nonce: u16,
+        action: u8,
+        task: u16,
+        arg: u8,
+        text: String,
+    },
     /// The board (answer to every TaskAction), in parts of at most
     /// `MAX_PACKET`: `done` = the last applied nonce; `members` (part 0) =
     /// the department's employees.
-    TaskBoard { dept: u8, done: u16, part: u8, parts: u8, members: Vec<String>, tasks: Vec<TaskCard> },
+    TaskBoard {
+        dept: u8,
+        done: u16,
+        part: u8,
+        parts: u8,
+        members: Vec<String>,
+        tasks: Vec<TaskCard>,
+    },
     /// One card's description and its latest comments (nick, text).
-    TaskDetail { id: u16, desc: String, comments: Vec<(String, String)> },
+    TaskDetail {
+        id: u16,
+        desc: String,
+        comments: Vec<(String, String)>,
+    },
     /// Work mail as the computer owner (`mail_action`): SYNC (`id` = the
     /// newest one the client has), SEND (`to`, `subject`, `body`), TRASH /
     /// RESTORE `id`, EMPTY_TRASH.
-    MailAction { token: u32, nonce: u16, action: u8, id: u16, to: String, subject: String, body: String },
+    MailAction {
+        token: u32,
+        nonce: u16,
+        action: u8,
+        id: u16,
+        to: String,
+        subject: String,
+        body: String,
+    },
     /// One mail of the owner's inbox (sent after a SYNC for newer ids).
-    WorkMail { id: u16, from: String, to: String, subject: String, body: String, day: u16, minute: u16 },
+    WorkMail {
+        id: u16,
+        from: String,
+        to: String,
+        subject: String,
+        body: String,
+        day: u16,
+        minute: u16,
+    },
     /// Answer to every MailAction: the last applied nonce, the ids in the
     /// inbox and which of them are in the trash.
-    MailState { done: u16, ids: Vec<u16>, trashed: Vec<u16> },
+    MailState {
+        done: u16,
+        ids: Vec<u16>,
+        trashed: Vec<u16>,
+    },
     /// Push-to-talk: one voice frame (opaque to the server: 16 kHz IMA
     /// ADPCM, see PROTOCOL.md) to the room, or whispered to the nearest
     /// person within reach (`whisper` = 1).
-    Voice { token: u32, seq: u16, whisper: u8, data: Vec<u8> },
+    Voice {
+        token: u32,
+        seq: u16,
+        whisper: u8,
+        data: Vec<u8>,
+    },
     /// A voice frame relayed from `speaker`.
-    VoiceFrom { speaker: u16, seq: u16, whisper: u8, data: Vec<u8> },
+    VoiceFrom {
+        speaker: u16,
+        seq: u16,
+        whisper: u8,
+        data: Vec<u8>,
+    },
     /// Closed doors (locked toilet stalls, elevator doors) on the receiver's
     /// floor: solid for the simulation. Plus every elevator, in the order
     /// the map lists them (floors ascending, links in file order, grouped by
     /// id). Sent on change and every 0.5 s.
-    Doors { floor: u8, tiles: Vec<(u8, u8)>, lifts: Vec<Lift> },
+    Doors {
+        floor: u8,
+        tiles: Vec<(u8, u8)>,
+        lifts: Vec<Lift>,
+    },
     /// Lock / unlock the stall the sender is in.
-    DoorAction { token: u32 },
+    DoorAction {
+        token: u32,
+    },
     /// The company's departments (ids used everywhere else): after
     /// `Welcome` and every 5 s.
-    Departments { list: Vec<DepartmentInfo> },
+    Departments {
+        list: Vec<DepartmentInfo>,
+    },
 }
 
 #[derive(Debug, PartialEq, Eq)]

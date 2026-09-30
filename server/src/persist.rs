@@ -56,7 +56,16 @@ impl SavedItem {
 
     /// Back into an item (`id` fresh, `owner` = the owner's session id or 0).
     pub fn to_item(&self, id: u32, owner: u16) -> Item {
-        Item { id, kind: self.kind, label: self.label.clone(), expires: None, owner, count: self.count.max(1), unpaid: self.unpaid, stale: self.stale }
+        Item {
+            id,
+            kind: self.kind,
+            label: self.label.clone(),
+            expires: None,
+            owner,
+            count: self.count.max(1),
+            unpaid: self.unpaid,
+            stale: self.stale,
+        }
     }
 }
 
@@ -357,7 +366,13 @@ mod tests {
     fn character(nick: &str, money: i64) -> Character {
         Character {
             nick: nick.into(),
-            profile: SavedProfile { gender: 1, age: 28, city: "Kraków".into(), email: "ola@example.com".into(), appearance: [1, 2, 3, 4, 5] },
+            profile: SavedProfile {
+                gender: 1,
+                age: 28,
+                city: "Kraków".into(),
+                email: "ola@example.com".into(),
+                appearance: [1, 2, 3, 4, 5],
+            },
             contract: true,
             department: 1,
             position: Some(2),
@@ -370,7 +385,12 @@ mod tests {
             pay_rate: 3000,
             last_raise_day: None,
             needs: Needs::default(),
-            inventory: vec![None, Some(SavedItem { kind: 2, label: "Ola · IT".into(), owner: "Ola".into(), count: 1, unpaid: false, stale: false }), None, None],
+            inventory: vec![
+                None,
+                Some(SavedItem { kind: 2, label: "Ola · IT".into(), owner: "Ola".into(), count: 1, unpaid: false, stale: false }),
+                None,
+                None,
+            ],
             seen_questions: HashMap::from([("programming".to_string(), vec![11, 22])]),
         }
     }
@@ -402,7 +422,16 @@ mod tests {
 
     #[test]
     fn coffee_goes_cold_over_a_restart() {
-        let item = Item { id: 7, kind: item_kind::COFFEE, label: "Kawa".into(), expires: Some(100), owner: 3, count: 1, unpaid: false, stale: false };
+        let item = Item {
+            id: 7,
+            kind: item_kind::COFFEE,
+            label: "Kawa".into(),
+            expires: Some(100),
+            owner: 3,
+            count: 1,
+            unpaid: false,
+            stale: false,
+        };
         let s = SavedItem::from_item(&item, |_| "Ola".into());
         assert_eq!((s.kind, s.owner.as_str()), (item_kind::EMPTY_CUP, "Ola"));
         assert_eq!(s.to_item(9, 3).expires, None);
