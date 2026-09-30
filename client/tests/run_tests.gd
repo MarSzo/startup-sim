@@ -85,8 +85,9 @@ func test_protocol(path: String) -> void:
 		expect(e0.id == 3 and e0.kind == 0 and e0.x == 4096 and e0.y == 8192 and e0.flags == 5 and e0.held == 3 and e0.activity == Protocol.ACT_COMPUTER, "entity 0 %s" % e0)
 		expect(e1.id == 65535 and e1.kind == 1 and e1.x == -1 and e1.y == 2000000 and e1.flags == Protocol.FLAG_SLOW, "entity 1 %s" % e1)
 	var dr := Protocol.decode(golden["doors"].hex_decode())
-	expect(dr.get("type") == Protocol.T_DOORS and dr.floor == 1 and dr.tiles == [Vector2i(46, 27), Vector2i(54, 31)]
-		and dr.lift_floor == 0 and dr.lift_target == 1 and dr.lift_moving, "decode doors %s" % dr)
+	expect(dr.get("type") == Protocol.T_DOORS and dr.floor == 1 and dr.tiles == [Vector2i(5, 45), Vector2i(41, 43)]
+		and dr.lifts.size() == 2 and dr.lifts[0].floor == 0 and dr.lifts[0].target == 1 and dr.lifts[0].moving
+		and dr.lifts[1].floor == 1 and dr.lifts[1].target == Protocol.NO_FLOOR and not dr.lifts[1].moving, "decode doors %s" % dr)
 	var st := Protocol.decode(golden["stats"].hex_decode())
 	expect(st.get("type") == Protocol.T_STATS and st.hunger == 35 and st.energy == 80 and st.stress == 12 and st.bladder == 64
 		and st.hygiene == 22 and st.stats_flags == Protocol.STATS_DIRTY_HANDS and st.money == 18750, "decode stats %s" % st)
@@ -221,6 +222,10 @@ func test_movement(path: String) -> void:
 		expect(ok, "movement case %d" % case_i)
 		case_i += 1
 	expect(floor_changes >= 3, "vectors exercise stairs/elevator (%d floor changes)" % floor_changes)
+	# Two lifts: the door tiles know theirs (the Doors packet's order).
+	expect(building.lift_ids == ["A", "B"], "lift ids %s" % [building.lift_ids])
+	expect(building.lift_at_door(0, Vector2i(37, 43)) == 0 and building.lift_at_door(1, Vector2i(41, 43)) == 1
+		and building.lift_at_door(0, Vector2i(30, 50)) == -1, "doors belong to their lift")
 	# Locked stall door (dynamic overlay): same result as stalls.rs in Rust.
 	var m = building.get_floor(1)
 	var walk_left := func() -> Dictionary:

@@ -669,10 +669,9 @@ mod tests {
     fn floors_share_the_elevator_geometry() {
         let b = b();
         let (a, c) = (b.floor(0).unwrap(), b.floor(1).unwrap());
-        assert_eq!(a.links.len(), 2);
-        assert_eq!(c.links.len(), 2);
-        let lift = |m: &super::Map| m.links.iter().find(|l| matches!(l.kind, super::LinkKind::Elevator { .. })).unwrap().area;
-        assert_eq!(lift(a), lift(c));
+        let lifts = |m: &super::Map| m.links.iter().filter(|l| matches!(l.kind, super::LinkKind::Elevator { .. })).map(|l| l.area).collect::<Vec<_>>();
+        assert_eq!(lifts(a).len(), 2, "two lifts side by side");
+        assert_eq!(lifts(a), lifts(c));
     }
 
     #[test]

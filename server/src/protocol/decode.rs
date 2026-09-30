@@ -196,7 +196,15 @@ impl Packet {
                 for _ in 0..n {
                     tiles.push((r.u8()?, r.u8()?));
                 }
-                Packet::Doors { floor, tiles, lift_floor: r.u8()?, lift_target: r.u8()?, lift_moving: r.u8()? != 0 }
+                let n = r.u8()? as usize;
+                if n > 16 {
+                    return Err(DecodeError::Invalid("too many lifts"));
+                }
+                let mut lifts = Vec::with_capacity(n);
+                for _ in 0..n {
+                    lifts.push(Lift { floor: r.u8()?, target: r.u8()?, moving: r.u8()? != 0 });
+                }
+                Packet::Doors { floor, tiles, lifts }
             }
             ty::DOOR_ACTION => Packet::DoorAction { token: r.u32()? },
             ty::STATS => Packet::Stats {

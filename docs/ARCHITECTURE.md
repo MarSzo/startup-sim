@@ -495,7 +495,9 @@ uprawnień obsługi. BFS (`Building::find_path`) stosuje te same reguły.
   górę, półpiętro, drugi bieg — widać tylko klatkę i osoby na niej. Zaraz po
   przejściu działa blokada: schody nie zadziałają, dopóki nie zmienisz
   klawiszy ruchu *i* nie zejdziesz z obszaru schodów.
-- **Winda** (`elevator.rs`, poza symulacją): E przy drzwiach przywołuje ją
+- **Windy** (`elevator.rs`, poza symulacją): każdy `id` linku `elevator` to
+  osobna winda (teraz „A” i „B” obok siebie); E przy drzwiach przywołuje
+  najbliższą w zasięgu (`Elevator::door_distance`), `Doors` niesie stan każdej
   (kolejka pięter), jazda trwa 3 s na piętro, drzwi są otwarte 4 s i nie
   zamkną się na kimś w drzwiach; z więcej niż 6 osobami w kabinie (3×2 pola)
   nie rusza; w czasie jazdy klient wygasza wszystko poza kabiną (`ride_mask.gd`,

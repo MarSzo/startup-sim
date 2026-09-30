@@ -249,7 +249,7 @@
   "~~#,,,,,,,,,,,,,,,#SSS.......#.....#########:::::::::#,,WWWW,WWW,#~~~~",
   "~~#,,,,,,,,,,,,,,,#..........#.....#eee#eee#:::::::::#,,,,,,,,,,,#~~~~",
   "~~#,,,,,,,,,,,,,,,#..........#.....#eee#eee#:::::::::#,,,,,,,,,,,#~~~~",
-  "~~###########DD#######DD######.....#EEE#########D#####,,,,,,,,,,,#~~~~",
+  "~~###########DD#######DD######.....#EEE#EEE#####D#####,,,,,,,,,,,#~~~~",
   "~~#|||::::V#.................#.............#.........#,,WWWW,WWW,#~~~~",
   "~~#U:k::::V#.................D.............D.........D,,,,,,,,,,,#~~~~",
   "~~#|||:::::D.................D.............D.........D,,,,,,,,,,,#~~~~",
@@ -323,7 +323,7 @@
   "---bbbbbbbbbbbbbbb-QQQQQQQQQQ-CCCCC---------ggggggggg-VVVVVVVVVVV-----",
   "---bbbbbbbbbbbbbbb-QQQQQQQQQQ-CCCCC-LLL-lll-ggggggggg-VVVVVVVVVVV-----",
   "---bbbbbbbbbbbbbbb-QQQQQQQQQQ-CCCCC-LLL-lll-ggggggggg-VVVVVVVVVVV-----",
-  "-------------DD-------DD------CCCCC-CCC---------U-----VVVVVVVVVVV-----",
+  "-------------DD-------DD------CCCCC-CCC-CCC-----U-----VVVVVVVVVVV-----",
   "---wwwwwwww-DDDDDDDDDDDDDDDDD-CCCCCCCCCCCCC-UUUUUUUUU-VVVVVVVVVVV-----",
   "---111wwwww-DDDDDDDDDDDDDDDDDDCCCCCCCCCCCCCUUUUUUUUUUVVVVVVVVVVVV-----",
   "---wwwwwwwwwDDDDDDDDDDDDDDDDDDCCCCCCCCCCCCCUUUUUUUUUUVVVVVVVVVVVV-----",
@@ -586,7 +586,7 @@
   },
   "l": {
    "id": 22,
-   "name": "Winda 2 (nieczynna)",
+   "name": "Winda 2",
    "type": "elevator",
    "light": "always"
   },
@@ -770,9 +770,19 @@
  "links": [
   {
    "kind": "elevator",
-   "id": "main",
+   "id": "A",
    "area": [
     36,
+    41,
+    3,
+    2
+   ]
+  },
+  {
+   "kind": "elevator",
+   "id": "B",
+   "area": [
+    40,
     41,
     3,
     2

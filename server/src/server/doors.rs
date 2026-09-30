@@ -28,22 +28,21 @@ impl Server {
     /// the doors. `None` = no elevator here.
     pub(super) fn use_elevator(&mut self, body: &Body) -> Option<String> {
         let tick = self.tick;
-        for i in 0..self.elevators.len() {
-            let e = &self.elevators[i];
-            if e.in_cabin(body.floor, body.pos) {
-                let e = &mut self.elevators[i];
-                self.doors_dirty = true;
-                return Some(match e.press_inside(&self.building, body.floor, tick) {
-                    Some(t) => format!("Jedziemy na: {}.", self.building.floor_name(t)),
-                    None => elevator::lines::RIDING.to_string(),
-                });
-            }
-            if e.door_in_reach(body) {
-                self.doors_dirty = true; // show where the car is heading at once
-                return Some(self.elevators[i].call(body.floor, tick).to_string());
-            }
+        if let Some(i) = self.elevators.iter().position(|e| e.in_cabin(body.floor, body.pos)) {
+            let e = &mut self.elevators[i];
+            self.doors_dirty = true;
+            return Some(match e.press_inside(&self.building, body.floor, tick) {
+                Some(t) => format!("Jedziemy na: {}.", self.building.floor_name(t)),
+                None => elevator::lines::RIDING.to_string(),
+            });
         }
-        None
+        // Between two lifts: the call button of the nearer one.
+        let i = (0..self.elevators.len())
+            .filter_map(|i| self.elevators[i].door_distance(body).map(|d| (i, d)))
+            .min_by_key(|&(_, d)| d)?
+            .0;
+        self.doors_dirty = true; // show where the car is heading at once
+        Some(self.elevators[i].call(body.floor, tick).to_string())
     }
 
     /// Move the elevators; carry the people in a cabin that arrived.
@@ -155,10 +154,11 @@ impl Server {
             .building
             .floor(floor)
             .map_or_else(Vec::new, |m| m.closed_tiles().into_iter().map(|(x, y)| (x as u8, y as u8)).collect());
-        let (lift_floor, lift_target, lift_moving) = self
+        let lifts = self
             .elevators
-            .first()
-            .map_or((proto::NO_FLOOR, proto::NO_FLOOR, false), |e| (e.floor, e.heading().unwrap_or(proto::NO_FLOOR), e.moving.is_some()));
-        Packet::Doors { floor, tiles, lift_floor, lift_target, lift_moving }
+            .iter()
+            .map(|e| proto::Lift { floor: e.floor, target: e.heading().unwrap_or(proto::NO_FLOOR), moving: e.moving.is_some() })
+            .collect();
+        Packet::Doors { floor, tiles, lifts }
     }
 }

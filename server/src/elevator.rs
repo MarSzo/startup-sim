@@ -110,10 +110,21 @@ impl Elevator {
     }
 
     pub fn door_in_reach(&self, body: &Body) -> bool {
-        self.doors.iter().any(|(f, t)| {
-            let c = Pos::tile_center(t.x, t.y);
-            *f == body.floor && (c.x - body.pos.x).pow(2) + (c.y - body.pos.y).pow(2) <= CALL_RADIUS * CALL_RADIUS
-        })
+        self.door_distance(body).is_some()
+    }
+
+    /// Squared distance to the nearest of this lift's doors on the body's
+    /// floor, if within reach of the call button.
+    pub fn door_distance(&self, body: &Body) -> Option<i32> {
+        self.doors
+            .iter()
+            .filter(|(f, _)| *f == body.floor)
+            .map(|(_, t)| {
+                let c = Pos::tile_center(t.x, t.y);
+                (c.x - body.pos.x).pow(2) + (c.y - body.pos.y).pow(2)
+            })
+            .filter(|&d| d <= CALL_RADIUS * CALL_RADIUS)
+            .min()
     }
 
     /// Target floor while moving, else the next call.
@@ -222,6 +233,24 @@ mod tests {
         let arrival = ev.iter().find(|(_, u)| u.arrived.is_some()).unwrap();
         assert_eq!(arrival.1.arrived, Some((1, 0)));
         assert_eq!(arrival.0, 310 + CLOSE_AFTER_PRESS + TRAVEL_TICKS);
+    }
+
+    #[test]
+    fn two_lifts_side_by_side_each_with_its_own_doors() {
+        let b = Building::load(&default_building_path()).unwrap();
+        let lifts = find_elevators(&b);
+        assert_eq!(lifts.iter().map(|e| e.id.as_str()).collect::<Vec<_>>(), ["A", "B"]);
+        for e in &lifts {
+            assert_eq!(e.doors.len(), 6, "{}: 3 door tiles per floor", e.id);
+        }
+        assert!(lifts[0].doors.iter().all(|d| !lifts[1].doors.contains(d)), "no shared doors");
+        // In front of each: that one's call button is the nearer.
+        let (a, c) = (&lifts[0], &lifts[1]);
+        let near_a = Body::at(0, Pos::tile_center(37, 44));
+        let near_b = Body::at(0, Pos::tile_center(41, 44));
+        assert!(a.door_distance(&near_a).unwrap() < c.door_distance(&near_a).unwrap_or(i32::MAX));
+        assert!(c.door_distance(&near_b).unwrap() < a.door_distance(&near_b).unwrap_or(i32::MAX));
+        assert!(a.door_distance(&Body::at(0, Pos::tile_center(30, 50))).is_none(), "out of reach");
     }
 
     #[test]

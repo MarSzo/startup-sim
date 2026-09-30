@@ -9,6 +9,9 @@ var floors: Array = []
 ## CRC32 over building.json followed by every floor file, in floor order
 ## (same as the server's; compared with Welcome.map_crc).
 var crc := 0
+## Elevator ids in the server's order (floors ascending, links in file
+## order, first appearance): index of a lift in the Doors packet.
+var lift_ids: Array[String] = []
 var error := ""
 
 
@@ -39,6 +42,13 @@ func load_path(path: String) -> void:
 			entry.map = m
 		floors.append(entry)
 	crc = MapData.crc32(all)
+	for f in floors.size():
+		var m = get_floor(f)
+		if m == null:
+			continue
+		for l in m.links:
+			if l.kind == "elevator" and not lift_ids.has(l.id):
+				lift_ids.append(l.id)
 
 
 ## Map of an active (existing, unlocked) floor, or null.
@@ -63,6 +73,17 @@ func next_elevator_floor(from: int, id: String) -> int:
 		for l in m.links:
 			if l.kind == "elevator" and l.id == id:
 				return f
+	return -1
+
+
+## Which elevator a door tile belongs to (it touches that cabin), or -1.
+func lift_at_door(f: int, t: Vector2i) -> int:
+	var m = get_floor(f)
+	if m == null:
+		return -1
+	for l in m.links:
+		if l.kind == "elevator" and (l.rect as Rect2i).grow(1).has_point(t):
+			return lift_ids.find(l.id)
 	return -1
 
 

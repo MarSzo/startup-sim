@@ -261,10 +261,13 @@ je znać do predykcji. `Doors`: floor u8, n u8, n × {`x u8`, `y u8`} — lista
 zamkniętych drzwi na piętrze odbiorcy; wysyłana po każdej zmianie i co 0,5 s
 (zastępuje poprzednią listę dla tego piętra). Lista obejmuje też **drzwi
 windy** — zamknięte, dopóki winda nie stoi na danym piętrze z otwartymi
-drzwiami. Na końcu pakietu: `lift_floor u8` (gdzie jest winda) i
-`lift_target u8` (dokąd jedzie / najbliższe wezwanie; 255 = stoi) i
-`lift_moving u8` (1 = w ruchu) — do wyświetlacza przy drzwiach, podpowiedzi i
-widoku samej kabiny w czasie jazdy. Winda nie rusza z więcej niż 6 osobami w
+drzwiami. Na końcu pakietu lista wind: `n u8` (≤ 16), n × {`floor u8` (gdzie
+jest winda), `target u8` (dokąd jedzie / najbliższe wezwanie; 255 = stoi),
+`moving u8` (1 = w ruchu)} — do wyświetlaczy przy drzwiach, podpowiedzi i
+widoku samej kabiny w czasie jazdy. Kolejność wind: jak w mapie (piętra
+rosnąco, linki w kolejności z pliku, pierwsze wystąpienie danego `id`) — klient
+liczy ją tak samo (`Building.lift_ids`) i przypisuje drzwi do windy, której
+kabiny dotykają. Winda nie rusza z więcej niż 6 osobami w
 kabinie (drzwi zostają otwarte, `Say` „Przeciążenie!” od kogoś w kabinie). `DoorAction`: token u32 —
 zamknij / otwórz kabinę, w której stoi nadawca (odmowy jako `Say`: nie w
 kabinie, ktoś stoi w drzwiach, sam stoi w drzwiach). Serwer otwiera kabinę
@@ -529,6 +532,7 @@ szyfrowaniem.
 
 ## Historia wersji
 
+- **36** — dwie windy: `Doors` kończy się listą wind `n u8` (≤ 16) × {`floor u8`, `target u8` (255 = stoi), `moving u8`} zamiast jednej trójki `lift_*`.
 - **35** — stanowiska firmy: `CompanyOffers` w częściach, z działem, zestawem pytań i listą zestawów; `CompanyAction` 8–12 (dodaj / nazwa / dział / zestaw / usuń stanowisko).
 - **34** (uzup.) — `Reject` 7 = nick zajęty (konto, zapisana postać albo ktoś w grze), 8 = e-mail postaci zajęty.
 - **34** — szyfrowanie: pakiety `0xF0` (sesja) i `0xF1` (Connect) dla zalogowanych; pakiet gry ≤ 1152 B (datagram ≤ 1200 B); klucz sesji w odpowiedzi logowania (`key`).

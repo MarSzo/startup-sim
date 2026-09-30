@@ -6,6 +6,7 @@ extends Node2D
 var tile := Vector2i.ZERO
 var closed := true
 var display := false        # this door shows the floor indicator
+var lift := -1              # which elevator (index into Building.lift_ids)
 var lift_floor := 0
 var lift_target := 255
 
@@ -43,9 +44,10 @@ func _draw() -> void:
 			draw_line(Vector2(-6.5 + k * 2.2, -6.5), Vector2(-6.5 + k * 2.2, 6.5), Color(1, 1, 1, 0.18), 0.5, true)
 		draw_line(Vector2(0, -7.6), Vector2(0, 7.6), ink, 0.8, true)
 	if display:
-		# Floor indicator on the wall right of the doors (hall side): dark
-		# screen, amber pixel digits (3x5 glyphs), an arrow while moving.
-		var o := Vector2(30, 1)
+		# Floor indicator on the wall left of the doors (hall side; to the
+		# right stands the next lift): dark screen, amber pixel digits (3x5
+		# glyphs), an arrow while moving.
+		var o := Vector2(-30, 1)
 		draw_set_transform(o)
 		draw_rect(Rect2(-6.5, -16.5, 13, 8), Color("#2a2118"))
 		draw_rect(Rect2(-6, -16, 12, 7), Color("#15171c"))

@@ -3,7 +3,7 @@
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 35
+const VERSION := 36
 const MAX_PACKET := 1152  # a game packet; sealed it grows to at most MAX_DATAGRAM
 const MAX_DATAGRAM := 1200
 const MAX_NICK_BYTES := 16
@@ -605,9 +605,11 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			for i in n:
 				tiles.append(Vector2i(r.u8(), r.u8()))
 			p.tiles = tiles
-			p.lift_floor = r.u8()
-			p.lift_target = r.u8()
-			p.lift_moving = r.u8() != 0
+			# Every elevator, in the map's order (see Building.lift_ids).
+			var lifts := []
+			for i in r.u8():
+				lifts.append({"floor": r.u8(), "target": r.u8(), "moving": r.u8() != 0})
+			p.lifts = lifts
 		T_STATS:
 			p.hunger = r.u8()
 			p.energy = r.u8()

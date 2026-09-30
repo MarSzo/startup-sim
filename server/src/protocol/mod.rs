@@ -23,7 +23,7 @@ pub use golden::{golden_samples, to_hex};
 pub use snapshot::{snapshot_fragments, SelfState};
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 35;
+pub const VERSION: u8 = 36;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
 /// A game packet at most (sealed, it grows by up to 48 B to `MAX_DATAGRAM`).
@@ -261,6 +261,15 @@ pub mod sound {
     pub const WHISTLE: u8 = 17;
 }
 
+/// One elevator in `Doors`: the floor it is at (or left), where it is
+/// heading (`NO_FLOOR` = standing), whether it is moving.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Lift {
+    pub floor: u8,
+    pub target: u8,
+    pub moving: bool,
+}
+
 /// A position of our startup in the founder's panel.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CompanyOffer {
@@ -345,7 +354,7 @@ pub mod slot {
 /// `Clock::arrive` when there is no arrival time.
 pub const NO_TIME: u16 = 0xFFFF;
 
-/// `Doors::lift_target` when the elevator isn't heading anywhere.
+/// `Lift::target` when the elevator isn't heading anywhere.
 pub const NO_FLOOR: u8 = 255;
 
 /// `EntityState::flags` bit: walks slowly (exhausted / needs the toilet).
@@ -631,10 +640,10 @@ pub enum Packet {
     /// A voice frame relayed from `speaker`.
     VoiceFrom { speaker: u16, seq: u16, whisper: u8, data: Vec<u8> },
     /// Closed doors (locked toilet stalls, elevator doors) on the receiver's
-    /// floor: solid for the simulation. Plus the elevator: the floor it is at
-    /// and where it is heading (`NO_FLOOR` = standing). Sent on change and
-    /// every 0.5 s.
-    Doors { floor: u8, tiles: Vec<(u8, u8)>, lift_floor: u8, lift_target: u8, lift_moving: bool },
+    /// floor: solid for the simulation. Plus every elevator, in the order
+    /// the map lists them (floors ascending, links in file order, grouped by
+    /// id). Sent on change and every 0.5 s.
+    Doors { floor: u8, tiles: Vec<(u8, u8)>, lifts: Vec<Lift> },
     /// Lock / unlock the stall the sender is in.
     DoorAction { token: u32 },
 }

@@ -236,8 +236,10 @@ mod tests {
     #[test]
     fn elevator_cycles_between_active_floors() {
         let b = b();
-        assert_eq!(b.next_elevator_floor(0, "main"), Some(1));
-        assert_eq!(b.next_elevator_floor(1, "main"), Some(0), "locked floor 2 is skipped");
+        for lift in ["A", "B"] {
+            assert_eq!(b.next_elevator_floor(0, lift), Some(1));
+            assert_eq!(b.next_elevator_floor(1, lift), Some(0), "locked floor 2 is skipped");
+        }
         assert_eq!(b.next_elevator_floor(0, "nope"), None);
     }
 

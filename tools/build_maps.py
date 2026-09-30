@@ -191,13 +191,14 @@ def stall(f, key, rid, name, bath, gender, toilet, stand, door, bath_name):
 
 
 # ------------------------------------------------------------------ shared
-# Shared building geometry (must line up between floors): two elevator
-# shafts side by side, doors facing down (8/9 on the ground floor, 14/15
-# upstairs). The second one is out of order for now (walled up).
+# Shared building geometry (must line up between floors): two elevators
+# side by side, doors facing down (8/9 on the ground floor, 14/15 upstairs),
+# each running on its own.
 ELEV_A = (36, 41, 38, 42)    # cabin interior: 3 x 2, a tight fit for 6
 ELEV_B = (40, 41, 42, 42)
-SHAFT = (35, 40, 43, 43)     # walls around both (the rest is the shaft)
+SHAFT = (35, 40, 43, 43)     # walls around both (a pillar between the doors)
 ELEV_A_DOOR = (36, 43, 38, 43)
+ELEV_B_DOOR = (40, 43, 42, 43)
 
 # The stairwell between floors 0 and 1 is its own map ("floor" 3 in the
 # building list, not a real storey): a U-shaped staircase - flight up from
@@ -224,9 +225,9 @@ def elevators(f, hall_room):
     f.box(*ELEV_A, "e", "L")
     f.room("L", 20, "Winda", "elevator", light="always")
     f.area(*ELEV_A_DOOR, "E", hall_room)
-    # The second cabin: out of order (walled up) until it's wired up.
     f.box(*ELEV_B, "e", "l")
-    f.room("l", 22, "Winda 2 (nieczynna)", "elevator", light="always")
+    f.room("l", 22, "Winda 2", "elevator", light="always")
+    f.area(*ELEV_B_DOOR, "E", hall_room)
 
 
 # ------------------------------------------------------------ ground floor
@@ -608,10 +609,10 @@ def rect(r):
 
 
 def links():
-    elevator = {"kind": "elevator", "id": "main", "area": rect(ELEV_A)}
+    lifts = [{"kind": "elevator", "id": "A", "area": rect(ELEV_A)}, {"kind": "elevator", "id": "B", "area": rect(ELEV_B)}]
     return {
-        0: [elevator, {"kind": "stairs", "area": rect(STAIRS0), "to_floor": STAIRWELL_FLOOR, "to": list(MID_ARRIVAL_A)}],
-        1: [elevator, {"kind": "stairs", "area": rect(STAIRS1), "to_floor": STAIRWELL_FLOOR, "to": list(MID_ARRIVAL_B)}],
+        0: lifts + [{"kind": "stairs", "area": rect(STAIRS0), "to_floor": STAIRWELL_FLOOR, "to": list(MID_ARRIVAL_A)}],
+        1: lifts + [{"kind": "stairs", "area": rect(STAIRS1), "to_floor": STAIRWELL_FLOOR, "to": list(MID_ARRIVAL_B)}],
         STAIRWELL_FLOOR: [
             {"kind": "stairs", "area": [31, 15, 3, 1], "to_floor": 0, "to": list(STAIRS0_ARRIVAL)},
             {"kind": "stairs", "area": [35, 15, 3, 1], "to_floor": 1, "to": list(STAIRS1_ARRIVAL)},

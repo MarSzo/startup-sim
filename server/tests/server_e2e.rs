@@ -1282,7 +1282,8 @@ fn elevator_is_called_waited_for_and_ridden() {
 
     // In front of the elevator on floor 1: the car is downstairs, doors shut.
     let body = ola.walk_to(&b, start, (1, Tile { x: 37, y: 44 }), &[]);
-    let doors = |c: &Client| wait_for(c, &[], wait, |p| if let Packet::Doors { tiles, lift_floor, lift_target, .. } = p { Some((tiles.clone(), *lift_floor, *lift_target)) } else { None });
+    // (Lift A: the left one, doors at x 36..38.)
+    let doors = |c: &Client| wait_for(c, &[], wait, |p| if let Packet::Doors { tiles, lifts, .. } = p { Some((tiles.clone(), lifts[0].floor, lifts[0].target)) } else { None });
     let (tiles, lift, _) = doors(&ola).unwrap();
     assert!(tiles.contains(&(37, 43)) && lift == 0);
     let body = ola.press_e(&b, body);
@@ -1294,7 +1295,7 @@ fn elevator_is_called_waited_for_and_ridden() {
     assert!(y >= 44 * sim::TILE_UNITS, "doors closed while the car is away");
     // ~3 s later it arrives and opens.
     let opened = wait_for(&ola, &[], Duration::from_millis(4000), |p| match p {
-        Packet::Doors { tiles, lift_floor: 1, .. } if !tiles.contains(&(37, 43)) => Some(()),
+        Packet::Doors { tiles, lifts, .. } if lifts[0].floor == 1 && !tiles.contains(&(37, 43)) => Some(()),
         _ => None,
     });
     assert!(opened.is_some(), "the car came up and opened");
@@ -1309,6 +1310,33 @@ fn elevator_is_called_waited_for_and_ridden() {
     });
     let (x, y) = arrived.expect("arrived at the ground floor");
     assert_eq!(Pos { x, y }.tile(), (37, 42), "same spot in the cabin, other floor");
+}
+
+#[test]
+fn the_two_lifts_run_on_their_own() {
+    use game::elevator::lines as el;
+    let (addr, _) = start_server_cfg(0, true, true);
+    let b = building();
+    let (mut ola, _) = Client::connect(addr, "Ola"); // IT, floor 1
+    let wait = Duration::from_millis(800);
+    let ws = game::computer::find_workstations(&b);
+    let w = ws.iter().find(|w| w.department == 1).unwrap();
+    let start = Body { access: access::CARD, ..Body::at(w.floor, Pos::tile_center(w.tile.x, w.tile.y + 1)) };
+    // In front of the right-hand lift (B, doors at x 40..42): call it.
+    let body = ola.walk_to(&b, start, (1, Tile { x: 41, y: 44 }), &[]);
+    while ola.recv().is_some() {}
+    ola.press_e(&b, body);
+    assert!(wait_for(&ola, &[], wait, |p| matches!(p, Packet::Say { text, .. } if text == el::CALLED).then_some(())).is_some());
+    // B comes up and opens; A stays downstairs with its doors shut.
+    let state = wait_for(&ola, &[], Duration::from_millis(4000), |p| match p {
+        Packet::Doors { tiles, lifts, .. } if lifts.len() == 2 && lifts[1].floor == 1 && !lifts[1].moving && !tiles.contains(&(41, 43)) => {
+            Some((lifts[0], tiles.contains(&(37, 43))))
+        }
+        _ => None,
+    });
+    let (a, a_shut) = state.expect("lift B came up and opened");
+    assert_eq!((a.floor, a.moving), (0, false), "lift A didn't move");
+    assert!(a_shut, "lift A's doors stay shut");
 }
 
 #[test]
@@ -1470,8 +1498,9 @@ fn office_closes_at_ten_pm_and_pays_the_day() {
 fn morning_commute_choice_ride_and_arrival() {
     use game::commute::mode;
     use proto::place;
-    // 5:58 (night: at home), daytime 600x faster so the morning goes quickly.
-    let (addr, _) = start_server_at(0, true, true, 5 * 60 + 58, 600);
+    // 5:58 (night: at home), daytime 450x faster so the morning goes quickly
+    // (but the car still gets in before the office closes at 22:00).
+    let (addr, _) = start_server_at(0, true, true, 5 * 60 + 58, 450);
     let (ola, _) = Client::connect(addr, "Ola");
     let (day, _, pl, _, _) = clock_until(&ola, Duration::from_millis(800), |_, _, _, _, _| true).expect("clock");
     assert_eq!((day, pl), (2, place::HOME), "hired at night: at home until the morning");

@@ -200,7 +200,7 @@
   "Fvvvvvvvvvvv=====v#############DD######################vvvvvvvvvvvvvvF",
   "Fvvvvvvvvvvv=====v#SSS.....#P______#eee#eee#..........#vvvvvvvvvvvvvvF",
   "Fvvvvvvvvvvv=====v#SSS.....D_______#eee#eee#..........#vvvvvvvvvvvvvvF",
-  "Fvvvvvvvvvvv=====v#........#_______#EEE#####..........#vvvvvvvvvvvvvvF",
+  "Fvvvvvvvvvvv=====v#........#_______#EEE#EEE#..........#vvvvvvvvvvvvvvF",
   "Fvvvvvvvvvvv=====v##########_______________#..........#vvvvvvvvvvvvvvF",
   "Fvvvvvvvvvvv=====v#........#_______________x..........#vvvvvvvvvvvvvvF",
   "Fvvvvvvvvvvv=====v#H.HHH..H#BBBBBBB#########..........#vvvvvvvvvvvvvvF",
@@ -274,7 +274,7 @@
   "-OOOOOOOOOOOOOOOOO-------------HH----------------------OOOOOOOOOOOOOO-",
   "-OOOOOOOOOOOOOOOOO-QQQQQQQQ-HHHHHHH-LLL-lll-ZZZZZZZZZZ-OOOOOOOOOOOOOO-",
   "-OOOOOOOOOOOOOOOOO-QQQQQQQQQHHHHHHH-LLL-lll-ZZZZZZZZZZ-OOOOOOOOOOOOOO-",
-  "-OOOOOOOOOOOOOOOOO-QQQQQQQQ-HHHHHHH-HHH-----ZZZZZZZZZZ-OOOOOOOOOOOOOO-",
+  "-OOOOOOOOOOOOOOOOO-QQQQQQQQ-HHHHHHH-HHH-HHH-ZZZZZZZZZZ-OOOOOOOOOOOOOO-",
   "-OOOOOOOOOOOOOOOOO----------HHHHHHHHHHHHHHH-ZZZZZZZZZZ-OOOOOOOOOOOOOO-",
   "-OOOOOOOOOOOOOOOOO-SSSSSSSS-HHHHHHHHHHHHHHHZZZZZZZZZZZ-OOOOOOOOOOOOOO-",
   "-OOOOOOOOOOOOOOOOO-SSSSSSSS-HHHHHHH---------ZZZZZZZZZZ-OOOOOOOOOOOOOO-",
@@ -350,7 +350,7 @@
   },
   "l": {
    "id": 22,
-   "name": "Winda 2 (nieczynna)",
+   "name": "Winda 2",
    "type": "elevator",
    "light": "always"
   },
@@ -392,9 +392,19 @@
  "links": [
   {
    "kind": "elevator",
-   "id": "main",
+   "id": "A",
    "area": [
     36,
+    41,
+    3,
+    2
+   ]
+  },
+  {
+   "kind": "elevator",
+   "id": "B",
+   "area": [
+    40,
     41,
     3,
     2

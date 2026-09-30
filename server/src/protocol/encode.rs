@@ -256,16 +256,19 @@ impl Packet {
                 w.u32(*arg);
                 w.str16(text, MAX_CHAT_BYTES);
             }
-            Packet::Doors { floor, tiles, lift_floor, lift_target, lift_moving } => {
+            Packet::Doors { floor, tiles, lifts } => {
                 w.u8(*floor);
                 w.u8(tiles.len().min(255) as u8);
                 for (x, y) in tiles.iter().take(255) {
                     w.u8(*x);
                     w.u8(*y);
                 }
-                w.u8(*lift_floor);
-                w.u8(*lift_target);
-                w.u8(*lift_moving as u8);
+                w.u8(lifts.len().min(16) as u8);
+                for l in lifts.iter().take(16) {
+                    w.u8(l.floor);
+                    w.u8(l.target);
+                    w.u8(l.moving as u8);
+                }
             }
             Packet::DoorAction { token } => w.u32(*token),
             Packet::Stats { hunger, energy, stress, bladder, hygiene, flags, money } => {

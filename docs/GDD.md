@@ -300,7 +300,7 @@ zmienia. Piętro 2 jest w `building.json` jako zablokowane (bez pliku).
 
 **Parter + teren zewnętrzny** — gracz startuje na chodniku przed wejściem.
 Wiatrołap (2) → hol (3) z ladą portiera (5, portier siedzi na 6), toaletą (7)
-i bramkami na kartę; za bramkami windy (8, 9 — druga na razie nieczynna),
+i bramkami na kartę; za bramkami windy (8, 9),
 klatka schodowa (4) i drzwi na parking wewnętrzny (12, brama od północy,
 dojazd wzdłuż zachodniej ściany). Sklep (1) z wejściem od ulicy, strefa
 zamknięta (11) za zablokowanymi drzwiami, sprzątaczka siedzi w holu (10).
@@ -343,7 +343,7 @@ Fvvvvvvvvvvv=====v#===================================#vvvvvvvvvvvvvvF
 Fvvvvvvvvvvv=====v#############DD######################vvvvvvvvvvvvvvF
 Fvvvvvvvvvvv=====v#SSS.....#P______#eee#eee#..........#vvvvvvvvvvvvvvF
 Fvvvvvvvvvvv=====v#SSS.....D_______#eee#eee#..........#vvvvvvvvvvvvvvF
-Fvvvvvvvvvvv=====v#........#_______#EEE#####..........#vvvvvvvvvvvvvvF
+Fvvvvvvvvvvv=====v#........#_______#EEE#EEE#..........#vvvvvvvvvvvvvvF
 Fvvvvvvvvvvv=====v##########_______________#..........#vvvvvvvvvvvvvvF
 Fvvvvvvvvvvv=====v#........#_______________x..........#vvvvvvvvvvvvvvF
 Fvvvvvvvvvvv=====v#H.HHH..H#BBBBBBB#########..........#vvvvvvvvvvvvvvF
@@ -432,7 +432,7 @@ kabiną (31).
 ~~#,,,,,,,,,,,,,,,#SSS.......#.....#########:::::::::#,,WWWW,WWW,#~
 ~~#,,,,,,,,,,,,,,,#..........#.....#eee#eee#:::::::::#,,,,,,,,,,,#~
 ~~#,,,,,,,,,,,,,,,#..........#.....#eee#eee#:::::::::#,,,,,,,,,,,#~
-~~###########DD#######DD######.....#EEE#########D#####,,,,,,,,,,,#~
+~~###########DD#######DD######.....#EEE#EEE#####D#####,,,,,,,,,,,#~
 ~~#|||::::V#.................#.............#.........#,,WWWW,WWW,#~
 ~~#U:k::::V#.................D.............D.........D,,,,,,,,,,,#~
 ~~#|||:::::D.................D.............D.........D,,,,,,,,,,,#~
@@ -668,10 +668,14 @@ Zastępuje prosty portal z 10.8. Po połączeniu gracz widzi pulpit komputera
   świadku — komentarz „Ej, …, a ręce?!” (i trochę stresu); owoc jedzony
   brudnymi rękami — „Fuj…” i stres +5.
 
-### 10.18 Winda
+### 10.18 Windy
 
+- **Dwie windy obok siebie** (8/9 na parterze, 14/15 na piętrze), każda jeździ
+  osobno: własne wezwania, drzwi i wyświetlacz. Stojąc między nimi, E wzywa
+  bliższą.
 - Drzwi są zamknięte, dopóki winda nie stoi na piętrze. **E przy drzwiach
-  wzywa windę**; nad drzwiami wyświetlacz: piętro (P, 1) i strzałka jazdy.
+  wzywa windę**; przy drzwiach (po lewej) wyświetlacz: piętro (P, 1) i
+  strzałka jazdy.
 - Jazda: ~3 s na piętro; po przyjeździe drzwi otwarte ~4 s (nie zamkną się na
   kimś w drzwiach). **E w kabinie** wybiera piętro (przy dwóch aktywnych —
   drugie); drzwi zamykają się po 1 s i jadą wszyscy w kabinie.
@@ -1225,7 +1229,8 @@ piętro 1, schody, winda), uprawnienia (bramki) oraz cała ścieżka nowego
 gracza: portal z ofertami → rekrutacja → portier → recepcja → HR → karta
 pracownika z działem; oprawa graficzna w pixel arcie (10.9). 2026-09-30:
 nowy układ budynku wg odręcznego planu (10.5) — generator map znów jest
-jedynym źródłem, otoczenie i stałe punkty w `places` mapy.*
+jedynym źródłem, otoczenie i stałe punkty w `places` mapy; dwie niezależne
+windy (10.18, protokół 36).*
 
 #### Zrobione
 - **Serwer Rust** (`server/`): tick 20 Hz bez dryfu z liczeniem zgubionych

@@ -147,7 +147,14 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
             Packet::ComputerAction { token: 0x01020304, action: computer_action::SEND, conv: 17, arg: 42, text: "Kto zjadł mój jogurt?".into() },
         ),
         ("stats", Packet::Stats { hunger: 35, energy: 80, stress: 12, bladder: 64, hygiene: 22, flags: STATS_DIRTY_HANDS, money: 187_50 }),
-        ("doors", Packet::Doors { floor: 1, tiles: vec![(46, 27), (54, 31)], lift_floor: 0, lift_target: 1, lift_moving: true }),
+        (
+            "doors",
+            Packet::Doors {
+                floor: 1,
+                tiles: vec![(5, 45), (41, 43)],
+                lifts: vec![Lift { floor: 0, target: 1, moving: true }, Lift { floor: 1, target: NO_FLOOR, moving: false }],
+            },
+        ),
         ("door_action", Packet::DoorAction { token: 0x01020304 }),
         (
             "shelf",

@@ -78,9 +78,9 @@ var screen_layer := CanvasLayer.new()
 var stats_hud := StatsHud.new()
 var stall_doors := {}    # floor -> Array of StallDoorView
 var elevator_doors := {} # floor -> Array of ElevatorDoorView
-var lift_floor := 0      # elevator: where the car is (from Doors)
-var lift_target := 255   # ...and where it is heading (Protocol.NO_FLOOR = standing)
-var lift_moving := false
+## The elevators (from Doors), indexed like `building.lift_ids`: where each
+## car is, where it is heading (Protocol.NO_FLOOR = standing), moving.
+var lifts := []
 var ride_mask := RideMask.new()
 var clock_label := Label.new()
 var daylight := CanvasModulate.new()   # time-of-day tint of the world
@@ -217,6 +217,7 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 					ev.position = Movement.to_px(Movement.tile_center(x, y))
 					var is_door := func(dx: int) -> bool: return m.legend.get(m.tile_chars[y * m.width + x + dx], {}).get("type") == "elevator_door"
 					ev.display = is_door.call(-1) and is_door.call(1)  # the middle one
+					ev.lift = building.lift_at_door(f, Vector2i(x, y))
 					ev.visible = false
 					world.add_child(ev)
 					elevator_doors[f].append(ev)
@@ -646,9 +647,7 @@ func _on_packet(p: Dictionary) -> void:
 			var dm = building.get_floor(p.floor)
 			if dm:
 				dm.set_closed_tiles(p.tiles)
-			lift_floor = p.lift_floor
-			lift_target = p.lift_target
-			lift_moving = p.lift_moving
+			lifts = p.lifts
 		Protocol.T_SHELF:
 			shelf_window.show_shelf(p)
 			_shelf_at = Movement.to_px(pred.pos)
@@ -976,7 +975,8 @@ func _update_hint() -> void:
 	var link: Dictionary = map.link_at(t.x, t.y) if map else {}
 	if not link.is_empty() and link.kind == "elevator":
 		# In the cabin: the car stands here -> choose the floor; else riding.
-		var standing: bool = not lift_moving and lift_floor == pred.floor
+		var l := _lift(building.lift_ids.find(link.id))
+		var standing: bool = not l.moving and l.floor == pred.floor
 		var target: int = building.next_elevator_floor(pred.floor, link.id)
 		if standing and target >= 0:
 			text = "[E] Jedź na: %s" % building.floor_name(target)
@@ -1159,7 +1159,7 @@ func _update_ride() -> void:
 	var m = building.get_floor(pred.floor)
 	var t := Movement.tile_of_pos(pred.pos)
 	var link: Dictionary = m.link_at(t.x, t.y) if m else {}
-	var riding: bool = lift_moving and not link.is_empty() and link.kind == "elevator"
+	var riding: bool = not link.is_empty() and link.kind == "elevator" and _lift(building.lift_ids.find(link.id)).moving
 	if riding:
 		var r: Rect2i = link.rect
 		ride_mask.show_cabin(Rect2(Vector2(r.position) * m.tile_px, Vector2(r.size) * m.tile_px).grow(2))
@@ -1222,7 +1222,8 @@ func _update_stall_doors() -> void:
 				break
 		dv.set_state(m.is_closed(dv.tile.x, dv.tile.y), busy)
 	for ev in elevator_doors.get(pred.floor, []):
-		ev.set_state(m.is_closed(ev.tile.x, ev.tile.y), lift_floor, lift_target)
+		var l := _lift(ev.lift)
+		ev.set_state(m.is_closed(ev.tile.x, ev.tile.y), l.floor, l.target)
 
 
 ## In a stall: lock / unlock (L). Outside next to a locked stall: "Zajęte".
@@ -1247,15 +1248,26 @@ const SPOT_HINTS := {"shelf": "[E] Zobacz półkę", "sofa": "[E] Usiądź na so
 
 ## Next to the elevator doors (outside the cabin): call it / wait / step in.
 func _elevator_call_hint(map) -> String:
+	# The nearest door within reach (between two lifts: like the server).
 	var me_px := Movement.to_px(pred.pos)
+	var best = null
 	for ev in elevator_doors.get(pred.floor, []):
-		if ev.position.distance_to(me_px) <= 24.0:
-			if not map.is_closed(ev.tile.x, ev.tile.y):
-				return "Winda otwarta — wejdź"
-			if lift_target == pred.floor:
-				return "Winda jedzie… (%s)" % ElevatorDoorView.floor_label(lift_floor)
-			return "[E] Wezwij windę"
-	return ""
+		var d: float = ev.position.distance_to(me_px)
+		if d <= 24.0 and (best == null or d < best.position.distance_to(me_px)):
+			best = ev
+	if best == null:
+		return ""
+	if not map.is_closed(best.tile.x, best.tile.y):
+		return "Winda otwarta — wejdź"
+	var l := _lift(best.lift)
+	if l.target == pred.floor:
+		return "Winda jedzie… (%s)" % ElevatorDoorView.floor_label(l.floor)
+	return "[E] Wezwij windę"
+
+
+## Elevator `i`'s state (a standing car downstairs until Doors says).
+func _lift(i: int) -> Dictionary:
+	return lifts[i] if i >= 0 and i < lifts.size() else {"floor": 0, "target": Protocol.NO_FLOOR, "moving": false}
 
 
 ## Sofa / toilet / ashtray / fruit bowl within reach (1.5 tiles, as the server).
