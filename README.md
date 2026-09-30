@@ -4,6 +4,15 @@
 Etap 1: fundament sieci. Dokumentacja: [GDD](docs/GDD.md) ·
 [Protokół](docs/PROTOCOL.md) · [Architektura](docs/ARCHITECTURE.md).
 
+## Pobierz
+
+Gotowy klient na macOS (podpisany i notaryzowany dmg, Intel + Apple Silicon):
+[Startup Sim 0.1.0](https://github.com/mateuszpalak/startup-sim/releases/tag/v0.1.0) —
+wszystkie wydania: [Releases](https://github.com/mateuszpalak/startup-sim/releases).
+Nowe wydanie: zbuduj dmg (`tools/build-macos.sh`), potem
+`git tag -a v<wersja> -m "Startup Sim <wersja>"`, `git push origin v<wersja>` i
+`gh release create v<wersja> build/StartupSim-<wersja>.dmg --title "Startup Sim <wersja>" --notes "…"`.
+
 ## Uruchomienie
 
 Wymagania: Rust (rustup), Godot 4.7 (`godot` w PATH).
