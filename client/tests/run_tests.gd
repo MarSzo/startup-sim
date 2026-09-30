@@ -88,6 +88,13 @@ func test_protocol(path: String) -> void:
 	expect(dr.get("type") == Protocol.T_DOORS and dr.floor == 1 and dr.tiles == [Vector2i(5, 45), Vector2i(41, 43)]
 		and dr.lifts.size() == 2 and dr.lifts[0].floor == 0 and dr.lifts[0].target == 1 and dr.lifts[0].moving
 		and dr.lifts[1].floor == 1 and dr.lifts[1].target == Protocol.NO_FLOOR and not dr.lifts[1].moving, "decode doors %s" % dr)
+	var dp := Protocol.decode(golden["departments"].hex_decode())
+	expect(dp.get("type") == Protocol.T_DEPARTMENTS and dp.list.size() == 2 and dp.list[0].id == 1 and dp.list[0].short == "IT"
+		and dp.list[0].name == "Produkt / IT" and dp.list[1].id == 10 and dp.list[1].name == "Obsługa klienta", "decode departments %s" % dp)
+	var Departments = load("res://net/departments.gd")
+	Departments.set_list(dp.list + [{"id": 3, "short": "Zarząd", "name": "Zarząd"}])
+	expect(Departments.short_of(10) == "Obsługa" and Departments.name_of(7) == "?" and Departments.for_positions() == [1, 10],
+		"departments store (no board for positions)")
 	var st := Protocol.decode(golden["stats"].hex_decode())
 	expect(st.get("type") == Protocol.T_STATS and st.hunger == 35 and st.energy == 80 and st.stress == 12 and st.bladder == 64
 		and st.hygiene == 22 and st.stats_flags == Protocol.STATS_DIRTY_HANDS and st.money == 18750, "decode stats %s" % st)

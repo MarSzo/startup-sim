@@ -86,7 +86,7 @@ LEGEND = {
 
 # Departments of the company (recruitment.json): rooms whose desks belong
 # to one carry its id.
-IT, BUSINESS, BOARD = 1, 2, 3
+IT, BUSINESS, BOARD, MOBILE, DEVOPS, AI, FINANCE, SALES, MARKETING, SUPPORT = range(1, 11)
 
 
 class Floor:
@@ -465,7 +465,7 @@ def floor1():
     f.door(43, 14, 43, 14, "D", "K")
     f.walls(43, 15, 53, 24, ",", "k")
     f.room("k", 10, "Marketing", "department", detector=True, light="switch", switch_door=(43, 23),
-           windows=True, department=BUSINESS)
+           windows=True, department=MARKETING)
     f.desk_rows(48, 51, (17, 21))
     f.door(43, 23, 43, 23, "D", "K")
     f.walls(43, 18, 47, 21, ":", "c")
@@ -474,12 +474,12 @@ def floor1():
     f.door(43, 20, 43, 20, "L", "c")                     # the cleaner's
     f.walls(43, 24, 53, 32, ",", "j")
     f.room("j", 11, "Sales", "department", detector=True, light="switch", switch_door=(43, 29),
-           windows=True, department=BUSINESS)
+           windows=True, department=SALES)
     f.desk_rows(46, 49, (26, 30))
     f.door(43, 29, 43, 29, "D", "K")
     f.walls(43, 32, 53, 38, ",", "o")
     f.room("o", 12, "Obsługa klienta", "department", detector=True, light="switch", switch_door=(43, 35),
-           windows=True, department=BUSINESS)
+           windows=True, department=SUPPORT)
     f.desk_rows(46, 49, (34,))
     f.door(43, 35, 43, 35, "D", "K")
     f.walls(43, 38, 53, 43, ":", "g")
@@ -502,7 +502,7 @@ def floor1():
     # stalls), 17 corridor, 19 and 18 team rooms, 16 finance.
     f.walls(2, 37, 18, 43, ",", "b")
     f.room("b", 24, "Mobile", "department", detector=True, light="switch", switch_door=(13, 43),
-           windows=True, department=IT)
+           windows=True, department=MOBILE)
     f.desk_rows(5, 10, (39,))
     f.put(13, 39, 15, 39, "W")
     f.walls(11, 43, 29, 49, ".", "D")
@@ -536,7 +536,7 @@ def floor1():
     f.door(21, 49, 22, 49, "D", "D")
     f.walls(27, 49, 43, 60, ",", "F")
     f.room("F", 29, "Finanse", "department", detector=True, light="switch", switch_door=(33, 49),
-           windows=True, department=BUSINESS)
+           windows=True, department=FINANCE)
     f.desk_rows(30, 34, (52, 56))
     f.desk_rows(37, 40, (52, 56))
     f.door(33, 49, 34, 49, "D", "C")
@@ -550,7 +550,7 @@ def floor1():
     f.door(48, 43, 48, 43, "D", "U")                     # storeroom 41
     f.walls(53, 37, 65, 49, ",", "V")
     f.room("V", 31, "DevOps (Mordor)", "department", detector=True, light="switch", switch_door=(53, 45),
-           windows=True, department=IT)
+           windows=True, department=DEVOPS)
     f.desk_rows(56, 59, (40, 44))
     f.desk_rows(61, 63, (40, 44))
     f.door(53, 45, 53, 46, "D", "V")
@@ -565,7 +565,7 @@ def floor1():
     f.door(49, 54, 50, 54, "D", "B")
     f.walls(53, 54, 65, 60, ",", "i")
     f.room("i", 38, "AI team", "department", detector=True, light="switch", switch_door=(55, 54),
-           windows=True, department=IT)
+           windows=True, department=AI)
     f.desk_rows(56, 62, (57,))
     f.door(55, 54, 56, 54, "D", "i")
     f.walls(58, 49, 65, 54, ":", "u")

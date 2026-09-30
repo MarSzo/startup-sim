@@ -23,7 +23,7 @@ pub use golden::{golden_samples, to_hex};
 pub use snapshot::{snapshot_fragments, SelfState};
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 36;
+pub const VERSION: u8 = 37;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
 /// A game packet at most (sealed, it grows by up to 48 B to `MAX_DATAGRAM`).
@@ -105,6 +105,7 @@ pub mod ty {
     pub const MAIL_STATE: u8 = 51;
     pub const VOICE: u8 = 52;
     pub const VOICE_FROM: u8 = 53;
+    pub const DEPARTMENTS: u8 = 54;
 }
 
 /// `ItemAction::action`.
@@ -260,6 +261,18 @@ pub mod sound {
     pub const DRINK: u8 = 16;
     pub const WHISTLE: u8 = 17;
 }
+
+/// A department of the company in `Departments`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DepartmentInfo {
+    pub id: u8,
+    /// Next to a nick ("Ola · IT").
+    pub short: String,
+    pub name: String,
+}
+
+/// Most departments in one `Departments` packet.
+pub const MAX_DEPARTMENTS: usize = 32;
 
 /// One elevator in `Doors`: the floor it is at (or left), where it is
 /// heading (`NO_FLOOR` = standing), whether it is moving.
@@ -646,6 +659,9 @@ pub enum Packet {
     Doors { floor: u8, tiles: Vec<(u8, u8)>, lifts: Vec<Lift> },
     /// Lock / unlock the stall the sender is in.
     DoorAction { token: u32 },
+    /// The company's departments (ids used everywhere else): after
+    /// `Welcome` and every 5 s.
+    Departments { list: Vec<DepartmentInfo> },
 }
 
 #[derive(Debug, PartialEq, Eq)]

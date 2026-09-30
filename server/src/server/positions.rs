@@ -31,7 +31,7 @@ pub(super) fn from_file(r: &Recruitment) -> Vec<Position> {
 pub mod lines {
     pub const LIMIT: &str = "Firma ma już 10 stanowisk — usuń któreś, zanim dodasz nowe.";
     pub const BAD_TITLE: &str = "Nazwa stanowiska: 3–40 znaków.";
-    pub const BAD_DEPARTMENT: &str = "Stanowisko może być w dziale IT / Produkt albo Biznes.";
+    pub const BAD_DEPARTMENT: &str = "Nie ma takiego działu (Zarząd nie rekrutuje).";
     pub const BAD_SET: &str = "Nie ma takiego zestawu pytań.";
 }
 
@@ -63,7 +63,7 @@ impl Server {
         let title = company::clean(parts.next().unwrap_or(""), company::TITLE_MIN, company::TITLE_MAX).ok_or(lines::BAD_TITLE)?;
         let set = parts.next().unwrap_or("").trim().to_string();
         let description = parts.next().and_then(|d| company::clean(d, 1, company::DESCRIPTION_MAX)).unwrap_or_default();
-        if !company::position_department(department) {
+        if !company::position_department(&self.cfg.recruitment, department) {
             return Err(lines::BAD_DEPARTMENT);
         }
         if self.cfg.recruitment.set(&set).is_none() {

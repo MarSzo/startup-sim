@@ -17,7 +17,7 @@ signal found_company(name: String)
 ## StartOS button: the game menu (settings, leave).
 signal menu_requested
 
-const DEPT_NAMES := {1: "IT / Produkt", 2: "Biznes", 3: "Zarząd"}
+const Departments = preload("res://net/departments.gd")
 const RESEND_MSEC := 1500
 
 var offers := {}          # id -> offer dict (merged from JobOffers parts)
@@ -419,7 +419,8 @@ func _render_browser(body: VBoxContainer) -> void:
 		t.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		head.add_child(t)
 		box.add_child(head)
-		var company: String = o.company + ("  ·  dział " + DEPT_NAMES[o.department] if DEPT_NAMES.has(o.department) else "")
+		var dept := Departments.name_of(o.department, "")
+		var company: String = o.company + ("  ·  dział " + dept if dept != "" else "")
 		box.add_child(_label(company, 14, Color("#2e6bd9")))
 		box.add_child(_label(o.description, 15, Color("#4a5566")))
 		if ours:

@@ -625,7 +625,9 @@ Format piętra:
   lit_by?, windows?, department?}`, `-` = brak pokoju (ściany). Id są unikalne w
   obrębie piętra; `see` — klucze pokoi, których ludzi też widać (interest
   management); `department` — czyje są biurka w pokoju (`computer::Workstation`
-  bierze dział z pokoju, nie z nazwy).
+  bierze dział z pokoju, nie z nazwy). Działy (id, nazwa, skrót) są w
+  `recruitment.json`; serwer rozsyła je pakietem `Departments`, klient trzyma
+  je w `net/departments.gd`.
 - `links`: `{kind: "stairs", area: [x,y,w,h], to_floor, to: [x,y]}` albo
   `{kind: "elevator", id, area}`.
 - `spawns`: kafle startowe (tylko parter: chodnik przed wejściem).

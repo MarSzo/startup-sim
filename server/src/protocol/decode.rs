@@ -342,6 +342,17 @@ impl Packet {
                 let (token, seq, whisper) = (r.u32()?, r.u16()?, r.u8()?);
                 Packet::Voice { token, seq, whisper, data: r.voice()? }
             }
+            ty::DEPARTMENTS => {
+                let n = r.u8()? as usize;
+                if n > MAX_DEPARTMENTS {
+                    return Err(DecodeError::Invalid("too many departments"));
+                }
+                let mut list = Vec::with_capacity(n);
+                for _ in 0..n {
+                    list.push(DepartmentInfo { id: r.u8()?, short: r.str8()?, name: r.str8()? });
+                }
+                Packet::Departments { list }
+            }
             ty::VOICE_FROM => {
                 let (speaker, seq, whisper) = (r.u16()?, r.u16()?, r.u8()?);
                 Packet::VoiceFrom { speaker, seq, whisper, data: r.voice()? }

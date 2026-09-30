@@ -18,6 +18,8 @@ pub(super) const INFO_PER_PACKET: usize = 55;
 const INVENTORY_RESEND_TICKS: u32 = 40;
 /// Resend the game time this often (ticks).
 const CLOCK_RESEND_TICKS: u32 = 20;
+/// The department list again (a lost one comes back): every 5 s.
+const DEPARTMENTS_RESEND_TICKS: u32 = 100;
 /// Send the character's needs (and the doors) this often (ticks).
 const STATS_EVERY_TICKS: u32 = 10;
 /// Resend the computer screen state this often (ticks).
@@ -209,6 +211,12 @@ impl Server {
     /// lights of the floor for those in the building.
     fn queue_world_state(&mut self, out: &mut Vec<Outgoing>) {
         let tick = self.tick;
+        if tick.is_multiple_of(DEPARTMENTS_RESEND_TICKS) {
+            let list = self.cfg.recruitment.department_list();
+            for p in self.players.values() {
+                out.push((p.addr, p.id, Packet::Departments { list: list.clone() }));
+            }
+        }
         if !self.clock_dirty && !tick.is_multiple_of(CLOCK_RESEND_TICKS) {
             return;
         }

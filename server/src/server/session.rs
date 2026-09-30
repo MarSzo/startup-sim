@@ -259,6 +259,7 @@ impl Server {
         }
         if let Some(welcome) = self.welcome(id) {
             self.send(addr, &welcome);
+            self.send(addr, &Packet::Departments { list: self.cfg.recruitment.department_list() });
         }
         // A saved character: its own look and name, as the server knows them.
         if restored {

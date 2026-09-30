@@ -204,7 +204,7 @@ impl Server {
                 }
                 None => self.says.push(super::Say::new(pid, super::positions::lines::BAD_TITLE)),
             },
-            a::SET_DEPARTMENT if company::position_department(value) => {
+            a::SET_DEPARTMENT if company::position_department(&self.cfg.recruitment, value) => {
                 if let Some(pos) = u8::try_from(target).ok().and_then(|o| self.position_mut(o)) {
                     pos.department = value;
                 }

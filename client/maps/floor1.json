@@ -522,7 +522,7 @@
    "detector": true,
    "light": "switch",
    "windows": true,
-   "department": 2,
+   "department": 9,
    "switch": [
     44,
     23
@@ -541,7 +541,7 @@
    "detector": true,
    "light": "switch",
    "windows": true,
-   "department": 2,
+   "department": 8,
    "switch": [
     44,
     29
@@ -554,7 +554,7 @@
    "detector": true,
    "light": "switch",
    "windows": true,
-   "department": 2,
+   "department": 10,
    "switch": [
     44,
     35
@@ -603,7 +603,7 @@
    "detector": true,
    "light": "switch",
    "windows": true,
-   "department": 1,
+   "department": 4,
    "switch": [
     13,
     42
@@ -681,7 +681,7 @@
    "detector": true,
    "light": "switch",
    "windows": true,
-   "department": 2,
+   "department": 7,
    "switch": [
     33,
     50
@@ -701,7 +701,7 @@
    "detector": true,
    "light": "switch",
    "windows": true,
-   "department": 1,
+   "department": 5,
    "switch": [
     54,
     45
@@ -738,7 +738,7 @@
    "detector": true,
    "light": "switch",
    "windows": true,
-   "department": 1,
+   "department": 6,
    "switch": [
     55,
     55

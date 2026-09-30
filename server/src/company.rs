@@ -33,7 +33,7 @@ pub const FIRST_CUSTOM_ID: u8 = 20;
 pub struct Position {
     pub id: u8,
     pub title: String,
-    /// IT / Produkt (1) or Biznes (2).
+    /// One of the company's departments (recruitment.json), not the board.
     pub department: u8,
     /// Question set id.
     pub set: String,
@@ -68,9 +68,9 @@ pub mod action {
     pub const REMOVE_POSITION: u8 = 12;
 }
 
-/// Departments a position can be in (not the board).
-pub fn position_department(d: u8) -> bool {
-    matches!(d, 1 | 2)
+/// Departments a position can be in: any of the company's but the board.
+pub fn position_department(r: &crate::recruitment::Recruitment, d: u8) -> bool {
+    d != BOARD_DEPARTMENT && r.department_name(d).is_some()
 }
 
 #[derive(Debug, Clone)]

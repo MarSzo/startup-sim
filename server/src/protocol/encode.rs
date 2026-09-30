@@ -57,6 +57,7 @@ impl Packet {
             Packet::MailState { .. } => ty::MAIL_STATE,
             Packet::Voice { .. } => ty::VOICE,
             Packet::VoiceFrom { .. } => ty::VOICE_FROM,
+            Packet::Departments { .. } => ty::DEPARTMENTS,
             Packet::Doors { .. } => ty::DOORS,
             Packet::DoorAction { .. } => ty::DOOR_ACTION,
         }
@@ -412,6 +413,14 @@ impl Packet {
                 let n = data.len().min(MAX_VOICE_BYTES);
                 w.u16(n as u16);
                 w.0.extend_from_slice(&data[..n]);
+            }
+            Packet::Departments { list } => {
+                w.u8(list.len().min(MAX_DEPARTMENTS) as u8);
+                for d in list.iter().take(MAX_DEPARTMENTS) {
+                    w.u8(d.id);
+                    w.str8(&d.short);
+                    w.str8(&d.name);
+                }
             }
             Packet::VoiceFrom { speaker, seq, whisper, data } => {
                 w.u16(*speaker);

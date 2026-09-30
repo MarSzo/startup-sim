@@ -259,6 +259,15 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
         ("mail_state", Packet::MailState { done: 4, ids: vec![1, 2, 5], trashed: vec![2] }),
         ("voice", Packet::Voice { token: 0x01020304, seq: 9, whisper: 1, data: vec![0x10, 0x00, 0x05, 0x7f, 0x80] }),
         ("voice_from", Packet::VoiceFrom { speaker: 3, seq: 9, whisper: 0, data: vec![0x10, 0x00, 0x05, 0x7f, 0x80] }),
+        (
+            "departments",
+            Packet::Departments {
+                list: vec![
+                    DepartmentInfo { id: 1, short: "IT".into(), name: "Produkt / IT".into() },
+                    DepartmentInfo { id: 10, short: "Obsługa".into(), name: "Obsługa klienta".into() },
+                ],
+            },
+        ),
         ("sound", Packet::Sound { sounds: vec![(1, 12_288, -256), (17, 0, 65_536)] }),
         (
             "chat",

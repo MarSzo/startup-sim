@@ -161,7 +161,7 @@ pub struct Messenger {
     read: HashMap<(u16, u16), u32>,
 }
 
-/// "#it-produkt" from "IT / Produkt".
+/// "#produkt-it" from "Produkt / IT".
 pub fn channel_title(department_name: &str) -> String {
     let mut s = String::from("#");
     let mut dash = false;
@@ -306,9 +306,34 @@ mod tests {
     }
 
     #[test]
+    fn every_department_has_desks_and_the_map_knows_only_real_ones() {
+        use crate::building::{default_building_path, Building};
+        use crate::recruitment::{default_recruitment_path, Recruitment};
+        let b = Building::load(&default_building_path()).unwrap();
+        let r = Recruitment::load(&default_recruitment_path()).unwrap();
+        let ws = find_workstations(&b);
+        for w in &ws {
+            assert!(w.department == 0 || r.department_name(w.department).is_some(), "{}: unknown department {}", w.room_name, w.department);
+        }
+        for d in &r.departments {
+            assert!(ws.iter().any(|w| w.department == d.id), "{} has no desks", d.name);
+        }
+        assert!(r.departments.len() >= 10);
+        // Positions: any department but the board.
+        assert!(crate::company::position_department(&r, 4), "Mobile");
+        assert!(crate::company::position_department(&r, 10), "customer service");
+        assert!(!crate::company::position_department(&r, crate::company::BOARD_DEPARTMENT));
+        assert!(!crate::company::position_department(&r, 99));
+        let list = r.department_list();
+        assert_eq!(list.iter().find(|d| d.id == 10).map(|d| d.short.as_str()), Some("Obsługa"));
+    }
+
+    #[test]
     fn channel_titles() {
         assert_eq!(channel_title("IT / Produkt"), "#it-produkt");
         assert_eq!(channel_title("Biznes"), "#biznes");
+        assert_eq!(channel_title("Produkt / IT"), "#produkt-it");
+        assert_eq!(channel_title("Obsługa klienta"), "#obsługa-klienta");
     }
 
     #[test]

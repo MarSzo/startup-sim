@@ -6,15 +6,53 @@
  "departments": [
   {
    "id": 1,
-   "name": "IT / Produkt"
+   "name": "Produkt / IT",
+   "short": "IT"
   },
   {
    "id": 2,
-   "name": "Biznes"
+   "name": "Biznes",
+   "short": "Biznes"
   },
   {
    "id": 3,
-   "name": "Zarząd"
+   "name": "Zarząd",
+   "short": "Zarząd"
+  },
+  {
+   "id": 4,
+   "name": "Mobile",
+   "short": "Mobile"
+  },
+  {
+   "id": 5,
+   "name": "DevOps",
+   "short": "DevOps"
+  },
+  {
+   "id": 6,
+   "name": "AI",
+   "short": "AI"
+  },
+  {
+   "id": 7,
+   "name": "Finanse",
+   "short": "Finanse"
+  },
+  {
+   "id": 8,
+   "name": "Sales",
+   "short": "Sales"
+  },
+  {
+   "id": 9,
+   "name": "Marketing",
+   "short": "Marketing"
+  },
+  {
+   "id": 10,
+   "name": "Obsługa klienta",
+   "short": "Obsługa"
   }
  ],
  "question_sets": [
@@ -1199,7 +1237,7 @@
    "id": 3,
    "company": "Startup Sim sp. z o.o.",
    "hiring": true,
-   "department": 2,
+   "department": 8,
    "set": "sales",
    "title": "Specjalista/ka ds. sprzedaży",
    "description": "Sprzedajesz produkt, który IT właśnie skończy (prawie). Oferujemy: prowizję od sukcesów, nielimitowane spotkania i własny kubek z logo.",
@@ -1209,7 +1247,7 @@
    "id": 4,
    "company": "Startup Sim sp. z o.o.",
    "hiring": true,
-   "department": 2,
+   "department": 9,
    "set": "marketing",
    "title": "Specjalista/ka ds. marketingu",
    "description": "Opowiadasz światu, że nasz produkt jest rewolucyjny. Oferujemy: budżet na kampanie (mały) i swobodę twórczą (dużą).",

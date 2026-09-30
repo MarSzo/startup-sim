@@ -28,7 +28,7 @@ signal task_action(nonce: int, action: int, task: int, arg: int, text: String)
 ## Work mail: MailAction.
 signal mail_action(nonce: int, action: int, id: int, to: String, subject: String, body: String)
 
-const DEPARTMENTS := {1: "IT / Produkt", 2: "Biznes", 3: "Zarząd"}
+const Departments = preload("res://net/departments.gd")
 const SYNC_MSEC := 1000
 const RESEND_MSEC := 800
 const MAX_TRIES := 5
@@ -1003,8 +1003,8 @@ func _new_position_card(count: int) -> Control:
 
 func _dept_select(selected: int) -> OptionButton:
 	var o := OptionButton.new()
-	for d in [1, 2]:
-		o.add_item(DEPARTMENTS[d], d)
+	for d in Departments.for_positions():
+		o.add_item(Departments.name_of(d), d)
 		if d == selected:
 			o.select(o.item_count - 1)
 	o.add_theme_font_size_override("font_size", 14)
@@ -1083,7 +1083,7 @@ func _render_company() -> void:
 	for s in staff:
 		var pid: int = s.id
 		row = _co_row()
-		var l := _co_label("%s — %s, od dnia %d" % [s.nick, DEPARTMENTS.get(s.department, "?"), s.day], 15)
+		var l := _co_label("%s — %s, od dnia %d" % [s.nick, Departments.name_of(s.department), s.day], 15)
 		l.custom_minimum_size = Vector2(430, 0)
 		row.add_child(l)
 		if pid == my_id:

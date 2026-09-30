@@ -18,6 +18,9 @@ use crate::protocol::{OfferInfo, MAX_MAIL_BYTES, MAX_OPTIONS, MAX_TEXT_BYTES};
 pub struct Department {
     pub id: u8,
     pub name: String,
+    /// Shown next to a nick ("Ola · IT"); the name if missing.
+    #[serde(default)]
+    pub short: String,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -141,6 +144,18 @@ impl Recruitment {
 
     pub fn department_name(&self, id: u8) -> Option<&str> {
         self.departments.iter().find(|d| d.id == id).map(|d| d.name.as_str())
+    }
+
+    /// The departments for the clients (`Departments`).
+    pub fn department_list(&self) -> Vec<crate::protocol::DepartmentInfo> {
+        self.departments
+            .iter()
+            .map(|d| crate::protocol::DepartmentInfo {
+                id: d.id,
+                short: if d.short.is_empty() { d.name.clone() } else { d.short.clone() },
+                name: d.name.clone(),
+            })
+            .collect()
     }
 
     /// Other companies' offers as shown on the job portal (our startup's
@@ -295,10 +310,10 @@ mod tests {
         assert_eq!(
             ours,
             vec![
-                ("Startup Sim sp. z o.o.", "Programista/ka", "IT / Produkt"),
-                ("Startup Sim sp. z o.o.", "Designer/ka", "IT / Produkt"),
-                ("Startup Sim sp. z o.o.", "Specjalista/ka ds. sprzedaży", "Biznes"),
-                ("Startup Sim sp. z o.o.", "Specjalista/ka ds. marketingu", "Biznes"),
+                ("Startup Sim sp. z o.o.", "Programista/ka", "Produkt / IT"),
+                ("Startup Sim sp. z o.o.", "Designer/ka", "Produkt / IT"),
+                ("Startup Sim sp. z o.o.", "Specjalista/ka ds. sprzedaży", "Sales"),
+                ("Startup Sim sp. z o.o.", "Specjalista/ka ds. marketingu", "Marketing"),
             ]
         );
         let others: Vec<_> = r.offers.iter().filter(|o| !o.hiring).collect();

@@ -11,6 +11,7 @@ extends Node
 
 const Seal = preload("res://net/seal.gd")
 const Protocol = preload("res://net/protocol.gd")
+const Departments = preload("res://net/departments.gd")
 
 signal connected(welcome: Dictionary)
 ## Lost the session; trying to get a new one (game should freeze, not quit).
@@ -303,4 +304,6 @@ func _poll() -> void:
 			_:
 				if state == State.CONNECTED:
 					_since_heard = 0.0
+					if p.type == Protocol.T_DEPARTMENTS:
+						Departments.set_list(p.list)
 					packet_received.emit(p)

@@ -1067,7 +1067,7 @@ fn laptop_on_desk_messenger_lock_and_take() {
     let (owner, locked, convs) = wait_for(&ola, &[&kuba, &ewa], wait, screen).expect("Ola's screen");
     assert_eq!((owner, locked), (ola.id, false));
     let titles: Vec<&str> = convs.iter().map(|c| c.title.as_str()).collect();
-    assert_eq!(titles, ["#ogólny", "#it-produkt", "Ewa", "Kuba"]);
+    assert_eq!(titles, ["#ogólny", "#produkt-it", "Ewa", "Kuba"]);
     assert!(at_computer(&ola, &[&kuba, &ewa], true));
 
     // Ola says hi on #ogólny (the message comes back to her screen) and walks off
@@ -1102,7 +1102,7 @@ fn laptop_on_desk_messenger_lock_and_take() {
     let convs = wait_for(&kuba, &[&ola, &ewa], wait, |p| screen(p).map(|s| s.2)).expect("Kuba's screen");
     let dm = convs.iter().find(|c| c.conv == conv::DM | ola.id).expect("DM with Ola");
     assert_eq!(dm.unread, 1);
-    assert!(convs.iter().any(|c| c.title == "#biznes") && !convs.iter().any(|c| c.title == "#it-produkt"));
+    assert!(convs.iter().any(|c| c.title == "#biznes") && !convs.iter().any(|c| c.title == "#produkt-it"));
     action(&kuba, ca::SYNC, conv::DM | ola.id, 0, "");
     let got = wait_for(&kuba, &[&ola, &ewa], wait, |p| match p {
         Packet::Chat { messages, .. } => messages.first().cloned(),

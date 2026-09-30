@@ -51,7 +51,7 @@ startupu do korporacji.
 
 ### Piętro 1 (aktywne od startu)
 - Recepcja przy wejściu na piętro
-- Pokój działu IT / Produkt
+- Pokoje zespołów — każdy dział ma swój (rozdz. 5)
 - Pokój działu Biznesu (marketing + sprzedaż)
 - Pokój Zarządu
 - Pokój HR
@@ -78,14 +78,25 @@ napędzana AI (propozycja: na start quizy i minigry, AI później).
 
 ## 5. Struktura firmy — start (startup)
 
-| Dział | Kto | Uwagi |
+| Dział (id) | Kto | Pokój (numer z planu) |
 |-------|-----|-------|
-| IT / Produkt | Gracze — programiści | Na start bez podziału na backend/frontend |
-| Biznes | Gracze — marketing + sprzedaż | Zadania powiązane z IT (klienci, potrzeby produktu) |
-| Zarząd | NPC | Wyznacza cele firmy, decyduje o awansach |
-| HR | NPC | Rekrutacja, dzień próbny, umowy, później konflikty i skargi |
+| Produkt / IT (1) | Gracze — programiści, designerzy | 18, 19, 38 |
+| Biznes (2) | Gracze | 27 |
+| Zarząd (3) | NPC (prezes, wspólniczka) + założyciel | 37 |
+| Mobile (4) | Gracze | 20 |
+| DevOps (5) | Gracze | 32 „Mordor” |
+| AI (6) | Gracze | 28 |
+| Finanse (7) | Gracze | 16 |
+| Sales (8) | Gracze — sprzedaż | 43 |
+| Marketing (9) | Gracze | 44 |
+| Obsługa klienta (10) | Gracze | 42 |
+| HR | NPC | 46 (rekrutacja, dzień próbny, umowy, później konflikty i skargi) |
 
-Zespoły na start = działy (każdy dział ma swój pokój).
+Zespoły = działy: każdy ma swoje biurka, tablicę zadań, kanał w komunikatorze
+i skrzynkę działu. Lista działów jest w `server/data/recruitment.json` (nazwa
+i skrót przy nicku); klient dostaje ją od serwera (pakiet `Departments`).
+Na start rekrutujemy do Produkt / IT, Sales i Marketingu; założyciel może
+dodać stanowiska w każdym dziale poza Zarządem.
 
 **NPC na start:** portier; recepcjonista/recepcjonistka; Zarząd (CEO / założyciele); HR.
 
@@ -147,7 +158,7 @@ Docelowo role w Zarządzie i HR mogą stać się dostępne dla graczy (awanse).
    widzą imię i wygląd) + wygląd (fryzura, kolory skóry, włosów, ubrań).
 2. **Pulpit komputera** → przeglądarka → **portal z ogłoszeniami**: kilka
    fikcyjnych firm i stanowisk. Zatrudnia tylko nasz startup (Programista/ka,
-   Designer/ka — IT / Produkt; Sprzedaż, Marketing — Biznes); inne firmy
+   Designer/ka — Produkt / IT; Sprzedaż — Sales; Marketing — Marketing); inne firmy
    odpowiadają zabawną odmową albo milczą.
 3. Formularz zgłoszeniowy → po chwili **wiadomość z zaproszeniem na rozmowę**
    → **rozmowa online** (pytania z humorystycznymi odpowiedziami) → zaproszenie
@@ -467,9 +478,8 @@ szafka z kubkami, `i` zlew, `d` zmywarka, `f` lodówka, `O` owoce, `w` szafa,
 Bramki (`B`) i brama garażowa (`g`) wymagają przepustki lub karty przy
 wejściu, wyjście jest wolne; składzik (`L`) — uprawnień obsługi; drzwi `x`
 nie przepuszczają nikogo. Biurka należą do działu pokoju (pole `department`
-w definicji pokoju): Produkt/IT (18, 19, 38), Mobile, DevOps i AI na razie w
-dziale IT / Produkt; Biznes, Finanse, Sales, Marketing, Obsługa klienta w
-dziale Biznes; stół w pokoju prezesa to miejsce Zarządu. Punkty otoczenia
+w definicji pokoju, patrz rozdział 5): każdy zespół to osobny dział; stół w
+pokoju prezesa to miejsce Zarządu; pokój z jednym biurkiem (26) jest niczyj. Punkty otoczenia
 (ulica, przystanki, miejsca parkingowe, stojak, gdzie staje policja i straż),
 taca ze słodyczami, miejsce założyciela i półki sklepu są w `places` mapy.
 
@@ -520,14 +530,14 @@ gry; pytanie rozpoznawane po treści), a po przejściu całej puli zaczyna się
 nowa runda.
 
 - Po połączeniu gracz widzi „Portal z ofertami pracy · Startup Sim sp. z o.o.”
-  z dwiema ofertami: **Programista/ka** (dział IT / Produkt) i **Marketing i
+  z dwiema ofertami: **Programista/ka** (dział Produkt / IT) i **Marketing i
   sprzedaż** (dział Biznes). Nazwa firmy to zaślepka (otwarta kwestia z sekcji 8).
 - „Aplikuj” → 3 losowe pytania z puli oferty (po 8 w puli), odpowiedzi w losowej
   kolejności → wynik: przyjęcie („zapraszamy na dzień próbny”) albo „Tym razem
   się nie udało” z możliwością ponownej próby.
 - Po przyjęciu gracz pojawia się przed budynkiem i przechodzi wdrożenie (10.7);
   HR podpisuje umowę **na dział z rekrutacji**: „Umowa podpisana — witamy w
-  dziale IT / Produkt! Oto karta pracownika.” Od tej chwili inni widzą przy
+  dziale Produkt / IT! Oto karta pracownika.” Od tej chwili inni widzą przy
   nicku dział („Ala · IT”).
 - Pytania i oferty są w `server/data/recruitment.json` (edycja bez zmiany kodu;
   pierwsza odpowiedź w pliku jest poprawna — gra ją tasuje). Ocenia serwer.
@@ -575,8 +585,8 @@ Ostatnia postać jest zapamiętywana lokalnie.
 Zastępuje prosty portal z 10.8. Po połączeniu gracz widzi pulpit komputera
 („StartOS”): Przeglądarka, Poczta, Kosz, pasek zadań z zegarem.
 - **Przeglądarka** → portal „praca.example”: nasz startup szuka na 4
-  stanowiska (Programista/ka, Designer/ka — IT / Produkt; Specjalista/ka ds.
-  sprzedaży, ds. marketingu — Biznes) + 4 fikcyjne firmy (Korpo-Bank S.A.,
+  stanowiska (Programista/ka, Designer/ka — Produkt / IT; Specjalista/ka ds.
+  sprzedaży — Sales, ds. marketingu — Marketing) + 4 fikcyjne firmy (Korpo-Bank S.A.,
   Mega Software Inc., Pizzeria u Stefana, Agencja Kreatywna BUZZ) z
   humorystycznymi ogłoszeniami. Formularz: dane postaci, „Dlaczego chcesz u
   nas pracować?”, zgoda na przetwarzanie danych.
@@ -857,7 +867,7 @@ Zastępuje prosty portal z 10.8. Po połączeniu gracz widzi pulpit komputera
   przy jego własnym koncie):
   - zmiana nazwy;
   - **stanowiska** (do 10): dodawanie („Nowe stanowisko”: nazwa 3–40
-    znaków, dział IT / Produkt albo Biznes, zestaw pytań na rozmowę, opis),
+    znaków, dowolny dział poza Zarządem, zestaw pytań na rozmowę, opis),
     zmiana nazwy, działu i zestawu pytań, liczba miejsc (−/+, 0–5), opis,
     **usuwanie** — kandydaci w trakcie rekrutacji dostają maila
     „Rekrutacja zakończona”, zatrudnieni zostają. Zestawy pytań (po 25):
@@ -1230,7 +1240,8 @@ gracza: portal z ofertami → rekrutacja → portier → recepcja → HR → kar
 pracownika z działem; oprawa graficzna w pixel arcie (10.9). 2026-09-30:
 nowy układ budynku wg odręcznego planu (10.5) — generator map znów jest
 jedynym źródłem, otoczenie i stałe punkty w `places` mapy; dwie niezależne
-windy (10.18, protokół 36).*
+windy (10.18, protokół 36); osobne działy dla każdego zespołu (rozdz. 5,
+protokół 37).*
 
 #### Zrobione
 - **Serwer Rust** (`server/`): tick 20 Hz bez dryfu z liczeniem zgubionych

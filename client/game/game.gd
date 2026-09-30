@@ -46,8 +46,7 @@ const MAX_PENDING := 240
 const TALK_RADIUS_PX := 56.0
 const LOG_LINES := 4
 const LOG_TTL_SEC := 12.0
-const DEPT_SHORT := {1: "IT", 2: "Biznes", 3: "Zarząd"}
-const DEPT_NAMES := {1: "IT / Produkt", 2: "Biznes", 3: "Zarząd"}
+const Departments = preload("res://net/departments.gd")
 
 var net
 var building
@@ -417,7 +416,8 @@ func set_job(title: String, dept: int) -> void:
 
 
 func _label_for(nick_text: String, dept: int) -> String:
-	return "%s · %s" % [nick_text, DEPT_SHORT[dept]] if DEPT_SHORT.has(dept) else nick_text
+	var short := Departments.short_of(dept)
+	return "%s · %s" % [nick_text, short] if short != "" else nick_text
 
 
 func _refresh_own_label() -> void:
@@ -1345,7 +1345,7 @@ func debug_text() -> String:
 		"Widoczni gracze: %d" % visible_count,
 		"Gracz #%d %s  kafel (%d, %d)" % [net.player_id, nick, t.x, t.y],
 		"Uprawnienia: %s" % _access_text(),
-		"Stanowisko: %s" % (("%s (dział %s), umowa %s" % [job_title, DEPT_NAMES.get(department, "?"), "podpisana" if have_state and (pred.access & MapData.ACCESS_CARD) else "jeszcze nie"]) if department else "-"),
+		"Stanowisko: %s" % (("%s (dział %s), umowa %s" % [job_title, Departments.name_of(department), "podpisana" if have_state and (pred.access & MapData.ACCESS_CARD) else "jeszcze nie"]) if department else "-"),
 		"Inputy w locie: %d  korekty: %d" % [pending.size(), corrections],
 		"Bufor interpolacji pusty: %.2f%% klatek" % (100.0 * interp_underruns / maxi(interp_frames, 1)),
 		"Ruch: %.1f KB/s in / %.1f KB/s out" % [net.bytes_in_per_sec / 1024.0, net.bytes_out_per_sec / 1024.0],

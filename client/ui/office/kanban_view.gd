@@ -16,7 +16,7 @@ const RESEND_MSEC := 800
 const COLUMNS := ["Do zrobienia", "W toku", "Zrobione"]
 const PRIORITIES := ["Niski", "Średni", "Pilny"]
 const PRIO_COLORS := [Color("#8fa37a"), Color("#e0a82e"), Color("#c0392b")]
-const DEPTS := {1: "IT / Produkt", 2: "Biznes", 3: "Zarząd"}
+const Departments = preload("res://net/departments.gd")
 const INK := Color("#1c2430")
 const MUTED := Color("#6a7383")
 
@@ -312,7 +312,7 @@ func _card(id: int) -> Dictionary:
 # ------------------------------------------------------------------- render
 
 func _render() -> void:
-	_head.text = "Tablica zadań — %s" % DEPTS.get(dept, "dział")
+	_head.text = "Tablica zadań — %s" % Departments.name_of(dept, "dział")
 	var sig := JSON.stringify([tasks, open_id])
 	if sig != _sig:
 		_sig = sig

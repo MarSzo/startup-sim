@@ -146,8 +146,9 @@ każdy z pełnymi polami `self_*`. Pusty pokój → 1 fragment z `n = 0`.
 Wysyłany, gdy encja (gracz lub NPC — wtedy `nick` to jego imię, np. „Portier”)
 pierwszy raz staje się widoczna dla odbiorcy, przed pierwszą skierowaną do niego
 wypowiedzią NPC oraz w odpowiedzi na `InfoRequest`. Max 55 wpisów na pakiet.
-`department` — dział gracza po podpisaniu umowy w HR (1 IT / Produkt, 2 Biznes,
-0 brak / NPC). Po podpisaniu umowy serwer rozsyła `PlayerInfo` ponownie.
+`department` — dział gracza po podpisaniu umowy w HR (id z pakietu
+`Departments`, np. 1 Produkt / IT, 2 Biznes, 3 Zarząd, 4 Mobile … 10 Obsługa
+klienta; 0 brak / NPC). Po podpisaniu umowy serwer rozsyła `PlayerInfo` ponownie.
 
 ### 7 `InfoRequest` (C→S)
 | pole  | typ |
@@ -396,6 +397,15 @@ certyfikatu serwera (404 przy prawdziwym certyfikacie); klient przypina go
 przy pierwszym kontakcie i weryfikuje z nazwą `startup-sim`. `ticket` idzie
 potem w `Connect`.
 
+### 54 `Departments` (S→C)
+
+Działy firmy (z `server/data/recruitment.json`): n u8 (≤ 32) × {`id u8`,
+`short` str8 (przy nicku, np. „IT”), `name` str8 (pełna nazwa)}. Serwer wysyła
+go zaraz po `Welcome` i co 5 s (zgubiony wraca); klient trzyma listę w
+`net/departments.gd` i z niej bierze nazwy działów wszędzie (etykiety,
+tablica zadań, panel założyciela, portal). Id działu są te same we wszystkich
+pakietach (`PlayerInfo`, `JobOffers`, `TaskBoard`, `CompanyOffers` …).
+
 ### 52 `Voice` (C→S), 53 `VoiceFrom` (S→C)
 
 `Voice`: token u32, seq u16, whisper u8 (0 pokój, 1 szept), n u16 (≤ 800) ×
@@ -532,6 +542,7 @@ szyfrowaniem.
 
 ## Historia wersji
 
+- **37** — osobne działy: pakiet `Departments` (54, S→C) z listą działów; działy 4–10 (Mobile, DevOps, AI, Finanse, Sales, Marketing, Obsługa klienta), dział 1 nazywa się „Produkt / IT”.
 - **36** — dwie windy: `Doors` kończy się listą wind `n u8` (≤ 16) × {`floor u8`, `target u8` (255 = stoi), `moving u8`} zamiast jednej trójki `lift_*`.
 - **35** — stanowiska firmy: `CompanyOffers` w częściach, z działem, zestawem pytań i listą zestawów; `CompanyAction` 8–12 (dodaj / nazwa / dział / zestaw / usuń stanowisko).
 - **34** (uzup.) — `Reject` 7 = nick zajęty (konto, zapisana postać albo ktoś w grze), 8 = e-mail postaci zajęty.

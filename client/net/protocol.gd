@@ -3,7 +3,7 @@
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 36
+const VERSION := 37
 const MAX_PACKET := 1152  # a game packet; sealed it grows to at most MAX_DATAGRAM
 const MAX_DATAGRAM := 1200
 const MAX_NICK_BYTES := 16
@@ -65,6 +65,7 @@ const T_WORK_MAIL := 50
 const T_MAIL_STATE := 51
 const T_VOICE := 52
 const T_VOICE_FROM := 53
+const T_DEPARTMENTS := 54
 const MAX_VOICE_BYTES := 800
 # TaskAction.action / MailAction.action (server/src/protocol/mod.rs)
 const TA_SYNC := 0
@@ -681,6 +682,11 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 				for i in n:
 					list.append(r.u16())
 				p[key] = list
+		T_DEPARTMENTS:
+			var list := []
+			for i in r.u8():
+				list.append({"id": r.u8(), "short": r.str8(), "name": r.str8()})
+			p.list = list
 		T_VOICE_FROM:
 			p.speaker = r.u16()
 			p.seq = r.u16()
