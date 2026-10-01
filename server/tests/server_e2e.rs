@@ -2097,6 +2097,11 @@ fn progress_survives_a_server_restart() {
     let reg = api("register", r#"{"nick":"Ola","password":"tajne-haslo"}"#);
     assert_eq!(reg["ok"], true, "registered: {reg}");
     assert_eq!(reg["character"], false);
+    // A client crash report lands in <save dir>/crashes.
+    let report = api("crash", r#"{"version":"0.1.0","os":"macOS","log":"...\nProgram crashed with signal 11\n"}"#);
+    assert_eq!(report["ok"], true, "crash report: {report}");
+    let file = save.parent().unwrap().join("crashes").join(format!("{}.txt", report["id"].as_str().unwrap()));
+    assert!(std::fs::read_to_string(&file).unwrap().contains("signal 11"), "saved as {}", file.display());
     // Guests are off on a server with accounts; a wrong ticket is refused.
     let refused = |c: &Client| {
         wait_for(c, &[], Duration::from_millis(500), |p| match p {

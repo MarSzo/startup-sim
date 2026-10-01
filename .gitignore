@@ -12,3 +12,4 @@
 /client/net/pins/*.pem
 /tools/macos/signing.env
 __pycache__/
+/crash-reports

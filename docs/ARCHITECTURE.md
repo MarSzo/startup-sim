@@ -539,6 +539,15 @@ Limit klatek: `run/max_fps=60`, `Settings.apply_fps` (30 przy oszczędzaniu
 baterii, 20 w tle). Pomiar: `--perf` wypisuje co 2 s FPS, wywołania
 rysowania, liczbę elementów i węzły, które przerysowują się najczęściej.
 
+**Raporty awarii** (`net/crash_reports.gd` → `POST /api/crash` →
+`server/src/crash.rs`): sesja zapisuje „running” w `user://session.cfg`, a przy
+zwykłym wyjściu (`main._exit_tree`) „clean”; „running” na starcie = awaria.
+Dziennik poprzedniej sesji to najnowszy `user://logs/godot<data>.log` (Godot
+odkłada go przy starcie). Po zgodzie (albo „zawsze”) klient wysyła koniec
+logu przez `AuthClient.send_crash` (to samo przypinanie certyfikatu co
+logowanie). Serwer: limity na adres i godzinę, usuwa znaki sterujące, plik na
+raport, rotacja do 200. Tylko w wydanych wersjach (`--crash-test` w edytorze).
+
 **Połączenie** (`net_client.gd`): parsowanie adresów z IPv6, rozwiązywanie
 nazw `TYPE_ANY`, nowe gniazdo po 1,5 s ciszy lub powrocie z tła (ta sama
 sesja), automatyczne ponowne łączenie przez 30 s po utracie sesji — `main.gd`

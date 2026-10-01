@@ -201,7 +201,8 @@ fn start(args: &Args) -> Result<Server, StartError> {
         };
         let game = server.local_addr();
         let auth_bind = args.try_get("auth-bind", SocketAddr::new(bind.ip(), game.port().wrapping_add(1)))?;
-        http::spawn(auth.clone(), auth_bind, tls).map_err(StartError::Fatal)?;
+        let crashes = game::crash::Crashes::new(path.parent().unwrap_or(std::path::Path::new(".")).join("crashes"));
+        http::spawn(auth.clone(), crashes, auth_bind, tls).map_err(StartError::Fatal)?;
         server.set_auth(auth);
         println!("login API (HTTPS) on {auth_bind}");
     }

@@ -20,6 +20,7 @@ const Desktop = preload("res://ui/desktop.gd")
 const Protocol = preload("res://net/protocol.gd")
 const DayScreen = preload("res://ui/day_screen.gd")
 const TitleScreen = preload("res://ui/title_screen.gd")
+const CrashReports = preload("res://net/crash_reports.gd")
 const PauseMenu = preload("res://ui/pause_menu.gd")
 const Settings = preload("res://ui/settings.gd")
 const Audio = preload("res://audio/audio.gd")
@@ -75,6 +76,11 @@ func _ready() -> void:
 	Settings.apply_fps()
 	add_child(audio)
 	Settings.apply_audio()
+	# The previous session crashed? Offer to send its log (once the UI is up).
+	if CrashReports.enabled(args):
+		var crashed := CrashReports.begin_session()
+		if not crashed.is_empty():
+			_offer_crash_report.call_deferred(crashed)
 	# Every button in the game clicks.
 	get_tree().node_added.connect(func(n: Node):
 		if n is BaseButton:
@@ -451,6 +457,74 @@ func _on_disconnected(reason: String) -> void:
 	start.get_parent().visible = true
 	start.set_busy(false)
 	start.set_status(reason, true)
+
+
+## A normal exit: the next start won't think it crashed.
+func _exit_tree() -> void:
+	if CrashReports.enabled(args):
+		CrashReports.end_session()
+
+
+## After a crash: send the log if the player always agrees, else ask.
+func _offer_crash_report(crashed: Dictionary) -> void:
+	var log_text := CrashReports.previous_log()
+	if log_text.strip_edges() == "":
+		return
+	var report := CrashReports.make_report(crashed, log_text)
+	if Settings.crash_reports_always:
+		_send_crash_report(report, null)
+		return
+	var panel := PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", Ink.box("paper"))
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 10)
+	box.custom_minimum_size = Vector2(520, 0)
+	panel.add_child(box)
+	box.add_child(Ink.label("Gra zamknęła się niespodziewanie", 26, Ink.TEXT_INK))
+	var info := Ink.label("Wysłać twórcom raport? Pomoże znaleźć błąd. Zawiera koniec dziennika gry " +
+		"(bez haseł), wersję gry, system i nazwę procesora i karty graficznej.", 17, Ink.TEXT_INK, true)
+	info.custom_minimum_size.x = 520  # wrapped text needs a width
+	box.add_child(info)
+	var always := CheckBox.new()
+	always.text = "Wysyłaj zawsze bez pytania (zmienisz w Ustawieniach)"
+	for k in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color", "font_hover_pressed_color"]:
+		always.add_theme_color_override(k, Ink.TEXT_INK)
+	box.add_child(always)
+	var status := Ink.label("", 16, Ink.TEXT_INK, true)
+	status.custom_minimum_size.x = 520
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	var send := Ink.button("Wyślij raport", true)
+	var skip := Ink.button("Nie wysyłaj")
+	for b in [send, skip]:
+		b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(b)
+	box.add_child(row)
+	box.add_child(status)
+	skip.pressed.connect(func(): panel.queue_free())
+	send.pressed.connect(func():
+		if always.button_pressed:
+			Settings.crash_reports_always = true
+			Settings.save()
+		send.disabled = true
+		skip.disabled = true
+		_send_crash_report(report, status, panel))
+	title_layer.add_child(panel)
+	panel.reset_size()
+	panel.position = (get_viewport().get_visible_rect().size - panel.size) / 2
+
+
+func _send_crash_report(report: Dictionary, status: Label, panel: Control = null) -> void:
+	var address: String = AuthClient.remembered().get("address", AuthClient.default_server())
+	if status:
+		status.text = "Wysyłanie…"
+	var r: Dictionary = await auth.send_crash(address, report)
+	print("crash report: ", r)
+	if status:
+		status.text = "Dziękujemy! Raport wysłany." if r.get("ok", false) else str(r.get("error", "Nie udało się wysłać."))
+	if panel:
+		await get_tree().create_timer(2.0).timeout
+		panel.queue_free()
 
 
 func _notification(what: int) -> void:

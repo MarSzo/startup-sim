@@ -18,6 +18,7 @@ pub mod coffee;
 pub mod commute;
 pub mod company;
 pub mod computer;
+pub mod crash;
 pub mod crypto;
 pub mod elevator;
 pub mod fire;

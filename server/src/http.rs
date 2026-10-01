@@ -6,20 +6,23 @@
 //!   `POST /api/password` `{nick, password, new_password}` →
 //!   `{ok, nick, ticket, refresh, character, error}`;
 //! - `GET /api/cert`: the server's own certificate (PEM) when it made it
-//!   itself, so the client can pin it on first contact (like SSH).
+//!   itself, so the client can pin it on first contact (like SSH);
+//! - `POST /api/crash` `{version, os, cpu, gpu, started, log}`: a client crash
+//!   report (see `crash`) → `{ok, id, error}`.
 //!
 //! Passwords never cross the plain UDP game protocol.
 
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 
-use axum::extract::{ConnectInfo, State};
+use axum::extract::{ConnectInfo, DefaultBodyLimit, State};
 use axum::http::StatusCode;
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 
 use crate::auth::{Auth, AuthError, Granted};
+use crate::crash::{CrashError, Crashes, Report};
 
 /// Where the certificate comes from.
 pub struct Tls {
@@ -45,6 +48,7 @@ pub fn self_signed(dir: &Path) -> Result<Tls, String> {
 #[derive(Clone)]
 struct AppState {
     auth: Auth,
+    crashes: Crashes,
     /// PEM of our own certificate (None with a real one).
     cert: Option<String>,
 }
@@ -145,8 +149,44 @@ async fn cert(State(s): State<AppState>) -> (StatusCode, String) {
     }
 }
 
+#[derive(Serialize)]
+struct CrashReply {
+    ok: bool,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    id: String,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    error: String,
+}
+
+async fn crash(
+    State(s): State<AppState>,
+    ConnectInfo(from): ConnectInfo<SocketAddr>,
+    Json(r): Json<Report>,
+) -> (StatusCode, Json<CrashReply>) {
+    let saved = tokio::task::spawn_blocking(move || {
+        let res = s.crashes.save(&r, from.ip());
+        (res, r.version, r.os)
+    })
+    .await;
+    let reply =
+        |code: StatusCode, id: String, error: &str| (code, Json(CrashReply { ok: code == StatusCode::OK, id, error: error.into() }));
+    match saved {
+        Ok((Ok(id), version, os)) => {
+            println!("* crash report {id} from {} ({version}, {os})", from.ip());
+            reply(StatusCode::OK, id, "")
+        }
+        Ok((Err(CrashError::TooMany), ..)) => reply(StatusCode::TOO_MANY_REQUESTS, String::new(), "Za dużo raportów — spróbuj później."),
+        Ok((Err(CrashError::Empty), ..)) => reply(StatusCode::BAD_REQUEST, String::new(), "Pusty raport."),
+        Ok((Err(CrashError::Disk(e)), ..)) => {
+            eprintln!("crash report: {e}");
+            reply(StatusCode::INTERNAL_SERVER_ERROR, String::new(), "Nie udało się zapisać raportu.")
+        }
+        Err(_) => reply(StatusCode::INTERNAL_SERVER_ERROR, String::new(), "Nie udało się zapisać raportu."),
+    }
+}
+
 /// Start the HTTPS API on its own thread.
-pub fn spawn(auth: Auth, bind: SocketAddr, tls: Tls) -> Result<(), String> {
+pub fn spawn(auth: Auth, crashes: Crashes, bind: SocketAddr, tls: Tls) -> Result<(), String> {
     let cert_pem = if tls.self_signed { Some(std::fs::read_to_string(&tls.cert).map_err(|e| e.to_string())?) } else { None };
     let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
     std::thread::Builder::new()
@@ -168,7 +208,8 @@ pub fn spawn(auth: Auth, bind: SocketAddr, tls: Tls) -> Result<(), String> {
                     .route("/api/password", post(password))
                     .route("/api/logout", post(logout))
                     .route("/api/cert", get(cert))
-                    .with_state(AppState { auth, cert: cert_pem });
+                    .route("/api/crash", post(crash).layer(DefaultBodyLimit::max(crate::crash::BODY_MAX)))
+                    .with_state(AppState { auth, crashes, cert: cert_pem });
                 if let Err(e) = axum_server::bind_rustls(bind, config).serve(app.into_make_service_with_connect_info::<SocketAddr>()).await
                 {
                     eprintln!("https: {e}");

@@ -1231,6 +1231,18 @@ pełnym ekranie — zastąpiona stylem inspirowanym Don't Starve:
   przesunięcie / przezroczystość gotowego rysunku, nie przez rysowanie od
   nowa co klatkę (szczegóły: ARCHITECTURE, „Wydajność rysowania”).
 
+### 10.45 Raporty awarii klienta
+
+- Gdy gra zamknie się niespodziewanie, przy następnym uruchomieniu pyta:
+  „Gra zamknęła się niespodziewanie — wysłać twórcom raport?” (*Wyślij
+  raport* / *Nie wysyłaj*, pole „Wysyłaj zawsze bez pytania”; to samo w
+  Ustawieniach: „Wysyłaj raporty awarii bez pytania”).
+- Raport: koniec dziennika gry z poprzedniej sesji (bez haseł i tokenów),
+  wersja gry, system, procesor, karta graficzna. Idzie na serwer, na którym
+  gracz się ostatnio logował (albo domyślny).
+- Tylko w wydanych wersjach (w edytorze każde zatrzymanie wyglądałoby jak
+  awaria; do testów `--crash-test`).
+
 ### 10.6 Stan implementacji
 
 *Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie,

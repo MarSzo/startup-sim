@@ -397,6 +397,12 @@ certyfikatu serwera (404 przy prawdziwym certyfikacie); klient przypina go
 przy pierwszym kontakcie i weryfikuje z nazwą `startup-sim`. `ticket` idzie
 potem w `Connect`.
 
+Raport awarii klienta: `POST /api/crash` `{version, os, cpu, gpu, started,
+log}` (bez logowania; ciało ≤ 64 KB, z logu zostaje koniec ≤ 48 KB; 5 na
+godzinę z jednego adresu, 60 na godzinę łącznie) → `{ok, id}` albo
+`{ok: false, error}` (429 za dużo, 400 pusty). Serwer zapisuje go jako
+`<katalog zapisu>/crashes/<data>-<id>.txt` (najnowsze 200).
+
 ### 54 `Departments` (S→C)
 
 Działy firmy (z `server/data/recruitment.json`): n u8 (≤ 32) × {`id u8`,

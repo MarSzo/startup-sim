@@ -78,6 +78,11 @@ static func api_base(address: String) -> String:
 
 # ------------------------------------------------------------------ calls
 
+## A crash report (see crash_reports.gd) -> {ok, id} or {ok: false, error}.
+func send_crash(address: String, report: Dictionary) -> Dictionary:
+	return await _post(address, "crash", report)
+
+
 func register(address: String, nick: String, password: String) -> Dictionary:
 	return await _post(address, "register", {"nick": nick, "password": password})
 
