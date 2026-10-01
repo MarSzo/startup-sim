@@ -141,6 +141,8 @@ var interp_underruns := 0
 # a room name or "x,y" tile on the current floor, "E" (press interact once) or
 # "wait:N" (stand still N seconds). E.g. "27,29;E;wait:2;34,6;Recepcja".
 var autowalk := false
+## An end-to-end scenario driving the character (tests/e2e/scenario.gd).
+var script_driver = null
 var _autowalk_bits := 0
 var _autowalk_timer := 0.0
 var goto_legs: PackedStringArray = []
@@ -438,6 +440,8 @@ func _refresh_own_label() -> void:
 func _sample_input(delta: float) -> int:
 	if input_blocked or me.status in [Protocol.ACT_RIDING, Protocol.ACT_HELD]:
 		return 0
+	if script_driver != null:
+		return 0 if screen.visible or dialog.visible else script_driver.next_input(delta)
 	if not goto_legs.is_empty() or not _goto_path.is_empty():
 		var g := _goto_input(delta)  # dev script also drives the computer screen / dialogs
 		return 0 if screen.visible or dialog.visible else g

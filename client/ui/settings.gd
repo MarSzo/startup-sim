@@ -3,7 +3,7 @@
 ## sound volumes (0..1), sending crash reports without asking.
 extends RefCounted
 
-const PATH := "user://settings.cfg"
+const UserPaths = preload("res://net/user_paths.gd")
 
 static var fullscreen := false
 static var mood := true
@@ -23,7 +23,7 @@ static func load_once() -> void:
 		return
 	_loaded = true
 	var cfg := ConfigFile.new()
-	if cfg.load(PATH) != OK:
+	if cfg.load(UserPaths.at("settings.cfg")) != OK:
 		return
 	fullscreen = cfg.get_value("video", "fullscreen", false)
 	mood = cfg.get_value("video", "mood", true)
@@ -49,7 +49,7 @@ static func save() -> void:
 	cfg.set_value("audio", "music", vol_music)
 	cfg.set_value("audio", "voice", vol_voice)
 	cfg.set_value("audio", "mic", mic_device)
-	cfg.save(PATH)
+	cfg.save(UserPaths.at("settings.cfg"))
 
 
 static func apply_audio() -> void:

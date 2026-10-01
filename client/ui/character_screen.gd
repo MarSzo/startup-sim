@@ -11,7 +11,7 @@ const PlayerView = preload("res://game/player_view.gd")
 signal connect_pressed(nick: String, profile: Dictionary, address: String)
 signal back_pressed
 
-const SAVE_PATH := "user://character.cfg"
+const UserPaths = preload("res://net/user_paths.gd")
 const GENDERS := ["Kobieta", "Mężczyzna", "Inna"]
 const PREVIEW_SCALE := 7.0
 
@@ -328,12 +328,12 @@ func _save() -> void:
 	cfg.set_value("character", "email", email_edit.text.strip_edges())
 	cfg.set_value("character", "appearance", appearance)
 	cfg.set_value("connection", "address", addr_edit.text.strip_edges())
-	cfg.save(SAVE_PATH)
+	cfg.save(UserPaths.at("character.cfg"))
 
 
 func _load() -> void:
 	var cfg := ConfigFile.new()
-	if cfg.load(SAVE_PATH) != OK:
+	if cfg.load(UserPaths.at("character.cfg")) != OK:
 		_randomize()
 		return
 	nick_edit.text = cfg.get_value("character", "nick", "")

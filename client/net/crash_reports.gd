@@ -7,7 +7,7 @@
 ## with --crash-test.
 extends RefCounted
 
-const STATE := "user://session.cfg"
+const UserPaths = preload("res://net/user_paths.gd")
 const LOGS := "user://logs"
 ## The end of the log that goes in a report.
 const LOG_TAIL := 48 * 1024
@@ -22,20 +22,20 @@ static func enabled(args: Dictionary) -> bool:
 static func begin_session() -> Dictionary:
 	var cfg := ConfigFile.new()
 	var crashed := {}
-	if cfg.load(STATE) == OK and cfg.get_value("session", "running", false):
+	if cfg.load(UserPaths.at("session.cfg")) == OK and cfg.get_value("session", "running", false):
 		crashed = {"started": str(cfg.get_value("session", "started", ""))}
 	cfg.set_value("session", "running", true)
 	cfg.set_value("session", "started", Time.get_datetime_string_from_system(true) + " UTC")
-	cfg.save(STATE)
+	cfg.save(UserPaths.at("session.cfg"))
 	return crashed
 
 
 ## A normal exit.
 static func end_session() -> void:
 	var cfg := ConfigFile.new()
-	cfg.load(STATE)
+	cfg.load(UserPaths.at("session.cfg"))
 	cfg.set_value("session", "running", false)
-	cfg.save(STATE)
+	cfg.save(UserPaths.at("session.cfg"))
 
 
 ## The end of the previous session's log ("" if there is none).

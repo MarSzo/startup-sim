@@ -40,7 +40,9 @@ Jak to działa: [architektura](docs/ARCHITECTURE.md), [protokół](docs/PROTOCOL
 - Styl: taki jak w otaczającym kodzie — komentarze po angielsku, teksty w grze
   po polsku; nazwy i gęstość komentarzy jak obok.
 - Nowa mechanika = test (jednostkowy w module, e2e w `server/tests/`, parytet
-  w `client/tests/run_tests.gd`) i akapit w GDD / ARCHITECTURE.
+  w `client/tests/run_tests.gd`, a większa rzecz w grze — scenariusz w
+  `client/tests/e2e/scenarios/`, patrz `tests/README.md`) i akapit w GDD /
+  ARCHITECTURE.
 - **Nie commituj** adresów serwerów, certyfikatów, kluczy ani danych graczy:
   `client/net/servers.cfg`, `client/net/pins/*.pem` i
   `tools/macos/signing.env` są w `.gitignore` z powodu.
@@ -54,7 +56,8 @@ cd server && cargo fmt --check && cargo clippy --all-targets -- -D warnings && c
 cd server && cargo deny check                       # cargo install cargo-deny
 godot --headless --path client --import && godot --headless --path client -s tests/run_tests.gd
 cd client && gdlint .                               # pipx install "gdtoolkit==4.*"
-ruff check tools && python3 tools/build_maps.py && git diff --exit-code client/maps
+ruff check tools tests && python3 tools/build_maps.py && git diff --exit-code client/maps
+python3 tests/e2e/run.py                            # scenariusze rozgrywki (ok. 3 min)
 ```
 
 ## Pull request

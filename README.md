@@ -90,6 +90,17 @@ godot --headless --path client -s tests/run_tests.gd
 Pliki golden (`server/tests/golden/`) pilnują, że protokół i ruch są identyczne
 w Rust i GDScript. Po celowej zmianie: `UPDATE_GOLDEN=1 cargo test --test golden`.
 
+Rozgrywka od początku do końca — prawdziwy klient (bez okna) na prawdziwym
+serwerze, sterowany scenariuszami z `client/tests/e2e/scenarios/`:
+
+```bash
+python3 tests/e2e/run.py              # wszystkie (ok. 3 min): workday, onboarding, together, founder, persistence
+python3 tests/e2e/run.py together     # wybrane; --list wypisze nazwy
+python3 tests/load/soak.py            # obciążenie: 50 botów przez 3 min (--bots, --minutes)
+```
+
+Szczegóły i jak dopisać scenariusz: [tests/README.md](tests/README.md).
+
 ## Wdrożenie na VPS
 
 Serwer testowy działa na VPS-ie (Hetzner). SSH jest otwarte **tylko z tailnetu**

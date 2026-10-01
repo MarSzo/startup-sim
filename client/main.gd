@@ -21,6 +21,7 @@ const Protocol = preload("res://net/protocol.gd")
 const DayScreen = preload("res://ui/day_screen.gd")
 const TitleScreen = preload("res://ui/title_screen.gd")
 const CrashReports = preload("res://net/crash_reports.gd")
+const UserPaths = preload("res://net/user_paths.gd")
 const PauseMenu = preload("res://ui/pause_menu.gd")
 const Settings = preload("res://ui/settings.gd")
 const Audio = preload("res://audio/audio.gd")
@@ -71,6 +72,9 @@ func _ready() -> void:
 		var kv: PackedStringArray = a.trim_prefix("--").split("=", true, 1)
 		args[kv[0]] = kv[1] if kv.size() > 1 else ""
 	get_tree().auto_accept_quit = false
+	# End-to-end scenarios keep their files (login, settings) to themselves.
+	if args.has("scenario"):
+		UserPaths.use_folder("e2e/" + str(args.get("scenario-id", args["scenario"])))
 	Settings.load_once()
 	Settings.apply_window()
 	Settings.apply_fps()
@@ -182,6 +186,11 @@ func _ready() -> void:
 		add_child(rec)
 	if args.has("screenshot"):
 		_take_screenshots(args["screenshot"], args.get("screenshot-delay", "5").split(","))
+	if args.has("scenario"):
+		var sc = load("res://tests/e2e/scenarios/%s.gd" % args["scenario"]).new()
+		sc.main = self
+		sc.scenario_name = str(args.get("scenario-id", args["scenario"]))
+		add_child(sc)
 
 
 func _take_screenshots(path: String, delays: PackedStringArray) -> void:
@@ -215,7 +224,8 @@ func _on_logged_in(address: String, g: Dictionary, remember: bool) -> void:
 		start.get_parent().visible = true
 		start.set_busy(false)
 		start.for_account(g.nick, address)
-		if args.has("autocreate"):  # dev: accept the character as it is
+		if args.has("autocreate"):  # dev: accept the character (filled in if empty)
+			start.set_defaults(g.nick, address)
 			start._submit.call_deferred()
 
 
@@ -243,6 +253,9 @@ func _on_connected(welcome: Dictionary) -> void:
 	get_viewport().gui_release_focus()  # the nick field must not keep eating keys
 	get_window().title = "Startup Sim — %s" % net.nick
 	game = Game.new()
+	for c in get_children():
+		if c.has_method("next_input"):
+			game.script_driver = c  # an end-to-end scenario drives
 	add_child(game)
 	game.setup(net, building, welcome, net.nick, args)
 	game.set_own_appearance(profile.appearance)

@@ -39,6 +39,7 @@ var room_windows := {}  # id -> true: has windows (daylight)
 var room_light := {}  # id -> "switch" / "always" (missing = outdoors / none)
 var room_switch := {}  # id -> Vector2i: tile by the light switch
 var room_lit_by := {}  # id -> id of the room whose lamp lights it
+var room_department := {}  # id -> department whose desks are in it
 var legend := {}      # char -> {type, solid, color, access?, free_dir?}
 ## [{kind: "stairs"|"elevator", rect: Rect2i, id, to_floor, to: Vector2i}]
 var links: Array = []
@@ -94,6 +95,8 @@ func parse(bytes: PackedByteArray) -> void:
 			room_windows[rid] = true
 		if defs[key].get("light", "") != "":
 			room_light[rid] = defs[key]["light"]
+		if int(defs[key].get("department", 0)) != 0:
+			room_department[rid] = int(defs[key]["department"])
 		var sw = defs[key].get("switch", null)
 		if sw != null:
 			room_switch[rid] = Vector2i(int(sw[0]), int(sw[1]))

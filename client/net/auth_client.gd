@@ -8,7 +8,7 @@ extends Node
 
 const NetClient = preload("res://net/net_client.gd")
 
-const PINS := "user://known_servers.cfg"
+const UserPaths = preload("res://net/user_paths.gd")
 ## The game's servers, as the players see them (the address stays inside):
 ## read from res://net/servers.cfg, which is not in the repository (see
 ## servers.example.cfg) - an official build ships it, a build without it
@@ -52,7 +52,7 @@ static func server_name(address: String) -> String:
 		if s.address == address:
 			return s.name
 	return "Serwer lokalny" if address.begins_with("127.") or address.begins_with("localhost") else "Inny serwer"
-const SESSION := "user://auth.cfg"
+
 ## The name in the server's own certificate.
 const SELF_SIGNED_NAME := "startup-sim"
 
@@ -170,29 +170,29 @@ static func pinned(address: String) -> String:
 	if FileAccess.file_exists(shipped):
 		return FileAccess.get_file_as_string(shipped)
 	var cfg := ConfigFile.new()
-	if cfg.load(PINS) != OK:
+	if cfg.load(UserPaths.at("known_servers.cfg")) != OK:
 		return ""
 	return str(cfg.get_value("pins", address, ""))
 
 
 static func _pin(address: String, pem: String) -> void:
 	var cfg := ConfigFile.new()
-	cfg.load(PINS)
+	cfg.load(UserPaths.at("known_servers.cfg"))
 	cfg.set_value("pins", address, pem)
-	cfg.save(PINS)
+	cfg.save(UserPaths.at("known_servers.cfg"))
 
 
 static func forget_pin(address: String) -> void:
 	var cfg := ConfigFile.new()
-	if cfg.load(PINS) == OK and cfg.has_section_key("pins", address):
+	if cfg.load(UserPaths.at("known_servers.cfg")) == OK and cfg.has_section_key("pins", address):
 		cfg.erase_section_key("pins", address)
-		cfg.save(PINS)
+		cfg.save(UserPaths.at("known_servers.cfg"))
 
 
 ## The remembered login: {address, nick, refresh} or {}.
 static func remembered() -> Dictionary:
 	var cfg := ConfigFile.new()
-	if cfg.load(SESSION) != OK or str(cfg.get_value("session", "refresh", "")) == "":
+	if cfg.load(UserPaths.at("auth.cfg")) != OK or str(cfg.get_value("session", "refresh", "")) == "":
 		return {}
 	return {"address": str(cfg.get_value("session", "address", "")), "nick": str(cfg.get_value("session", "nick", "")),
 		"refresh": str(cfg.get_value("session", "refresh", ""))}
@@ -203,10 +203,10 @@ static func remember(address: String, nick: String, token: String) -> void:
 	cfg.set_value("session", "address", address)
 	cfg.set_value("session", "nick", nick)
 	cfg.set_value("session", "refresh", token)
-	cfg.save(SESSION)
+	cfg.save(UserPaths.at("auth.cfg"))
 
 
 static func forget() -> void:
 	var cfg := ConfigFile.new()
 	cfg.set_value("session", "refresh", "")
-	cfg.save(SESSION)
+	cfg.save(UserPaths.at("auth.cfg"))

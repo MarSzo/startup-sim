@@ -1,0 +1,33 @@
+# Load test: the release server with bots walking around the building
+# (tests/load/soak.py) - every night and by hand (Actions -> Obciążenie ->
+# Run workflow).
+name: Obciążenie
+
+on:
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+    inputs:
+      bots:
+        description: Liczba botów
+        default: "50"
+      minutes:
+        description: Czas (minuty)
+        default: "10"
+
+permissions:
+  contents: read
+
+jobs:
+  soak:
+    name: Boty na serwerze
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: server
+      - name: Test obciążeniowy
+        run: python3 tests/load/soak.py --bots "${{ inputs.bots || '50' }}" --minutes "${{ inputs.minutes || '10' }}"
