@@ -490,7 +490,8 @@ z niezapłaconym towarem: `Say` z alarmem od kasy, towar znika.
 
 Rodzaje przedmiotów sklepowych (`held`, `Inventory.kind`): 10 kanapka z serem,
 11 z szynką, 12 wrap wege, 13 hamburger, 14 frytki, 15 drożdżówka, 16 batonik,
-17 chipsy, 18 woda, 19 energetyk, 20 sok, 21 piwo, 22 wino, 23 papierosy.
+17 chipsy, 18 woda, 19 energetyk, 20 sok, 21 piwo, 22 wino, 23 papierosy,
+38 małpka (setka wódki; nazwa z serwera, więc starszy klient pokaże ją bez ikony).
 
 ## Połączenie i timeouty
 

@@ -92,6 +92,14 @@ pub const PRODUCTS: &[Product] = &[
     },
     Product { kind: kind::BEER, name: "Piwo", price: 7_00, effect: e(0, -5, -15, 20), count: 1, line: "Piwko… w pracy? Cicho sza." },
     Product { kind: kind::WINE, name: "Wino", price: 25_00, effect: e(0, -10, -25, 10), count: 1, line: "Wino. To był ciężki dzień." },
+    Product {
+        kind: kind::MALPKA,
+        name: "Małpka (Żołądkowa Gorzka z miętą)",
+        price: 10_00,
+        effect: e(0, -8, -20, 5),
+        count: 1,
+        line: "Na odwagę przed review.",
+    },
     Product { kind: kind::CIGARETTES, name: "Papierosy", price: 18_00, effect: e(0, 0, 0, 0), count: 20, line: "" },
     Product { kind: kind::UMBRELLA, name: "Parasol", price: 25_00, effect: e(0, 0, 0, 0), count: 1, line: "" },
     // Chill-room sweets (free, not on the shelves - see `treats`).
@@ -157,7 +165,7 @@ const SHELF_GOODS: [(u8, &str, &[u8]); 6] = {
         (2, "Fast food", &[BURGER, FRIES]),
         (3, "Przekąski", &[BUN, BAR, CHIPS]),
         (4, "Napoje", &[WATER, ENERGY_DRINK, JUICE, MILK]),
-        (5, "Alkohol i papierosy", &[BEER, WINE, CIGARETTES]),
+        (5, "Alkohol i papierosy", &[BEER, WINE, MALPKA, CIGARETTES]),
         (6, "Parasole", &[UMBRELLA]),
     ]
 };
@@ -249,6 +257,17 @@ mod tests {
         let mut all: Vec<u8> = PRODUCTS.iter().filter(|p| p.price > 0 && !lunch.contains(&p.kind)).map(|p| p.kind).collect();
         all.sort();
         assert_eq!(sold, all);
+    }
+
+    #[test]
+    fn a_malpka_costs_ten_zloty_and_fits_a_pocket() {
+        let m = product(kind::MALPKA).unwrap();
+        assert_eq!(m.price, 10_00);
+        assert!(m.name.contains("Żołądkowa Gorzka z miętą"));
+        assert!(crate::inventory::is_small(kind::MALPKA), "a 100 ml bottle goes in a pocket");
+        let b = Building::load(&default_building_path()).unwrap();
+        let shelf = shelves(&b).into_iter().find(|s| s.goods.contains(&kind::MALPKA)).unwrap();
+        assert_eq!(shelf.title, "Alkohol i papierosy");
     }
 
     #[test]

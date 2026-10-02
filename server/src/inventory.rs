@@ -50,6 +50,8 @@ pub mod kind {
     pub const MILK: u8 = 36;
     /// Coffee with milk (the fridge's milk).
     pub const LATTE: u8 = 37;
+    /// A 100 ml "małpka" of vodka (shop).
+    pub const MALPKA: u8 = 38;
 }
 
 pub const POCKETS: usize = 3;
@@ -60,7 +62,7 @@ pub fn is_small(k: u8) -> bool {
         // Shop goods fit in a pocket, except the bulky ones.
         kind::BURGER | kind::FRIES | kind::WINE => false,
         10..=27 => true,
-        kind::MILK => true,
+        kind::MILK | kind::MALPKA => true,
         28..=33 => false, // lunch boxes: both hands
         _ => false,
     }

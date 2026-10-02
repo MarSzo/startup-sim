@@ -721,10 +721,12 @@ Zastępuje prosty portal z 10.8. Po połączeniu gracz widzi pulpit komputera
   **Fast food** (hamburger 18 zł, frytki 9 zł — tylko w rękach), **Przekąski**
   (drożdżówka 6 zł, batonik 5 zł, chipsy 7 zł), **Napoje** (woda 4 zł,
   energetyk 8 zł, sok 6 zł), **Alkohol i papierosy** (piwo 7 zł, wino 25 zł,
+  **małpka** — setka Żołądkowej Gorzkiej z miętą 10 zł, mieści się w kieszeni;
   papierosy 18 zł / 20 szt.).
 - **F = zjedz / wypij** (niezapłaconego nie można): każdy towar zmienia potrzeby
   (np. kanapka głód −35…−40, energetyk energia +30 ale stres +8 i toaleta +10,
-  piwo stres −15 i toaleta +20).
+  piwo stres −15 i toaleta +20, małpka stres −20, energia −8, toaleta +5 —
+  „Na odwagę przed review.”).
 - **Palenie wymaga papierosów** (jeden z paczki na przerwę).
 - Do przemyślenia: konsekwencje alkoholu w pracy, zwroty, promocje.
 

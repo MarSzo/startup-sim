@@ -66,6 +66,7 @@ func show_shelf(p: Dictionary) -> void:
 		name.custom_minimum_size = Vector2(200, 0)
 		Ink.style_label(name, 16, Ink.TEXT_INK)
 		name.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		name.size_flags_horizontal = Control.SIZE_EXPAND_FILL  # a long name: prices and buttons stay in line
 		row.add_child(name)
 		var price := Label.new()
 		price.text = zl(g.price)

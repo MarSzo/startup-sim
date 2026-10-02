@@ -39,6 +39,7 @@ const EMPTY_CUP := 34
 const CUP := 35
 const MILK := 36
 const LATTE := 37
+const MALPKA := 38
 
 const NAMES := {GUEST_PASS: "Przepustka gościa", EMPLOYEE_CARD: "Karta pracownika", LAPTOP: "Laptop", COFFEE: "Kawa", FRUIT: "Owoc",
 	SANDWICH_CHEESE: "Kanapka z serem", SANDWICH_HAM: "Kanapka z szynką", WRAP: "Wrap wege", BURGER: "Hamburger",
@@ -47,9 +48,9 @@ const NAMES := {GUEST_PASS: "Przepustka gościa", EMPLOYEE_CARD: "Karta pracowni
 	DONUT: "Pączek", COOKIE: "Ciastko", CHEESECAKE: "Kawałek sernika",
 	PIEROGI: "Pierogi ruskie", PIZZA: "Pizza margherita", SUSHI: "Zestaw sushi", SCHNITZEL: "Schabowy z ziemniakami",
 	SALAD: "Sałatka z kurczakiem", KEBAB: "Kebab", EMPTY_CUP: "Brudny kubek", CUP: "Kubek", MILK: "Mleko (karton)",
-	LATTE: "Kawa z mlekiem"}
+	LATTE: "Kawa z mlekiem", MALPKA: "Małpka"}
 const SMALL := [GUEST_PASS, EMPLOYEE_CARD, FRUIT, SANDWICH_CHEESE, SANDWICH_HAM, WRAP, BUN, BAR, CHIPS, WATER,
-	ENERGY_DRINK, JUICE, BEER, CIGARETTES, UMBRELLA, DONUT, COOKIE, CHEESECAKE, MILK]
+	ENERGY_DRINK, JUICE, BEER, CIGARETTES, UMBRELLA, DONUT, COOKIE, CHEESECAKE, MILK, MALPKA]
 
 
 static func item_name(kind: int) -> String:
@@ -182,6 +183,18 @@ static func draw(c: CanvasItem, kind: int, o: Vector2, s: float) -> void:
 				poly.call([Vector2(8.6, 4), Vector2(6, 9), Vector2(8, 9), Vector2(7, 13), Vector2(10.2, 7.6), Vector2(8.2, 7.6)], Color("#8fd04a"))
 		WINE:
 			bottle.call(Color("#5a1f2a"), Color("#efe6d2"), Color("#8e2a3a"))
+		MALPKA:
+			# A 100 ml flask: short and flat, sloped shoulders, a short neck
+			# with a screw cap; mint Żołądkowa (amber-green), dark green label.
+			poly.call([Vector2(6.9, 5), Vector2(9.1, 5), Vector2(9.1, 6.4), Vector2(11.4, 7.8), Vector2(11.8, 9),
+				Vector2(11.8, 14.1), Vector2(11.1, 14.8), Vector2(4.9, 14.8), Vector2(4.2, 14.1), Vector2(4.2, 9),
+				Vector2(4.6, 7.8), Vector2(6.9, 6.4)], Color("#b3a447"))
+			rr.call(4.9, 9.6, 6.2, 3.8, Color("#1f5a3a"), 0.4)
+			ln.call(5.4, 10.5, 10.6, 10.5, Color("#d9b84a"), 0.5)
+			dot.call(8, 12.1, 0.8, Color("#8fd49a"))
+			ln.call(5.3, 8.4, 6.3, 7.8, Color(1, 1, 1, 0.55), 0.6)
+			rr.call(6.5, 2.6, 3, 2.4, Color("#d4b04a"), 0.4)
+			ln.call(6.9, 3.5, 9.1, 3.5, Color("#9c7f2e"), 0.4)
 		DONUT:
 			circ.call(8, 8.5, 6.2, Color("#d9a15a"))
 			c.draw_arc(pt.call(8, 8.5), 3.8 * s, 0, TAU, 24, Color("#e889a8"), 3.6 * s, true)
