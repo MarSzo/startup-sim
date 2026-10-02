@@ -23,6 +23,7 @@ pub mod crypto;
 pub mod drunk;
 pub mod elevator;
 pub mod fire;
+pub mod hr;
 pub mod http;
 pub mod inventory;
 pub mod kitchen;

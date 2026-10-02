@@ -19,6 +19,8 @@ func _init() -> void:
 	test_sealed(golden.path_join("sealed.json"))
 	test_rejects_garbage()
 	test_parse_address()
+	test_shell()
+	test_scripts_compile()
 	print("%d checks, %d failures" % [checks, failures])
 	quit(1 if failures > 0 else 0)
 
@@ -60,6 +62,7 @@ func test_protocol(path: String) -> void:
 		"fridge_action": Protocol.encode_fridge_action(0x01020304, Protocol.FRIDGE_PUT, 0),
 		"skip_wait": Protocol.encode_skip_wait(0x01020304),
 		"action": Protocol.encode_action(0x01020304, Protocol.ACTION_ATTACK),
+		"hr_action": Protocol.encode_hr_action(0x01020304, Protocol.HR_REQUEST, 9),
 		"task_action": Protocol.encode_task_action(0x01020304, 7, Protocol.TA_CREATE, 0, 2, "Naprawić logowanie\nPo zmianie hasła."),
 		"voice": Protocol.encode_voice(0x01020304, 9, true, PackedByteArray([0x10, 0x00, 0x05, 0x7f, 0x80])),
 		"mail_action": Protocol.encode_mail_action(0x01020304, 4, Protocol.MA_SEND, 0, "Kuba", "Kawa?", "O 12 w kuchni."),
@@ -108,7 +111,13 @@ func test_protocol(path: String) -> void:
 	expect(ck.get("type") == Protocol.T_CLOCK and ck.day == 2 and ck.minute == 492 and not ck.night
 		and ck.place == Protocol.PLACE_COMMUTING and ck.arrive == 545 and ck.pay == 23000 and ck.pay_minutes == 460
 		and ck.today_minutes == 0 and ck.mode == 2 and ck.depart == 520 and ck.money == 18600
-		and ck.weather == Protocol.WEATHER_RAIN and ck.company == "Pixel Pierogi sp. z o.o." and ck.founded and ck.alarm == 1 and ck.skip == 1, "decode clock %s" % ck)
+		and ck.weather == Protocol.WEATHER_RAIN and ck.company == "Pixel Pierogi sp. z o.o." and ck.founded and ck.alarm == 1 and ck.skip == 1
+		and ck.leave, "decode clock %s" % ck)
+	var hr := Protocol.decode(golden["hr_info"].hex_decode())
+	expect(hr.get("type") == Protocol.T_HR_INFO and hr.title == "Programista/ka" and hr.form == Protocol.EMPLOYMENT_B2B
+		and hr.salary == 10200 and hr.pay_rate == 6071 and hr.start_day == 2 and hr.today == 7 and hr.reprimands == 1
+		and hr.leave_days == 2 and hr.worked == 3 and hr.annexes.size() == 2 and hr.annexes[1].text == "Aneks nr 1"
+		and hr.requests == [{"id": 1, "day": 9, "status": 1}, {"id": 2, "day": 8, "status": 3}], "decode hr_info %s" % hr)
 	var fr := Protocol.decode(golden["fridge"].hex_decode())
 	expect(fr.get("type") == Protocol.T_FRIDGE and fr.items.size() == 1 and fr.items[0].kind == 11
 		and fr.items[0].label == "Kanapka z szynką (Ola)" and fr.milk == 7 and fr.water == 4 and fr.juice == 2, "decode fridge %s" % fr)
@@ -271,6 +280,43 @@ func test_sealed(path: String) -> void:
 	bad[20] ^= 1
 	expect(s.open(Seal.TO_CLIENT, 8, bad).is_empty(), "tampered")
 	expect(s.accept(3) and s.accept(1) and not s.accept(3) and s.accept(80) and not s.accept(10), "replay window")
+
+
+## Every script of the game compiles (a missing preload in a window that the
+## other tests never open shows up here, not in the middle of a game).
+func test_scripts_compile() -> void:
+	var dirs := ["res://"]
+	var count := 0
+	while not dirs.is_empty():
+		var dir: String = dirs.pop_back()
+		for sub in DirAccess.get_directories_at(dir):
+			if not sub.begins_with(".") and sub != "addons":
+				dirs.append(dir.path_join(sub))
+		for f in DirAccess.get_files_at(dir):
+			if f.ends_with(".gd"):
+				var script = load(dir.path_join(f))
+				expect(script != null and script.can_instantiate(), "compiles: %s" % dir.path_join(f))
+				count += 1
+	expect(count > 40, "scripts found (%d)" % count)
+
+
+## The office terminal's make-believe shell.
+func test_shell() -> void:
+	var sh = preload("res://ui/office/shell.gd").new()
+	sh.setup("Ola", "Pixel Pierogi", "Mobile")
+	expect(sh.prompt() == "ola@startup:~$ ", "prompt %s" % sh.prompt())
+	expect(sh.run("ls").contains("notatki.txt") and not sh.run("ls").contains(".bash_history"), "ls hides dotfiles")
+	expect(sh.run("ls -la").contains(".bash_history"), "ls -la")
+	expect(sh.run("cd /srv/startup") == "" and sh.run("pwd") == "/srv/startup", "cd")
+	expect(sh.run("cat README.md").contains("Pixel Pierogi"), "cat (relative)")
+	expect(sh.run("cd ../..") == "" and sh.run("pwd") == "/", "cd ..")
+	expect(sh.run("cd /nie/ma").begins_with("cd:"), "cd to nowhere")
+	expect(sh.run("cat /etc").contains("katalog"), "cat a directory")
+	expect(sh.run("rm -rf /").contains("Prezes"), "rm -rf /")
+	expect(sh.run("make").contains("Brak reguły") and sh.run("make coffee").contains("418"), "make coffee")
+	expect(sh.run("foo").contains("nie znaleziono"), "unknown command")
+	expect(sh.run("clear") == sh.CLEAR and sh.run("exit") == sh.EXIT, "clear / exit")
+	expect(sh.run("history").contains("rm -rf /"), "history")
 
 
 func test_rejects_garbage() -> void:

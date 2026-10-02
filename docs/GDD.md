@@ -1345,6 +1345,30 @@ pełnym ekranie — zastąpiona stylem inspirowanym Don't Starve:
   wnuczek, działka) albo z miasta (ceny na rynku, tramwaje, dzik w parku). Paulina
   dalej tylko siedzi w fotelu przy wejściu.
 
+### 10.50 Komputer w biurze: Kadry, przeglądarka, terminal
+
+- **Kadry** (ikona na pulpicie firmowego komputera):
+  - *Umowa*: stanowisko, dział, forma, wynagrodzenie brutto, stawka za
+    godzinę, od którego dnia, nagany.
+  - *Aneksy*: umowa jako pierwszy wpis, potem każda podwyżka u prezesa
+    („Aneks nr 1: podwyżka — stawka …/h, ok. … brutto / mies.”).
+  - *Urlop*: 2 dni na start, +1 co 5 przepracowanych dni (dzień liczy się od
+    godziny w biurze). Wniosek na któryś z najbliższych 7 dni — decyzja od
+    razu (mail od HR): zaakceptowany, jeśli są dni, inaczej odrzucony;
+    zaakceptowany można anulować przed tym dniem.
+  - **Dzień urlopu**: rano zostaje się w domu („Urlop 🌴”) do następnego dnia;
+    na umowie o pracę płatny (8 h według stawki), na B2B i zleceniu bez
+    wypłaty.
+- **Przeglądarka**: obok obiadów i tablicy zadań — *Plotek.pl* (wiadomości z
+  biura i z miasta, zmieniają się co dzień), *Pogoda* i *Memy*. Przycisk
+  „Otwórz onet.pl w prawdziwej przeglądarce” otwiera prawdziwą stronę w
+  przeglądarce gracza.
+- **Terminal** (w stylu Ghostty: ciemny, czcionka o stałej szerokości,
+  historia ↑/↓): fikcyjny system z plikami firmy — `ls`, `cd`, `cat`, `git`,
+  `ssh prod`, `top`, `neofetch`, `cowsay`, `curl wttr.in` (pogoda z gry), `npm
+  install`… i easter eggi (`sudo rm -rf /` — dzwoni prezes, `make coffee` — 418).
+  Nic nie uruchamia się na komputerze gracza.
+
 ### 10.6 Stan implementacji
 
 *Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie,

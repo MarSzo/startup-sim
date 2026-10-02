@@ -1,4 +1,4 @@
-# Protokół sieciowy (wersja 41)
+# Protokół sieciowy (wersja 42)
 
 Własny binarny protokół na UDP. Implementacje:
 - serwer: `server/src/protocol/` (źródło prawdy),
@@ -23,7 +23,7 @@ przez `cargo test` i czytane przez `client/tests/run_tests.gd`.
 | pole    | typ | wartość |
 |---------|-----|---------|
 | magic   | u16 | `0x5354` (bajty `54 53`, „TS”) |
-| version | u8  | `41` |
+| version | u8  | `42` |
 | type    | u8  | typ pakietu (niżej) |
 
 ## Jednostki
@@ -308,7 +308,7 @@ wyjazdu albo 0xFFFF), `money u32` (portfel — także w domu), `weather u8`
 `arrive` = 0xFFFF oznacza „jeszcze w domu, wybierz dojazd”; po wyjeździe
 `arrive` = minuta przyjazdu. Od v23 na końcu: `company` str16 (nazwa firmy,
 ≤ 64 B) i `founded u8` (1 = firma ma założyciela; 0 = portal pokazuje „Załóż
-firmę”). Od v26: `alarm u8` (1 = alarm pożarowy w budynku — ewakuacja).
+firmę”). Od v26: `alarm u8` (1 = alarm pożarowy w budynku — ewakuacja). Od v42 na końcu: `leave u8` (1 = dziś dzień urlopu — w domu).
 
 ### 30 `CommuteChoice` (C→S)
 
@@ -466,6 +466,18 @@ szafka, 13 podniesienie, 14 upuszczenie, 15 jedzenie, 16 picie, 17 gwizdek,
 18 beknięcie (po alkoholu; klient gra je ~1 s później, po łyku), 19 wymioty,
 20 cios, 21 dźgnięcie, 22 sikanie, 23 kupa.
 
+### 56 `HrAction` (C→S), 57 `HrInfo` (S→C)
+
+Aplikacja Kadry. `HrAction`: token u32, `action u8` (1 pokaż, 2 wniosek
+urlopowy na dzień `arg`, 3 anuluj wniosek `arg`), `arg u16`; serwer zawsze
+odpowiada `HrInfo` (tylko z umową). `HrInfo`: `title` str16, `department u8`,
+`form u8` (`employment`, 0 = sprzed widełek), `salary u32` (zł brutto /
+mies.), `pay_rate u32` (gr / h), `start_day u16`, `today u16` (dni gracza),
+`reprimands u8`, `leave_days u8`, `worked u8` (przepracowane dni do kolejnego
+dnia urlopu, z 5), aneksy n u8 (≤ 10, najnowsze na końcu) × {`day u16`, `text`
+str16}, wnioski n u8 (≤ 10) × {`id u8`, `day u16`, `status u8` (1
+zaakceptowany, 2 odrzucony, 3 anulowany, 4 wykorzystany)}.
+
 ### 55 `Action` (C→S)
 
 token u32, `action u8`: 1 menu psot (R) — serwer odpowiada `Dialog` o id 250
@@ -573,6 +585,7 @@ szyfrowaniem.
 
 ## Historia wersji
 
+- **42** — Kadry: `HrAction` (56, C→S), `HrInfo` (57, S→C); `Clock` + `leave u8` na końcu (dzień urlopu: w domu).
 - **41** — widełki i umowa: `JobOffers` oferta + `salary_min u32`, `salary_max u32` (zł brutto / mies., po `vacancies`); `Apply` + `salary u32`, `form u8` (1 umowa o pracę, 2 B2B, 3 umowa zlecenie — tylko student < 26 lat), `student u8` (po `motivation`); `Dialog` 252 = umowa w HR (0 podpisuję, 1 rezygnuję).
 - **40** — psoty i bójki: `Stats` + `bowels`, `health` (po `alcohol`); czynności 11 nokaut, 12 cios, 13 sikanie, 14 kucanie; dźwięki 20 cios, 21 dźgnięcie, 22 sikanie, 23 kupa; kałuża `held` 2 = kupa; przedmiot 40 nóż; wygląd NPC 7 = kasjer; `Action` (55, C→S); `Dialog` 250 (menu R) i 251 (szafka).
 - **39** — upojenie alkoholem: `Stats` + `alcohol` (po `hygiene`); `Snapshot` + `self_drunk` (po `self_slow`, zataczanie w symulacji — też w wektorach golden ruchu); flagi encji gracza bity 4–5 = upojenie; czynności 9 wymioty, 10 odsypianie; dźwięki 18 beknięcie, 19 wymioty; kałuża `held` 1 = wymiociny; `CompanyPeople` pracownik + `reprimands u8` (przed `nick`); przedmiot 39 alkomat (pytanie o naganę to zwykły `Dialog`).

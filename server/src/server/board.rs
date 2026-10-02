@@ -213,6 +213,12 @@ impl Server {
                 let days_worked = p.day.saturating_sub(1);
                 if chance_roll < board::raise_chance(days_worked, good > 0) {
                     p.pay_rate += board::RAISE_STEP;
+                    // An annex to the contract (the HR app shows it).
+                    p.salary = u32::try_from(p.pay_rate * crate::pay::HOURS_A_MONTH / 100).unwrap_or(u32::MAX);
+                    let n = p.hr.annexes.len().max(1);
+                    let rate = crate::shop::zl(p.pay_rate);
+                    let text = crate::hr::lines::raise(n, &rate, &crate::pay::zl(p.salary));
+                    p.hr.annex(p.day, text);
                     board::lines::RAISE_YES.into()
                 } else {
                     board::lines::RAISE_NO.into()

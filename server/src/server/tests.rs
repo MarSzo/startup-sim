@@ -533,3 +533,39 @@ fn reception_asks_about_lunch_and_pani_maria_never_stops_talking() {
     }
     assert_eq!(stories(&s), 4, "and again after a minute");
 }
+
+#[test]
+fn the_hr_app_plans_leave_and_a_day_off_is_spent_at_home_paid() {
+    use crate::hr;
+    let mut s = server();
+    let hr_npc = s.npcs.iter().find(|n| n.role == crate::npc::Role::Hr).unwrap().id;
+    add_player(&mut s, 1);
+    let pass = s.mint_item(item_kind::GUEST_PASS, "");
+    let p = s.players.get_mut(&1).unwrap();
+    p.inventory.add(pass).unwrap();
+    p.position = Some(1);
+    p.department = 1;
+    p.terms = Some(crate::pay::Terms { agreed: 8_400, form: crate::protocol::employment::EMPLOYMENT, offered: 0 });
+    s.show_contract(hr_npc, 1);
+    s.handle_dialog_answer(1, crate::pay::CONTRACT_ID, 0);
+    let p = &s.players[&1];
+    assert!(p.hr.annexes[0].text.starts_with("Umowa: Programista/ka, umowa o pracę"), "{:?}", p.hr.annexes);
+    assert_eq!(p.hr.leave_days, hr::START_LEAVE_DAYS);
+    // Leave for tomorrow: approved (one day less).
+    let tomorrow = p.day + 1;
+    s.handle_hr_action(1, hr::action::REQUEST, tomorrow as u16);
+    assert_eq!(s.players[&1].hr.leave_days, hr::START_LEAVE_DAYS - 1);
+    assert_eq!(s.players[&1].hr.requests[0].status, hr::status::APPROVED);
+    // Evening, night, morning: the day off - at home, paid 8 hours.
+    s.players.get_mut(&1).unwrap().stage = Stage::Home { arrive_at: None };
+    let money = s.players[&1].money;
+    s.clock.ds = (crate::clock::OPEN_MIN - 1) * crate::clock::DS_PER_MIN;
+    while s.clock.minute() != crate::clock::OPEN_MIN {
+        s.tick_clock();
+    }
+    let p = &s.players[&1];
+    assert_eq!(p.day, tomorrow);
+    assert!(p.hr.on_leave && p.depart_at.is_none(), "staying at home");
+    assert_eq!(p.money, money + hr::LEAVE_HOURS * p.pay_rate);
+    assert!(matches!(s.clock_packet(p), Packet::Clock { leave: true, .. }));
+}

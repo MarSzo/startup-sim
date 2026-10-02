@@ -174,6 +174,8 @@ pub(super) struct Player {
     /// Gave the pass back after turning the contract down: back to the job
     /// portal at this tick.
     pub(super) to_portal_at: Option<u32>,
+    /// The HR file: annexes, leave days and requests.
+    pub(super) hr: crate::hr::HrFile,
     /// World day of the last raise request (cooldown).
     pub(super) last_raise_day: Option<u32>,
     /// Talking to a board member: meeting index, NPC, dialog id, good answers.
@@ -266,6 +268,7 @@ impl Player {
             employment: 0,
             contract_shown: None,
             to_portal_at: None,
+            hr: crate::hr::HrFile::default(),
             last_raise_day: None,
             talk: None,
             next_dialog_id: 0,

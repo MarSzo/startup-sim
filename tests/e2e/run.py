@@ -53,6 +53,10 @@ SCENARIOS = {
          "clients": [["fight_ola", ["--nick=Ola", "--autoconnect"]],
                      ["fight_kuba", ["--nick=Kuba", "--autoconnect"], 1.5]]},
     ],
+    "office_apps": [
+        {"server": EMPLOYED + ["--start-time", "10:00"],
+         "clients": [["office_apps", ["--nick=Ola", "--autoconnect"]]]},
+    ],
     "together": [
         {"server": EMPLOYED + ["--start-time", "10:00"],
          "clients": [["together_ola", ["--nick=Ola", "--autoconnect"]],

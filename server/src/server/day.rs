@@ -45,9 +45,20 @@ impl Server {
             }
             Some(Transition::Morning) => {
                 let now = self.clock.total_minutes();
+                let mut off = Vec::new();
                 for p in self.players.values_mut() {
                     p.day += 1;
                     p.thefts_today = 0;
+                    // A day off: at home all day (paid on an employment contract).
+                    if p.contract && p.hr.morning(p.day) {
+                        let paid = matches!(p.employment, 0 | proto::employment::EMPLOYMENT);
+                        if paid {
+                            p.money += crate::hr::LEAVE_HOURS * p.pay_rate;
+                        }
+                        p.depart_at = None;
+                        off.push((p.nick.clone(), paid));
+                        continue;
+                    }
                     if matches!(p.stage, Stage::Home { .. }) {
                         // Leaves home at a random time; how they travel is
                         // chosen until then (the last choice by default).
@@ -58,6 +69,9 @@ impl Server {
                 self.open_vacancy();
                 if let Some(k) = self.kitchen.as_mut() {
                     k.restock();
+                }
+                for (nick, paid) in off {
+                    self.log(format!("* {nick} is on leave today ({})", if paid { "paid" } else { "unpaid" }));
                 }
                 self.log(format!("* day {} starts", self.clock.day));
                 self.clock_dirty = true;
@@ -113,6 +127,9 @@ impl Server {
         let pay = minutes as i64 * p.pay_rate / 60;
         p.money += pay;
         p.last_pay = (pay, minutes);
+        if p.contract && minutes >= crate::hr::WORKED_DAY_MINUTES {
+            p.hr.worked_a_day();
+        }
         p.worked_ds = 0;
         p.stage = Stage::Home { arrive_at: None };
         let msg = format!("* {} goes home: worked {} min, paid {}", p.nick, minutes, shop::zl(pay));
@@ -249,6 +266,7 @@ impl Server {
             founded: self.company.founder.is_some() || self.offline.founder.is_some(),
             alarm: self.alarm.is_some() as u8,
             skip: if self.clock.skip { 2 } else { p.skip_wait as u8 },
+            leave: p.hr.on_leave,
         }
     }
 }

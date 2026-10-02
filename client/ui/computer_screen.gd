@@ -1,7 +1,8 @@
 ## The screen of a computer on a desk: a desktop like the one at home (icons,
 ## windows, a taskbar) with the company messenger, work mail (+ trash), the
-## browser (bookmarks: lunch ordering, the department's task board), the
-## calendar and — for the founder — the company panel; or the lock screen.
+## browser (bookmarks: lunch ordering, the department's task board, news,
+## weather, memes), the calendar, the HR app, a terminal and — for the
+## founder — the company panel; or the lock screen.
 ## Shown while the server says we sit at a computer (self_status bit); the
 ## computer is logged in as its owner, whoever sits at it.
 extends Control
@@ -14,6 +15,9 @@ const OsWindow = preload("res://ui/office/os_window.gd")
 const KanbanView = preload("res://ui/office/kanban_view.gd")
 const MailBox = preload("res://ui/office/mail_box.gd")
 const MailView = preload("res://ui/office/mail_view.gd")
+const HrView = preload("res://ui/office/hr_view.gd")
+const TerminalView = preload("res://ui/office/terminal_view.gd")
+const WebPage = preload("res://ui/office/web_page.gd")
 
 ## ComputerAction to send: action, conversation, argument, text.
 signal action(action: int, conv: int, arg: int, text: String)
@@ -27,6 +31,8 @@ signal company_action(action: int, target: int, value: int, text: String)
 signal task_action(nonce: int, action: int, task: int, arg: int, text: String)
 ## Work mail: MailAction.
 signal mail_action(nonce: int, action: int, id: int, to: String, subject: String, body: String)
+## The HR app: HrAction (Protocol.HR_*).
+signal hr_action(action: int, arg: int)
 
 const Departments = preload("res://net/departments.gd")
 const SYNC_MSEC := 1000
@@ -89,7 +95,16 @@ var _co_sig := ""
 var _co_drafts := {}            # text typed into the panel's fields, by key
 # The desktop: icons, windows, the taskbar; apps open in windows.
 const WINDOW_TITLES := {"chat": "Komunikator", "mail": "Poczta", "trash": "Kosz", "browser": "Przeglądarka",
-	"calendar": "Kalendarz zarządu", "company": "Panel firmy"}
+	"calendar": "Kalendarz zarządu", "company": "Panel firmy", "hr": "Kadry", "terminal": "Terminal"}
+## Browser pages beyond the work tools: name -> [url, title, bookmark].
+const WEB := {"news": ["https://plotek.pl", "Plotek.pl", "★ Plotek.pl"], "weather": ["https://pogoda.example", "Pogoda", "★ Pogoda"],
+	"memes": ["https://memy.example", "Memy", "★ Memy"]}
+## The HR app asks again this often while open (a lost reply is no harm).
+const HR_POLL_MSEC := 3000
+var hr_view := HrView.new()
+var terminal := TerminalView.new()
+var world := {}                 # {day, minute, weather, company, nick, department} for the web pages / terminal
+var _hr_asked := 0
 var _desk := Control.new()
 var _win_layer := Control.new()
 var _windows := {}              # name -> OsWindow
@@ -203,6 +218,9 @@ func _process(_d: float) -> void:
 	if _windows.has("browser") and page == "tasks":
 		kanban.tick()
 	var now := Time.get_ticks_msec()
+	if _windows.has("hr") and now - _hr_asked >= HR_POLL_MSEC:
+		_hr_asked = now
+		hr_action.emit(Protocol.HR_SHOW, 0)
 	if now - _last_sync >= SYNC_MSEC and _windows.has("chat"):
 		_last_sync = now
 		action.emit(Protocol.PC_SYNC, current, _last_id(current), "")
@@ -248,7 +266,9 @@ func _send() -> void:
 
 ## Dev (--goto): pc:say:<conv>:<text>, pc:open:<conv>, pc:lock, pc:unlock,
 ## pc:take, pc:close; <conv> = general / dept / dm:<nick>; pc:win:<app>
-## (chat / mail / trash / browser / calendar / company / lunch / tasks),
+## (chat / mail / trash / browser / calendar / company / hr / terminal / lunch /
+## tasks / news / weather / memes), pc:term:<line> (type in the terminal),
+## pc:hr:<action>:<arg> (the HR app, Protocol.HR_*),
 ## pc:task:<title> (a new card), pc:mail:<nick>:<subject> (send a mail),
 ## pc:card:<n> (open the n-th card), pc:read:<n> (read the n-th mail),
 ## pc:comment:<text> (on the open card), pc:take-card (assign it to me).
@@ -287,6 +307,13 @@ func dev_command(cmd: String) -> void:
 				_mail_view._selected = list[int(parts[1])].id
 				mailbox.read[_mail_view._selected] = true
 				mailbox.changed.emit()
+		"term":  # term:<command line>
+			_set_tab("terminal")
+			terminal.run_command(cmd.substr(5))
+		"hr":  # hr:<action>:<arg>
+			_set_tab("hr")
+			if parts.size() > 2:
+				hr_action.emit(int(parts[1]), int(parts[2]))
 		"lock": action.emit(Protocol.PC_LOCK, 0, 0, "")
 		"unlock": action.emit(Protocol.PC_UNLOCK, 0, 0, "")
 		"take": action.emit(Protocol.PC_TAKE, 0, 0, "")
@@ -363,7 +390,8 @@ func _build() -> void:
 	icons.add_theme_constant_override("separation", 6)
 	_desk.add_child(icons)
 	for ic in [["mail", "Poczta", "mail"], ["browser", "Przeglądarka", "browser"], ["chat", "Komunikator", "chat"],
-			["calendar", "Kalendarz", "calendar"], ["company", "Firma", "company"], ["trash", "Kosz", "trash"]]:
+			["calendar", "Kalendarz", "calendar"], ["hr", "Kadry", "hr"], ["terminal", "Terminal", "terminal"],
+			["company", "Firma", "company"], ["trash", "Kosz", "trash"]]:
 		var b := _desk_icon(ic[1], ic[2])
 		var name: String = ic[0]
 		b.pressed.connect(func(): _open(name))
@@ -410,7 +438,10 @@ func _build() -> void:
 	var marks := HBoxContainer.new()
 	marks.add_theme_constant_override("separation", 6)
 	marks.add_child(_mini_label("Ulubione:"))
-	for bm in [["home", "⌂ Start"], ["lunch", "★ Obiady do biura"], ["tasks", "★ Tablica zadań"]]:
+	var marks_list := [["home", "⌂ Start"], ["lunch", "★ Obiady do biura"], ["tasks", "★ Tablica zadań"]]
+	for w in WEB:
+		marks_list.append([w, WEB[w][2]])
+	for bm in marks_list:
 		var mb := Ink.button(bm[1])
 		mb.add_theme_font_size_override("font_size", 14)
 		var pg: String = bm[0]
@@ -428,7 +459,8 @@ func _build() -> void:
 	var tiles := HBoxContainer.new()
 	tiles.add_theme_constant_override("separation", 14)
 	for bm in [["lunch", "Obiady do biura", "lunchbox.example — dostawa na recepcję", "company"],
-			["tasks", "Tablica zadań", "tasks.startup — zadania działu (kanban)", "tasks"]]:
+			["tasks", "Tablica zadań", "tasks.startup — zadania działu (kanban)", "tasks"],
+			["news", "Plotek.pl", "wiadomości z biura i z miasta", "browser"]]:
 		var tb := Button.new()
 		tb.custom_minimum_size = Vector2(260, 130)
 		for st in ["normal", "hover", "pressed", "focus"]:
@@ -455,6 +487,18 @@ func _build() -> void:
 	home.add_child(tiles)
 	_pages["home"] = home
 	_pages["tasks"] = kanban
+	for w in WEB:
+		var wp := WebPage.new()
+		wp.setup(w)
+		var ws := ScrollContainer.new()
+		ws.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		wp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		ws.add_child(wp)
+		_pages[w] = ws
+	_views["hr"] = hr_view
+	hr_view.action.connect(func(a: int, arg: int): hr_action.emit(a, arg))
+	_views["terminal"] = terminal
+	terminal.exit_requested.connect(func(): _close("terminal"))
 	kanban.send.connect(func(n: int, a: int, t: int, arg: int, text: String): task_action.emit(n, a, t, arg, text))
 	mailbox.send.connect(func(n: int, a: int, id: int, to: String, subj: String, body: String): mail_action.emit(n, a, id, to, subj, body))
 	mailbox.arrived.connect(_on_new_mail)
@@ -709,6 +753,14 @@ func _open(name: String) -> void:
 			_co_sig = ""
 		elif name == "browser":
 			_go(page)
+		elif name == "hr":
+			_hr_asked = Time.get_ticks_msec()
+			hr_action.emit(Protocol.HR_SHOW, 0)
+		elif name == "terminal":
+			terminal.setup(world.get("nick", ""), world.get("company", ""), world.get("department", ""))
+			terminal.set_context(world.get("day", 1), world.get("minute", 0), world.get("weather", ""))
+	if name == "terminal":
+		terminal.focus()
 	_win_layer.move_child(_windows[name], -1)
 	_render()
 
@@ -732,9 +784,16 @@ func _go(p: String) -> void:
 	page = p
 	for k in _pages:
 		_pages[k].visible = k == p
-	_url.text = {"home": "  🔒  start.os/ulubione", "lunch": "  🔒  https://lunchbox.example/biuro", "tasks": "  🔒  https://tasks.startup/tablica"}[p]
+	var urls := {"home": "start.os/ulubione", "lunch": "https://lunchbox.example/biuro", "tasks": "https://tasks.startup/tablica"}
+	var titles := {"home": "Start", "lunch": "Obiady do biura", "tasks": "Tablica zadań"}
+	for w in WEB:
+		urls[w] = WEB[w][0]
+		titles[w] = WEB[w][1]
+	if WEB.has(p):
+		_pages[p].get_child(0).refresh(world)
+	_url.text = "  🔒  " + urls[p]
 	if _windows.has("browser"):
-		_windows["browser"].set_title("Przeglądarka — %s" % {"home": "Start", "lunch": "Obiady do biura", "tasks": "Tablica zadań"}[p])
+		_windows["browser"].set_title("Przeglądarka — %s" % titles[p])
 	_lunch_sig = ""
 	_render()
 
@@ -828,15 +887,26 @@ func on_mail_state(p: Dictionary) -> void:
 	mailbox.on_state(p)
 
 
+## The HR app's data (HrInfo).
+func on_hr(p: Dictionary) -> void:
+	hr_view.on_hr(p)
+
+
+## The world for the web pages and the terminal: {day, minute, weather,
+## company, nick, department}.
+func set_world(w: Dictionary) -> void:
+	world = w
+	terminal.set_context(w.get("day", 1), w.get("minute", 0), w.get("weather", ""))
+	if WEB.has(page) and _windows.has("browser"):
+		_pages[page].get_child(0).refresh(world)
+
+
 func _set_tab(t: String) -> void:
 	tab = t
 	match t:
-		"lunch":
+		"lunch", "tasks", "news", "weather", "memes":
 			_open("browser")
-			_go("lunch")
-		"tasks":
-			_open("browser")
-			_go("tasks")
+			_go(t)
 		_:
 			_open(t)
 

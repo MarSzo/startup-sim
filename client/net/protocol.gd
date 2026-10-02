@@ -3,7 +3,7 @@
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 41
+const VERSION := 42
 const MAX_PACKET := 1152  # a game packet; sealed it grows to at most MAX_DATAGRAM
 const MAX_DATAGRAM := 1200
 const MAX_NICK_BYTES := 16
@@ -67,6 +67,8 @@ const T_VOICE := 52
 const T_VOICE_FROM := 53
 const T_DEPARTMENTS := 54
 const T_ACTION := 55
+const T_HR_ACTION := 56
+const T_HR_INFO := 57
 const MAX_VOICE_BYTES := 800
 # TaskAction.action / MailAction.action (server/src/protocol/mod.rs)
 const TA_SYNC := 0
@@ -197,6 +199,11 @@ const MANDATE_AGE := 26
 const DIALOG_MENU := 250
 const DIALOG_CUPBOARD := 251
 const DIALOG_CONTRACT := 252
+# HrAction.action (server/src/hr.rs `action`): show the file, ask for leave on
+# a day, cancel a request.
+const HR_SHOW := 1
+const HR_REQUEST := 2
+const HR_CANCEL := 3
 # Puddle entity `held` (server/src/protocol/mod.rs `puddle`).
 const PUDDLE_PEE := 0
 const PUDDLE_VOMIT := 1
@@ -451,6 +458,14 @@ static func encode_action(token: int, action: int) -> PackedByteArray:
 	return b.data_array
 
 
+static func encode_hr_action(token: int, action: int, arg: int) -> PackedByteArray:
+	var b := _writer(T_HR_ACTION)
+	b.put_u32(token)
+	b.put_u8(action)
+	b.put_u16(arg)
+	return b.data_array
+
+
 static func encode_skip_wait(token: int) -> PackedByteArray:
 	var b := _writer(T_SKIP_WAIT)
 	b.put_u32(token)
@@ -675,6 +690,31 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			p.health = r.u8()
 			p.stats_flags = r.u8()
 			p.money = r.u32()
+		T_HR_INFO:
+			p.title = r.str16(MAX_TEXT_BYTES)
+			p.department = r.u8()
+			p.form = r.u8()
+			p.salary = r.u32()
+			p.pay_rate = r.u32()
+			p.start_day = r.u16()
+			p.today = r.u16()
+			p.reprimands = r.u8()
+			p.leave_days = r.u8()
+			p.worked = r.u8()
+			var annexes := []
+			var n := r.u8()
+			if n > 10:
+				return {}
+			for i in n:
+				annexes.append({"day": r.u16(), "text": r.str16(MAX_TEXT_BYTES)})
+			p.annexes = annexes
+			var reqs := []
+			n = r.u8()
+			if n > 10:
+				return {}
+			for i in n:
+				reqs.append({"id": r.u8(), "day": r.u16(), "status": r.u8()})
+			p.requests = reqs
 		T_CLOCK:
 			p.day = r.u16()
 			p.minute = r.u16()
@@ -692,6 +732,7 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			p.founded = r.u8() != 0
 			p.alarm = r.u8()
 			p.skip = r.u8()
+			p.leave = r.u8() != 0
 		T_TASK_BOARD:
 			p.dept = r.u8()
 			p.done = r.u16()

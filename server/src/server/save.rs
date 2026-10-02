@@ -148,6 +148,7 @@ impl Server {
             salary: p.salary,
             employment: p.employment,
             terms: p.terms,
+            hr: p.hr.clone(),
             last_raise_day: p.last_raise_day,
             needs: p.needs.clone(),
             inventory,
@@ -260,6 +261,7 @@ impl Server {
         p.salary = c.salary;
         p.employment = c.employment;
         p.terms = c.terms;
+        p.hr = c.hr.clone();
         p.last_raise_day = c.last_raise_day;
         p.needs = c.needs.clone();
         p.last_pay = c.last_pay;
@@ -299,6 +301,8 @@ impl Server {
         if board_without {
             self.give_new(pid, crate::inventory::kind::BREATHALYSER);
         }
+        // Saved before the HR app: the file starts with the contract.
+        self.open_hr_file(pid);
         self.clock_dirty = true;
         self.says.push(super::Say::new(pid, "Z powrotem — wszystko jest tam, gdzie było."));
         self.log(format!("* save: {nick} is back (day {}, {})", c.day, crate::shop::zl(c.money)));

@@ -338,6 +338,9 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 	screen.mail_action.connect(func(n: int, act: int, id: int, to: String, subj: String, body: String):
 		if net.is_playing():
 			net.send(Protocol.encode_mail_action(net.token, n, act, id, to, subj, body)))
+	screen.hr_action.connect(func(act: int, arg: int):
+		if net.is_playing():
+			net.send(Protocol.encode_hr_action(net.token, act, arg)))
 	screen.company_action.connect(func(act: int, target: int, value: int, text: String):
 		if net.is_playing():
 			net.send(Protocol.encode_company_action(net.token, act, target, value, text)))
@@ -703,12 +706,16 @@ func _on_packet(p: Dictionary) -> void:
 			weather = p.weather
 			clock_label.text = "Dzień %d · %02d:%02d · %s · %s" % [p.day, p.minute / 60, p.minute % 60, part, Protocol.WEATHER_NAMES.get(weather, "")]
 			_update_light()
+			screen.set_world({"day": p.day, "minute": p.minute, "weather": Protocol.WEATHER_NAMES.get(weather, ""),
+				"company": p.company, "nick": nick, "department": Departments.name_of(department, "")})
 		Protocol.T_STATS:
 			stats_hud.update_stats(p)
 			me.set_smelly(p.hygiene < 25)
 			me.set_drunk(Protocol.drunk_tier(p.alcohol))
 		Protocol.T_COMPUTER:
 			screen.on_computer(p)
+		Protocol.T_HR_INFO:
+			screen.on_hr(p)
 		Protocol.T_CALENDAR:
 			screen.on_calendar(p)
 		Protocol.T_LUNCH_MENU:

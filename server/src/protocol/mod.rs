@@ -23,7 +23,7 @@ pub use golden::{golden_samples, to_hex};
 pub use snapshot::{snapshot_fragments, SelfState};
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 41;
+pub const VERSION: u8 = 42;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
 /// A game packet at most (sealed, it grows by up to 48 B to `MAX_DATAGRAM`).
@@ -107,6 +107,8 @@ pub mod ty {
     pub const VOICE_FROM: u8 = 53;
     pub const DEPARTMENTS: u8 = 54;
     pub const ACTION: u8 = 55;
+    pub const HR_ACTION: u8 = 56;
+    pub const HR_INFO: u8 = 57;
 }
 
 /// `ItemAction::action`.
@@ -307,6 +309,29 @@ pub mod sound {
     pub const POOP: u8 = 23;
 }
 
+/// `Packet::HrInfo`: the contract, its annexes and the leave.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct HrInfo {
+    pub title: String,
+    pub department: u8,
+    /// `employment::*` (0 = signed before the pay ranges).
+    pub form: u8,
+    /// zł a month gross; the rate in grosze an hour.
+    pub salary: u32,
+    pub pay_rate: u32,
+    /// The player's day it was signed on, and today.
+    pub start_day: u16,
+    pub today: u16,
+    pub reprimands: u8,
+    pub leave_days: u8,
+    /// Days worked towards the next leave day (of `hr::DAYS_PER_LEAVE_DAY`).
+    pub worked: u8,
+    /// (day, text), the newest last.
+    pub annexes: Vec<(u16, String)>,
+    /// (id, day, `hr::status`).
+    pub requests: Vec<(u8, u16, u8)>,
+}
+
 /// A department of the company in `Departments`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DepartmentInfo {
@@ -388,6 +413,8 @@ pub const MAX_VOICE_BYTES: usize = 800;
 
 /// Most sounds in one `Sound` packet.
 pub const MAX_SOUNDS: usize = 64;
+/// Annexes / leave requests in `HrInfo`.
+pub const MAX_HR_ROWS: usize = 10;
 
 /// `Clock::place`: where the receiver is.
 pub mod place {
@@ -758,6 +785,8 @@ pub enum Packet {
         /// Skipping the wait at home: 0 no, 1 asked (waiting for the others
         /// at home), 2 time is flying.
         skip: u8,
+        /// Today is a day off (approved leave): at home all day.
+        leave: bool,
     },
     /// Morning choice of how to get to work (before the departure).
     CommuteChoice {
@@ -859,6 +888,15 @@ pub enum Packet {
     SkipWait {
         token: u32,
     },
+    /// The HR app: show the file, ask for leave on day `arg`, cancel
+    /// request `arg` (`hr::action`).
+    HrAction {
+        token: u32,
+        action: u8,
+        arg: u16,
+    },
+    /// The HR app's view of the receiver's file.
+    HrInfo(Box<HrInfo>),
     /// R (menu of actions) / X (attack): `action::*`.
     Action {
         token: u32,

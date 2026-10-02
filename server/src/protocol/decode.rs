@@ -265,6 +265,7 @@ impl Packet {
                 founded: r.u8()? != 0,
                 alarm: r.u8()?,
                 skip: r.u8()?,
+                leave: r.u8()? != 0,
             },
             ty::FRIDGE => {
                 let n = r.u8()? as usize;
@@ -360,6 +361,37 @@ impl Packet {
             ty::VOICE => {
                 let (token, seq, whisper) = (r.u32()?, r.u16()?, r.u8()?);
                 Packet::Voice { token, seq, whisper, data: r.voice()? }
+            }
+            ty::HR_ACTION => Packet::HrAction { token: r.u32()?, action: r.u8()?, arg: r.u16()? },
+            ty::HR_INFO => {
+                let mut h = HrInfo {
+                    title: r.str16(MAX_TEXT_BYTES)?,
+                    department: r.u8()?,
+                    form: r.u8()?,
+                    salary: r.u32()?,
+                    pay_rate: r.u32()?,
+                    start_day: r.u16()?,
+                    today: r.u16()?,
+                    reprimands: r.u8()?,
+                    leave_days: r.u8()?,
+                    worked: r.u8()?,
+                    ..HrInfo::default()
+                };
+                let n = r.u8()? as usize;
+                if n > MAX_HR_ROWS {
+                    return Err(DecodeError::Invalid("too many annexes"));
+                }
+                for _ in 0..n {
+                    h.annexes.push((r.u16()?, r.str16(MAX_TEXT_BYTES)?));
+                }
+                let n = r.u8()? as usize;
+                if n > MAX_HR_ROWS {
+                    return Err(DecodeError::Invalid("too many leave requests"));
+                }
+                for _ in 0..n {
+                    h.requests.push((r.u8()?, r.u16()?, r.u8()?));
+                }
+                Packet::HrInfo(Box::new(h))
             }
             ty::DEPARTMENTS => {
                 let n = r.u8()? as usize;

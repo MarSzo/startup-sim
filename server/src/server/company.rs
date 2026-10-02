@@ -313,6 +313,8 @@ impl Server {
         if advance {
             p.money += shop::ADVANCE;
         }
+        self.open_hr_file(pid);
+        let Some(p) = self.players.get_mut(&pid) else { return };
         self.company.hired_on.entry(pid).or_insert(p.day);
         let dept = self.cfg.recruitment.department_name(p.department).unwrap_or("-");
         let msg = format!("* player {pid} '{}' signed a contract: {dept}", p.nick);
@@ -327,6 +329,28 @@ impl Server {
         // Everyone gets the updated PlayerInfo (department) again.
         for other in self.players.values_mut() {
             other.known.remove(&pid);
+        }
+    }
+
+    /// A contract without an HR file (just signed, `--start-employed`, a
+    /// save from before the HR app): the contract is its first entry, and
+    /// the starting leave days.
+    pub(super) fn open_hr_file(&mut self, pid: u16) {
+        let Some(p) = self.players.get_mut(&pid) else { return };
+        if !p.contract || !p.hr.annexes.is_empty() {
+            return;
+        }
+        if p.salary == 0 {
+            p.salary = u32::try_from(p.pay_rate * crate::pay::HOURS_A_MONTH / 100).unwrap_or(0);
+        }
+        let form = crate::pay::form_name(p.employment);
+        let (day, salary, position, department) = (p.day, p.salary, p.position, p.department);
+        let title = position
+            .and_then(|o| self.job_title(o))
+            .or_else(|| self.cfg.recruitment.department_name(department).map(str::to_string))
+            .unwrap_or_default();
+        if let Some(p) = self.players.get_mut(&pid) {
+            p.hr.signed(day, crate::hr::lines::contract(&title, form, &crate::pay::zl(salary)));
         }
     }
 
@@ -356,5 +380,6 @@ impl Server {
         }
         self.give_new(id, item_kind::EMPLOYEE_CARD);
         self.give_new(id, item_kind::LAPTOP);
+        self.open_hr_file(id);
     }
 }

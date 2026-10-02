@@ -283,6 +283,22 @@ static func draw_icon(c: Control, kind: String) -> void:
 				for wx in 3:
 					c.draw_rect(Rect2(r.position + Vector2(3 + wx * 8, 3 + wy * 7), Vector2(4, 4)), Color("#e8b85a") if (wx + wy) % 3 else Color(ink, 0.7))
 			c.draw_rect(Rect2(o + Vector2(-3, 11), Vector2(6, 8)), ink)
+		"hr":  # a folder with a document and a stamp
+			var f := Rect2(o + Vector2(-20, -12), Vector2(40, 30))
+			c.draw_rect(Rect2(f.position + Vector2(0, -5), Vector2(16, 7)), Color("#d9a13a"))
+			c.draw_rect(f, Color("#e8b85a"))
+			c.draw_rect(f, ink, false, 2.0)
+			c.draw_rect(Rect2(o + Vector2(-12, -8), Vector2(22, 20)), Color("#fbf8ef"))
+			for k in 3:
+				c.draw_line(o + Vector2(-9, -3 + k * 5), o + Vector2(6, -3 + k * 5), Color(ink, 0.6), 1.2)
+			c.draw_circle(o + Vector2(10, 10), 5, Color("#c0392b"))
+		"terminal":  # a dark window with a prompt
+			var t := Rect2(o + Vector2(-22, -16), Vector2(44, 34))
+			c.draw_rect(t, Color("#1e1f29"))
+			c.draw_rect(t, ink, false, 2.0)
+			c.draw_line(o + Vector2(-16, -6), o + Vector2(-9, -1), Color("#8be9fd"), 2.2, true)
+			c.draw_line(o + Vector2(-9, -1), o + Vector2(-16, 4), Color("#8be9fd"), 2.2, true)
+			c.draw_rect(Rect2(o + Vector2(-5, 3), Vector2(10, 3)), Color("#e6e6e6"))
 		"tasks":  # a board with three columns of cards
 			var r := Rect2(o + Vector2(-19, -15), Vector2(38, 30))
 			c.draw_rect(r.grow(1.5), ink)

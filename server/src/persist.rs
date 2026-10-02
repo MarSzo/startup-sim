@@ -138,6 +138,9 @@ pub struct Character {
     /// Hired, not signed yet: what was agreed (and offered).
     #[serde(default)]
     pub terms: Option<crate::pay::Terms>,
+    /// Annexes, leave days and requests (the HR app).
+    #[serde(default)]
+    pub hr: crate::hr::HrFile,
 }
 
 /// A laptop standing on a desk.
@@ -408,6 +411,7 @@ mod tests {
             salary: 0,
             employment: 0,
             terms: None,
+            hr: Default::default(),
         }
     }
 

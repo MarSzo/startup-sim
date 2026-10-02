@@ -37,6 +37,7 @@ mod day;
 mod doors;
 mod fight;
 mod greetings;
+mod hr;
 mod interact;
 mod items;
 mod kitchen;

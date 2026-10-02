@@ -152,6 +152,11 @@ func _render() -> void:
 				_sub.text = "Biuro zamknięte do rana."
 			if clock.night:
 				_info.text = "Noc… Teraz %s — nowy dzień zaczyna się o 06:00." % hhmm(clock.minute)
+			elif clock.get("leave", false):
+				# A day off (the HR app): at home until tomorrow morning.
+				_title.text = "Urlop 🌴"
+				_sub.text = "Dzień wolny — odpoczywasz w domu (na umowie o pracę płatny)."
+				_info.text = "Teraz %s. Do biura jutro rano." % hhmm(clock.minute)
 			else:
 				# Home early: the day goes on for the others (fast if nobody works).
 				_title.text = "W domu"

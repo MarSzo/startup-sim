@@ -236,6 +236,7 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
                 founded: true,
                 alarm: 1,
                 skip: 1,
+                leave: true,
             },
         ),
         ("commute_choice", Packet::CommuteChoice { token: 0x01020304, mode: 5 }),
@@ -315,6 +316,24 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
         ("fridge_action", Packet::FridgeAction { token: 0x01020304, action: 2, arg: 0 }),
         ("skip_wait", Packet::SkipWait { token: 0x01020304 }),
         ("action", Packet::Action { token: 0x01020304, action: 2 }),
+        ("hr_action", Packet::HrAction { token: 0x01020304, action: 2, arg: 9 }),
+        (
+            "hr_info",
+            Packet::HrInfo(Box::new(HrInfo {
+                title: "Programista/ka".into(),
+                department: 1,
+                form: 2,
+                salary: 10_200,
+                pay_rate: 6071,
+                start_day: 2,
+                today: 7,
+                reprimands: 1,
+                leave_days: 2,
+                worked: 3,
+                annexes: vec![(2, "Umowa".into()), (6, "Aneks nr 1".into())],
+                requests: vec![(1, 9, 1), (2, 8, 3)],
+            })),
+        ),
         (
             "task_action",
             Packet::TaskAction {
