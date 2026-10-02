@@ -319,7 +319,7 @@ mod tests {
     }
 
     /// Stairwell map (between floors 0 and 1).
-    const MID: u8 = 3;
+    const MID: u8 = 4;
 
     #[test]
     fn stairs_go_through_the_stairwell_and_landing() {

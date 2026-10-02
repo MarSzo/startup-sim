@@ -71,8 +71,8 @@ impl Server {
             self.says.push(Say::new(pid, if on { lights::lines::ON } else { lights::lines::OFF }));
         } else if let Some(said) = self.use_spot(pid, body) {
             self.says.extend(said.map(|line| Say::new(pid, line)));
-        } else if let Some(line) = self.use_elevator(body) {
-            self.says.push(Say::new(pid, line));
+        } else if self.use_elevator(pid, body) {
+            // The call button, or the panel in the cabin opened.
         } else if self.show_shelf(pid, body) {
             // The shelf window opened.
         } else if let Some(line) = self.try_go_home(pid, body) {

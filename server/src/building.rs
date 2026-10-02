@@ -143,14 +143,6 @@ impl Building {
         self.active_floors().flat_map(|(f, m)| m.spawns.iter().map(move |t| (f, *t))).collect()
     }
 
-    /// Next active floor (cyclically, going up) with an elevator cabin `id`.
-    pub fn next_elevator_floor(&self, from: u8, id: &str) -> Option<u8> {
-        let n = self.floors.len() as u8;
-        (1..n)
-            .map(|k| (from + k) % n)
-            .find(|&f| self.floor(f).is_some_and(|m| m.links.iter().any(|l| matches!(&l.kind, LinkKind::Elevator { id: i } if i == id))))
-    }
-
     pub fn find_room(&self, name: &str) -> Option<(u8, &RoomDef)> {
         self.active_floors().find_map(|(f, m)| m.room_by_name(name).map(|r| (f, r)))
     }
@@ -219,23 +211,21 @@ mod tests {
     }
 
     #[test]
-    fn loads_two_active_floors_and_locked_third() {
+    fn loads_three_active_floors_locked_second_and_two_stairwells() {
         let b = b();
-        assert_eq!(b.floors.len(), 4);
-        assert!(b.floor(0).is_some() && b.floor(1).is_some());
+        assert_eq!(b.floors.len(), 6);
+        assert!(b.floor(0).is_some() && b.floor(1).is_some() && b.floor(3).is_some());
         assert!(b.floor(2).is_none() && b.floors[2].locked);
         assert_eq!(b.floor_name(1), "Piętro 1");
-        assert!(b.floor(3).is_some(), "the stairwell between 0 and 1 is a map of its own");
-    }
-
-    #[test]
-    fn elevator_cycles_between_active_floors() {
-        let b = b();
-        for lift in ["A", "B"] {
-            assert_eq!(b.next_elevator_floor(0, lift), Some(1));
-            assert_eq!(b.next_elevator_floor(1, lift), Some(0), "locked floor 2 is skipped");
-        }
-        assert_eq!(b.next_elevator_floor(0, "nope"), None);
+        assert_eq!(b.floor_name(3), "Piętro 3");
+        assert!(b.floor(4).is_some(), "the stairwell between 0 and 1 is a map of its own");
+        assert!(b.floor(5).is_some(), "and so is the one between 1 and 3");
+        let lifts: Vec<u8> = b
+            .active_floors()
+            .filter(|(_, m)| m.links.iter().any(|l| matches!(&l.kind, LinkKind::Elevator { id } if id == "A")))
+            .map(|(f, _)| f)
+            .collect();
+        assert_eq!(lifts, [0, 1, 3], "the lifts stop at every storey");
     }
 
     #[test]
@@ -255,9 +245,9 @@ mod tests {
             }
             v
         });
-        assert_eq!(floors, [0, 3, 1]);
+        assert_eq!(floors, [0, 4, 1]);
         let i = path.iter().position(|p| p.0 == 1).unwrap();
-        assert_eq!(b.floor(3).unwrap().tile_char(path[i - 1].1.x, path[i - 1].1.y), Some('S'));
+        assert_eq!(b.floor(4).unwrap().tile_char(path[i - 1].1.x, path[i - 1].1.y), Some('S'));
         assert_eq!(path[i].1, Tile { x: 25, y: 41 }, "arrival tile (the stairwell upstairs)");
         for w in path.windows(2) {
             if w[0].0 == w[1].0 {
@@ -265,6 +255,22 @@ mod tests {
                 assert_eq!(d, 1, "4-connected steps: {:?}", w);
             }
         }
+    }
+
+    #[test]
+    fn path_to_floor_3_goes_through_the_upper_stairwell() {
+        let b = b();
+        let (f, room) = b.find_room("Pokój wypoczynkowy").unwrap();
+        assert_eq!(f, 3);
+        let goal = b.floor(f).unwrap().room_tiles(room.id)[0];
+        let path = b.find_path(b.spawns()[0], (f, goal), crate::map::access::GUEST).expect("reachable on foot");
+        let floors: Vec<u8> = path.iter().map(|p| p.0).fold(Vec::new(), |mut v, f| {
+            if v.last() != Some(&f) {
+                v.push(f);
+            }
+            v
+        });
+        assert_eq!(floors, [0, 4, 1, 5, 3], "ground floor, stairwell, floor 1, upper stairwell, floor 3");
     }
 
     #[test]

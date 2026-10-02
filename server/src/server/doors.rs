@@ -5,7 +5,15 @@ use crate::protocol::{self as proto, Packet};
 use crate::sim::{Body, Pos};
 use crate::stalls;
 
+use super::player::LiftPanel;
 use super::{Say, Server};
+
+/// What the panel in the cabin asks.
+pub const PANEL_TEXT: &str = "Które piętro?";
+/// The last button: close the panel, stay in the cabin.
+pub const PANEL_STAY: &str = "Zostań";
+/// Most floor buttons on the panel (a `Dialog` has up to 4 options).
+const PANEL_BUTTONS: usize = proto::MAX_OPTIONS - 1;
 
 impl Server {
     /// Elevator doors: closed (solid) unless the car stands there open.
@@ -24,22 +32,86 @@ impl Server {
         }
     }
 
-    /// E at the elevator: the button in the cabin, or the call button at
-    /// the doors. `None` = no elevator here.
-    pub(super) fn use_elevator(&mut self, body: &Body) -> Option<String> {
+    /// E at the elevator: in the cabin the panel of floor buttons opens (a
+    /// `Dialog`); at the doors it is the call button. `false` = no elevator
+    /// here.
+    pub(super) fn use_elevator(&mut self, pid: u16, body: &Body) -> bool {
         let tick = self.tick;
         if let Some(i) = self.elevators.iter().position(|e| e.in_cabin(body.floor, body.pos)) {
-            let e = &mut self.elevators[i];
-            self.doors_dirty = true;
-            return Some(match e.press_inside(&self.building, body.floor, tick) {
-                Some(t) => format!("Jedziemy na: {}.", self.building.floor_name(t)),
-                None => elevator::lines::RIDING.to_string(),
-            });
+            let floors: Vec<u8> = self.elevators[i].buttons(body.floor).into_iter().take(PANEL_BUTTONS).collect();
+            if floors.is_empty() {
+                self.says.push(Say::new(pid, elevator::lines::RIDING));
+                return true;
+            }
+            let Some(p) = self.players.get_mut(&pid) else { return true };
+            let id = p.next_dialog();
+            p.lift_panel = Some(LiftPanel { lift: i, floor: body.floor, id, floors });
+            self.send_dialog(pid);
+            return true;
         }
         // Between two lifts: the call button of the nearer one.
-        let i = (0..self.elevators.len()).filter_map(|i| self.elevators[i].door_distance(body).map(|d| (i, d))).min_by_key(|&(_, d)| d)?.0;
+        let Some(i) = (0..self.elevators.len())
+            .filter_map(|i| self.elevators[i].door_distance(body).map(|d| (i, d)))
+            .min_by_key(|&(_, d)| d)
+            .map(|(i, _)| i)
+        else {
+            return false;
+        };
         self.doors_dirty = true; // show where the car is heading at once
-        Some(self.elevators[i].call(body.floor, tick).to_string())
+        let line = self.elevators[i].call(body.floor, tick);
+        self.says.push(Say::new(pid, line));
+        true
+    }
+
+    /// The open panel as a `Dialog` (npc 0): a button per floor, then "stay".
+    pub(super) fn lift_panel_packet(&self, panel: &LiftPanel) -> Packet {
+        let mut options: Vec<String> = panel.floors.iter().map(|&f| self.building.floor_name(f).to_string()).collect();
+        options.push(PANEL_STAY.to_string());
+        Packet::Dialog { id: panel.id, npc: 0, text: PANEL_TEXT.to_string(), options }
+    }
+
+    /// A button on the panel pressed (`DialogAnswer` to the panel's id).
+    pub(super) fn press_lift_panel(&mut self, pid: u16, panel: &LiftPanel, choice: u8) {
+        self.close_lift_panel(pid);
+        let Some(&target) = panel.floors.get(usize::from(choice)) else { return }; // "stay"
+        let Some(e) = self.elevators.get_mut(panel.lift) else { return };
+        let line = match e.press_floor(panel.floor, target, self.tick) {
+            Some(t) => format!("Jedziemy na: {}.", self.building.floor_name(t)),
+            None => elevator::lines::RIDING.to_string(),
+        };
+        self.doors_dirty = true;
+        self.says.push(Say::new(pid, line));
+    }
+
+    /// Close the panel (the client hides it on id 0).
+    pub(super) fn close_lift_panel(&mut self, pid: u16) {
+        if self.players.get_mut(&pid).and_then(|p| p.lift_panel.take()).is_none() {
+            return;
+        }
+        let close = Packet::Dialog { id: 0, npc: 0, text: String::new(), options: Vec::new() };
+        self.send_to(pid, &close);
+        self.send_to(pid, &close); // tiny packet; a duplicate makes loss unlikely
+    }
+
+    /// Panels of people who left the cabin, or whose car set off (somebody
+    /// else pressed a button), close by themselves.
+    fn close_stale_lift_panels(&mut self) {
+        let stale: Vec<u16> = self
+            .players
+            .values()
+            .filter(|p| {
+                p.lift_panel.as_ref().is_some_and(|l| {
+                    !self
+                        .elevators
+                        .get(l.lift)
+                        .is_some_and(|e| !e.buttons(l.floor).is_empty() && p.body.floor == l.floor && e.in_cabin(l.floor, p.body.pos))
+                })
+            })
+            .map(|p| p.id)
+            .collect();
+        for pid in stale {
+            self.close_lift_panel(pid);
+        }
     }
 
     /// Move the elevators; carry the people in a cabin that arrived.
@@ -78,6 +150,7 @@ impl Server {
             self.sync_elevator_doors();
             self.doors_dirty = true;
         }
+        self.close_stale_lift_panels();
     }
 }
 

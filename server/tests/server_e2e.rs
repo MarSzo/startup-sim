@@ -1312,10 +1312,19 @@ fn elevator_is_called_waited_for_and_ridden() {
         _ => None,
     });
     assert!(opened.is_some(), "the car came up and opened");
-    // Step in, choose the floor (the other one: ground floor), ride.
+    // Step in; E opens the panel of floor buttons (the other floors and
+    // "stay"); the ground floor pressed: ride.
     let body = Body { pos: Pos { x: body.pos.x, y: 44 * sim::TILE_UNITS + sim::HALF_H }, ..body };
     let body = ola.walk_to(&b, body, (1, Tile { x: 37, y: 42 }), &[]);
     ola.press_e(&b, body);
+    let panel = wait_for(&ola, &[], wait, |p| match p {
+        Packet::Dialog { id, npc: 0, options, .. } if *id != 0 => Some((*id, options.clone())),
+        _ => None,
+    });
+    let (id, options) = panel.expect("the floor panel");
+    assert_eq!(options, ["Parter", "Piętro 3", "Zostań"]);
+    ola.send(&Packet::DialogAnswer { token: ola.token, id, choice: 0 });
+    assert!(wait_for(&ola, &[], wait, |p| matches!(p, Packet::Dialog { id: 0, .. }).then_some(())).is_some(), "panel closed");
     assert!(wait_for(&ola, &[], wait, said(|t| t.starts_with("Jedziemy na: Parter"))).is_some());
     let arrived = wait_for(&ola, &[], Duration::from_millis(5000), |p| match p {
         Packet::Snapshot { floor: 0, self_x, self_y, .. } => Some((*self_x, *self_y)),

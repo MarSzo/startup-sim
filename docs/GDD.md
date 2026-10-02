@@ -46,7 +46,7 @@ startupu do korporacji.
 - Wejście z portiernią — bramki na kartę; portier (NPC) wpuszcza osoby bez karty
 - Parking wewnętrzny
 - Sklep — zakupy (np. kawa, przekąski, papierosy)
-- Winda — dwa piętra do wyboru, na początku aktywne tylko jedno
+- Winda — panel pięter w kabinie (parter, piętro 1, piętro 3); piętro 2 zablokowane
 - Schody — alternatywa dla windy
 
 ### Piętro 1 (aktywne od startu)
@@ -60,6 +60,15 @@ startupu do korporacji.
 - Łazienka damska i męska
 
 Gracze mogą swobodnie chodzić po korytarzu, pokojach i wspólnych przestrzeniach.
+
+### Piętro 3 (aktywne, wg planu architekta)
+- Pokój wypoczynkowy ze stolikami i sofami, otwarty na kuchnię; balkony 3 i 4
+- Open space (48 biurek po obu stronach przejścia), na wyspach WC damski, męski
+  i dla niepełnosprawnych, lada recepcji; małe balkony 1, 2, 5, 6
+- Pokój spotkań, serwerownia (zamknięta), dwa magazyny, toaleta
+- Hol windowy z recepcją, klatka schodowa, sale konferencyjne 5 i 6, WC
+- Korytarz do skrzydła sal: sale konferencyjne 1, 3 (16 osób) i 4, pokój
+  biurowy, poczekalnia; balkon 7
 
 ### Piętro 2 (zablokowane)
 Odblokowywane wraz z rozwojem firmy (patrz sekcja 6).
@@ -305,9 +314,10 @@ graczy; testy jednostkowe serializacji i ruchu/kolizji.
 
 Układ wg odręcznego planu (numery w nawiasach to numery z rysunku). Mapy
 70×72 kafli po 16 px (1 kafel ≈ 1 m; skala: pokój 18 mieści 8 biurek);
-pliki `client/maps/building.json`, `floor0.json`, `floor1.json`, `floor3.json`
-(klatka schodowa) generuje `tools/build_maps.py` — jedyne miejsce, gdzie się je
-zmienia. Piętro 2 jest w `building.json` jako zablokowane (bez pliku).
+pliki `client/maps/building.json`, `floor0.json`, `floor1.json`, `floor3.json`,
+`floor4.json` i `floor5.json` (klatki schodowe) generuje `tools/build_maps.py`
+— jedyne miejsce, gdzie się je zmienia. Piętro 2 jest w `building.json` jako
+zablokowane (bez pliku).
 
 **Parter + teren zewnętrzny** — gracz startuje na chodniku przed wejściem.
 Wiatrołap (2) → hol (3) z ladą portiera (5, portier siedzi na 6), toaletą (7)
@@ -399,6 +409,22 @@ Finanse (16), korytarz wschodni (25), pokój z jednym biurkiem (26), Biznes (27)
 AI team (28), DevOps „Mordor” (32), łazienka męska (29) z pisuarami (30) i
 kabiną (31).
 
+**Piętro 3** — wg rzutu architekta (numery 301–319), obróconego o ćwierć
+obrotu, żeby drzwi wind patrzyły na południe jak na innych piętrach (zachód
+planu jest tu północą). Wzdłuż północnej ściany pokój wypoczynkowy (312) ze
+stolikami, sofami i balkonami 3 i 4, otwarty na kuchnię (313; ekspres, misa
+z owocami). Rząd pod nim: przejście do open space, pokój spotkań, serwerownia
+(311, zamknięta), magazyny (310, 309), toaleta. Open space (304) z biurkami
+po obu stronach przejścia (komunikacja), na wyspach WC damski (308), męski
+(307) i dla niepełnosprawnych (306), na końcu lada recepcji (305); po bokach
+małe balkony 1, 2, 5, 6. Trzon: sala konferencyjna 6 (318) i WC damski (319)
+na zachodzie, klatka schodowa (301), przejście obok zamkniętego pomieszczenia
+użytkowego (303) do wind, sala konferencyjna 5 (315) na wschodzie, pod nimi
+hol windowy (302) z ladą recepcji (317) i WC męski (316). Na południe
+korytarz i skrzydło sal: sala konferencyjna 4, poczekalnia, sala
+konferencyjna 3 na 16 osób (z balkonem 7), pokój biurowy na 2 osoby, sala
+konferencyjna 1.
+
 ```
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ~~~~~~~~~~~~~~~~~~hhhhhhhhhhhhhhhh~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -485,8 +511,9 @@ taca ze słodyczami, miejsce założyciela i półki sklepu są w `places` mapy.
 
 **Poruszanie między piętrami:** schody — wejście na biegi schodów przenosi do
 klatki schodowej (osobny widok: bieg, półpiętro, drugi bieg), a jej koniec
-na drugie piętro; winda — trzeba ją wezwać (E przy drzwiach), poczekać, wejść
-i wybrać piętro (E w kabinie) — szczegóły w 10.18.
+na sąsiednie piętro (parter–1 i 1–3 mają osobne klatki); winda — trzeba ją
+wezwać (E przy drzwiach), poczekać, wejść i wybrać piętro na panelu (E w
+kabinie) — szczegóły w 10.18.
 
 ### 10.7 Wdrożenie: portier, recepcja, HR (dzień próbny → karta)
 
@@ -686,11 +713,15 @@ Zastępuje prosty portal z 10.8. Po połączeniu gracz widzi pulpit komputera
   osobno: własne wezwania, drzwi i wyświetlacz. Stojąc między nimi, E wzywa
   bliższą.
 - Drzwi są zamknięte, dopóki winda nie stoi na piętrze. **E przy drzwiach
-  wzywa windę**; przy drzwiach (po lewej) wyświetlacz: piętro (P, 1) i
+  wzywa windę**; przy drzwiach (po lewej) wyświetlacz: piętro (P, 1, 3) i
   strzałka jazdy.
-- Jazda: ~3 s na piętro; po przyjeździe drzwi otwarte ~4 s (nie zamkną się na
-  kimś w drzwiach). **E w kabinie** wybiera piętro (przy dwóch aktywnych —
-  drugie); drzwi zamykają się po 1 s i jadą wszyscy w kabinie.
+- Jazda: ~3 s na piętro (na piętro 3 mija zablokowane 2, więc z 1 jedzie
+  ~6 s); po przyjeździe drzwi otwarte ~4 s (nie zamkną się na kimś w
+  drzwiach). **E w kabinie** otwiera **panel pięter** (okno jak w rozmowie):
+  przycisk na każde piętro, na którym winda staje, bez bieżącego, i „Zostań”;
+  wybór przyciskiem albo klawiszami 1–4. Po wyborze drzwi zamykają się po 1 s
+  i jadą wszyscy w kabinie. Panel znika sam, gdy winda ruszy (ktoś inny
+  wybrał) albo gdy wyjdziesz z kabiny.
 - **Maksymalnie 6 osób**: z większą liczbą winda nie ruszy — drzwi zostają
   otwarte, a ktoś w kabinie woła „Przeciążenie!”. Kabina jest mała (3×2
   pola), więc 6 osób stoi ciasno.
@@ -699,11 +730,12 @@ Zastępuje prosty portal z 10.8. Po połączeniu gracz widzi pulpit komputera
 
 ### 10.19 Klatka schodowa i półpiętro
 
-- Schody między parterem a piętrem 1 prowadzą przez **osobny widok klatki
-  schodowej**: bieg w górę, **półpiętro** (podest), drugi bieg. Widać tylko
-  klatkę i osoby na niej; przejście trwa kilka sekund.
-- Przy wyjściach etykiety, dokąd prowadzą (Parter / Piętro 1 / Klatka
-  schodowa).
+- Schody między parterem a piętrem 1 oraz między piętrem 1 a 3 prowadzą
+  przez **osobne widoki klatek schodowych**: bieg w górę, **półpiętro**
+  (podest), drugi bieg. Widać tylko klatkę i osoby na niej; przejście trwa
+  kilka sekund. W klatce na piętrze 1 są dwa biegi: w dół i w górę.
+- Przy wyjściach etykiety, dokąd prowadzą (Parter / Piętro 1 / Piętro 3 /
+  Klatka schodowa).
 
 ### 10.20 Sklep i pieniądze
 
@@ -1280,8 +1312,9 @@ protokół 37).*
   meblami; snapshoty z interest management po `(piętro, pokój)`,
   fragmentowane ≤ 1200 B; nicki przez `PlayerInfo`/`InfoRequest`; ping;
   statystyki co 5 s; symulator `--lag-ms/--jitter-ms/--loss`.
-- **Budynek**: parter (z parkingiem zewnętrznym i strefą palenia) + piętro 1
-  wg sekcji 3, piętro 2 zablokowane; schody i winda (E) jako część
+- **Budynek**: parter (z parkingiem zewnętrznym i strefą palenia), piętro 1
+  i piętro 3 (wg planu architekta) wg sekcji 3, piętro 2 zablokowane; schody
+  i winda (E, panel pięter w kabinie) jako część
   deterministycznej symulacji, przewidywane przez klienta; JSON-y wspólne dla
   serwera i klienta, weryfikowane jednym CRC32 budynku (protokół v2).
 - **Klient Godot** (`client/`): ekran startowy, mapa z kolorowych kafli i

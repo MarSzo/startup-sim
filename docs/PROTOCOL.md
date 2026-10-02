@@ -333,6 +333,12 @@ Rozmowa z NPC (spotkanie z zarządem): `id u8` (0 = zamknij okno), `npc u16`,
 `DialogAnswer`: token u32, id u8, choice u8 — odpowiedzi na nieaktualne `id`
 są ignorowane. Odpowiedzi NPC idą jako `Say`.
 
+`npc` 0 = **panel pięter w windzie** (E w kabinie stojącej windy): `text`
+„Które piętro?”, opcje to nazwy pięter, na których winda staje (bez bieżącego,
+zablokowane piętro 2 pomija), ostatnia „Zostań”. `DialogAnswer` wciska
+przycisk („Jedziemy na: …” jako `Say`); serwer zamyka panel (`id` 0) po
+odpowiedzi, gdy winda ruszy albo gdy gracz wyjdzie z kabiny.
+
 ### 35 `LunchMenu` (S→C), 36 `LunchOrder` (C→S)
 
 Aplikacja obiadowa dla konta komputera, przy którym siedzi odbiorca (co 1 s):
@@ -551,6 +557,7 @@ szyfrowaniem.
 
 ## Historia wersji
 
+- **39** — piętro 3 (`floor3.json`); klatki schodowe jako mapy 4 (parter–1) i 5 (1–3); panel pięter w windzie jako `Dialog` z `npc` 0 + `DialogAnswer` (zamiast „E jedzie na następne piętro”).
 - **38** — kałuża po wpadce: encja `kind` 6 (`flags`, `held`, `activity` = 0), id z puli od `0xE000`; widoczna jak przedmioty w pokoju; ściera ją sprzątaczka, inaczej znika o 22:00.
 - **37** — osobne działy: pakiet `Departments` (54, S→C) z listą działów; działy 4–10 (Mobile, DevOps, AI, Finanse, Sales, Marketing, Obsługa klienta), dział 1 nazywa się „Produkt / IT”.
 - **36** — dwie windy: `Doors` kończy się listą wind `n u8` (≤ 16) × {`floor u8`, `target u8` (255 = stoi), `moving u8`} zamiast jednej trójki `lift_*`.

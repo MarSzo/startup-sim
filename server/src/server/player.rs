@@ -74,6 +74,17 @@ pub(super) struct Talk {
     pub(super) good: u32,
 }
 
+/// The panel of floor buttons open in a lift cabin (a `Dialog` with npc 0).
+#[derive(Debug, Clone)]
+pub(super) struct LiftPanel {
+    /// Index into `Server::elevators`, the floor the car stands at.
+    pub(super) lift: usize,
+    pub(super) floor: u8,
+    pub(super) id: u8,
+    /// The buttons, in option order (the last option is "stay").
+    pub(super) floors: Vec<u8>,
+}
+
 pub(super) struct Player {
     pub(super) id: u16,
     /// Character from the creation screen (age, city, e-mail stay here).
@@ -144,6 +155,8 @@ pub(super) struct Player {
     pub(super) last_raise_day: Option<u32>,
     /// Talking to a board member: meeting index, NPC, dialog id, good answers.
     pub(super) talk: Option<Talk>,
+    /// In a lift cabin, choosing the floor.
+    pub(super) lift_panel: Option<LiftPanel>,
     pub(super) next_dialog_id: u8,
     /// Sofa / toilet / smoke break, and where it started (moving ends it).
     pub(super) rest: Option<(Rest, u8, Pos)>,
@@ -217,6 +230,7 @@ impl Player {
             pay_rate: clock::PAY_PER_MIN * 60,
             last_raise_day: None,
             talk: None,
+            lift_panel: None,
             next_dialog_id: 0,
             rest: None,
             last_chat_tick: None,

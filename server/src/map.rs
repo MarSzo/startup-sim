@@ -505,7 +505,7 @@ mod tests {
     }
 
     /// Rooms behind locked doors (or walled up): nobody gets in.
-    const SEALED: [&str; 3] = ["Strefa zamknięta", "Serwerownia", "Szafa"];
+    const SEALED: [&str; 4] = ["Strefa zamknięta", "Serwerownia", "Szafa", "Pomieszczenie użytkowe"];
 
     #[test]
     fn ground_floor_has_the_planned_rooms() {
@@ -615,7 +615,7 @@ mod tests {
         let b = b();
         let spawn = (0, b.floor(0).unwrap().spawns[0]);
         let public = ["outside", "parking", "entrance", "shop", "smoking", "stall"];
-        for f in [0u8, 1] {
+        for f in [0u8, 1, 3] {
             let m = b.floor(f).unwrap();
             // (The lift cabins are reached by riding, not walking.)
             for r in m.rooms.iter().filter(|r| r.kind != "elevator") {

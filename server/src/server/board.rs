@@ -154,8 +154,14 @@ impl Server {
         self.meetings.iter().position(|m| m.day == t.day && m.start == t.start && m.owner == pid)
     }
 
+    /// The dialog open for the player: the lift's floor panel or a board
+    /// member's question.
     pub(super) fn dialog_packet(&self, pid: u16) -> Option<Packet> {
-        let t = self.players.get(&pid)?.talk.as_ref()?;
+        let p = self.players.get(&pid)?;
+        if let Some(panel) = &p.lift_panel {
+            return Some(self.lift_panel_packet(panel));
+        }
+        let t = p.talk.as_ref()?;
         let m = &self.meetings[self.talk_meeting(pid, t)?];
         let board::State::Talking(step) = m.state else { return None };
         let s = board::steps(m.topic).get(step)?;
@@ -169,6 +175,12 @@ impl Server {
     }
 
     pub(super) fn handle_dialog_answer(&mut self, pid: u16, dialog: u8, choice: u8) {
+        if let Some(panel) = self.players.get(&pid).and_then(|p| p.lift_panel.clone()) {
+            if panel.id == dialog {
+                self.press_lift_panel(pid, &panel, choice);
+            }
+            return;
+        }
         let Some(t) = self.players.get(&pid).and_then(|p| p.talk) else { return };
         if t.id != dialog {
             return; // stale (resend of an answered question)

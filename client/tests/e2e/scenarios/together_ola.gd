@@ -32,7 +32,10 @@ func run() -> void:
 		return
 	if not await walk(1, 37, 42):  # into the cabin
 		return
-	await press_e()
+	await press_e()  # the panel of floor buttons
+	if not await until(func(): return game().dialog.visible, 5.0, "the floor panel"):
+		return
+	game().dialog._choose(0)  # the first button: the ground floor
 	if not await hear("Jedziemy na: Parter"):
 		return
 	await until(func(): return floor_now() == 0, 10.0, "down on the ground floor")

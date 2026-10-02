@@ -62,18 +62,18 @@ func floor_name(f: int) -> String:
 	return floors[f].name if f >= 0 and f < floors.size() else "?"
 
 
-## Next active floor (cyclically, going up) with an elevator cabin `id`, or -1.
-func next_elevator_floor(from: int, id: String) -> int:
-	var n := floors.size()
-	for k in range(1, n):
-		var f := (from + k) % n
+## Active floors with a cabin of elevator `id` (where it stops), bottom up.
+func elevator_floors(id: String) -> Array[int]:
+	var out: Array[int] = []
+	for f in floors.size():
 		var m = get_floor(f)
 		if m == null:
 			continue
 		for l in m.links:
 			if l.kind == "elevator" and l.id == id:
-				return f
-	return -1
+				out.append(f)
+				break
+	return out
 
 
 ## Which elevator a door tile belongs to (it touches that cabin), or -1.

@@ -1,5 +1,6 @@
-## A conversation with an NPC (board meeting): the question and the answers
-## as buttons (or keys 1-3). The server drives it; id 0 closes it.
+## A conversation with an NPC (board meeting) or the panel of floor buttons
+## in a lift (npc 0): the question and the answers as buttons (or keys 1-4).
+## The server drives it; id 0 closes it.
 extends Control
 
 const Ink = preload("res://ui/ink_ui.gd")
@@ -57,7 +58,7 @@ func on_dialog(p: Dictionary) -> void:
 			answer.emit(dialog_id, _answer_choice)
 		return
 	dialog_id = p.id
-	_who.text = "Spotkanie — %s" % name_of.call(p.npc)
+	_who.text = "Winda" if p.npc == 0 else "Spotkanie — %s" % name_of.call(p.npc)
 	_text.text = p.text
 	for c in _opts.get_children():
 		c.queue_free()

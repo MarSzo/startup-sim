@@ -469,7 +469,8 @@ mod tests {
         let b = Building::load(&default_building_path()).unwrap();
         let spots = find_spots(&b);
         let count = |k| spots.iter().filter(|s| s.kind == k).count();
-        assert!(count(SpotKind::Sofa) >= 1 && count(SpotKind::Ashtray) >= 1 && count(SpotKind::FruitBowl) == 1);
+        assert!(count(SpotKind::Sofa) >= 1 && count(SpotKind::Ashtray) >= 1);
+        assert_eq!(count(SpotKind::FruitBowl), 2, "the chill room's and the floor 3 kitchen's");
         assert!(count(SpotKind::Sink) >= 4 && count(SpotKind::Sanitizer) >= 3);
         let toilets: Vec<_> = spots.iter().filter(|s| s.kind == SpotKind::Toilet).collect();
         assert!(toilets.iter().any(|t| t.gender.as_deref() == Some("female")));

@@ -1013,12 +1013,11 @@ func _update_hint() -> void:
 	var t := Movement.tile_of_pos(pred.pos)
 	var link: Dictionary = map.link_at(t.x, t.y) if map else {}
 	if not link.is_empty() and link.kind == "elevator":
-		# In the cabin: the car stands here -> choose the floor; else riding.
+		# In the cabin: the car stands here -> the panel of floor buttons; else riding.
 		var l := _lift(building.lift_ids.find(link.id))
 		var standing: bool = not l.moving and l.floor == pred.floor
-		var target: int = building.next_elevator_floor(pred.floor, link.id)
-		if standing and target >= 0:
-			text = "[E] Jedź na: %s" % building.floor_name(target)
+		if standing and building.elevator_floors(link.id).size() > 1:
+			text = "[E] Wybierz piętro"
 		else:
 			text = "Jedziemy…"
 	elif map:

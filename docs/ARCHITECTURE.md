@@ -22,7 +22,7 @@ z własnym binarnym protokołem (`docs/PROTOCOL.md`).
 ```
 server/                 crate Rusta (lib `game` + binarki)
   src/lib.rs            moduły współdzielone przez serwer i boty
-  src/building.rs       budynek: lista pięter (+ mapa klatki schodowej), CRC, BFS między piętrami
+  src/building.rs       budynek: lista pięter (+ mapy klatek schodowych), CRC, BFS między piętrami
   src/map.rs            jedno piętro: kafle, kolizje, pokoje, linki (schody/winda)
   src/sim.rs            deterministyczny krok: ruch, kolizje, schody
   src/elevator.rs       winda: przywołanie, jazda, drzwi (serwer, poza symulacją)
@@ -77,6 +77,9 @@ client/                 projekt Godota 4.7
   maps/building.json    lista pięter (piętro 2 zablokowane)
   maps/floor0.json      parter + teren zewnętrzny
   maps/floor1.json      piętro 1
+  maps/floor3.json      piętro 3 (wg planu architekta)
+  maps/floor4.json      klatka schodowa parter–1 (półpiętro)
+  maps/floor5.json      klatka schodowa 1–3 (półpiętro)
   main.gd / main.tscn   wejście: start screen <-> gra, argumenty dev
   net/protocol.gd       lustro protocol/
   net/net_client.gd     połączenie UDP (PacketPeerUDP)
@@ -498,9 +501,10 @@ uprawnień obsługi. BFS (`Building::find_path`) stosuje te same reguły.
 **Przejścia między piętrami**:
 - **Schody** (część kroku, więc przewidywane przez klienta): wejście środkiem
   postaci na kafel schodów (`links` typu `stairs`) przenosi na kafel przyjścia
-  na innej mapie. Między parterem a piętrem 1 jest osobna mapa **klatki
-  schodowej** (w `building.json` jako „piętro” 3 z `stairwell: true`): bieg w
-  górę, półpiętro, drugi bieg — widać tylko klatkę i osoby na niej. Zaraz po
+  na innej mapie. Między parterem a piętrem 1 oraz między piętrem 1 a 3 są
+  osobne mapy **klatek schodowych** (w `building.json` jako „piętra” 4 i 5 z
+  `stairwell: true`): bieg w górę, półpiętro, drugi bieg — widać tylko klatkę
+  i osoby na niej. Zaraz po
   przejściu działa blokada: schody nie zadziałają, dopóki nie zmienisz
   klawiszy ruchu *i* nie zejdziesz z obszaru schodów.
 - **Windy** (`elevator.rs`, poza symulacją): każdy `id` linku `elevator` to
@@ -509,8 +513,12 @@ uprawnień obsługi. BFS (`Building::find_path`) stosuje te same reguły.
   (kolejka pięter), jazda trwa 3 s na piętro, drzwi są otwarte 4 s i nie
   zamkną się na kimś w drzwiach; z więcej niż 6 osobami w kabinie (3×2 pola)
   nie rusza; w czasie jazdy klient wygasza wszystko poza kabiną (`ride_mask.gd`,
-  między mapą a postaciami); E w kabinie wybiera następne aktywne piętro
-  (drzwi zamykają się po 1 s). Drzwi windy są w nakładce `closed` mapy (jak
+  między mapą a postaciami); E w kabinie otwiera **panel pięter** — pakiet
+  `Dialog` z `npc` 0 (`Player::lift_panel`, `doors.rs`): przycisk na każde
+  piętro, na którym winda staje (bez bieżącego; zablokowane 2 pomija), i
+  „Zostań”; `DialogAnswer` wciska przycisk (`Elevator::press_floor`, drzwi
+  zamykają się po 1 s), panel znika, gdy winda ruszy albo gracz wyjdzie z
+  kabiny. Drzwi windy są w nakładce `closed` mapy (jak
   kabiny toaletowe), więc zamknięte blokują ruch także w predykcji. Po
   przyjeździe serwer przenosi wszystkich z kabiny piętra startowego na tę samą
   pozycję docelowego piętra; klient dostaje to jak korektę (zmiana piętra =
