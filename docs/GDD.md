@@ -1243,6 +1243,16 @@ pełnym ekranie — zastąpiona stylem inspirowanym Don't Starve:
 - Tylko w wydanych wersjach (w edytorze każde zatrzymanie wyglądałoby jak
   awaria; do testów `--crash-test`).
 
+### 10.46 Aktualizacje klienta
+
+- Przy starcie gra sprawdza najnowsze wydanie na GitHubie; jeśli jest nowsze
+  niż jej wersja, nad ekranem tytułowym: „Dostępna nowa wersja gry: X (masz
+  Y)” — *Pobierz* (strona wydania z dmg) / *Później*.
+- Serwer z innym protokołem odrzuca klienta; zamiast suchego błędu: „Ta wersja
+  gry nie pasuje do serwera — pobierz najnowszą” z tym samym przyciskiem.
+- Na razie gracz sam pobiera i podmienia aplikację; aktualizacja jednym
+  kliknięciem (Sparkle / łatki `.pck` / itch.io) — później.
+
 ### 10.6 Stan implementacji
 
 *Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie,

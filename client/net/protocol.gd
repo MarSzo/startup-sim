@@ -199,9 +199,10 @@ const DISCONNECT_KICKED := 2
 const DISCONNECT_SHUTDOWN := 3
 const DISCONNECT_SESSION_UNKNOWN := 4
 
-const REJECT_REASONS := {1: "Serwer pełny", 2: "Niezgodna wersja protokołu", 3: "Nieprawidłowe imię", 4: "Nieprawidłowe dane postaci",
+const REJECT_REASONS := {1: "Serwer pełny", 2: "Ta wersja gry nie pasuje do serwera — pobierz najnowszą", 3: "Nieprawidłowe imię", 4: "Nieprawidłowe dane postaci",
 	5: "Logowanie wygasło — zaloguj się ponownie", 6: "Ten serwer wymaga konta — zaloguj się", 7: "Ten nick jest zajęty — wybierz inny",
 	8: "Ten e-mail ma już inna postać — wpisz inny"}
+const REJECT_BAD_VERSION := 2
 const REJECT_BAD_TICKET := 5
 const REJECT_GUESTS_OFF := 6
 const REJECT_NICK_TAKEN := 7

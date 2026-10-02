@@ -548,6 +548,13 @@ logu przez `AuthClient.send_crash` (to samo przypinanie certyfikatu co
 logowanie). Serwer: limity na adres i godzinę, usuwa znaki sterujące, plik na
 raport, rotacja do 200. Tylko w wydanych wersjach (`--crash-test` w edytorze).
 
+**Aktualizacje** (`net/updates.gd`): przy starcie (tylko wydane wersje albo
+`--update-check`) `GET api.github.com/repos/<repo>/releases/latest`,
+porównanie `tag_name` z `application/config/version` (`is_newer`, po
+częściach); nowsze → panel na `update_layer` (warstwa 60, nad wszystkim) z
+`OS.shell_open` na stronę wydania. `Reject(2)` (zła wersja) pokazuje ten sam
+panel jako wymagany. `--pretend-version` do testów.
+
 **Połączenie** (`net_client.gd`): parsowanie adresów z IPv6, rozwiązywanie
 nazw `TYPE_ANY`, nowe gniazdo po 1,5 s ciszy lub powrocie z tła (ta sama
 sesja), automatyczne ponowne łączenie przez 30 s po utracie sesji — `main.gd`

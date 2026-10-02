@@ -22,6 +22,7 @@ const DayScreen = preload("res://ui/day_screen.gd")
 const TitleScreen = preload("res://ui/title_screen.gd")
 const CrashReports = preload("res://net/crash_reports.gd")
 const UserPaths = preload("res://net/user_paths.gd")
+const Updates = preload("res://net/updates.gd")
 const PauseMenu = preload("res://ui/pause_menu.gd")
 const Settings = preload("res://ui/settings.gd")
 const Audio = preload("res://audio/audio.gd")
@@ -47,6 +48,8 @@ var pause := PauseMenu.new()
 var _leaving := false  # "Wyjdź do menu": the disconnect goes to the title
 var audio := Audio.new()
 var auth := AuthClient.new()
+var updates := Updates.new()
+var update_layer := CanvasLayer.new()   # "a new version" over every screen
 var login_layer := CanvasLayer.new()
 var login := LoginScreen.new()
 ## The logged-in account: {address, nick, ticket, refresh, key} ({} = a
@@ -80,6 +83,12 @@ func _ready() -> void:
 	Settings.apply_fps()
 	add_child(audio)
 	Settings.apply_audio()
+	add_child(updates)
+	update_layer.layer = 60
+	add_child(update_layer)
+	Updates.pretend = str(args.get("pretend-version", ""))
+	if Updates.enabled(args):
+		_check_updates.call_deferred()
 	# The previous session crashed? Offer to send its log (once the UI is up).
 	if CrashReports.enabled(args):
 		var crashed := CrashReports.begin_session()
@@ -373,6 +382,8 @@ func _show_login(message: String) -> void:
 ## back in); "needs an account" sends us to the login screen.
 func _on_rejected(reason: int) -> void:
 	var msg: String = Protocol.REJECT_REASONS.get(reason, "")
+	if reason == Protocol.REJECT_BAD_VERSION:
+		_show_update("", Updates.DOWNLOAD_PAGE, true)
 	if reason == Protocol.REJECT_BAD_TICKET and session.get("refresh", "") != "":
 		_retry_login = true
 	elif reason == Protocol.REJECT_EMAIL_TAKEN or (reason == Protocol.REJECT_NICK_TAKEN and session.is_empty()):
@@ -470,6 +481,39 @@ func _on_disconnected(reason: String) -> void:
 	start.get_parent().visible = true
 	start.set_busy(false)
 	start.set_status(reason, true)
+
+
+## A newer release on GitHub? Offer it (on top of the title screen).
+func _check_updates() -> void:
+	var r: Dictionary = await updates.check()
+	if not r.is_empty():
+		_show_update(r.version, r.url, false)
+
+
+## "A new version" panel at the top: optional (a newer release) or required
+## (the server refused this version).
+func _show_update(version: String, url: String, required: bool) -> void:
+	for c in update_layer.get_children():
+		c.queue_free()
+	var panel := PanelContainer.new()
+	panel.add_theme_stylebox_override("panel", Ink.box("paper"))
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	panel.add_child(row)
+	var text := "Ta wersja gry (%s) nie pasuje do serwera — pobierz najnowszą." % Updates.current() if required \
+		else "Dostępna nowa wersja gry: %s (masz %s)." % [version, Updates.current()]
+	var label := Ink.label(text, 18, Ink.TEXT_INK)
+	label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	row.add_child(label)
+	var get_it := Ink.button("Pobierz", true)
+	get_it.pressed.connect(func(): OS.shell_open(url))
+	row.add_child(get_it)
+	var later := Ink.button("Zamknij" if required else "Później")
+	later.pressed.connect(func(): panel.queue_free())
+	row.add_child(later)
+	update_layer.add_child(panel)
+	panel.reset_size()
+	panel.position = Vector2((get_viewport().get_visible_rect().size.x - panel.size.x) / 2, 16)
 
 
 ## A normal exit: the next start won't think it crashed.

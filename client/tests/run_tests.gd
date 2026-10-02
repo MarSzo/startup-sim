@@ -88,6 +88,10 @@ func test_protocol(path: String) -> void:
 	expect(dr.get("type") == Protocol.T_DOORS and dr.floor == 1 and dr.tiles == [Vector2i(5, 45), Vector2i(41, 43)]
 		and dr.lifts.size() == 2 and dr.lifts[0].floor == 0 and dr.lifts[0].target == 1 and dr.lifts[0].moving
 		and dr.lifts[1].floor == 1 and dr.lifts[1].target == Protocol.NO_FLOOR and not dr.lifts[1].moving, "decode doors %s" % dr)
+	var Updates = load("res://net/updates.gd")
+	expect(Updates.is_newer("0.2.0", "0.1.0") and Updates.is_newer("v0.1.10", "0.1.9") and Updates.is_newer("1.0", "0.9.9")
+		and not Updates.is_newer("0.1.0", "0.1.0") and not Updates.is_newer("v0.1.0", "0.2.0") and not Updates.is_newer("0.1", "0.1.0"),
+		"version comparison")
 	var dp := Protocol.decode(golden["departments"].hex_decode())
 	expect(dp.get("type") == Protocol.T_DEPARTMENTS and dp.list.size() == 2 and dp.list[0].id == 1 and dp.list[0].short == "IT"
 		and dp.list[0].name == "Produkt / IT" and dp.list[1].id == 10 and dp.list[1].name == "Obsługa klienta", "decode departments %s" % dp)

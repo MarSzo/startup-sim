@@ -14,9 +14,21 @@ docs are in Polish; contributions in English are welcome too
 Gotowy klient na macOS (podpisany i notaryzowany dmg, Intel + Apple Silicon):
 [Startup Sim 0.1.0](https://github.com/mateuszpalak/startup-sim/releases/tag/v0.1.0) —
 wszystkie wydania: [Releases](https://github.com/mateuszpalak/startup-sim/releases).
-Nowe wydanie: zbuduj dmg (`tools/build-macos.sh`), potem
-`git tag -a v<wersja> -m "Startup Sim <wersja>"`, `git push origin v<wersja>` i
-`gh release create v<wersja> build/StartupSim-<wersja>.dmg --title "Startup Sim <wersja>" --notes "…"`.
+Gra przy starcie sprawdza najnowsze wydanie na GitHubie i, jeśli jest nowsze,
+proponuje „Pobierz” na ekranie tytułowym; serwer odrzucający starą wersję
+(inny protokół) też kończy się tym przyciskiem.
+
+Nowe wydanie:
+1. podbij wersję w `client/project.godot` (`config/version`) i w
+   `client/export_presets.cfg` (`application/short_version` i o 1 wyżej
+   `application/version`) — po niej klienci poznają, że jest nowsza;
+2. zbuduj dmg: `tools/build-macos.sh`;
+3. `git tag -a v<wersja> -m "Startup Sim <wersja>"` i `git push origin v<wersja>`;
+4. `gh release create v<wersja> build/StartupSim-<wersja>.dmg --title "Startup Sim <wersja>" --notes "…"`
+   (tag `v<wersja>` musi zgadzać się z `config/version`; szkiców i wersji
+   „pre-release” klienci nie proponują);
+5. przy zmianie protokołu wdróż też serwer (`deploy/deploy.sh`) — stare
+   klienty dostaną „pobierz najnowszą”.
 
 ## Uruchomienie
 
