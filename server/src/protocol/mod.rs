@@ -23,7 +23,7 @@ pub use golden::{golden_samples, to_hex};
 pub use snapshot::{snapshot_fragments, SelfState};
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 38;
+pub const VERSION: u8 = 39;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
 /// A game packet at most (sealed, it grows by up to 48 B to `MAX_DATAGRAM`).
@@ -46,7 +46,7 @@ pub const MAX_CONVS: usize = 40;
 pub const MAX_INPUTS_PER_PACKET: usize = 8;
 
 /// Fixed part of a Snapshot packet (header + fields before the entity list).
-pub const SNAPSHOT_FIXED_LEN: usize = HEADER_LEN + 4 + 4 + 1 + 1 + (4 + 4 + 1 + 2 + 1 + 1 + 1 + 1 + 1) + 1;
+pub const SNAPSHOT_FIXED_LEN: usize = HEADER_LEN + 4 + 4 + 1 + 1 + (4 + 4 + 1 + 2 + 1 + 1 + 1 + 1 + 1 + 1) + 1;
 pub const ENTITY_LEN: usize = 14;
 /// Entities per snapshot fragment so a fragment never exceeds `MAX_PACKET`.
 pub const MAX_ENTITIES_PER_SNAPSHOT: usize = (MAX_PACKET - SNAPSHOT_FIXED_LEN) / ENTITY_LEN;
@@ -239,6 +239,10 @@ pub mod activity {
     pub const RIDING: u8 = 7;
     /// Stopped by the guard / the police (can't move for a moment).
     pub const HELD: u8 = 8;
+    /// Throwing up (a moment; leaves a puddle).
+    pub const VOMITING: u8 = 9;
+    /// Passed out drunk (asleep on the floor for a while).
+    pub const PASSED_OUT: u8 = 10;
 }
 
 /// `Sound` kinds: things happening in the world that others hear too.
@@ -260,6 +264,9 @@ pub mod sound {
     pub const EAT: u8 = 15;
     pub const DRINK: u8 = 16;
     pub const WHISTLE: u8 = 17;
+    /// A burp after a beer (the client plays it a moment later).
+    pub const BURP: u8 = 18;
+    pub const VOMIT: u8 = 19;
 }
 
 /// A department of the company in `Departments`.
@@ -375,6 +382,11 @@ pub const FLAG_SLOW: u8 = 0x40;
 /// `EntityState::flags` bit 3 for players (NPC looks use bits 3-5): an open
 /// umbrella (outdoors in the rain).
 pub const FLAG_UMBRELLA: u8 = 0x08;
+
+/// `EntityState::flags` bits 4-5 for players: how drunk it shows (0 sober,
+/// 1 tipsy, 2 drunk, 3 very drunk).
+pub const FLAG_DRUNK_SHIFT: u8 = 4;
+pub const FLAG_DRUNK_MASK: u8 = 0x30;
 
 /// `EntityState::flags` bit: low hygiene (a smell cloud others can see).
 pub const FLAG_SMELLY: u8 = 0x80;
@@ -533,6 +545,8 @@ pub enum Packet {
         self_access: u8,
         /// Receiver's `sim::Body::slow` (simulated: movement speed).
         self_slow: u8,
+        /// Receiver's `sim::Body::drunk` (simulated: staggering).
+        self_drunk: u8,
         /// Receiver's activity (not simulated): see `activity`.
         self_activity: u8,
         entities: Vec<EntityState>,
@@ -647,6 +661,8 @@ pub enum Packet {
         stress: u8,
         bladder: u8,
         hygiene: u8,
+        /// Alcohol, 0..100 (75 throws up, 100 after that: passes out).
+        alcohol: u8,
         flags: u8,
         money: u32,
     },
@@ -749,10 +765,10 @@ pub enum Packet {
         offers: Vec<CompanyOffer>,
     },
     /// Company panel: candidates (player, offer, score, total, nick) and
-    /// staff (player, department, hired on day, nick).
+    /// staff (player, department, hired on day, reprimands, nick).
     CompanyPeople {
         candidates: Vec<(u16, u8, u8, u8, String)>,
-        staff: Vec<(u16, u8, u16, String)>,
+        staff: Vec<(u16, u8, u16, u8, String)>,
     },
     /// Found the company (from the portal) / run it (panel): `company::action`.
     CompanyAction {

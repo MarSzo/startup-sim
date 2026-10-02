@@ -107,7 +107,7 @@ fn an_accident_leaves_a_puddle_until_the_office_closes() {
 fn puddles_are_capped_and_never_share_a_handle() {
     let mut s = server();
     for _ in 0..1000 {
-        s.leave_puddle(0, Pos::tile_center(5, 5));
+        s.leave_puddle(0, Pos::tile_center(5, 5), false);
         let item = s.mint_item(item_kind::FRUIT, "Jabłko");
         s.drop_at(0, Pos::tile_center(5, 5), item);
     }
@@ -124,7 +124,7 @@ fn the_cleaner_mops_up_a_puddle_on_her_round() {
     s.clock.ds = 10 * 60 * crate::clock::DS_PER_MIN;
     let ws = crate::computer::find_workstations(&s.building);
     let w = ws.iter().find(|w| w.department == 1).unwrap();
-    s.leave_puddle(w.floor, Pos::tile_center(w.tile.x, w.tile.y + 1));
+    s.leave_puddle(w.floor, Pos::tile_center(w.tile.x, w.tile.y + 1), false);
     let mut said = false;
     for _ in 0..20 * 120 {
         s.tick += 1;
@@ -139,4 +139,78 @@ fn the_cleaner_mops_up_a_puddle_on_her_round() {
     }
     assert!(s.puddles.is_empty(), "the puddle is mopped up");
     assert!(said, "and she has a word about it");
+}
+
+/// A beer (or another drink) in hands, then F.
+fn drink(s: &mut Server, id: u16, kind: u8) {
+    let item = s.mint_item(kind, "test");
+    s.players.get_mut(&id).unwrap().inventory.hands = Some(item);
+    s.use_held(id);
+}
+
+#[test]
+fn five_beers_throw_up_and_more_puts_you_to_sleep() {
+    use crate::protocol::{activity, sound};
+    let mut s = server();
+    add_player(&mut s, 1);
+    for _ in 0..4 {
+        drink(&mut s, 1, item_kind::BEER);
+    }
+    assert!(s.puddles.is_empty(), "four beers: still standing");
+    assert!(s.sounds.iter().any(|x| x.0 == sound::BURP), "a burp after a beer");
+    assert_eq!(s.players[&1].needs.alcohol_points(), 60);
+    drink(&mut s, 1, item_kind::BEER);
+    assert_eq!(s.puddles.len(), 1, "the fifth: thrown up");
+    assert!(s.puddles[0].vomit);
+    assert!(s.sounds.iter().any(|x| x.0 == sound::VOMIT));
+    assert_eq!(super::player::activity(&s.players[&1], s.tick), activity::VOMITING);
+    drink(&mut s, 1, item_kind::WINE); // 65 + 30
+    assert!(!s.players[&1].passed_out);
+    drink(&mut s, 1, item_kind::MALPKA);
+    let p = &s.players[&1];
+    assert!(p.passed_out, "drank on after throwing up: asleep");
+    assert_eq!(super::player::activity(p, s.tick), activity::PASSED_OUT);
+    assert_eq!(s.puddles.len(), 1, "only one puddle");
+    // A minute later they wake up with less in the blood.
+    s.tick += crate::drunk::PASS_OUT_TICKS;
+    s.simulate_players();
+    let p = &s.players[&1];
+    assert!(!p.passed_out && p.needs.alcohol_points() <= 60);
+    assert!(s.says.iter().any(|l| l.text == crate::drunk::lines::WAKE_UP));
+}
+
+#[test]
+fn the_board_tests_with_the_breathalyser_and_three_reprimands_fire() {
+    let mut s = server();
+    let (boss, worker) = (1, 2);
+    add_player(&mut s, boss);
+    add_player(&mut s, worker);
+    s.company.founder = Some(boss);
+    s.players.get_mut(&boss).unwrap().department = crate::company::BOARD_DEPARTMENT;
+    let w = s.players.get_mut(&worker).unwrap();
+    w.department = 1;
+    w.contract = true;
+    w.body.pos = Pos::tile_center(6, 5); // right next to the boss
+                                         // Not on the board: no test.
+    drink(&mut s, worker, item_kind::BREATHALYSER);
+    assert!(s.says.iter().any(|l| l.text == crate::drunk::lines::NOT_BOARD));
+    // Sober: a reading, no question.
+    s.says.clear();
+    drink(&mut s, boss, item_kind::BREATHALYSER);
+    assert!(s.says.iter().any(|l| l.text.contains("0,00 ‰")), "{:?}", s.says.iter().map(|l| &l.text).collect::<Vec<_>>());
+    assert!(s.players[&boss].reprimand_ask.is_none());
+    for n in 1..=3u8 {
+        s.players.get_mut(&worker).unwrap().needs.drink_alcohol(20);
+        s.says.clear();
+        drink(&mut s, boss, item_kind::BREATHALYSER);
+        assert!(s.says.iter().any(|l| l.text.contains("pod wpływem")));
+        let (ask, target) = s.players[&boss].reprimand_ask.expect("asked whether to reprimand");
+        assert_eq!(target, worker);
+        assert!(!s.answer_reprimand(boss, ask.wrapping_add(1), 0), "another dialog");
+        assert!(s.answer_reprimand(boss, ask, 0));
+        assert_eq!(s.players[&worker].reprimands, n);
+        // Sober again for the next test.
+        s.players.get_mut(&worker).unwrap().needs.alcohol = 0;
+    }
+    assert!(!s.players[&worker].contract, "the third reprimand: fired");
 }

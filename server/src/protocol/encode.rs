@@ -112,6 +112,7 @@ impl Packet {
                 self_prev_input,
                 self_access,
                 self_slow,
+                self_drunk,
                 self_activity,
                 entities,
             } => {
@@ -127,6 +128,7 @@ impl Packet {
                 w.u8(*self_prev_input);
                 w.u8(*self_access);
                 w.u8(*self_slow);
+                w.u8(*self_drunk);
                 w.u8(*self_activity);
                 let n = entities.len().min(MAX_ENTITIES_PER_SNAPSHOT);
                 w.u8(n as u8);
@@ -272,12 +274,13 @@ impl Packet {
                 }
             }
             Packet::DoorAction { token } => w.u32(*token),
-            Packet::Stats { hunger, energy, stress, bladder, hygiene, flags, money } => {
+            Packet::Stats { hunger, energy, stress, bladder, hygiene, alcohol, flags, money } => {
                 w.u8(*hunger);
                 w.u8(*energy);
                 w.u8(*stress);
                 w.u8(*bladder);
                 w.u8(*hygiene);
+                w.u8(*alcohol);
                 w.u8(*flags);
                 w.u32(*money);
             }
@@ -487,10 +490,11 @@ impl Packet {
                     w.str16(nick, MAX_NICK_BYTES);
                 }
                 w.u8(staff.len().min(30) as u8);
-                for (pid, dept, day, nick) in staff.iter().take(30) {
+                for (pid, dept, day, reprimands, nick) in staff.iter().take(30) {
                     w.u16(*pid);
                     w.u8(*dept);
                     w.u16(*day);
+                    w.u8(*reprimands);
                     w.str16(nick, MAX_NICK_BYTES);
                 }
             }

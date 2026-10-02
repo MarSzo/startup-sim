@@ -89,7 +89,14 @@ impl Server {
             let outdoors = self.outdoor_rooms.contains(&(p.body.floor, p.room));
             let umbrella_open = outdoor_weather(p, outdoors, weather_now, &mut self.says);
             p.body.slow = p.needs.slow();
-            p.flags = (p.flags & 0x37)
+            p.body.drunk = p.needs.stagger();
+            if p.passed_out && tick >= p.held_until {
+                p.passed_out = false;
+                p.needs.sleep_it_off();
+                self.says.push(Say::new(p.id, crate::drunk::lines::WAKE_UP));
+            }
+            p.flags = (p.flags & 0x07)
+                | (p.needs.drunk_tier() << proto::FLAG_DRUNK_SHIFT)
                 | if umbrella_open { proto::FLAG_UMBRELLA } else { 0 }
                 | if p.body.slow { proto::FLAG_SLOW } else { 0 }
                 | if p.needs.smelly() { proto::FLAG_SMELLY } else { 0 };
@@ -118,7 +125,7 @@ impl Server {
             self.smoke.puff(place, pid, pos);
         }
         for (floor, pos) in std::mem::take(&mut steps.accidents) {
-            self.leave_puddle(floor, pos);
+            self.leave_puddle(floor, pos, false);
         }
     }
 
@@ -199,6 +206,8 @@ fn tick_needs(p: &mut Player, speed: u32, tick: u32, says: &mut Vec<Say>, sounds
                     accidents.push((p.body.floor, p.body.pos));
                     needs::lines::ACCIDENT
                 }
+                // Only from drinking (see `after_drink`).
+                needs::Event::Vomit | needs::Event::PassOut => continue,
             };
             says.push(Say::new(p.id, line));
         }

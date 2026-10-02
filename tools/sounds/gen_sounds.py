@@ -371,6 +371,22 @@ def music(name, bpm, chords, roots, melody, drums, bars_n, pad_gain):
     write(name, fold_loop(buf, total), 0.7)
 
 
+def drunk():
+    # Burp: a low croak with vocal fry, the pitch wobbling down.
+    croak = tone(lambda t: 95 - 30 * t + 8 * math.sin(TAU * 7 * t), 0.55, "saw")
+    croak = [v * (0.55 + 0.45 * math.sin(TAU * 38 * i / SR)) for i, v in enumerate(croak)]
+    croak = mix(lowpass(croak, 700), gain(lowpass(noise(0.55), 400), 0.25))
+    write("burp", env(croak, a=0.03, d=2.5, r=0.12), 0.7)
+    # Vomit: a retch ("hurk"), a gush, the splash on the floor.
+    retch = env(bandpass(mix(noise(0.35), gain(tone(lambda t: 160 + 220 * t, 0.35, "saw"), 0.6)), 200, 1400), a=0.04, r=0.08)
+    gush = env(lowpass(noise(0.9), 900), a=0.03, d=2.0, r=0.2)
+    gush = [v * (0.7 + 0.3 * math.sin(TAU * 11 * i / SR)) for i, v in enumerate(gush)]
+    splash = []
+    for b in range(12):
+        splash = mix(splash, at(env(bandpass(noise(0.08), 300, 2500), a=0.002, d=35), rng.uniform(0, 0.5)))
+    write("vomit", mix(retch, at(gush, 0.4), at(gain(splash, 0.6), 0.6)), 0.7)
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     steps()
@@ -387,6 +403,7 @@ def main():
     night_chords = [[45, 52, 55, 60, 64], [41, 48, 52, 55, 60], [43, 50, 55, 59, 62], [40, 47, 52, 55, 59]]
     night_mel = [(0, 72, 2), (2, 71, 1), (3, 67, 1), (4, 69, 3), (8, 72, 1), (9, 74, 1), (10, 76, 2), (12, 74, 2), (14, 71, 2)]
     music("music_home", 70, night_chords, [33, 29, 31, 28], night_mel, False, 12, 0.05)
+    drunk()
 
 
 if __name__ == "__main__":

@@ -119,6 +119,7 @@ impl Server {
         let nick = p.nick.clone();
         self.give_new(pid, item_kind::EMPLOYEE_CARD);
         self.give_new(pid, item_kind::LAPTOP);
+        self.give_new(pid, item_kind::BREATHALYSER); // the board's
         self.clock_dirty = true;
         for other in self.players.values_mut() {
             other.known.remove(&pid); // new department on the name tag
@@ -153,7 +154,7 @@ impl Server {
                     0 => p.position.and_then(|o| self.position(o)).map_or(0, |o| o.department),
                     d => d,
                 };
-                (p.id, dept, self.company.hired_on.get(&p.id).copied().unwrap_or(1) as u16, p.nick.clone())
+                (p.id, dept, self.company.hired_on.get(&p.id).copied().unwrap_or(1) as u16, p.reprimands, p.nick.clone())
             })
             .collect();
         packets.push(Packet::CompanyPeople { candidates, staff });

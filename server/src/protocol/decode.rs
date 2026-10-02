@@ -56,6 +56,7 @@ impl Packet {
                 let self_prev_input = r.u8()?;
                 let self_access = r.u8()?;
                 let self_slow = r.u8()?;
+                let self_drunk = r.u8()?;
                 let self_activity = r.u8()?;
                 let n = r.u8()? as usize;
                 let mut entities = Vec::with_capacity(n);
@@ -83,6 +84,7 @@ impl Packet {
                     self_prev_input,
                     self_access,
                     self_slow,
+                    self_drunk,
                     self_activity,
                     entities,
                 }
@@ -217,6 +219,7 @@ impl Packet {
                 stress: r.u8()?,
                 bladder: r.u8()?,
                 hygiene: r.u8()?,
+                alcohol: r.u8()?,
                 flags: r.u8()?,
                 money: r.u32()?,
             },
@@ -439,7 +442,7 @@ impl Packet {
                 }
                 let mut staff = Vec::with_capacity(n);
                 for _ in 0..n {
-                    staff.push((r.u16()?, r.u8()?, r.u16()?, r.str16(MAX_NICK_BYTES)?));
+                    staff.push((r.u16()?, r.u8()?, r.u16()?, r.u8()?, r.str16(MAX_NICK_BYTES)?));
                 }
                 Packet::CompanyPeople { candidates, staff }
             }

@@ -13,6 +13,7 @@ pub struct SelfState {
     pub prev_input: u8,
     pub access: u8,
     pub slow: bool,
+    pub drunk: u8,
     pub activity: u8,
 }
 
@@ -37,6 +38,7 @@ pub fn snapshot_fragments(tick: u32, last_input_seq: u32, me: SelfState, entitie
             self_prev_input: me.prev_input,
             self_access: me.access,
             self_slow: me.slow as u8,
+            self_drunk: me.drunk,
             self_activity: me.activity,
             entities: c.to_vec(),
         })

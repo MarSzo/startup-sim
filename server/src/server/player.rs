@@ -123,6 +123,14 @@ pub(super) struct Player {
     pub(super) home_ask_until: u32,
     /// Stopped by the guard / the police until this tick (no walking).
     pub(super) held_until: u32,
+    /// What others see meanwhile (`activity::HELD`, `VOMITING`, `PASSED_OUT`).
+    pub(super) held_activity: u8,
+    /// Passed out drunk: wakes up when `held_until` comes.
+    pub(super) passed_out: bool,
+    /// Reprimands from the board (3 = fired).
+    pub(super) reprimands: u8,
+    /// A board member asked "reprimand?": (dialog id, the tested player).
+    pub(super) reprimand_ask: Option<(u8, u16)>,
     /// At home: asked to skip the waiting (`SkipWait`).
     pub(super) skip_wait: bool,
     /// Last applied TaskAction / MailAction nonces (retries are ignored).
@@ -206,6 +214,10 @@ impl Player {
             alarm_nag: 0,
             home_ask_until: 0,
             held_until: 0,
+            held_activity: proto::activity::HELD,
+            passed_out: false,
+            reprimands: 0,
+            reprimand_ask: None,
             skip_wait: false,
             task_nonce: 0,
             mail_nonce: 0,
@@ -255,7 +267,7 @@ pub(super) fn activity(p: &Player, tick: u32) -> u8 {
         return a::RIDING;
     }
     if tick < p.held_until {
-        return a::HELD;
+        return p.held_activity;
     }
     match (p.at_computer, p.rest.map(|r| r.0)) {
         (Some(_), _) => a::COMPUTER,

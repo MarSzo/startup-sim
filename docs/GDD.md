@@ -632,7 +632,8 @@ Zastępuje prosty portal z 10.8. Po połączeniu gracz widzi pulpit komputera
 ### 10.15 Statystyki postaci (etap 5 z 9a)
 
 - Paski w prawym górnym rogu: **Głód**, **Energia**, **Stres**, **Toaleta**
-  (0–100, z zielonego na czerwony; krytyczne migają).
+  (0–100, z zielonego na czerwony; krytyczne migają); później **Higiena**
+  (10.17) i **Upojenie** (10.47).
 - Tempo (czas rzeczywisty): głód 0→100 w ~25 min, energia 100→0 w ~35 min,
   toaleta 0→100 w ~20 min; stres rośnie, gdy któraś potrzeba jest zaniedbana
   (głód ≥ 70, energia ≤ 25, toaleta ≥ 80), a bez tego powoli spada.
@@ -1260,6 +1261,36 @@ pełnym ekranie — zastąpiona stylem inspirowanym Don't Starve:
   gry nie pasuje do serwera — pobierz najnowszą” z tym samym przyciskiem.
 - Na razie gracz sam pobiera i podmienia aplikację; aktualizacja jednym
   kliknięciem (Sparkle / łatki `.pck` / itch.io) — później.
+
+### 10.47 Upojenie alkoholem
+
+- Szósta statystyka, **Upojenie** (0–100%, plakietka z kuflem). Piwo +15%,
+  wino +30%, małpka +25%; trzeźwieje się o ok. 20% na godzinę gry. Liczy
+  tylko serwer, stan zapisuje się z postacią.
+- **Widać to na postaci** (wszyscy widzą, flagi encji): od 25% rumieńce i
+  lekkie kołysanie, od 50% ciężkie powieki i czkawka („hyk!” nad głową),
+  od 75% mocniejsze kołysanie. Własny widok lekko się buja.
+- **Słychać w wypowiedziach**: dymki, komunikator i czat głosowy. Serwer
+  przerabia tekst wg poziomu (przeciągane samogłoski, „*hyk*”, „sz” zamiast
+  „s”, przestawione litery, wszystko małymi i „…” przy 75%+), deterministycznie
+  — każdy widzi to samo. Głos pijanego (od 50%) faluje wysokością u słuchaczy.
+- **Sterowanie** („zataczanie”): od 50% chodząc prosto, znosi lekko na boki
+  (zygzak co 2 kafle), od 75% mocniej i wolniej; po skosie idzie się prosto,
+  ściany dalej trzymają — nigdy pełna utrata kontroli. Część deterministycznej
+  symulacji (przewidywana przez klienta, w wektorach golden ruchu).
+- **Beknięcie** po każdym alkoholu (dźwięk ~1 s po łyku).
+- **75% — wymioty**: 3 s w miejscu, dźwięk, „Bleeeeh…”, −10% upojenia, −15
+  higieny, +10 stresu; zostaje plama (zielonkawa kałuża) — ściera ją
+  sprzątaczka jak kałużę po wpadce, inaczej znika o 22:00. Raz — kolejne
+  wymioty dopiero po wytrzeźwieniu poniżej 40%.
+- **100% po wymiotach — zasypia**: minutę leży na podłodze (zzz), potem budzi
+  się z kacem: upojenie spada do 60%, energia +30.
+- **Alkomat Zarządu**: założyciel dostaje go przy założeniu firmy (członkowie
+  Zarządu z zapisu, którym go brakuje — przy wczytaniu). F z alkomatem przy
+  kimś (do 2 kafli): odczyt w promilach (upojenie × 0,03, np. 50% = 1,5 ‰),
+  „w normie” do 0,2 ‰. Powyżej normy pytanie: *Wystaw naganę* / *Daruję tym
+  razem*. Nagana: mail od Zarządu do pracownika, licznik nagan w panelu
+  założyciela; **3 nagany = zwolnienie**. Nie-Zarząd: „to nie dla mnie”.
 
 ### 10.6 Stan implementacji
 

@@ -52,6 +52,8 @@ pub mod kind {
     pub const LATTE: u8 = 37;
     /// A 100 ml "małpka" of vodka (shop).
     pub const MALPKA: u8 = 38;
+    /// The board's breathalyser (F: test the person next to you).
+    pub const BREATHALYSER: u8 = 39;
 }
 
 pub const POCKETS: usize = 3;
@@ -62,7 +64,7 @@ pub fn is_small(k: u8) -> bool {
         // Shop goods fit in a pocket, except the bulky ones.
         kind::BURGER | kind::FRIES | kind::WINE => false,
         10..=27 => true,
-        kind::MILK | kind::MALPKA => true,
+        kind::MILK | kind::MALPKA | kind::BREATHALYSER => true,
         28..=33 => false, // lunch boxes: both hands
         _ => false,
     }
@@ -78,6 +80,7 @@ pub fn display_name(k: u8) -> &'static str {
         kind::CUP => "Kubek",
         kind::LATTE => "Kawa z mlekiem",
         kind::FRUIT => "Owoc",
+        kind::BREATHALYSER => "Alkomat",
         k => crate::shop::product(k).map_or("?", |p| p.name),
     }
 }

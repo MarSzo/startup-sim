@@ -3,7 +3,7 @@
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 38
+const VERSION := 39
 const MAX_PACKET := 1152  # a game packet; sealed it grows to at most MAX_DATAGRAM
 const MAX_DATAGRAM := 1200
 const MAX_NICK_BYTES := 16
@@ -89,7 +89,8 @@ const MAIL_BODY_MAX := 400
 ## Sound.kind -> file in res://sounds (server/src/protocol/mod.rs `sound`).
 const SOUND_FILES := {1: "coffee", 2: "till", 3: "gate_alarm", 4: "ding", 5: "lock", 6: "switch",
 	7: "flush", 8: "tap", 9: "lighter", 10: "dishwasher", 11: "fridge", 12: "cupboard",
-	13: "pickup", 14: "drop", 15: "eat", 16: "drink", 17: "whistle"}
+	13: "pickup", 14: "drop", 15: "eat", 16: "drink", 17: "whistle", 18: "burp", 19: "vomit"}
+const SOUND_BURP := 18
 # FridgeAction.action (server/src/kitchen.rs)
 const FRIDGE_TAKE := 1
 const FRIDGE_PUT := 2
@@ -175,12 +176,22 @@ const ACT_SMOKING := 5
 const ACT_WASHING := 6
 const ACT_RIDING := 7
 const ACT_HELD := 8  # stopped by the guard / the police
+const ACT_VOMITING := 9
+const ACT_PASSED_OUT := 10
 # Entity flags bit 6: walks slowly (exhausted / needs the toilet).
 const FLAG_SLOW := 0x40
 # Entity flags bit 7: low hygiene (smell cloud).
 const FLAG_SMELLY := 0x80
 # Entity flags bit 3 (players only; NPC looks use bits 3-5): open umbrella.
 const FLAG_UMBRELLA := 0x08
+# Entity flags bits 4-5 (players only): drunk tier 0 sober .. 3 very drunk.
+const FLAG_DRUNK_SHIFT := 4
+const FLAG_DRUNK_MASK := 0x30
+
+
+## Stats.alcohol (0..100) -> drunk tier, like server/src/needs.rs `drunk_tier`.
+static func drunk_tier(alcohol: int) -> int:
+	return 3 if alcohol >= 75 else (2 if alcohol >= 50 else (1 if alcohol >= 25 else 0))
 # Clock.weather
 const WEATHER_SUNNY := 1
 const WEATHER_CLOUDY := 2
@@ -529,6 +540,7 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			p.self_prev_input = r.u8()
 			p.self_access = r.u8()
 			p.self_slow = r.u8()
+			p.self_drunk = r.u8()
 			p.self_activity = r.u8()
 			var n := r.u8()
 			var ents := []
@@ -619,6 +631,7 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			p.stress = r.u8()
 			p.bladder = r.u8()
 			p.hygiene = r.u8()
+			p.alcohol = r.u8()
 			p.stats_flags = r.u8()
 			p.money = r.u32()
 		T_CLOCK:
@@ -766,7 +779,7 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 				return {}
 			var staff := []
 			for i in m:
-				staff.append({"id": r.u16(), "department": r.u8(), "day": r.u16(), "nick": r.str16(MAX_NICK_BYTES)})
+				staff.append({"id": r.u16(), "department": r.u8(), "day": r.u16(), "reprimands": r.u8(), "nick": r.str16(MAX_NICK_BYTES)})
 			p.staff = staff
 		T_CALENDAR:
 			p.mine_start = r.u16()

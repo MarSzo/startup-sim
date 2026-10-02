@@ -174,7 +174,10 @@ impl Server {
         if nonce == p.last_chat_nonce || spam {
             return; // retry of a message already posted, or spam
         }
-        let Some(msg) = self.messenger.post(acc, conv, text, accounts) else { return };
+        // Typed drunk: typos and all.
+        let tier = p.needs.drunk_tier();
+        let text = if tier > 0 { crate::drunk::slur(text, tier, (u64::from(tick) << 16) | u64::from(pid)) } else { text.to_string() };
+        let Some(msg) = self.messenger.post(acc, conv, &text, accounts) else { return };
         let Some(p) = self.players.get_mut(&pid) else { return };
         p.last_chat_nonce = nonce;
         p.last_chat_tick = Some(tick);

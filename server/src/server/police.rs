@@ -109,6 +109,7 @@ impl Server {
         }
         p.inventory.remove_unpaid();
         p.held_until = self.tick + security::GUARD_HOLD_TICKS;
+        p.held_activity = crate::protocol::activity::HELD;
         p.needs.add_stress(security::GUARD_STRESS);
         refresh(p);
         let again = p.thefts_today >= security::THEFTS_FOR_POLICE;
@@ -123,6 +124,7 @@ impl Server {
     fn hold(&mut self, pid: u16, ticks: u32) {
         if let Some(p) = self.players.get_mut(&pid) {
             p.held_until = self.tick + ticks;
+            p.held_activity = crate::protocol::activity::HELD;
         }
     }
 

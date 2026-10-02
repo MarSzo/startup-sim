@@ -126,6 +126,9 @@ pub struct Character {
     /// Interview questions already asked (question set -> question ids).
     #[serde(default)]
     pub seen_questions: HashMap<String, Vec<u32>>,
+    /// Reprimands from the board (alcohol at work).
+    #[serde(default)]
+    pub reprimands: u8,
 }
 
 /// A laptop standing on a desk.
@@ -392,6 +395,7 @@ mod tests {
                 None,
             ],
             seen_questions: HashMap::from([("programming".to_string(), vec![11, 22])]),
+            reprimands: 0,
         }
     }
 

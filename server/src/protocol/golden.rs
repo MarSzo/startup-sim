@@ -48,9 +48,10 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
                 self_prev_input: 17,
                 self_access: 5,
                 self_slow: 1,
+                self_drunk: 2,
                 self_activity: 3,
                 entities: vec![
-                    EntityState { id: 3, kind: kind::PLAYER, x: 4096, y: 8192, flags: 0b101, held: 3, activity: 1 },
+                    EntityState { id: 3, kind: kind::PLAYER, x: 4096, y: 8192, flags: 0b10_0101, held: 3, activity: 1 },
                     EntityState { id: 65535, kind: kind::NPC, x: -1, y: 2_000_000, flags: 0x40, held: 0, activity: 0 },
                 ],
             },
@@ -166,7 +167,19 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
                 text: "Kto zjadł mój jogurt?".into(),
             },
         ),
-        ("stats", Packet::Stats { hunger: 35, energy: 80, stress: 12, bladder: 64, hygiene: 22, flags: STATS_DIRTY_HANDS, money: 187_50 }),
+        (
+            "stats",
+            Packet::Stats {
+                hunger: 35,
+                energy: 80,
+                stress: 12,
+                bladder: 64,
+                hygiene: 22,
+                alcohol: 77,
+                flags: STATS_DIRTY_HANDS,
+                money: 187_50,
+            },
+        ),
         (
             "doors",
             Packet::Doors {
@@ -276,7 +289,7 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
             "company_people",
             Packet::CompanyPeople {
                 candidates: vec![(7, 1, 3, 3, "Bob".into())],
-                staff: vec![(3, 1, 2, "Ala".into()), (4, 2, 5, "Kuba".into())],
+                staff: vec![(3, 1, 2, 0, "Ala".into()), (4, 2, 5, 2, "Kuba".into())],
             },
         ),
         ("company_action", Packet::CompanyAction { token: 0x01020304, action: 3, target: 1, value: 2, text: String::new() }),

@@ -1083,7 +1083,11 @@ func _render_company() -> void:
 	for s in staff:
 		var pid: int = s.id
 		row = _co_row()
-		var l := _co_label("%s — %s, od dnia %d" % [s.nick, Departments.name_of(s.department), s.day], 15)
+		var text := "%s — %s, od dnia %d" % [s.nick, Departments.name_of(s.department), s.day]
+		var reprimands: int = s.get("reprimands", 0)
+		if reprimands > 0:
+			text += " · nagany: %d/3" % reprimands
+		var l := _co_label(text, 15)
 		l.custom_minimum_size = Vector2(430, 0)
 		row.add_child(l)
 		if pid == my_id:

@@ -20,6 +20,7 @@ pub mod company;
 pub mod computer;
 pub mod crash;
 pub mod crypto;
+pub mod drunk;
 pub mod elevator;
 pub mod fire;
 pub mod http;

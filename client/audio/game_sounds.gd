@@ -112,8 +112,19 @@ func on_sound(p: Dictionary) -> void:
 		return
 	for s in p.sounds:
 		var file: String = Protocol.SOUND_FILES.get(s[0], "")
-		if file != "":
-			Audio.inst.play_at(file, Movement.to_px(Vector2i(s[1], s[2])), -2.0, 0.05)
+		if file == "":
+			continue
+		var at := Movement.to_px(Vector2i(s[1], s[2]))
+		if s[0] == Protocol.SOUND_BURP:
+			_burp_later(at)  # after the gulp, not over it
+		else:
+			Audio.inst.play_at(file, at, -2.0, 0.05)
+
+
+func _burp_later(at: Vector2) -> void:
+	await get_tree().create_timer(0.9).timeout
+	if Audio.inst != null:
+		Audio.inst.play_at("burp", at, -2.0, 0.12)
 
 
 ## Someone said something: a short voice blip (pitch per speaker).

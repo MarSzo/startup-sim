@@ -267,6 +267,7 @@ impl Bot {
                 self_prev_input,
                 self_access,
                 self_slow,
+                self_drunk,
                 entities,
                 ..
             } => {
@@ -295,6 +296,7 @@ impl Bot {
                     lock: self_lock,
                     access: self_access,
                     slow: self_slow != 0,
+                    drunk: self_drunk,
                 };
                 for &(_, bits) in &self.pending {
                     body = sim::step(building, body, bits);

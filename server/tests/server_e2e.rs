@@ -452,7 +452,7 @@ fn other_floors_are_invisible_and_state_matches_prediction() {
     }
     let (floor, room, x, y, lock, prev, ack) = last.expect("B gets snapshots");
     assert_eq!(ack, b.seq);
-    let server = Body { floor, pos: Pos { x, y }, prev_input: prev, lock, access: access::CARD, slow: false };
+    let server = Body { floor, pos: Pos { x, y }, prev_input: prev, lock, access: access::CARD, slow: false, drunk: 0 };
     assert_eq!(server, predicted, "server state == client prediction, bit for bit");
     assert_eq!(b0.floor(1).unwrap().room_name(room), "Korytarz");
 

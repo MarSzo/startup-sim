@@ -31,6 +31,7 @@ var _enc_state := [0, 0]
 var _seq := 0
 var _players := {}                # speaker -> {node, playback, whisper}
 var _heard := {}                  # speaker -> [msec, whisper]
+var _drunk := {}                  # speaker -> drunk tier (entity flags)
 var _last_self := 0
 ## Dev (goto talk:N / whisper:N, --voice-tone): talk without the keys, with
 ## a test tone instead of the microphone.
@@ -82,6 +83,14 @@ func _process(_delta: float) -> void:
 	elif _capture:
 		_capture.clear_buffer()
 		_pending.clear()
+	# Drunk speakers: the voice wobbles up and down (pitch averages 1.0, so
+	# the stream is consumed as fast as it arrives).
+	for id in _players:
+		var node = _players[id].node
+		if is_instance_valid(node):
+			var tier: int = _drunk.get(id, 0)
+			var depth := 0.0 if tier < 2 else (0.06 if tier == 2 else 0.12)
+			node.pitch_scale = 1.0 + sin(now / 1000.0 * 2.3 + id) * depth
 	# Waves over the heads of people talking.
 	for id in _heard.keys():
 		var v = _view(id)
@@ -179,6 +188,14 @@ func _read_tone() -> void:
 
 
 ## VoiceFrom: play it from the speaker (or in the ears, for a whisper).
+## Entity flags: how drunk a speaker is (0..3).
+func set_drunk(id: int, tier: int) -> void:
+	if tier == 0:
+		_drunk.erase(id)
+	else:
+		_drunk[id] = tier
+
+
 func on_voice(p: Dictionary) -> void:
 	var id: int = p.speaker
 	var entry: Dictionary = _players.get(id, {})

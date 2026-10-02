@@ -41,6 +41,16 @@ pub const SMOKE_TICKS: u32 = 30 * 20;
 pub const UPSET_RATE: i32 = SCALE / 20;
 /// A whole cigarette: -25 stress.
 pub const SMOKE_STRESS: i32 = 25 * SCALE / SMOKE_TICKS as i32;
+/// Sobering up: 20 points a game hour (5 real minutes) - a full 100 in 25.
+pub const ALCOHOL_DOWN: i32 = per_tick(25);
+/// Throwing up: at this many points of alcohol (once, until sober again).
+pub const VOMIT_AT: i32 = 75;
+/// After throwing up, drinking on to this: asleep where they stand.
+pub const PASS_OUT_AT: i32 = 100;
+/// Sober enough again (below this) to throw up another time.
+const VOMIT_REARM: i32 = 40;
+/// Throwing up gets rid of some of it.
+const VOMIT_RELIEF: i32 = 10;
 
 /// Reach for the sofa, toilet, ashtray and fruit bowl (like the coffee machine).
 pub const USE_RADIUS: i32 = TILE_UNITS * 3 / 2;
@@ -160,6 +170,10 @@ pub enum Event {
     Accident,
     /// Rest finished by itself (toilet empty, cigarette out).
     RestDone(&'static str),
+    /// Too much to drink: throws up right here (a puddle).
+    Vomit,
+    /// Drank on after throwing up: falls asleep where they stand.
+    PassOut,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -174,6 +188,12 @@ pub struct Needs {
     pub dirty_hands: bool,
     /// Upset stomach (stale fruit): the bladder fills fast until the toilet.
     pub upset: bool,
+    /// Alcohol, 0..100 points (beer +15, wine +30, a mini bottle +25).
+    #[serde(default)]
+    pub alcohol: i32,
+    /// Has thrown up since last being (almost) sober.
+    #[serde(default)]
+    pub vomited: bool,
     /// Warnings already given (bit per threshold), re-armed on recovery.
     warned: u8,
 }
@@ -188,6 +208,8 @@ impl Default for Needs {
             hygiene: 90 * SCALE,
             dirty_hands: false,
             upset: false,
+            alcohol: 0,
+            vomited: false,
             warned: 0,
         }
     }
@@ -215,6 +237,10 @@ impl Needs {
         self.energy -= if pts(self.hunger) >= 100 { 2 * ENERGY_DOWN } else { ENERGY_DOWN };
         self.bladder += BLADDER_UP + if self.upset { UPSET_RATE } else { 0 };
         self.hygiene -= HYGIENE_DOWN;
+        self.alcohol = (self.alcohol - ALCOHOL_DOWN).max(0);
+        if self.vomited && pts(self.alcohol) < VOMIT_REARM {
+            self.vomited = false;
+        }
         let neglected = [pts(self.hunger) >= HUNGRY, pts(self.energy) <= TIRED, pts(self.bladder) >= MUST_GO, pts(self.hygiene) < SMELLY]
             .iter()
             .filter(|&&b| b)
@@ -281,6 +307,58 @@ impl Needs {
         for v in [&mut self.hunger, &mut self.energy, &mut self.stress, &mut self.bladder, &mut self.hygiene] {
             *v = (*v).clamp(0, MAX);
         }
+    }
+
+    /// A drink (`points` of alcohol): throws up at `VOMIT_AT`, and having
+    /// thrown up, passes out at `PASS_OUT_AT`.
+    pub fn drink_alcohol(&mut self, points: i32) -> Option<Event> {
+        self.alcohol = (self.alcohol + points * SCALE).min(MAX);
+        let level = pts(self.alcohol);
+        if self.vomited && level >= PASS_OUT_AT {
+            return Some(Event::PassOut);
+        }
+        if !self.vomited && level >= VOMIT_AT {
+            self.vomited = true;
+            self.alcohol -= VOMIT_RELIEF * SCALE;
+            self.hygiene -= 15 * SCALE;
+            self.stress += 10 * SCALE;
+            self.clamp();
+            return Some(Event::Vomit);
+        }
+        None
+    }
+
+    /// Asleep it off: wakes up with less in the blood.
+    pub fn sleep_it_off(&mut self) {
+        self.alcohol = self.alcohol.min(60 * SCALE);
+        self.energy += 30 * SCALE;
+        self.clamp();
+    }
+
+    /// Alcohol in points (0..100), for the HUD.
+    pub fn alcohol_points(&self) -> u8 {
+        ((self.alcohol + SCALE / 2) / SCALE).clamp(0, 100) as u8
+    }
+
+    /// How drunk it shows: 0 sober, 1 tipsy (25+), 2 drunk (50+), 3 very
+    /// drunk (75+).
+    pub fn drunk_tier(&self) -> u8 {
+        match pts(self.alcohol) {
+            l if l >= 75 => 3,
+            l if l >= 50 => 2,
+            l if l >= 25 => 1,
+            _ => 0,
+        }
+    }
+
+    /// Walks unsteadily (`sim::Body::drunk`): 1 from 50, 2 from 75.
+    pub fn stagger(&self) -> u8 {
+        self.drunk_tier().saturating_sub(1)
+    }
+
+    /// Breathalyser reading in thousandths of per mille (100 points = 3 ‰).
+    pub fn promille_milli(&self) -> u32 {
+        (self.alcohol.max(0) as i64 * 3000 / MAX as i64) as u32
     }
 
     /// Walks slowly: exhausted, or about to burst.
@@ -462,6 +540,28 @@ mod tests {
         let (rest, ev) = run(&mut n, Some(Rest::Toilet), 20 * 20);
         assert_eq!(rest, None);
         assert!(ev.contains(&Event::RestDone(lines::RELIEVED)) && !n.upset, "cured");
+    }
+
+    #[test]
+    fn alcohol_shows_staggers_and_wears_off() {
+        let mut n = Needs::default();
+        assert_eq!((n.drunk_tier(), n.stagger()), (0, 0));
+        assert_eq!(n.drink_alcohol(30), None);
+        assert_eq!((n.drunk_tier(), n.stagger()), (1, 0));
+        assert_eq!(n.drink_alcohol(30), None);
+        assert_eq!((n.drunk_tier(), n.stagger()), (2, 1));
+        assert_eq!(n.drink_alcohol(15), Some(Event::Vomit), "75: throws up");
+        assert_eq!(n.alcohol_points(), 65);
+        assert_eq!(n.drink_alcohol(30), None, "95: not yet");
+        assert_eq!(n.drink_alcohol(15), Some(Event::PassOut), "100 after throwing up: asleep");
+        assert_eq!(n.promille_milli(), 3000);
+        // 20 points a game hour (5 real minutes = 6000 ticks).
+        let before = n.alcohol_points();
+        run(&mut n, None, 6000);
+        assert_eq!(before - n.alcohol_points(), 20);
+        run(&mut n, None, 6000 * 5);
+        assert_eq!(n.alcohol_points(), 0);
+        assert!(!n.vomited, "sober again: could throw up again");
     }
 
     #[test]

@@ -185,7 +185,7 @@ impl Server {
     }
 
     /// F: drink, eat, smoke or look at what you hold.
-    fn use_held(&mut self, id: u16) {
+    pub(super) fn use_held(&mut self, id: u16) {
         let tick = self.tick;
         let Some(p) = self.players.get_mut(&id) else { return };
         let Some(held) = &p.inventory.hands else { return };
@@ -210,6 +210,7 @@ impl Server {
         if let Some(s) = snd {
             self.sounds.push((s, p.body.floor, p.body.pos));
         }
+        let mut drink: Option<Option<needs::Event>> = None;
         let line = match held.kind {
             item_kind::COFFEE | item_kind::LATTE => {
                 let latte = held.kind == item_kind::LATTE;
@@ -252,15 +253,57 @@ impl Server {
                 if self.smoke.is_open_air((p.body.floor, p.room)) { fire::lines::LIT } else { fire::lines::LIT_INSIDE }.into()
             }
             item_kind::LAPTOP => format!("{} — położę go na wolnym biurku w swoim dziale (E).", held.label),
+            item_kind::BREATHALYSER => {
+                let department = p.department;
+                return self.breath_test(id, department);
+            }
             k => {
                 let Some(prod) = shop::product(k) else { return };
                 p.inventory.take_hands();
                 p.needs.apply(prod.effect);
+                let alcohol = crate::drunk::alcohol_of(k);
+                if alcohol > 0 {
+                    drink = Some(p.needs.drink_alcohol(alcohol));
+                }
                 refresh(p);
                 prod.line.to_string()
             }
         };
         self.says.push(Say::new(id, line));
+        if let Some(event) = drink {
+            self.after_drink(id, event);
+        }
+    }
+
+    /// After a beer (wine, vodka): a burp - or throwing up / passing out.
+    fn after_drink(&mut self, id: u16, event: Option<needs::Event>) {
+        let tick = self.tick;
+        let Some(p) = self.players.get_mut(&id) else { return };
+        let (floor, pos) = (p.body.floor, p.body.pos);
+        match event {
+            Some(needs::Event::Vomit) => {
+                p.held_until = tick + crate::drunk::VOMIT_TICKS;
+                p.held_activity = crate::protocol::activity::VOMITING;
+                p.rest = None;
+                self.sounds.push((crate::protocol::sound::VOMIT, floor, pos));
+                self.says.push(Say::new(id, crate::drunk::lines::VOMIT));
+                self.leave_puddle(floor, pos, true);
+                self.log(format!("* drunk: {} threw up", self.nick_of_player(id)));
+            }
+            Some(needs::Event::PassOut) => {
+                p.held_until = tick + crate::drunk::PASS_OUT_TICKS;
+                p.held_activity = crate::protocol::activity::PASSED_OUT;
+                p.passed_out = true;
+                p.rest = None;
+                self.says.push(Say::new(id, crate::drunk::lines::PASS_OUT));
+                self.log(format!("* drunk: {} passed out", self.nick_of_player(id)));
+            }
+            _ => self.sounds.push((crate::protocol::sound::BURP, floor, pos)),
+        }
+    }
+
+    fn nick_of_player(&self, id: u16) -> String {
+        self.players.get(&id).map(|p| p.nick.clone()).unwrap_or_default()
     }
 
     /// Pick up the nearest item on the floor within reach, if any.

@@ -149,6 +149,7 @@ impl Server {
             needs: p.needs.clone(),
             inventory,
             seen_questions: p.seen_questions.clone(),
+            reprimands: p.reprimands,
         }
     }
 
@@ -259,6 +260,7 @@ impl Server {
         p.worked_ds = c.worked_ds;
         p.attempts = c.attempts;
         p.seen_questions = c.seen_questions.clone();
+        p.reprimands = c.reprimands;
         if c.contract {
             p.contract = true;
             p.department = c.department;
@@ -271,6 +273,9 @@ impl Server {
             }
             refresh(p);
         }
+        // A board member saved before the breathalyser existed gets one.
+        let board_without =
+            c.contract && c.department == crate::company::BOARD_DEPARTMENT && !p.inventory.has(crate::inventory::kind::BREATHALYSER);
         // The company knows them by nick.
         if self.offline.founder.as_deref() == Some(nick.as_str()) && c.contract {
             self.company.founder = Some(pid);
@@ -284,6 +289,9 @@ impl Server {
             if let Some(comp) = self.computers.iter_mut().find(|x| x.handle == h) {
                 comp.item.owner = pid;
             }
+        }
+        if board_without {
+            self.give_new(pid, crate::inventory::kind::BREATHALYSER);
         }
         self.clock_dirty = true;
         self.says.push(super::Say::new(pid, "Z powrotem — wszystko jest tam, gdzie było."));

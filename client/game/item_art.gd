@@ -40,6 +40,7 @@ const CUP := 35
 const MILK := 36
 const LATTE := 37
 const MALPKA := 38
+const BREATHALYSER := 39
 
 const NAMES := {GUEST_PASS: "Przepustka gościa", EMPLOYEE_CARD: "Karta pracownika", LAPTOP: "Laptop", COFFEE: "Kawa", FRUIT: "Owoc",
 	SANDWICH_CHEESE: "Kanapka z serem", SANDWICH_HAM: "Kanapka z szynką", WRAP: "Wrap wege", BURGER: "Hamburger",
@@ -48,9 +49,9 @@ const NAMES := {GUEST_PASS: "Przepustka gościa", EMPLOYEE_CARD: "Karta pracowni
 	DONUT: "Pączek", COOKIE: "Ciastko", CHEESECAKE: "Kawałek sernika",
 	PIEROGI: "Pierogi ruskie", PIZZA: "Pizza margherita", SUSHI: "Zestaw sushi", SCHNITZEL: "Schabowy z ziemniakami",
 	SALAD: "Sałatka z kurczakiem", KEBAB: "Kebab", EMPTY_CUP: "Brudny kubek", CUP: "Kubek", MILK: "Mleko (karton)",
-	LATTE: "Kawa z mlekiem", MALPKA: "Małpka"}
+	LATTE: "Kawa z mlekiem", MALPKA: "Małpka", BREATHALYSER: "Alkomat"}
 const SMALL := [GUEST_PASS, EMPLOYEE_CARD, FRUIT, SANDWICH_CHEESE, SANDWICH_HAM, WRAP, BUN, BAR, CHIPS, WATER,
-	ENERGY_DRINK, JUICE, BEER, CIGARETTES, UMBRELLA, DONUT, COOKIE, CHEESECAKE, MILK, MALPKA]
+	ENERGY_DRINK, JUICE, BEER, CIGARETTES, UMBRELLA, DONUT, COOKIE, CHEESECAKE, MILK, MALPKA, BREATHALYSER]
 
 
 static func item_name(kind: int) -> String:
@@ -195,6 +196,14 @@ static func draw(c: CanvasItem, kind: int, o: Vector2, s: float) -> void:
 			ln.call(5.3, 8.4, 6.3, 7.8, Color(1, 1, 1, 0.55), 0.6)
 			rr.call(6.5, 2.6, 3, 2.4, Color("#d4b04a"), 0.4)
 			ln.call(6.9, 3.5, 9.1, 3.5, Color("#9c7f2e"), 0.4)
+		BREATHALYSER:
+			# A handheld tester: grey body, green display, a white mouthpiece.
+			rr.call(6.6, 0.8, 2.8, 3.6, Color("#f4efe4"), 0.6)
+			rr.call(4.2, 4, 7.6, 11, Color("#5c6670"), 1.6)
+			rr.call(5.2, 5.2, 5.6, 3.2, Color("#9fd46a"), 0.4)
+			ln.call(6, 6.8, 7.6, 6.8, Color("#2c4a22"), 0.6)
+			ln.call(8.4, 6.8, 10, 6.8, Color("#2c4a22"), 0.6)
+			dot.call(8, 11.4, 1.1, Color("#d9443a"))
 		DONUT:
 			circ.call(8, 8.5, 6.2, Color("#d9a15a"))
 			c.draw_arc(pt.call(8, 8.5), 3.8 * s, 0, TAU, 24, Color("#e889a8"), 3.6 * s, true)

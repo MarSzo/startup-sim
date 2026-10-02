@@ -445,7 +445,7 @@ func _refresh_own_label() -> void:
 
 
 func _sample_input(delta: float) -> int:
-	if input_blocked or me.status in [Protocol.ACT_RIDING, Protocol.ACT_HELD]:
+	if input_blocked or me.status in [Protocol.ACT_RIDING, Protocol.ACT_HELD, Protocol.ACT_VOMITING, Protocol.ACT_PASSED_OUT]:
 		return 0
 	if script_driver != null:
 		return 0 if screen.visible or dialog.visible else script_driver.next_input(delta)
@@ -604,6 +604,15 @@ func _process(delta: float) -> void:
 	var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 1000.0 * TAU * 1.5)
 	alarm_tint.color.a = 0.16 * pulse if fire_alarm else 0.0
 	alarm_label.modulate.a = 0.55 + 0.45 * pulse
+	# Drunk: the view sways a little (more the more drunk).
+	if ride_mask.visible:
+		pass  # the elevator shakes it (_update_ride)
+	elif me.drunk > 0 and me.status != Protocol.ACT_PASSED_OUT:
+		var t := Time.get_ticks_msec() / 1000.0
+		var amp := 1.5 * me.drunk
+		camera.offset = Vector2(sin(t * 0.9) * amp, sin(t * 1.3) * amp * 0.5)
+	else:
+		camera.offset = Vector2.ZERO
 	if have_state:
 		error_offset *= exp(-ERROR_DECAY * delta)
 		if error_offset.length_squared() < 0.0025:
@@ -697,6 +706,7 @@ func _on_packet(p: Dictionary) -> void:
 		Protocol.T_STATS:
 			stats_hud.update_stats(p)
 			me.set_smelly(p.hygiene < 25)
+			me.set_drunk(Protocol.drunk_tier(p.alcohol))
 		Protocol.T_COMPUTER:
 			screen.on_computer(p)
 		Protocol.T_CALENDAR:
@@ -790,7 +800,7 @@ func _on_snapshot(p: Dictionary) -> void:
 			have_time = true
 		else:
 			est_tick += (tick - est_tick) * 0.1
-		_reconcile(Movement.body(p.floor, Vector2i(p.self_x, p.self_y), p.self_prev_input, p.self_lock, p.self_access, p.self_slow != 0), p.last_input_seq)
+		_reconcile(Movement.body(p.floor, Vector2i(p.self_x, p.self_y), p.self_prev_input, p.self_lock, p.self_access, p.self_slow != 0, p.self_drunk), p.last_input_seq)
 		me.set_status(p.self_activity, p.self_slow != 0)
 		me.visible = p.self_activity != Protocol.ACT_RIDING  # inside the vehicle
 		screen.set_seated(p.self_activity == Protocol.ACT_COMPUTER)
@@ -812,7 +822,7 @@ func _on_snapshot(p: Dictionary) -> void:
 			var pv = puddles.get(e.id)
 			if pv == null:
 				pv = PuddleView.new()
-				pv.setup(e.id)
+				pv.setup(e.id, e.held == 1)
 				puddle_layer.add_child(pv)
 				puddles[e.id] = pv
 			pv.position = Vector2(e.x, e.y) / float(Movement.SUBPIXELS)
@@ -870,6 +880,9 @@ func _on_snapshot(p: Dictionary) -> void:
 		r.set_status(e.activity, (e.flags & Protocol.FLAG_SLOW) != 0)
 		r.set_smelly((e.flags & Protocol.FLAG_SMELLY) != 0)
 		r.set_umbrella(e.kind == Protocol.KIND_PLAYER and (e.flags & Protocol.FLAG_UMBRELLA) != 0)
+		if e.kind == Protocol.KIND_PLAYER:
+			r.set_drunk((e.flags & Protocol.FLAG_DRUNK_MASK) >> Protocol.FLAG_DRUNK_SHIFT)
+			voice.set_drunk(e.id, (e.flags & Protocol.FLAG_DRUNK_MASK) >> Protocol.FLAG_DRUNK_SHIFT)
 		r.set_held(e.held)
 		kinds[e.id] = e.kind
 		if not nicks.has(e.id) and now - info_requested.get(e.id, -100000) > 500:
@@ -997,6 +1010,10 @@ func _update_hint() -> void:
 	var text := ""
 	if me.status == Protocol.ACT_HELD:
 		hint_label.text = "Zatrzymano cię — chwilę stoisz w miejscu…"
+		hint_label.visible = true
+		return
+	if me.status in [Protocol.ACT_VOMITING, Protocol.ACT_PASSED_OUT]:
+		hint_label.text = "Wymiotujesz…" if me.status == Protocol.ACT_VOMITING else "Odsypiasz… (chwilę potrwa)"
 		hint_label.visible = true
 		return
 	if voice.talking != 0:

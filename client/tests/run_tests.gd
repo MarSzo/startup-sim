@@ -76,13 +76,14 @@ func test_protocol(path: String) -> void:
 	var s := Protocol.decode(golden["snapshot"].hex_decode())
 	expect(s.get("tick") == 1234 and s.last_input_seq == 99 and s.frag_cnt == 1 and s.self_x == 10000 and s.self_y == -5
 		and s.floor == 1 and s.room == 6 and s.self_lock == 2 and s.self_prev_input == 17 and s.self_access == 5
-		and s.self_slow == 1 and s.self_activity == Protocol.ACT_SOFA
+		and s.self_slow == 1 and s.self_drunk == 2 and s.self_activity == Protocol.ACT_SOFA
 		and s.entities.size() == 2,
 		"decode snapshot %s" % s)
 	if s.has("entities") and s.entities.size() == 2:
 		var e0: Dictionary = s.entities[0]
 		var e1: Dictionary = s.entities[1]
-		expect(e0.id == 3 and e0.kind == 0 and e0.x == 4096 and e0.y == 8192 and e0.flags == 5 and e0.held == 3 and e0.activity == Protocol.ACT_COMPUTER, "entity 0 %s" % e0)
+		expect(e0.id == 3 and e0.kind == 0 and e0.x == 4096 and e0.y == 8192 and e0.flags == 0b10_0101
+			and (e0.flags & Protocol.FLAG_DRUNK_MASK) >> Protocol.FLAG_DRUNK_SHIFT == 2 and e0.held == 3 and e0.activity == Protocol.ACT_COMPUTER, "entity 0 %s" % e0)
 		expect(e1.id == 65535 and e1.kind == 1 and e1.x == -1 and e1.y == 2000000 and e1.flags == Protocol.FLAG_SLOW, "entity 1 %s" % e1)
 	var dr := Protocol.decode(golden["doors"].hex_decode())
 	expect(dr.get("type") == Protocol.T_DOORS and dr.floor == 1 and dr.tiles == [Vector2i(5, 45), Vector2i(41, 43)]
@@ -101,7 +102,7 @@ func test_protocol(path: String) -> void:
 		"departments store (no board for positions)")
 	var st := Protocol.decode(golden["stats"].hex_decode())
 	expect(st.get("type") == Protocol.T_STATS and st.hunger == 35 and st.energy == 80 and st.stress == 12 and st.bladder == 64
-		and st.hygiene == 22 and st.stats_flags == Protocol.STATS_DIRTY_HANDS and st.money == 18750, "decode stats %s" % st)
+		and st.hygiene == 22 and st.alcohol == 77 and st.stats_flags == Protocol.STATS_DIRTY_HANDS and st.money == 18750, "decode stats %s" % st)
 	var ck := Protocol.decode(golden["clock"].hex_decode())
 	expect(ck.get("type") == Protocol.T_CLOCK and ck.day == 2 and ck.minute == 492 and not ck.night
 		and ck.place == Protocol.PLACE_COMMUTING and ck.arrive == 545 and ck.pay == 23000 and ck.pay_minutes == 460
@@ -120,7 +121,7 @@ func test_protocol(path: String) -> void:
 		and co.offers[1].department == 2 and co.sets.size() == 2 and co.sets[0].name == "Programowanie" and co.parts == 1, "decode company offers %s" % co)
 	var cp := Protocol.decode(golden["company_people"].hex_decode())
 	expect(cp.get("type") == Protocol.T_COMPANY_PEOPLE and cp.candidates.size() == 1 and cp.candidates[0].nick == "Bob"
-		and cp.staff.size() == 2 and cp.staff[1].day == 5, "decode company people %s" % cp)
+		and cp.staff.size() == 2 and cp.staff[1].day == 5 and cp.staff[1].reprimands == 2 and cp.staff[1].nick == "Kuba", "decode company people %s" % cp)
 	var cal := Protocol.decode(golden["calendar"].hex_decode())
 	expect(cal.get("type") == Protocol.T_CALENDAR and cal.mine_start == 840 and cal.mine_topic == 1 and cal.slots.size() == 4
 		and cal.slots[3].state == Protocol.SLOT_MINE and cal.slots[1].start == 630, "decode calendar %s" % cal)
@@ -204,7 +205,7 @@ func test_protocol(path: String) -> void:
 
 
 func _body_from(a: Array) -> Dictionary:
-	return Movement.body(int(a[0]), Vector2i(int(a[1]), int(a[2])), int(a[3]), int(a[4]), int(a[5]), int(a[6]) != 0)
+	return Movement.body(int(a[0]), Vector2i(int(a[1]), int(a[2])), int(a[3]), int(a[4]), int(a[5]), int(a[6]) != 0, int(a[7]))
 
 
 func test_movement(path: String) -> void:

@@ -39,9 +39,12 @@ const ACT_SOFA := 3
 const ACT_TOILET := 4
 const ACT_SMOKING := 5
 const ACT_WASHING := 6
+const ACT_VOMITING := 9
+const ACT_PASSED_OUT := 10
 
 var slow := false
 var smelly := false
+var drunk := 0  # 0 sober .. 3 very drunk (Protocol.FLAG_DRUNK_*)
 var umbrella := false
 var status := 0
 ## Item in hands (ItemArt kinds), visible to everyone.
@@ -217,6 +220,15 @@ func set_smelly(on: bool) -> void:
 		queue_redraw()
 
 
+## Drunk tier 0..3: red cheeks, swaying, hiccups.
+func set_drunk(tier: int) -> void:
+	if tier != drunk:
+		drunk = tier
+		if tier == 0:
+			rotation = 0.0
+		queue_redraw()
+
+
 ## Activity (Protocol.ACT_*) and the slow walk (tired / needs the toilet).
 func set_status(s: int, p_slow := false) -> void:
 	if s != status or p_slow != slow:
@@ -258,8 +270,17 @@ func _process(delta: float) -> void:
 			bubble.visible = false
 		else:
 			_place_bubble()
-	if status in [ACT_BREWING, ACT_SOFA, ACT_SMOKING, ACT_COMPUTER, ACT_WASHING] or slow or smelly:
-		queue_redraw()  # animated dots / zzz / smoke / sweat
+	if status in [ACT_BREWING, ACT_SOFA, ACT_SMOKING, ACT_COMPUTER, ACT_WASHING, ACT_VOMITING, ACT_PASSED_OUT] \
+			or slow or smelly or drunk > 0:
+		queue_redraw()  # animated dots / zzz / smoke / sweat / hiccups
+	# Lying on the floor when passed out; swaying (from the feet) when drunk.
+	if status == ACT_PASSED_OUT:
+		rotation = -PI / 2.0
+	elif drunk > 0:
+		var t := Time.get_ticks_msec() / 1000.0
+		rotation = sin(t * (1.6 + drunk * 0.3)) * 0.05 * drunk + sin(t * 3.7) * 0.015 * (drunk - 1)
+	else:
+		rotation = 0.0
 	# Walk cycle from the distance travelled since the last frame.
 	if _last_pos != Vector2.INF:
 		var d := position.distance_to(_last_pos)
@@ -338,6 +359,8 @@ func _draw() -> void:
 	var sit := status in [ACT_SOFA, ACT_TOILET, ACT_COMPUTER] and not walking
 	var drop := 3.0 if sit else 0.0
 	var ink := _ink()
+	var asleep := status == ACT_PASSED_OUT
+	var retching := status == ACT_VOMITING
 
 	# Soft shadow at the feet.
 	draw_set_transform(Vector2(0, 0.6), 0.0, Vector2(1.0, 0.35))
@@ -347,6 +370,10 @@ func _draw() -> void:
 	var hip := Vector2(0, -7.0 + drop - bob)
 	var shoulder_y := -13.5 + drop - bob
 	var head := Vector2(0, HEAD_Y + drop - bob)
+	if retching:
+		# Bent over: head down and forward.
+		head += Vector2(dir * 2.5 if side else 0.0, 4.5)
+		shoulder_y += 2.0
 
 	# Legs: thin sticks, stepping; seated = short and bent forward.
 	var shoe := Color("#231a14")
@@ -433,10 +460,23 @@ func _draw() -> void:
 		var eyes: Array = [Vector2(-2.2, 0.6), Vector2(2.2, 0.6)] if not side else [Vector2(dir * 2.6, 0.6)]
 		for e in eyes:
 			var ep: Vector2 = head + e
+			if asleep or retching:
+				draw_line(ep + Vector2(-1.0, 0), ep + Vector2(1.0, 0), INK, 0.6, true)  # eyes shut
+				continue
 			draw_set_transform(ep, 0.0, Vector2(0.8, 1.0))
 			draw_circle(Vector2.ZERO, 1.25, INK)
 			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 			draw_circle(ep + Vector2(-0.35, -0.45), 0.38, Color(1, 1, 1, 0.9))
+			if drunk >= 2:
+				# Heavy eyelids.
+				draw_line(ep + Vector2(-1.1, -0.7), ep + Vector2(1.1, -0.7), skin.darkened(0.25), 1.0, true)
+		if drunk > 0:
+			# Red cheeks and nose, redder the more drunk.
+			var red := Color(0.9, 0.2, 0.2, 0.18 + 0.12 * drunk)
+			for e in eyes:
+				draw_circle(head + e + Vector2(-0.6 if side else (e.x * 0.25), 2.4), 1.3, red)
+			if not side:
+				draw_circle(head + Vector2(0, 1.9), 0.7, red)
 		var tired := slow or status == ACT_SOFA
 		if side:
 			draw_line(head + Vector2(dir * 5.6, 1.6), head + Vector2(dir * 6.4, 2.3), INK, 0.5, true)  # nose
@@ -447,6 +487,7 @@ func _draw() -> void:
 			draw_arc(head + Vector2(0, 2.6), 1.2, 0.3, PI - 0.3, 8, INK, 0.45, true)
 	_draw_headwear(head, side, dir)
 	_draw_status(head, shoulder_y, hip.y, side, dir)
+	_draw_drunk(head, side, dir)
 
 
 ## Hair over the head: short, long, bun, spiky (Wilson-like), ponytail, bald.
@@ -594,6 +635,38 @@ func _draw_status(head: Vector2, shoulder_y: float, hip_y: float, side: bool, di
 	if slow and (ms / 500) % 2 == 0:
 		var d := head + Vector2(HEAD_R - 0.5, -1.5)
 		_shape(PackedVector2Array([d + Vector2(0, -1.4), d + Vector2(0.8, 0.2), d + Vector2(0, 0.9), d + Vector2(-0.8, 0.2)]), Color("#9fd8ff"))
+
+
+## Drinking: hiccups, throwing up, sleeping it off.
+func _draw_drunk(head: Vector2, side: bool, dir: float) -> void:
+	var ms := Time.get_ticks_msec()
+	if status == ACT_VOMITING:
+		# A wobbly green stream from the mouth down to the floor, and drops.
+		var mouth := head + Vector2(dir * 3.0 if side else 0.0, 3.6)
+		var floor_at := Vector2(mouth.x + (dir * 2.0 if side else 0.0), 0.5)
+		var pts := PackedVector2Array()
+		for j in 7:
+			var k := j / 6.0
+			pts.append(mouth.lerp(floor_at, k) + Vector2(sin(k * 9.0 + ms / 60.0) * 0.6, 0))
+		draw_polyline(pts, INK, 2.6, true)
+		draw_polyline(pts, Color("#9bb83a"), 1.6, true)
+		for i in 3:
+			var k := float((ms + i * 170) % 500) / 500.0
+			draw_circle(floor_at + Vector2((i - 1) * 2.2 * k, -k * 2.0 + k * k * 3.0), 0.6, Color("#b8c94a"))
+	elif status == ACT_PASSED_OUT:
+		# Zzz rising up the screen (the body is rotated, so undo it).
+		draw_set_transform(head, PI / 2.0, Vector2.ONE)
+		_draw_z(Vector2(2.0, -HEAD_R - 2.0), ms)
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	elif drunk >= 2:
+		# A hiccup now and then: a little "hyk!" popping out.
+		var period := 2600 if drunk == 2 else 1700
+		var k := float((ms + get_instance_id() % 997) % period) / 500.0
+		if k < 1.0:
+			var font := ThemeDB.fallback_font
+			var p := head + Vector2(HEAD_R + 1.0, -HEAD_R - k * 3.0)
+			draw_string_outline(font, p, "hyk!", HORIZONTAL_ALIGNMENT_LEFT, -1, 5, 1, Color(INK, 1.0 - k))
+			draw_string(font, p, "hyk!", HORIZONTAL_ALIGNMENT_LEFT, -1, 5, Color(1, 1, 1, 1.0 - k))
 
 
 func _draw_z(p: Vector2, ms: int) -> void:

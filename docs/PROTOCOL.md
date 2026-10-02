@@ -1,4 +1,4 @@
-# Protokół sieciowy (wersja 38)
+# Protokół sieciowy (wersja 39)
 
 Własny binarny protokół na UDP. Implementacje:
 - serwer: `server/src/protocol/` (źródło prawdy),
@@ -23,7 +23,7 @@ przez `cargo test` i czytane przez `client/tests/run_tests.gd`.
 | pole    | typ | wartość |
 |---------|-----|---------|
 | magic   | u16 | `0x5354` (bajty `54 53`, „TS”) |
-| version | u8  | `38` |
+| version | u8  | `39` |
 | type    | u8  | typ pakietu (niżej) |
 
 ## Jednostki
@@ -102,26 +102,29 @@ aplikuje max 6 (średnio 3 = 60/20). Kolejka ponad 30 jest przycinana od najstar
 | self_prev_input| u8 — poprzedni input odbiorcy (`sim::Body::prev_input`, do akcji „na wciśnięcie”) |
 | self_access    | u8 — uprawnienia odbiorcy (`map::access`: 1 przepustka gościa, 2 karta pracownika, 4 obsługa) |
 | self_slow      | u8 — `sim::Body::slow` odbiorcy (1 = wolny chód: wyczerpanie / pilna toaleta); część symulowanego stanu |
+| self_drunk     | u8 — `sim::Body::drunk` odbiorcy (0 trzeźwy, 1 zataczanie od 50% upojenia, 2 mocniejsze i wolny chód od 75%); część symulowanego stanu |
 | self_activity  | u8 — czynność odbiorcy (nie symulowana), jak `activity` encji; 1 = przy komputerze (klient pokazuje jego ekran, dopóki trwa) |
 | n              | u8 |
 | entities       | n × 14 B |
 
 Encja (14 B): `id u16 | kind u8 | x i32 | y i32 | flags u8 | held u8 | activity u8`.
 - `kind`: 0 gracz, 1 NPC, 2 przedmiot na podłodze, 3 laptop na biurku,
-  4 pojazd, 5 taca słodyczy, 6 kałuża po wpadce (bez stanu; sprzątaczka ją
-  ściera, inaczej znika o 22:00).
+  4 pojazd, 5 taca słodyczy, 6 kałuża po wpadce (`held` 0) albo wymiociny
+  (`held` 1); sprzątaczka ją ściera, inaczej znika o 22:00.
   Id: gracze 1..0xDFFF, przedmioty na podłodze i laptopy na biurkach od
   `0xE000` (wspólna pula), NPC od `0xF000`. `PlayerInfo` laptopa niesie imię
   i dział jego właściciela.
 - `held`: przedmiot w rękach (0 brak, 1 przepustka gościa, 2 karta
   pracownika, 3 laptop, 4 kawa, 5 owoc); dla `kind` 2 i 3 — sam przedmiot.
 - `activity`: 0 nic, 1 przy komputerze, 2 parzy kawę, 3 odpoczywa na sofie,
-  4 w toalecie, 5 pali (strefa palenia), 6 myje ręce.
+  4 w toalecie, 5 pali (strefa palenia), 6 myje ręce, 7 w pojeździe,
+  8 zatrzymany (ochrona / policja), 9 wymiotuje, 10 śpi pijany (odsypia).
 - `flags`: bity 0–1 kierunek (0 dół, 1 góra, 2 lewo, 3 prawo), bit 2 „w ruchu”,
   bity 3–5 wygląd (0 gracz, 1 portier — mundur z czapką, 2 pracownik biurowy —
   koszula z krawatem, 3 ochroniarz — czarny strój z żółtą opaską, 4 policjant —
   granatowy mundur z czapką, 5 sprzątaczka — turkusowy fartuch i mop, 6 strażak — czerwony hełm, odblaski), bit 6 wolny chód (zmęczenie / pilna toaleta), bit 7
-  niska higiena (chmurka). U graczy (nie NPC) bit 3 = rozłożony parasol.
+  niska higiena (chmurka). U graczy (nie NPC) bit 3 = rozłożony parasol, bity 4–5
+  = upojenie (0 trzeźwy, 1 od 25%, 2 od 50%, 3 od 75%).
   Dla laptopa (`kind` 3): bit 0 zablokowany, bit 1 ktoś przy nim siedzi.
 
 **Interest management**: lista zawiera tylko encje z tym samym `(floor, room)` co
@@ -284,9 +287,9 @@ widzą pokój mówiącego.
 ### 24 `Stats` (S→C)
 
 Potrzeby postaci odbiorcy, co 0,5 s (tylko w budynku): `hunger u8`, `energy
-u8`, `stress u8`, `bladder u8`, `hygiene u8` (każda 0..100), `flags u8` (bit 0
-brudne ręce, bit 1 rozstrój żołądka), `money u32` (portfel w groszach). Głód, stres i toaleta: 100 =
-źle; energia i higiena: 0 = źle. Liczy je tylko serwer.
+u8`, `stress u8`, `bladder u8`, `hygiene u8`, `alcohol u8` (każda 0..100), `flags u8` (bit 0
+brudne ręce, bit 1 rozstrój żołądka), `money u32` (portfel w groszach). Głód, stres, toaleta i
+upojenie: 100 = źle; energia i higiena: 0 = źle. Liczy je tylko serwer.
 
 ### 29 `Clock` (S→C)
 
@@ -352,7 +355,7 @@ str8, `name` str16}, stanowiska n u8 (≤ 16) × {`id u8`, `places u8`,
 `department u8`, `set` str8, `title` str16, `description` str16}. `CompanyPeople`: n
 u8 × kandydat {`player u16`, `offer u8`, `score u8`, `total u8`, `nick` str16},
 m u8 × pracownik {`player u16`, `department u8`, `day u16` (dzień zatrudnienia),
-`nick` str16}.
+`reprimands u8` (nagany za alkohol, 3 = zwolnienie), `nick` str16}.
 
 `CompanyAction`: token u32, `action u8`, `target u16`, `value u8`, `text` str16.
 Akcje: 1 załóż firmę (z portalu, `text` = nazwa 3–40 znaków), 2 zmień nazwę,
@@ -455,6 +458,10 @@ n u8 (≤ 64) × {`kind u8`, `x i32`, `y i32`} (sub-piksele). Dźwięki zdarzeń
 tego ticku na piętrze odbiorcy w promieniu 28 kafli; klient gra je w miejscu
 zdarzenia (`SOUND_FILES` w `net/protocol.gd`). Nie są potwierdzane — zgubiony
 dźwięk po prostu przepada.
+Rodzaje: 1 ekspres, 2 kasa, 3 bramka sklepu, 4 winda, 5 zamek kabiny, 6
+włącznik, 7 spłuczka, 8 kran, 9 zapalniczka, 10 zmywarka, 11 lodówka, 12
+szafka, 13 podniesienie, 14 upuszczenie, 15 jedzenie, 16 picie, 17 gwizdek,
+18 beknięcie (po alkoholu; klient gra je ~1 s później, po łyku), 19 wymioty.
 
 ### 44 `SkipWait` (C→S)
 
@@ -492,6 +499,7 @@ Rodzaje przedmiotów sklepowych (`held`, `Inventory.kind`): 10 kanapka z serem,
 11 z szynką, 12 wrap wege, 13 hamburger, 14 frytki, 15 drożdżówka, 16 batonik,
 17 chipsy, 18 woda, 19 energetyk, 20 sok, 21 piwo, 22 wino, 23 papierosy,
 38 małpka (setka wódki; nazwa z serwera, więc starszy klient pokaże ją bez ikony).
+39 alkomat (nie ze sklepu — dostaje go Zarząd przy założeniu firmy).
 
 ## Połączenie i timeouty
 
@@ -551,6 +559,7 @@ szyfrowaniem.
 
 ## Historia wersji
 
+- **39** — upojenie alkoholem: `Stats` + `alcohol` (po `hygiene`); `Snapshot` + `self_drunk` (po `self_slow`, zataczanie w symulacji — też w wektorach golden ruchu); flagi encji gracza bity 4–5 = upojenie; czynności 9 wymioty, 10 odsypianie; dźwięki 18 beknięcie, 19 wymioty; kałuża `held` 1 = wymiociny; `CompanyPeople` pracownik + `reprimands u8` (przed `nick`); przedmiot 39 alkomat (pytanie o naganę to zwykły `Dialog`).
 - **38** — kałuża po wpadce: encja `kind` 6 (`flags`, `held`, `activity` = 0), id z puli od `0xE000`; widoczna jak przedmioty w pokoju; ściera ją sprzątaczka, inaczej znika o 22:00.
 - **37** — osobne działy: pakiet `Departments` (54, S→C) z listą działów; działy 4–10 (Mobile, DevOps, AI, Finanse, Sales, Marketing, Obsługa klienta), dział 1 nazywa się „Produkt / IT”.
 - **36** — dwie windy: `Doors` kończy się listą wind `n u8` (≤ 16) × {`floor u8`, `target u8` (255 = stoi), `moving u8`} zamiast jednej trójki `lift_*`.

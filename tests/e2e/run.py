@@ -40,6 +40,10 @@ SCENARIOS = {
         {"server": ["--save", "{tmp}/world.db"],
          "clients": [["onboarding", ["--login=Nowa:haslo-nowej-1", "--register", "--autocreate", "--auto-recruit=1"]]]},
     ],
+    "drinking": [
+        {"server": EMPLOYED + ["--start-time", "10:00"],
+         "clients": [["drinking", ["--nick=Kuba", "--autoconnect"]]]},
+    ],
     "together": [
         {"server": EMPLOYED + ["--start-time", "10:00"],
          "clients": [["together_ola", ["--nick=Ola", "--autoconnect"]],
