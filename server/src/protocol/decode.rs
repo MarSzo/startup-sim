@@ -128,6 +128,8 @@ impl Packet {
                         department: r.u8()?,
                         applied: r.u8()? != 0,
                         vacancies: r.u8()?,
+                        salary_min: r.u32()?,
+                        salary_max: r.u32()?,
                         company: r.str16(MAX_TEXT_BYTES)?,
                         title: r.str16(MAX_TEXT_BYTES)?,
                         description: r.str16(MAX_TEXT_BYTES)?,
@@ -135,7 +137,14 @@ impl Packet {
                 }
                 Packet::JobOffers { offers }
             }
-            ty::APPLY => Packet::Apply { token: r.u32()?, offer: r.u8()?, motivation: r.str16(MAX_TEXT_BYTES)? },
+            ty::APPLY => Packet::Apply {
+                token: r.u32()?,
+                offer: r.u8()?,
+                motivation: r.str16(MAX_TEXT_BYTES)?,
+                salary: r.u32()?,
+                form: r.u8()?,
+                student: r.u8()? != 0,
+            },
             ty::QUESTION => {
                 let (attempt, index, total) = (r.u8()?, r.u8()?, r.u8()?);
                 let text = r.str16(MAX_TEXT_BYTES)?;

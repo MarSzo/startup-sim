@@ -121,7 +121,7 @@ impl Server {
                 self.send_to(id, &Packet::Pong { client_time, server_tick });
             }
             Packet::Disconnect { .. } => self.remove_player(id, "left"),
-            Packet::Apply { offer, .. } => self.handle_apply(id, offer),
+            Packet::Apply { offer, salary, form, student, .. } => self.handle_apply(id, offer, salary, form, student),
             Packet::PortalAction { action, arg, .. } => self.handle_portal_action(id, action, arg),
             Packet::Answer { attempt, index, choice, .. } => self.handle_answer(id, attempt, index, choice),
             Packet::ItemAction { action, slot, .. } => self.handle_item_action(id, action, slot),

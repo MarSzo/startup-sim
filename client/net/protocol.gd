@@ -3,7 +3,7 @@
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 40
+const VERSION := 41
 const MAX_PACKET := 1152  # a game packet; sealed it grows to at most MAX_DATAGRAM
 const MAX_DATAGRAM := 1200
 const MAX_NICK_BYTES := 16
@@ -186,6 +186,17 @@ const ACT_PEEING := 13
 const ACT_POOPING := 14
 ## Can't walk meanwhile (the server ignores the inputs).
 const ACT_STUCK := [ACT_RIDING, ACT_HELD, ACT_VOMITING, ACT_PASSED_OUT, ACT_KNOCKED_OUT, ACT_PEEING, ACT_POOPING]
+# Apply.form (server/src/protocol/mod.rs `employment`).
+const EMPLOYMENT_CONTRACT := 1  # umowa o pracę
+const EMPLOYMENT_B2B := 2
+const EMPLOYMENT_MANDATE := 3  # umowa zlecenie: a student under 26
+const EMPLOYMENT_NAMES := {1: "Umowa o pracę", 2: "B2B", 3: "Umowa zlecenie"}
+const MANDATE_AGE := 26
+# Dialog ids the server uses (besides board talks 1..199): the breathalyser
+# 200..249, the R menu 250, the kitchen cupboard 251, the contract at HR 252.
+const DIALOG_MENU := 250
+const DIALOG_CUPBOARD := 251
+const DIALOG_CONTRACT := 252
 # Puddle entity `held` (server/src/protocol/mod.rs `puddle`).
 const PUDDLE_PEE := 0
 const PUDDLE_VOMIT := 1
@@ -316,11 +327,16 @@ static func encode_ping(token: int, client_time: int) -> PackedByteArray:
 	return b.data_array
 
 
-static func encode_apply(token: int, offer: int, motivation: String) -> PackedByteArray:
+## `form`: EMPLOYMENT_*; `salary`: expected, zł a month gross.
+static func encode_apply(token: int, offer: int, motivation: String, salary := 0, form := EMPLOYMENT_CONTRACT,
+		student := false) -> PackedByteArray:
 	var b := _writer(T_APPLY)
 	b.put_u32(token)
 	b.put_u8(offer)
 	_put_str16(b, motivation, MAX_TEXT_BYTES)
+	b.put_u32(salary)
+	b.put_u8(form)
+	b.put_u8(1 if student else 0)
 	return b.data_array
 
 
@@ -592,7 +608,8 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 				return {}
 			var offers := []
 			for i in n:
-				offers.append({"id": r.u8(), "department": r.u8(), "applied": r.u8() != 0, "vacancies": r.u8(), "company": r.str16(MAX_TEXT_BYTES),
+				offers.append({"id": r.u8(), "department": r.u8(), "applied": r.u8() != 0, "vacancies": r.u8(),
+					"salary_min": r.u32(), "salary_max": r.u32(), "company": r.str16(MAX_TEXT_BYTES),
 					"title": r.str16(MAX_TEXT_BYTES), "description": r.str16(MAX_TEXT_BYTES)})
 			p.offers = offers
 		T_QUESTION:

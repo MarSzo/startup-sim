@@ -40,6 +40,8 @@ pub(super) struct Desk {
     pub(super) hired: Option<u8>,
     /// Passed an interview, waiting for the founder's decision (offer).
     pub(super) awaiting: Option<u8>,
+    /// What the application said: (offer, expected zł a month, form).
+    pub(super) terms: Vec<(u8, u32, u8)>,
     pub(super) inbox: Vec<MailMsg>,
     pub(super) next_mail: u8,
 }
@@ -162,6 +164,16 @@ pub(super) struct Player {
     pub(super) crypto: Option<crate::crypto::Session>,
     /// Salary, grosze per game hour (raises from the CEO).
     pub(super) pay_rate: i64,
+    /// Hired, not signed yet: what was agreed (and what HR offers).
+    pub(super) terms: Option<crate::pay::Terms>,
+    /// Signed: zł a month gross and the form (`protocol::employment`).
+    pub(super) salary: u32,
+    pub(super) employment: u8,
+    /// HR showed the contract (the dialog is open): HR's NPC id.
+    pub(super) contract_shown: Option<u16>,
+    /// Gave the pass back after turning the contract down: back to the job
+    /// portal at this tick.
+    pub(super) to_portal_at: Option<u32>,
     /// World day of the last raise request (cooldown).
     pub(super) last_raise_day: Option<u32>,
     /// Talking to a board member: meeting index, NPC, dialog id, good answers.
@@ -249,6 +261,11 @@ impl Player {
             guest: true,
             crypto: None,
             pay_rate: clock::PAY_PER_MIN * 60,
+            terms: None,
+            salary: 0,
+            employment: 0,
+            contract_shown: None,
+            to_portal_at: None,
             last_raise_day: None,
             talk: None,
             next_dialog_id: 0,

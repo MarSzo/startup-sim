@@ -505,9 +505,10 @@ fn onboarding_porter_reception_hr_card() {
     let at_hr = g.walk_to(&b0, body, (1, Tile { x: 47, y: 14 }), &[]);
     assert!(g.wait_for_line(lines::RECEPTION_ARRIVED, Duration::from_secs(6)).is_some(), "receptionist reached HR");
 
-    // HR: contract signed, the card replaces the guest pass.
+    // HR: the contract (signed), the card replaces the guest pass.
     g.press_e(&b0, at_hr);
-    let access = g.wait_for_line(lines::HR_SIGNED, Duration::from_secs(1));
+    answer_dialog(&g, game::pay::CONTRACT_ID, 0);
+    let access = g.wait_for_line(&game::pay::lines::signed(None, true), Duration::from_secs(1));
     let deadline = Instant::now() + Duration::from_millis(300);
     let mut latest = access;
     while Instant::now() < deadline {
@@ -568,7 +569,7 @@ fn desktop_portal_mail_interview_and_office() {
 
     // Another company answers with a (funny) rejection; a silent one never does.
     let apply = |offer: u8| {
-        c.send(&Packet::Apply { token: c.token, offer, motivation: "Bo lubię kawę.".into() });
+        c.send(&Packet::Apply { token: c.token, offer, motivation: "Bo lubię kawę.".into(), salary: 8000, form: 1, student: false });
     };
     apply(12);
     apply(11);
@@ -1021,13 +1022,17 @@ fn access_card_can_be_dropped_picked_up_and_handed_over() {
 }
 
 /// Wait (pinging `keep` too) for a packet matching `f`.
+/// A server dialog `id` opened (the cupboard, the contract): answer `choice`.
+fn answer_dialog(c: &Client, id: u8, choice: u8) {
+    let open = wait_for(c, &[], Duration::from_secs(2), |p| matches!(p, Packet::Dialog { id: d, .. } if *d == id).then_some(()));
+    assert!(open.is_some(), "dialog {id} opens");
+    c.send(&Packet::DialogAnswer { token: c.token, id, choice });
+}
+
 /// E at the cupboard opened its window (mugs, knives): take option `choice`
 /// (0 = a mug).
 fn cupboard_take(c: &Client, choice: u8) {
-    let id = game::mischief::CUPBOARD_ID;
-    let open = wait_for(c, &[], Duration::from_secs(2), |p| matches!(p, Packet::Dialog { id: d, .. } if *d == id).then_some(()));
-    assert!(open.is_some(), "the cupboard opens");
-    c.send(&Packet::DialogAnswer { token: c.token, id, choice });
+    answer_dialog(c, game::mischief::CUPBOARD_ID, choice);
 }
 
 fn wait_for<T>(me: &Client, keep: &[&Client], wait: Duration, mut f: impl FnMut(&Packet) -> Option<T>) -> Option<T> {
@@ -1727,7 +1732,7 @@ fn a_filled_position_is_gone_for_the_others() {
     let (bob, _) = Client::connect(addr, "Bob");
     // Both apply for the one programmer position; both get invited.
     for c in [&ala, &bob] {
-        c.send(&Packet::Apply { token: c.token, offer: 1, motivation: "Kocham kod.".into() });
+        c.send(&Packet::Apply { token: c.token, offer: 1, motivation: "Kocham kod.".into(), salary: 8000, form: 1, student: false });
     }
     let invited = |c: &Client, other: &Client| {
         wait_for(c, &[other], Duration::from_millis(3000), |p| match p {
@@ -1812,7 +1817,7 @@ fn founder_founds_the_company_and_hires_from_the_panel() {
         _ => None,
     });
     assert_eq!(name.as_deref(), Some("Pixel Pierogi sp. z o.o."));
-    bob.send(&Packet::Apply { token: bob.token, offer: 1, motivation: "Chcę pierogi.".into() });
+    bob.send(&Packet::Apply { token: bob.token, offer: 1, motivation: "Chcę pierogi.".into(), salary: 8000, form: 1, student: false });
     let invited = wait_for(&bob, &[&ola], Duration::from_millis(3000), |p| {
         matches!(p, Packet::Mail { action, arg: 1, .. } if *action == proto::portal_action::JOIN_INTERVIEW).then_some(())
     });
@@ -1890,7 +1895,7 @@ fn founder_founds_the_company_and_hires_from_the_panel() {
         _ => None,
     });
     assert_eq!(seen, Some(("Office manager".into(), 1)));
-    ewa.send(&Packet::Apply { token: ewa.token, offer: new_id, motivation: String::new() });
+    ewa.send(&Packet::Apply { token: ewa.token, offer: new_id, motivation: String::new(), salary: 8000, form: 1, student: false });
     assert!(wait_for(&ewa, &[&ola, &bob], Duration::from_millis(3000), |p| {
         matches!(p, Packet::Mail { action, arg, .. } if *action == proto::portal_action::JOIN_INTERVIEW && *arg == new_id).then_some(())
     })

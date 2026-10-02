@@ -91,6 +91,8 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
                         department: 1,
                         applied: true,
                         vacancies: 2,
+                        salary_min: 8000,
+                        salary_max: 12000,
                         company: "Startup Sim sp. z o.o.".into(),
                         title: "Programista/ka".into(),
                         description: "Owocowe czwartki.".into(),
@@ -100,6 +102,8 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
                         department: 0,
                         applied: false,
                         vacancies: 0,
+                        salary_min: 4300,
+                        salary_max: 4800,
                         company: "Pizzeria u Stefana".into(),
                         title: "Dostawca/Dostawczyni".into(),
                         description: "Własny rower.".into(),
@@ -107,7 +111,17 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
                 ],
             },
         ),
-        ("apply", Packet::Apply { token: 0x01020304, offer: 2, motivation: "Lubię kawę i wyzwania.".into() }),
+        (
+            "apply",
+            Packet::Apply {
+                token: 0x01020304,
+                offer: 2,
+                motivation: "Lubię kawę i wyzwania.".into(),
+                salary: 9500,
+                form: 3,
+                student: true,
+            },
+        ),
         (
             "question",
             Packet::Question {

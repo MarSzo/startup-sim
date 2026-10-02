@@ -414,3 +414,122 @@ fn pani_wiesia_greets_newcomers_and_the_cashier_asks_about_the_hot_dog() {
     s.tick_cashier();
     assert_eq!(s.says.iter().filter(|l| l.text == crate::npc::lines::CASHIER_HOTDOG).count(), 2, "again after stepping away");
 }
+
+/// A player job hunting on the portal.
+fn on_portal(s: &mut Server, id: u16) {
+    add_player(s, id);
+    s.players.get_mut(&id).unwrap().stage = Stage::Portal(Box::default());
+}
+
+fn inbox_subjects(s: &Server, id: u16) -> Vec<String> {
+    match &s.players[&id].stage {
+        Stage::Portal(d) => d.inbox.iter().map(|m| m.subject.clone()).collect(),
+        _ => Vec::new(),
+    }
+}
+
+#[test]
+fn asking_too_much_gets_a_no_and_a_mandate_is_for_students_under_26() {
+    use crate::protocol::employment;
+    let mut s = server();
+    on_portal(&mut s, 1);
+    on_portal(&mut s, 2);
+    on_portal(&mut s, 3);
+    s.players.get_mut(&3).unwrap().profile.age = 30;
+    let max = s.position(1).unwrap().salary[1];
+    s.handle_apply(1, 1, max + 1, employment::EMPLOYMENT, false);
+    s.handle_apply(2, 1, max, employment::MANDATE, true);
+    s.handle_apply(3, 1, max, employment::MANDATE, true); // 30 years old: no mandate
+    match &s.players[&3].stage {
+        Stage::Portal(d) => assert!(d.applied.is_empty(), "rejected at once"),
+        _ => unreachable!(),
+    }
+    s.tick += s.cfg.recruitment.invite_delay_secs * 20 + 1;
+    s.deliver_replies(1);
+    s.deliver_replies(2);
+    assert_eq!(inbox_subjects(&s, 1), vec![crate::pay::lines::TOO_MUCH_SUBJECT]);
+    assert!(inbox_subjects(&s, 2)[0].starts_with("Zaproszenie na rozmowę"));
+    // Hired: what was agreed goes with them to HR.
+    s.hire(2, 1);
+    assert_eq!(s.players[&2].terms, Some(crate::pay::Terms { agreed: max, form: employment::MANDATE, offered: 0 }));
+}
+
+#[test]
+fn the_contract_says_less_sign_it_or_get_seen_out() {
+    use crate::pay::{self, Terms};
+    use crate::protocol::employment;
+    let mut s = server();
+    let hr = s.npcs.iter().find(|n| n.role == crate::npc::Role::Hr).unwrap().id;
+    for id in [1, 2] {
+        add_player(&mut s, id);
+        let pass = s.mint_item(item_kind::GUEST_PASS, "");
+        let p = s.players.get_mut(&id).unwrap();
+        p.inventory.add(pass).unwrap();
+        p.position = Some(1);
+        p.department = 1;
+    }
+    s.players.get_mut(&1).unwrap().terms = Some(Terms { agreed: 10_000, form: employment::B2B, offered: 0 });
+    // Shown: lower than agreed (B2B: +20% on top), the same every time.
+    s.show_contract(hr, 1);
+    let offered = s.players[&1].terms.unwrap().offered;
+    assert!((9_000..=10_800).contains(&offered) && offered.is_multiple_of(100), "{offered}");
+    s.show_contract(hr, 1);
+    assert_eq!(s.players[&1].terms.unwrap().offered, offered);
+    let money = s.players[&1].money;
+    s.handle_dialog_answer(1, pay::CONTRACT_ID, 0);
+    let p = &s.players[&1];
+    assert!(p.contract && p.salary == offered && p.employment == employment::B2B);
+    assert_eq!(p.pay_rate, pay::hourly(offered));
+    assert_eq!(p.money, money, "B2B: no advance");
+    assert!(p.inventory.has(item_kind::EMPLOYEE_CARD) && !p.inventory.has(item_kind::GUEST_PASS));
+    // Player 2 turns it down: HR walks them out, Pani Wiesia takes the pass,
+    // and it's the job portal again (the place is free again).
+    let places = s.places(1);
+    s.show_contract(hr, 2);
+    s.handle_dialog_answer(2, pay::CONTRACT_ID, 1);
+    assert_eq!(s.npcs.iter().find(|n| n.id == hr).unwrap().escorting(), Some(2));
+    s.says.clear();
+    s.saw_out(2);
+    assert!(!s.players[&2].inventory.has(item_kind::GUEST_PASS));
+    assert!(s.says.iter().any(|l| l.text == pay::lines::PASS_BACK));
+    s.tick += 200;
+    s.tick_to_portal();
+    assert!(matches!(s.players[&2].stage, Stage::Portal(_)));
+    assert_eq!(inbox_subjects(&s, 2), vec!["Rezygnacja z umowy"]);
+    assert_eq!((s.places(1), s.players[&2].position), (places + 1, None));
+}
+
+#[test]
+fn reception_asks_about_lunch_and_pani_maria_never_stops_talking() {
+    let mut s = server();
+    add_player(&mut s, 1);
+    add_player(&mut s, 2);
+    s.clock.ds = 10 * 60 * crate::clock::DS_PER_MIN;
+    let r = s.npcs.iter().find(|n| n.role == crate::npc::Role::Receptionist).unwrap().body;
+    let p = s.players.get_mut(&1).unwrap();
+    p.contract = true;
+    p.body = Body::at(r.floor, Pos { x: r.pos.x, y: r.pos.y + 2 * 256 });
+    for _ in 0..30 {
+        s.tick += 1;
+        s.tick_reception();
+    }
+    let asked = s.says.iter().filter(|l| l.text == crate::pay::lines::LUNCH).count();
+    assert_eq!(asked, 1, "once a day");
+    // Pani Maria: a story to each person near her, then a break, then more.
+    s.says.clear();
+    let m = s.npcs.iter().find(|n| n.role == crate::npc::Role::Cleaner).unwrap().body;
+    for id in [1, 2] {
+        s.players.get_mut(&id).unwrap().body = Body::at(m.floor, Pos { x: m.pos.x + 256, y: m.pos.y });
+    }
+    let stories = |s: &Server| s.says.iter().filter(|l| crate::cleaning::lines::STORIES.contains(&l.text.as_str())).count();
+    for _ in 0..(20 * 20) {
+        s.tick += 1;
+        s.tick_maria();
+    }
+    assert_eq!(stories(&s), 2, "one each, 12 s apart");
+    for _ in 0..(60 * 20) {
+        s.tick += 1;
+        s.tick_maria();
+    }
+    assert_eq!(stories(&s), 4, "and again after a minute");
+}

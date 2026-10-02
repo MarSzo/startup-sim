@@ -183,15 +183,20 @@ impl Packet {
                     w.u8(o.department);
                     w.u8(o.applied as u8);
                     w.u8(o.vacancies);
+                    w.u32(o.salary_min);
+                    w.u32(o.salary_max);
                     w.str16(&o.company, MAX_TEXT_BYTES);
                     w.str16(&o.title, MAX_TEXT_BYTES);
                     w.str16(&o.description, MAX_TEXT_BYTES);
                 }
             }
-            Packet::Apply { token, offer, motivation } => {
+            Packet::Apply { token, offer, motivation, salary, form, student } => {
                 w.u32(*token);
                 w.u8(*offer);
                 w.str16(motivation, MAX_TEXT_BYTES);
+                w.u32(*salary);
+                w.u8(*form);
+                w.u8(*student as u8);
             }
             Packet::Question { attempt, index, total, text, options } => {
                 w.u8(*attempt);

@@ -1,4 +1,4 @@
-# Protokół sieciowy (wersja 40)
+# Protokół sieciowy (wersja 41)
 
 Własny binarny protokół na UDP. Implementacje:
 - serwer: `server/src/protocol/` (źródło prawdy),
@@ -23,7 +23,7 @@ przez `cargo test` i czytane przez `client/tests/run_tests.gd`.
 | pole    | typ | wartość |
 |---------|-----|---------|
 | magic   | u16 | `0x5354` (bajty `54 53`, „TS”) |
-| version | u8  | `40` |
+| version | u8  | `41` |
 | type    | u8  | typ pakietu (niżej) |
 
 ## Jednostki
@@ -206,8 +206,8 @@ gracz pojawia się przed budynkiem. Inne firmy odpowiadają `Mail` z odmową
 
 | typ | kierunek | treść |
 |-----|----------|-------|
-| 12 `JobOffers` | S→C | n u8, n × {`id u8`, `department u8` (0 = inna firma), `applied u8`, `vacancies u8` (wolne miejsca w naszym startupie; 0 = obsadzone), `company` str16, `title` str16, `description` str16} — lista może przyjść w kilku pakietach (≤ 1200 B każdy); klient scala po `id` |
-| 13 `Apply` | C→S | token u32, offer u8, `motivation` str16 („Dlaczego chcesz u nas pracować?”) |
+| 12 `JobOffers` | S→C | n u8, n × {`id u8`, `department u8` (0 = inna firma), `applied u8`, `vacancies u8` (wolne miejsca w naszym startupie; 0 = obsadzone), `salary_min u32`, `salary_max u32` (widełki, zł brutto / mies.), `company` str16, `title` str16, `description` str16} — lista może przyjść w kilku pakietach (≤ 1200 B każdy); klient scala po `id` |
+| 13 `Apply` | C→S | token u32, offer u8, `motivation` str16 („Dlaczego chcesz u nas pracować?”), `salary u32` (oczekiwania, zł brutto / mies.; powyżej widełek — odmowa mailem), `form u8` (1 umowa o pracę, 2 B2B, 3 umowa zlecenie — tylko `student` < 26 lat, inaczej ignorowane), `student u8` |
 | 14 `Question` | S→C | attempt u8, index u8, total u8, `text` str16, n u8 (≤ 4), n × `option` str16 (kolejność potasowana) |
 | 15 `Answer` | C→S | token u32, attempt u8, index u8, choice u8 — odpowiedzi nieaktualne (inna próba / pytanie) są ignorowane |
 | 16 `RecruitResult` | S→C | attempt u8, passed u8 (0/1), score u8, total u8, department u8 — wysyłany 2× |
@@ -474,7 +474,7 @@ nasikać do ekspresu w zasięgu, nasikać do kubka osoby obok; ostatnia opcja =
 nic); 2 atak (X) — cios pięścią albo, z nożem w rękach, dźgnięcie najbliższej
 osoby w zasięgu 1,5 kafla. Odpowiedź na menu to zwykły `DialogAnswer`. Szafka
 w kuchni (E z wolnymi rękami) to `Dialog` o id 251 (kubek, nóż, zamknij);
-id 200–249 to pytanie o naganę po alkomacie.
+id 200–249 to pytanie o naganę po alkomacie, 252 — umowa w HR (kwota niższa niż uzgodniona; 0 podpisuję, 1 rezygnuję — HR odprowadza na portiernię, przepustka wraca, potem portal).
 
 ### 44 `SkipWait` (C→S)
 
@@ -573,6 +573,7 @@ szyfrowaniem.
 
 ## Historia wersji
 
+- **41** — widełki i umowa: `JobOffers` oferta + `salary_min u32`, `salary_max u32` (zł brutto / mies., po `vacancies`); `Apply` + `salary u32`, `form u8` (1 umowa o pracę, 2 B2B, 3 umowa zlecenie — tylko student < 26 lat), `student u8` (po `motivation`); `Dialog` 252 = umowa w HR (0 podpisuję, 1 rezygnuję).
 - **40** — psoty i bójki: `Stats` + `bowels`, `health` (po `alcohol`); czynności 11 nokaut, 12 cios, 13 sikanie, 14 kucanie; dźwięki 20 cios, 21 dźgnięcie, 22 sikanie, 23 kupa; kałuża `held` 2 = kupa; przedmiot 40 nóż; wygląd NPC 7 = kasjer; `Action` (55, C→S); `Dialog` 250 (menu R) i 251 (szafka).
 - **39** — upojenie alkoholem: `Stats` + `alcohol` (po `hygiene`); `Snapshot` + `self_drunk` (po `self_slow`, zataczanie w symulacji — też w wektorach golden ruchu); flagi encji gracza bity 4–5 = upojenie; czynności 9 wymioty, 10 odsypianie; dźwięki 18 beknięcie, 19 wymioty; kałuża `held` 1 = wymiociny; `CompanyPeople` pracownik + `reprimands u8` (przed `nick`); przedmiot 39 alkomat (pytanie o naganę to zwykły `Dialog`).
 - **38** — kałuża po wpadce: encja `kind` 6 (`flags`, `held`, `activity` = 0), id z puli od `0xE000`; widoczna jak przedmioty w pokoju; ściera ją sprzątaczka, inaczej znika o 22:00.

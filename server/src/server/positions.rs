@@ -24,6 +24,7 @@ pub(super) fn from_file(r: &Recruitment) -> Vec<Position> {
             set: o.set.clone(),
             description: o.description.clone(),
             places: o.vacancies,
+            salary: o.salary,
         })
         .collect()
 }
@@ -74,7 +75,7 @@ impl Server {
             .find(|&i| self.position(i).is_none() && self.cfg.recruitment.offer(i).is_none())
             .ok_or(lines::LIMIT)?;
         self.log(format!("* company: new position '{title}'"));
-        self.positions.push(Position { id, title, department, set, description, places: 1 });
+        self.positions.push(Position { id, title, department, set, description, places: 1, salary: crate::pay::DEFAULT_RANGE });
         self.save_soon = true;
         Ok(id)
     }

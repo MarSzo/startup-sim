@@ -130,6 +130,14 @@ pub struct Character {
     /// Reprimands from the board (alcohol at work).
     #[serde(default)]
     pub reprimands: u8,
+    /// The contract: zł a month gross and its form (0 = before the pay ranges).
+    #[serde(default)]
+    pub salary: u32,
+    #[serde(default)]
+    pub employment: u8,
+    /// Hired, not signed yet: what was agreed (and offered).
+    #[serde(default)]
+    pub terms: Option<crate::pay::Terms>,
 }
 
 /// A laptop standing on a desk.
@@ -397,6 +405,9 @@ mod tests {
             ],
             seen_questions: HashMap::from([("programming".to_string(), vec![11, 22])]),
             reprimands: 0,
+            salary: 0,
+            employment: 0,
+            terms: None,
         }
     }
 

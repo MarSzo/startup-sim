@@ -23,7 +23,7 @@ pub use golden::{golden_samples, to_hex};
 pub use snapshot::{snapshot_fragments, SelfState};
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 40;
+pub const VERSION: u8 = 41;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
 /// A game packet at most (sealed, it grows by up to 48 B to `MAX_DATAGRAM`).
@@ -259,6 +259,16 @@ pub mod puddle {
     pub const PEE: u8 = 0;
     pub const VOMIT: u8 = 1;
     pub const POOP: u8 = 2;
+}
+
+/// Form of employment (`Apply::form`, the contract).
+pub mod employment {
+    /// Umowa o pracę (an employment contract).
+    pub const EMPLOYMENT: u8 = 1;
+    /// B2B (own company: more on paper, no advance).
+    pub const B2B: u8 = 2;
+    /// Umowa zlecenie (only students under 26).
+    pub const MANDATE: u8 = 3;
 }
 
 /// `Action::action` (C→S).
@@ -522,6 +532,9 @@ pub struct OfferInfo {
     pub applied: bool,
     /// Open positions (our startup; 0 for other companies).
     pub vacancies: u8,
+    /// Pay range, zł a month gross (0, 0 = not given).
+    pub salary_min: u32,
+    pub salary_max: u32,
     pub company: String,
     pub title: String,
     pub description: String,
@@ -612,6 +625,12 @@ pub enum Packet {
         token: u32,
         offer: u8,
         motivation: String,
+        /// Expected pay, zł a month gross.
+        salary: u32,
+        /// `employment::*`.
+        form: u8,
+        /// "I'm a student" (needed for a contract of mandate, with age < 26).
+        student: bool,
     },
     /// Current recruitment question (resent every second until answered).
     Question {

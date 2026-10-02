@@ -82,6 +82,8 @@ func _title(p: Dictionary) -> String:
 		return "Co zrobić?"
 	if p.id == 251:
 		return "Szafka w kuchni"
+	if p.id == 252:
+		return "Umowa — %s" % name_of.call(p.npc)
 	if p.id >= 200:
 		return "Alkomat — %s" % name_of.call(p.npc)
 	return "Spotkanie — %s" % name_of.call(p.npc)
@@ -105,6 +107,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.keycode >= KEY_1 and event.keycode <= KEY_9:
 			_choose(event.keycode - KEY_1)
 			get_viewport().set_input_as_handled()
-		elif event.keycode == KEY_ESCAPE and dialog_id >= 250:
+		elif event.keycode == KEY_ESCAPE and dialog_id in [250, 251]:
 			_choose(_opts.get_child_count() - 1)  # the last option: never mind / close
 			get_viewport().set_input_as_handled()

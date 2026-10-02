@@ -344,9 +344,11 @@ def floor0():
         # The guard walks between the shelves.
         {"kind": "guard", "name": "Ochrona", "home": [25, 55],
          "patrol": [[24, 47], [20, 48], [24, 50], [20, 52], [25, 55]]},
-        # 10: the cleaner sits in the hall all day (her round in the afternoon).
-        {"kind": "cleaner", "name": "Pani Krysia", "home": [38, 56]},
-        # Paulina, also a cleaner, sits in her armchair all day. That's it.
+        # 10: Pani Maria, the cleaner: her round in the afternoon (15-16), and
+        # she talks to everybody, all the time.
+        {"kind": "cleaner", "name": "Pani Maria", "home": [38, 56]},
+        # Paulina, also a cleaner, sits in her armchair by the entrance all
+        # day. That's it.
         {"kind": "idler", "name": "Paulina", "home": [41, 54]},
     ]
     return f
@@ -589,7 +591,7 @@ def floor1():
         # 56: the receptionist behind the desk (guests come to its front,
         # row 36); takes newcomers to HR.
         {"kind": "receptionist", "name": "Recepcja", "home": [36, 34], "escort_to": [1, 47, 14]},
-        {"kind": "hr", "name": "HR", "home": [47, 12]},
+        {"kind": "hr", "name": "HR", "home": [47, 12], "escort_to": [0, 34, 49]},
         # The board: the CEO and the co-founder at the table in 37.
         {"kind": "ceo", "name": "Prezes", "home": [20, 19]},
         {"kind": "cofounder", "name": "Wspólniczka", "home": [27, 20]},

@@ -32,6 +32,7 @@ mod breath;
 mod cleaning;
 mod company;
 mod computers;
+mod contract;
 mod day;
 mod doors;
 mod fight;
@@ -220,6 +221,13 @@ pub struct Server {
     /// Pani Wiesia: when she last greeted each player, and the next joke.
     porter_greeted: HashMap<u16, u32>,
     porter_joke: usize,
+    /// The receptionist asked about lunch: player -> world day.
+    lunch_asked: HashMap<u16, u32>,
+    /// Pani Maria: when she last told each player something, when she may
+    /// talk again at all, and the next story.
+    maria_told: HashMap<u16, u32>,
+    maria_next: u32,
+    maria_story: usize,
     /// Some elevator was moving last tick (resend `Doors` when it starts/stops).
     lift_was_moving: bool,
     clock: Clock,
@@ -319,6 +327,10 @@ impl Server {
             cashier_asked: HashSet::new(),
             porter_greeted: HashMap::new(),
             porter_joke: 0,
+            lunch_asked: HashMap::new(),
+            maria_told: HashMap::new(),
+            maria_next: 0,
+            maria_story: 0,
             npcs,
             machines: coffee::find_machines(&building),
             dropped: Vec::new(),
@@ -472,6 +484,9 @@ impl Server {
         self.tick_police();
         self.tick_cleaning();
         self.tick_cashier();
+        self.tick_reception();
+        self.tick_maria();
+        self.tick_to_portal();
         self.tick_kitchen();
         self.tick_meetings();
         self.tick_lunch();

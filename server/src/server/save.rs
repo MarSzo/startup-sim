@@ -145,6 +145,9 @@ impl Server {
             last_pay: p.last_pay,
             commute_mode: p.commute_mode,
             pay_rate: p.pay_rate,
+            salary: p.salary,
+            employment: p.employment,
+            terms: p.terms,
             last_raise_day: p.last_raise_day,
             needs: p.needs.clone(),
             inventory,
@@ -254,6 +257,9 @@ impl Server {
         p.day = c.day.max(1);
         p.commute_mode = c.commute_mode;
         p.pay_rate = c.pay_rate;
+        p.salary = c.salary;
+        p.employment = c.employment;
+        p.terms = c.terms;
         p.last_raise_day = c.last_raise_day;
         p.needs = c.needs.clone();
         p.last_pay = c.last_pay;

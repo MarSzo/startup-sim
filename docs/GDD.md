@@ -917,7 +917,7 @@ Zastępuje prosty portal z 10.8. Po połączeniu gracz widzi pulpit komputera
   - podstawić pod **ekspres** (E) — kawa leci do tego samego kubka.
 - Kubki leżą, dopóki ktoś ich nie podniesie albo nie przyjdzie sprzątaczka —
   zostają nawet po wyjściu gracza z gry.
-- **Pani Krysia** (NPC, turkusowy fartuch i mop) siedzi w zapleczu technicznym
+- **Pani Maria** (NPC, turkusowy fartuch i mop; do 10.49 — Pani Krysia) siedzi w zapleczu technicznym
   na parterze. **Między 15:00 a 16:00** (o losowej porze, co dzień innej) zaczyna obchód: idzie do najbliższego kubka (najpierw
   na swoim piętrze), zbiera wszystkie w zasięgu, chwilę wyciera stół i idzie
   dalej — po całym budynku (ma klucze wszędzie; kubków w zamkniętej kabinie nie
@@ -1324,6 +1324,27 @@ pełnym ekranie — zastąpiona stylem inspirowanym Don't Starve:
 - **Pięć papierosów pod rząd** (każdy zapalony do 30 s po zgaszeniu
   poprzedniego) — wymioty.
 
+### 10.49 Widełki, umowa w HR, recepcja i pani Maria
+
+- **Widełki w ogłoszeniach** (zł brutto miesięcznie), np. Programista/ka
+  8 000–12 000 zł. W formularzu trzeba podać **oczekiwane wynagrodzenie** i
+  **formę zatrudnienia**: umowa o pracę, B2B albo umowa zlecenie (tylko z
+  zaznaczonym „Jestem studentem / studentką” i poniżej 26 lat). Oczekiwania
+  powyżej widełek — mail z grzeczną odmową zamiast zaproszenia na rozmowę.
+- **Umowa w HR**: zamiast od razu podpisywać, HR pokazuje umowę — kwota jest
+  10–25% niższa niż uzgodniona („drobna korekta, standard w branży”), na B2B
+  o 20% wyższa niż na umowie o pracę. *Podpisuję*: karta, laptop, praca;
+  kwota ustala stawkę godzinową (miesiąc = 168 h), na umowie o pracę także
+  200 zł zaliczki (B2B i zlecenie — bez zaliczki). *Rezygnuję*: HR odprowadza
+  na portiernię, pani Wiesia zabiera przepustkę i po chwili wraca się na
+  portal z ofertami (mail „Rezygnacja z umowy”, miejsce znów wolne).
+- **Recepcja** zaczepia przechodzących pracowników (9:00–13:00, raz dziennie):
+  „Zamówił/a już Pan/Pani obiad?” — jeśli jeszcze nie.
+- **Pani Maria** (dawniej Pani Krysia) robi popołudniowy obchód (15–16) i
+  bardzo dużo mówi: każdemu obok co około minutę opowiada coś z życia (Zbyszek,
+  wnuczek, działka) albo z miasta (ceny na rynku, tramwaje, dzik w parku). Paulina
+  dalej tylko siedzi w fotelu przy wejściu.
+
 ### 10.6 Stan implementacji
 
 *Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie,
@@ -1378,7 +1399,7 @@ protokół 37).*
   przenikający przez drzwi, czujki, alarm z ewakuacją, strażak i kara (10.31);
   protokół v26.
 - **Kubki i sprzątaczka**: pusty kubek po kawie (zostaw / umyj / dolewka z
-  ekspresu), popołudniowy obchód Pani Krysi (15–16) z narzekaniem i wpisem na #ogólny
+  ekspresu), popołudniowy obchód Pani Marii (15–16) z narzekaniem i wpisem na #ogólny
   (10.30); protokół v25.
 - **Ochrona i policja**: ochroniarz w sklepie goni złodzieja, radiowóz i
   policjant przy recydywie albo ucieczce, mandat (10.29); protokół v24.

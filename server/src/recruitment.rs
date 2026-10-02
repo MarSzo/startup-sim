@@ -54,6 +54,9 @@ pub struct Offer {
     pub vacancies: u8,
     pub title: String,
     pub description: String,
+    /// Pay range: zł a month gross, [min, max].
+    #[serde(default)]
+    pub salary: [u32; 2],
     /// Our startup: the question set of the interview.
     #[serde(default)]
     pub set: String,
@@ -124,6 +127,9 @@ impl Recruitment {
                 }
                 continue;
             }
+            if o.salary[0] == 0 || o.salary[0] > o.salary[1] {
+                return Err(format!("offer {}: needs a pay range [min, max]", o.id));
+            }
             if self.department_name(o.department).is_none() {
                 return Err(format!("offer {}: unknown department {}", o.id, o.department));
             }
@@ -170,6 +176,8 @@ impl Recruitment {
                 department: o.department,
                 applied: applied(o.id),
                 vacancies: 0,
+                salary_min: o.salary[0],
+                salary_max: o.salary[1],
                 company: o.company.clone(),
                 title: o.title.clone(),
                 description: o.description.clone(),

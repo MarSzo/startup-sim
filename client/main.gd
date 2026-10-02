@@ -118,7 +118,7 @@ func _ready() -> void:
 	day_screen.skip_wait.connect(func(): net.send(Protocol.encode_skip_wait(net.token)))
 	portal.auto_offer = int(args.get("auto-recruit", "0"))
 	portal.auto_delay = float(args.get("auto-recruit-delay", "0"))
-	portal.apply.connect(func(offer, motivation): net.send(Protocol.encode_apply(net.token, offer, motivation)))
+	portal.apply.connect(func(offer, a): net.send(Protocol.encode_apply(net.token, offer, a.motivation, a.salary, a.form, a.student)))
 	portal.answer.connect(func(a, i, c): net.send(Protocol.encode_answer(net.token, a, i, c)))
 	portal.portal_action.connect(func(action, arg): net.send(Protocol.encode_portal_action(net.token, action, arg)))
 	portal.found_company.connect(func(name): net.send(Protocol.encode_company_action(net.token, Protocol.CO_FOUND, 0, 0, name)))

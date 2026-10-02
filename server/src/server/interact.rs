@@ -27,7 +27,6 @@ impl Server {
     /// One E press: the first thing in reach, in priority order.
     fn interact(&mut self, pid: u16, body: &Body, events: &mut Vec<npc::Event>) {
         let Some(p) = self.players.get(&pid) else { return };
-        let dept = self.cfg.recruitment.department_name(p.department).map(str::to_string);
         let hands_free = p.inventory.hands_free();
         let holds_laptop = p.inventory.held_kind() == item_kind::LAPTOP;
         let lunch_waiting = self.lunch_orders.iter().any(|o| o.owner == pid && o.delivered);
@@ -59,7 +58,7 @@ impl Server {
                 let line = self.pick_up_lunch(pid);
                 self.says.push(Say::addressed(npc_id, line, pid));
             } else {
-                events.extend(n.interact(&self.building, pid, body.access, dept.as_deref(), hands_free));
+                events.extend(n.interact(&self.building, pid, body.access, hands_free));
             }
             return;
         }
@@ -161,6 +160,8 @@ impl Server {
                     }
                 }
                 npc::Event::Contract { player } => self.sign_contract(player),
+                npc::Event::ShowContract { npc, player } => self.show_contract(npc, player),
+                npc::Event::SawOut { player, .. } => self.saw_out(player),
             }
         }
     }

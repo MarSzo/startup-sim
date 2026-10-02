@@ -29,6 +29,10 @@ impl Server {
         let nick = p.nick.clone();
         p.position = Some(offer);
         let Stage::Portal(desk) = &mut p.stage else { return };
+        // What they asked for is what HR will (almost) put on paper.
+        let (agreed, form) = desk.terms.iter().find(|t| t.0 == offer).map_or((o.salary[0], proto::employment::EMPLOYMENT), |t| (t.1, t.2));
+        p.terms = Some(crate::pay::Terms { agreed, form, offered: 0 });
+        let Stage::Portal(desk) = &mut p.stage else { return };
         desk.awaiting = None;
         // Days as the employee sees them (their own day count): they start
         // at the office on their next day.
@@ -248,14 +252,24 @@ impl Server {
         if !p.contract && p.position.is_none() {
             return;
         }
+        let company = self.company.name.clone();
+        let body = company::lines::fired(&p.nick, &company);
+        self.back_to_portal(pid, &format!("{company} — Zarząd"), "Rozwiązanie umowy", body, "fired");
+    }
+
+    /// Out of the job (fired, or turned the contract down): card and laptop
+    /// back, out of the building, job hunting again with `subject` in the inbox.
+    pub(super) fn back_to_portal(&mut self, pid: u16, from: &str, subject: &str, body: String, why: &str) {
         self.end_session(pid);
         self.computers.retain(|c| c.owner() != pid);
         self.vehicles.retain(|v| v.owner != pid);
-        let company = self.company.name.clone();
-        let from = format!("{company} — Zarząd");
         let Some(p) = self.players.get_mut(&pid) else { return };
         let nick = p.nick.clone();
         p.inventory.remove_owned_by(pid);
+        p.inventory.remove_kind(item_kind::GUEST_PASS);
+        p.terms = None;
+        p.contract_shown = None;
+        p.to_portal_at = None;
         refresh(p);
         p.contract = false;
         p.department = 0;
@@ -266,7 +280,7 @@ impl Server {
         // The client clears its inbox when it sees the portal again; new ids
         // anyway, in case that Clock is lost.
         desk.next_mail = 100;
-        desk.mail(&from, "Rozwiązanie umowy".into(), company::lines::fired(&nick, &company), proto::portal_action::NONE, 0);
+        desk.mail(from, subject.into(), body, proto::portal_action::NONE, 0);
         p.stage = Stage::Portal(desk);
         if let Some(pos) = position.and_then(|o| self.position_mut(o)) {
             pos.places = (pos.places + 1).min(MAX_VACANCIES);
@@ -276,7 +290,7 @@ impl Server {
             other.known.remove(&pid);
         }
         self.clock_dirty = true;
-        self.log(format!("* {nick} fired"));
+        self.log(format!("* {nick} {why}"));
         // Clock first (back on the portal), then the new inbox.
         if let Some(clock) = self.players.get(&pid).map(|p| self.clock_packet(p)) {
             self.send_to(pid, &clock);
@@ -288,7 +302,17 @@ impl Server {
     pub(super) fn sign_contract(&mut self, pid: u16) {
         let Some(p) = self.players.get_mut(&pid) else { return };
         p.contract = true;
-        p.money += shop::ADVANCE;
+        // The contract's pay: from what HR offered (B2B and mandates: no advance).
+        let terms = p.terms.take();
+        let advance = terms.is_none_or(|t| t.form == proto::employment::EMPLOYMENT);
+        if let Some(t) = terms.filter(|t| t.offered > 0) {
+            p.salary = t.offered;
+            p.employment = t.form;
+            p.pay_rate = crate::pay::hourly(t.offered);
+        }
+        if advance {
+            p.money += shop::ADVANCE;
+        }
         self.company.hired_on.entry(pid).or_insert(p.day);
         let dept = self.cfg.recruitment.department_name(p.department).unwrap_or("-");
         let msg = format!("* player {pid} '{}' signed a contract: {dept}", p.nick);

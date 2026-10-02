@@ -106,7 +106,7 @@ Rozgrywka od początku do końca — prawdziwy klient (bez okna) na prawdziwym
 serwerze, sterowany scenariuszami z `client/tests/e2e/scenarios/`:
 
 ```bash
-python3 tests/e2e/run.py              # wszystkie (ok. 3 min): workday, onboarding, together, founder, persistence, drinking, fight
+python3 tests/e2e/run.py              # wszystkie (ok. 3 min): workday, onboarding, resign, together, founder, persistence, drinking, fight
 python3 tests/e2e/run.py together     # wybrane; --list wypisze nazwy
 python3 tests/load/soak.py            # obciążenie: 50 botów przez 3 min (--bots, --minutes)
 ```
