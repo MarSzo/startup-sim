@@ -3,7 +3,7 @@
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 37
+const VERSION := 38
 const MAX_PACKET := 1152  # a game packet; sealed it grows to at most MAX_DATAGRAM
 const MAX_DATAGRAM := 1200
 const MAX_NICK_BYTES := 16
@@ -163,6 +163,7 @@ const KIND_ITEM := 2
 const KIND_COMPUTER := 3
 const KIND_VEHICLE := 4
 const KIND_TRAY := 5
+const KIND_PUDDLE := 6
 
 # What a character is doing: Snapshot.self_activity / entity activity.
 const ACT_NONE := 0

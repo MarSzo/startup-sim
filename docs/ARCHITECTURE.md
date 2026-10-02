@@ -315,6 +315,14 @@ produkty sklepu z ceną 0 (poza półkami) — jedzenie działa jak dla towarów
 Owoce z misy mają `Item::stale` z szansą `stale_fruit_percent`; zjedzenie →
 `Needs::upset_stomach` (pęcherz min. 70, +1 pkt/s aż do toalety).
 
+**Kałuże** (`server/puddles.rs`): `needs::Event::Accident` trafia do
+`Steps::accidents` (piętro, pozycja), `react_to_steps` → `leave_puddle`
+kładzie `Puddle` (encja `kind` 6, uchwyt z `alloc_handle`, najwyżej 256 —
+nadmiar wysycha od najstarszej). Sprzątaczka w obchodzie (`tick_cleaning`)
+chodzi do kubków i kałuż, kałużę w zasięgu ściera z `lines::PUDDLE`;
+wieczorne przejście zegara (22:00) czyści resztę `Server::puddles`; bez zapisu w bazie. Klient: `game/puddle_view.gd` na
+własnej warstwie między mapą a `world` (pod ludźmi i przedmiotami).
+
 **Zarząd** (`board.rs`): `Meeting { day, start, owner, topic, state }` w
 `Server::meetings`. Kalendarz (pakiet `Calendar`) i rezerwacje idą przez konto
 właściciela komputera, przy którym siedzi gracz. Co tick `tick_meetings`

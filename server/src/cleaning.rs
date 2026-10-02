@@ -4,7 +4,7 @@
 //! the afternoon (15:00-16:00) the cleaner does her round: walks to every mug left lying
 //! around, all floors, and collects them - grumbling about rooms full of
 //! mugs, and when the day's haul is big, on #ogólny too (naming the record
-//! holder).
+//! holder). On the way she mops up the puddles left by toilet accidents.
 
 /// The round starts at a random minute between 15:00 and 16:00.
 pub const ROUND_AT: u32 = 15 * 60;
@@ -34,6 +34,8 @@ pub mod lines {
     pub const BUSY: &str = "Sprzątam, sprzątam — uwaga, mokra podłoga!";
     pub const START: &str = "Dzień dobry, sprzątanie! Zaczynam obchód.";
     pub const SPOTLESS: &str = "Czysto dziś, aż miło! Tak trzymać.";
+    /// Mopping up an accident puddle.
+    pub const PUDDLE: &str = "Co za cham tu naszczał!";
     pub fn room_mess(n: u32) -> String {
         format!("No nie… {} w jednym pokoju! To jakaś kolekcja?", mugs(n))
     }

@@ -96,9 +96,10 @@ impl Server {
             .chain(self.computers.iter().map(|c| c.handle))
             .chain(self.vehicles.iter().map(|v| v.handle))
             .chain(self.tray.as_ref().map(|t| t.handle))
+            .chain(self.puddles.iter().map(|p| p.handle))
             .collect();
         let mut handle = self.next_drop_handle;
-        // Bounded: MAX_DROPPED + laptops + vehicles is far below the span.
+        // Bounded: MAX_DROPPED + laptops + vehicles + puddles is far below the span.
         for _ in DROP_HANDLE_BASE..npc::NPC_ID_BASE {
             if !used.contains(&handle) {
                 break;

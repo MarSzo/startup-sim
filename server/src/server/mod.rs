@@ -44,6 +44,7 @@ mod movement;
 mod player;
 mod police;
 mod portal;
+mod puddles;
 mod save;
 mod session;
 mod shop;
@@ -87,6 +88,7 @@ use crate::weather::Weather;
 use cleaning::Cleaning;
 use items::{Dropped, DROP_HANDLE_BASE};
 use player::Player;
+use puddles::Puddle;
 use snapshot::Outgoing;
 use stats::Stats;
 
@@ -197,6 +199,8 @@ pub struct Server {
     machines: Vec<Machine>,
     /// Items lying on the floor.
     dropped: Vec<Dropped>,
+    /// Accident puddles, until 22:00.
+    puddles: Vec<Puddle>,
     /// Sofas, toilets, ashtrays, the fruit bowl.
     spots: Vec<Spot>,
     /// Toilet stalls and who locked them.
@@ -306,6 +310,7 @@ impl Server {
             npcs,
             machines: coffee::find_machines(&building),
             dropped: Vec::new(),
+            puddles: Vec::new(),
             workstations: computer::find_workstations(&building),
             spots: needs::find_spots(&building),
             stalls: stalls::find_stalls(&building),

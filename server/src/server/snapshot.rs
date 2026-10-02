@@ -82,6 +82,9 @@ impl Server {
         if let (Some(t), Some((floor, pos))) = (&self.tray, treats::tray_pos(&self.building)) {
             put(at(floor, pos), entity(t.handle, proto::kind::TRAY, pos, 0, t.kind, t.pieces));
         }
+        for p in &self.puddles {
+            put(at(p.floor, p.pos), entity(p.handle, proto::kind::PUDDLE, p.pos, 0, 0, 0));
+        }
         for d in &self.dropped {
             put(at(d.floor, d.pos), entity(d.handle, proto::kind::ITEM, d.pos, 0, d.item.kind, 0));
         }

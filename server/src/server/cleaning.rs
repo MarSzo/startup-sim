@@ -27,11 +27,13 @@ pub(super) struct Cleaning {
 #[derive(Default)]
 struct Round {
     collected: u32,
+    /// Puddles mopped up.
+    mopped: u32,
     /// Mugs per player who left them.
     by_owner: HashMap<u16, u32>,
     /// Rooms she already grumbled about.
     grumbled: HashSet<(u8, u16)>,
-    /// Mugs she can't get to (e.g. in a locked stall).
+    /// Mugs and puddles she can't get to (e.g. in a locked stall).
     unreachable: HashSet<u16>,
     /// Wiping up where the mugs stood until this tick.
     busy_until: u32,
@@ -39,8 +41,8 @@ struct Round {
 
 impl Server {
     /// The cleaner's afternoon round: from today's start (15:00-16:00), she walks to the
-    /// nearest mug left lying around (her floor first), collects what's in
-    /// reach, grumbles about messy rooms, and at the end reports.
+    /// nearest mug or puddle left around (her floor first), collects / mops
+    /// what's in reach, grumbles about messy rooms, and at the end reports.
     pub(super) fn tick_cleaning(&mut self) {
         let Some(ci) = self.npcs.iter().position(|n| n.role == npc::Role::Cleaner) else { return };
         let cleaner = self.npcs[ci].id;
@@ -73,7 +75,13 @@ impl Server {
             }
             !here
         });
-        if !picked.is_empty() {
+        let puddles = self.puddles.len();
+        self.puddles.retain(|p| !(p.floor == floor && dist2(p.pos, pos) <= reach * reach));
+        if self.puddles.len() < puddles {
+            round.mopped += u32::try_from(puddles - self.puddles.len()).unwrap_or(u32::MAX);
+            self.says.push(Say::new(cleaner, cleaning::lines::PUDDLE));
+        }
+        if !picked.is_empty() || self.puddles.len() < puddles {
             round.busy_until = self.tick + cleaning::WIPE_TICKS;
             for owner in picked {
                 round.collected += 1;
@@ -82,13 +90,12 @@ impl Server {
             self.cleaning.round = Some(round);
             return;
         }
-        // Next mug: this floor first, then the nearest.
-        let next = self
-            .dropped
-            .iter()
-            .filter(|d| d.item.kind == item_kind::EMPTY_CUP && !round.unreachable.contains(&d.handle))
-            .min_by_key(|d| (d.floor != floor, dist2(d.pos, pos)))
-            .map(|d| (d.handle, d.floor, d.pos));
+        // Next mug or puddle: this floor first, then the nearest.
+        let mugs = self.dropped.iter().filter(|d| d.item.kind == item_kind::EMPTY_CUP).map(|d| (d.handle, d.floor, d.pos));
+        let next = mugs
+            .chain(self.puddles.iter().map(|p| (p.handle, p.floor, p.pos)))
+            .filter(|(handle, _, _)| !round.unreachable.contains(handle))
+            .min_by_key(|&(_, f, p)| (f != floor, dist2(p, pos)));
         match next {
             Some((handle, f, p)) => {
                 let (x, y) = p.tile();
@@ -116,16 +123,20 @@ impl Server {
         }
     }
 
-    /// No mugs left: the verdict, a post for the messiest, back to her room.
+    /// No mugs or puddles left: the verdict, a post for the messiest, back
+    /// to her room.
     fn finish_round(&mut self, ci: usize, round: Round) {
         let cleaner = self.npcs[ci].id;
         let n = round.collected;
         let line = match n {
-            0 => cleaning::lines::SPOTLESS.to_string(),
-            n if n < cleaning::DAY_COMPLAINT => cleaning::lines::few(n),
-            n => cleaning::lines::done_many(n),
+            0 if round.mopped > 0 => None, // not spotless: she's had her say
+            0 => Some(cleaning::lines::SPOTLESS.to_string()),
+            n if n < cleaning::DAY_COMPLAINT => Some(cleaning::lines::few(n)),
+            n => Some(cleaning::lines::done_many(n)),
         };
-        self.says.push(Say::new(cleaner, line));
+        if let Some(line) = line {
+            self.says.push(Say::new(cleaner, line));
+        }
         if n >= cleaning::DAY_COMPLAINT {
             let record = round
                 .by_owner
@@ -142,6 +153,6 @@ impl Server {
             k.cleaner_load(u8::try_from(n).unwrap_or(u8::MAX), now);
         }
         self.npcs[ci].return_home(&self.building);
-        self.log(format!("* cleaning round done: {n} mugs"));
+        self.log(format!("* cleaning round done: {n} mugs, {} puddles", round.mopped));
     }
 }

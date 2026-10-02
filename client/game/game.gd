@@ -27,6 +27,7 @@ const VehicleView = preload("res://game/vehicle_view.gd")
 const WeatherFx = preload("res://ui/weather_fx.gd")
 const DialogWindow = preload("res://ui/dialog_window.gd")
 const TrayView = preload("res://game/tray_view.gd")
+const PuddleView = preload("res://game/puddle_view.gd")
 const SmokeView = preload("res://game/smoke_view.gd")
 const LightView = preload("res://game/light_view.gd")
 const Settings = preload("res://ui/settings.gd")
@@ -66,6 +67,8 @@ var log_label := Label.new()
 var _log: Array = []  # [msec, text]
 var kinds := {}          # id -> entity kind (player / NPC)
 var floor_items := {}    # entity id -> ItemView (items lying on the floor)
+var puddles := {}        # entity id -> PuddleView (toilet accidents)
+var puddle_layer := Node2D.new()  # on the floor, under the people and items
 var inventory: Array = [] # hands + pockets (from the server)
 var hud := InventoryHud.new()
 var computers := {}      # entity id -> ComputerView (laptops on desks)
@@ -195,6 +198,7 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 		view.labels.visible = false
 		views[f] = view
 	world.y_sort_enabled = true
+	add_child(puddle_layer)
 	add_child(ride_mask)  # between the map and the people
 	add_child(world)
 	light_view.setup(building)
@@ -386,6 +390,9 @@ func reset_session(welcome: Dictionary) -> void:
 	for iv in floor_items.values():
 		iv.queue_free()
 	floor_items.clear()
+	for pv in puddles.values():
+		pv.queue_free()
+	puddles.clear()
 	for cv in computers.values():
 		cv.queue_free()
 	computers.clear()
@@ -618,6 +625,10 @@ func _process(delta: float) -> void:
 		_update_stall_doors()
 		_update_ride()
 		_update_weather()
+	for id in puddles.keys():
+		if latest_tick - puddles[id].last_seen_tick > REMOTE_TIMEOUT_TICKS:
+			puddles[id].queue_free()
+			puddles.erase(id)
 	for id in trays.keys():
 		if latest_tick - trays[id].last_seen_tick > REMOTE_TIMEOUT_TICKS:
 			trays[id].queue_free()
@@ -755,6 +766,9 @@ func _on_snapshot(p: Dictionary) -> void:
 			for iv in floor_items.values():
 				iv.queue_free()
 			floor_items.clear()
+			for pv in puddles.values():
+				pv.queue_free()
+			puddles.clear()
 			for cv in computers.values():
 				cv.queue_free()
 			computers.clear()
@@ -793,6 +807,17 @@ func _on_snapshot(p: Dictionary) -> void:
 			iv.setup(e.held)
 			iv.position = Vector2(e.x, e.y) / float(Movement.SUBPIXELS)
 			iv.last_seen_tick = tick
+			continue
+		if e.kind == Protocol.KIND_PUDDLE:
+			var pv = puddles.get(e.id)
+			if pv == null:
+				pv = PuddleView.new()
+				pv.setup(e.id)
+				puddle_layer.add_child(pv)
+				puddles[e.id] = pv
+			pv.position = Vector2(e.x, e.y) / float(Movement.SUBPIXELS)
+			pv.last_seen_tick = tick
+			kinds[e.id] = e.kind
 			continue
 		if e.kind == Protocol.KIND_TRAY:
 			var tv = trays.get(e.id)

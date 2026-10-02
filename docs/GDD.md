@@ -647,7 +647,9 @@ Zastępuje prosty portal z 10.8. Po połączeniu gracz widzi pulpit komputera
   - Ruch albo ponowne E kończy odpoczynek.
 - Konsekwencje (miękkie): jednorazowe ostrzeżenia w dymku, stres z
   zaniedbania, głód 100 = energia spada 2× szybciej, toaleta 100 = „wpadka”
-  (komunikat dla pokoju, stres +30), a przy energii ≤ 10 albo toalecie ≥ 90
+  (komunikat dla pokoju, stres +30, w miejscu wpadki zostaje neonowo żółta
+  **kałuża** — leży, aż zetrze ją sprzątaczka w popołudniowym obchodzie
+  („Co za cham tu naszczał!”), a najpóźniej o 22:00), a przy energii ≤ 10 albo toalecie ≥ 90
   postać **chodzi wolniej** (kropla potu nad głową).
 - **Łazienki wg płci**: „nie ta” łazienka działa, ale z zawstydzonym
   komentarzem i odrobiną stresu (postać o płci „inna” — bez komentarza).
@@ -921,6 +923,10 @@ Zastępuje prosty portal z 10.8. Po połączeniu gracz widzi pulpit komputera
   nie… 3 kubki w jednym pokoju!”). Na koniec podsumowanie; przy 5 i więcej
   kubkach dziennie także wpis na **#ogólny** z rekordzistą dnia (kto zostawił
   najwięcej). Czysto — pochwała.
+- **Kałuże po wpadkach**: w obchodzie idzie też do kałuż (jak do kubków —
+  najbliższa, najpierw na jej piętrze), ściera je z komentarzem „Co za cham tu
+  naszczał!”. Kałuża zrobiona po obchodzie leży do 22:00. Same kałuże bez
+  kubków — bez pochwały za porządek.
 
 ### 10.31 Palenie wszędzie, dym i straż pożarna
 

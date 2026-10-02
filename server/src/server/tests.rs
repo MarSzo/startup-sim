@@ -81,3 +81,62 @@ fn company_actions_ignore_offer_ids_that_do_not_fit_a_byte() {
     s.company_set_places(256, 3);
     assert_eq!(s.positions, before);
 }
+
+#[test]
+fn an_accident_leaves_a_puddle_until_the_office_closes() {
+    let mut s = server();
+    add_player(&mut s, 1);
+    let at = Pos::tile_center(5, 5);
+    s.players.get_mut(&1).unwrap().needs.bladder = crate::needs::MAX - 1;
+    let mut steps = s.simulate_players();
+    s.react_to_steps(&mut steps);
+    assert_eq!(s.puddles.len(), 1, "a puddle where it happened");
+    assert_eq!((s.puddles[0].floor, s.puddles[0].pos), (0, at));
+    assert!((DROP_HANDLE_BASE..NPC_ID_BASE).contains(&s.puddles[0].handle));
+    // Still there in the evening, gone once the office closes.
+    s.clock.ds = (crate::clock::CLOSE_MIN - 1) * crate::clock::DS_PER_MIN;
+    s.tick_clock();
+    assert_eq!(s.puddles.len(), 1);
+    while s.clock.minute() != crate::clock::CLOSE_MIN {
+        s.tick_clock();
+    }
+    assert!(s.puddles.is_empty(), "mopped up at 22:00");
+}
+
+#[test]
+fn puddles_are_capped_and_never_share_a_handle() {
+    let mut s = server();
+    for _ in 0..1000 {
+        s.leave_puddle(0, Pos::tile_center(5, 5));
+        let item = s.mint_item(item_kind::FRUIT, "Jabłko");
+        s.drop_at(0, Pos::tile_center(5, 5), item);
+    }
+    assert!(s.puddles.len() <= 256, "{} puddles", s.puddles.len());
+    let handles: HashSet<u16> = s.puddles.iter().map(|p| p.handle).chain(s.dropped.iter().map(|d| d.handle)).collect();
+    assert_eq!(handles.len(), s.puddles.len() + s.dropped.len(), "duplicate entity handles");
+}
+
+#[test]
+fn the_cleaner_mops_up_a_puddle_on_her_round() {
+    let mut s = server();
+    s.cfg.cleaning_at = 10 * 60;
+    s.cfg.cleaning_spread = 0;
+    s.clock.ds = 10 * 60 * crate::clock::DS_PER_MIN;
+    let ws = crate::computer::find_workstations(&s.building);
+    let w = ws.iter().find(|w| w.department == 1).unwrap();
+    s.leave_puddle(w.floor, Pos::tile_center(w.tile.x, w.tile.y + 1));
+    let mut said = false;
+    for _ in 0..20 * 120 {
+        s.tick += 1;
+        s.tick_cleaning();
+        let events = s.tick_npcs();
+        s.apply_npc_events(events);
+        said |= s.says.iter().any(|l| l.text == crate::cleaning::lines::PUDDLE);
+        s.says.clear();
+        if s.puddles.is_empty() {
+            break;
+        }
+    }
+    assert!(s.puddles.is_empty(), "the puddle is mopped up");
+    assert!(said, "and she has a word about it");
+}

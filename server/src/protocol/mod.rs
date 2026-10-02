@@ -23,7 +23,7 @@ pub use golden::{golden_samples, to_hex};
 pub use snapshot::{snapshot_fragments, SelfState};
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 37;
+pub const VERSION: u8 = 38;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
 /// A game packet at most (sealed, it grows by up to 48 B to `MAX_DATAGRAM`).
@@ -398,6 +398,8 @@ pub mod kind {
     /// A tray of sweets in the chill room (`held`: the sweet, `activity`:
     /// pieces left).
     pub const TRAY: u8 = 5;
+    /// A puddle left by a toilet accident (no state; gone at 22:00).
+    pub const PUDDLE: u8 = 6;
 }
 
 /// One conversation in the messenger sidebar.

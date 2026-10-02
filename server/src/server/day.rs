@@ -35,6 +35,7 @@ impl Server {
             Some(Transition::Evening) => {
                 self.lunch_orders.clear(); // uncollected boxes go in the bin
                 self.lights.on.clear(); // the last one out turns off the lights
+                self.puddles.clear(); // mopped up overnight
                 let ids: Vec<u16> = self.players.values().filter(|p| p.in_building()).map(|p| p.id).collect();
                 for pid in ids {
                     self.go_home(pid);

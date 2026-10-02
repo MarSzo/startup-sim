@@ -30,6 +30,8 @@ pub(super) struct Steps {
     unwashed_exits: Vec<(u16, u8, u16)>,
     /// Walked out of the shop with unpaid goods.
     shoplifters: Vec<u16>,
+    /// Didn't make it to the toilet: (floor, where they stood).
+    accidents: Vec<(u8, Pos)>,
 }
 
 impl Server {
@@ -80,7 +82,7 @@ impl Server {
                 self.says.push(Say::new(p.id, coffee::lines::COLD));
                 steps.cold_cups.push(p.id);
             }
-            tick_needs(p, needs_speed, tick, &mut self.says, &mut self.sounds);
+            tick_needs(p, needs_speed, tick, &mut self.says, &mut self.sounds, &mut steps.accidents);
             if matches!(p.rest, Some((Rest::Smoking { .. }, _, _))) {
                 steps.puffs.push(((p.body.floor, p.room), p.id, p.body.pos));
             }
@@ -96,7 +98,7 @@ impl Server {
     }
 
     /// What the steps set off: the shop gate, bathroom witnesses, coffee
-    /// ready / gone cold, cigarette smoke.
+    /// ready / gone cold, cigarette smoke, accident puddles.
     pub(super) fn react_to_steps(&mut self, steps: &mut Steps) {
         for pid in std::mem::take(&mut steps.shoplifters) {
             self.shoplifted(pid);
@@ -114,6 +116,9 @@ impl Server {
         }
         for (place, pid, pos) in std::mem::take(&mut steps.puffs) {
             self.smoke.puff(place, pid, pos);
+        }
+        for (floor, pos) in std::mem::take(&mut steps.accidents) {
+            self.leave_puddle(floor, pos);
         }
     }
 
@@ -175,8 +180,8 @@ fn left_bathroom(building: &Building, floor: u8, from: u16, to: u16) -> bool {
 }
 
 /// Needs: moving ends a rest; `speed` needs ticks at once (dev); the
-/// warnings they raise are said aloud.
-fn tick_needs(p: &mut Player, speed: u32, tick: u32, says: &mut Vec<Say>, sounds: &mut Vec<(u8, u8, Pos)>) {
+/// warnings they raise are said aloud, accidents go to `accidents`.
+fn tick_needs(p: &mut Player, speed: u32, tick: u32, says: &mut Vec<Say>, sounds: &mut Vec<(u8, u8, Pos)>, accidents: &mut Vec<(u8, Pos)>) {
     let was_toilet = matches!(p.rest, Some((Rest::Toilet, _, _)));
     if let Some((_, floor, pos)) = p.rest {
         if (floor, pos) != (p.body.floor, p.body.pos) {
@@ -190,7 +195,10 @@ fn tick_needs(p: &mut Player, speed: u32, tick: u32, says: &mut Vec<Say>, sounds
         for e in events {
             let line = match e {
                 needs::Event::Warn(l) | needs::Event::RestDone(l) => l,
-                needs::Event::Accident => needs::lines::ACCIDENT,
+                needs::Event::Accident => {
+                    accidents.push((p.body.floor, p.body.pos));
+                    needs::lines::ACCIDENT
+                }
             };
             says.push(Say::new(p.id, line));
         }
