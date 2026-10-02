@@ -128,11 +128,19 @@ impl Building {
         self.floors.get(f as usize).map_or("?", |fl| fl.name.as_str())
     }
 
-    /// Rooms of the floor below seen from `room` (a balcony): (floor, room).
+    /// Rooms below seen from `room` (a balcony): (floor, room), on the
+    /// nearest active floor below that has them (from floor 4 the street,
+    /// past floor 3).
     pub fn below(&self, floor: u8, room: u16) -> Vec<(u8, u16)> {
-        let (Some(m), Some(down)) = (self.floor(floor), floor.checked_sub(1).and_then(|f| self.floor(f))) else { return vec![] };
-        let Some(def) = m.rooms.iter().find(|r| r.id == room) else { return vec![] };
-        def.below.iter().filter_map(|name| down.room_by_name(name)).map(|r| (floor - 1, r.id)).collect()
+        let Some(def) = self.floor(floor).and_then(|m| m.rooms.iter().find(|r| r.id == room)) else { return vec![] };
+        for f in (0..floor).rev() {
+            let Some(down) = self.floor(f) else { continue };
+            let seen: Vec<(u8, u16)> = def.below.iter().filter_map(|name| down.room_by_name(name)).map(|r| (f, r.id)).collect();
+            if !seen.is_empty() {
+                return seen;
+            }
+        }
+        vec![]
     }
 
     pub fn active_floors(&self) -> impl Iterator<Item = (u8, &Map)> {
@@ -211,21 +219,22 @@ mod tests {
     }
 
     #[test]
-    fn loads_three_active_floors_locked_second_and_two_stairwells() {
+    fn loads_the_ground_floor_floors_3_and_4_and_two_stairwells() {
         let b = b();
-        assert_eq!(b.floors.len(), 6);
-        assert!(b.floor(0).is_some() && b.floor(1).is_some() && b.floor(3).is_some());
-        assert!(b.floor(2).is_none() && b.floors[2].locked);
-        assert_eq!(b.floor_name(1), "Piętro 1");
+        assert_eq!(b.floors.len(), 7);
+        assert!(b.floor(0).is_some() && b.floor(3).is_some() && b.floor(4).is_some());
+        assert!(b.floor(1).is_none() && b.floors[1].locked, "floor 1 has no map yet");
+        assert!(b.floor(2).is_none() && b.floors[2].locked, "nor floor 2");
         assert_eq!(b.floor_name(3), "Piętro 3");
-        assert!(b.floor(4).is_some(), "the stairwell between 0 and 1 is a map of its own");
-        assert!(b.floor(5).is_some(), "and so is the one between 1 and 3");
+        assert_eq!(b.floor_name(4), "Piętro 4");
+        assert!(b.floor(5).is_some(), "the stairwell between the ground floor and 3 is a map of its own");
+        assert!(b.floor(6).is_some(), "and so is the one between 3 and 4");
         let lifts: Vec<u8> = b
             .active_floors()
             .filter(|(_, m)| m.links.iter().any(|l| matches!(&l.kind, LinkKind::Elevator { id } if id == "A")))
             .map(|(f, _)| f)
             .collect();
-        assert_eq!(lifts, [0, 1, 3], "the lifts stop at every storey");
+        assert_eq!(lifts, [0, 3, 4], "the lifts stop at every storey with a map");
     }
 
     #[test]
@@ -237,17 +246,17 @@ mod tests {
         let path = b.find_path(spawn, (f, goal), crate::map::access::GUEST).expect("reachable");
         assert!(b.find_path(spawn, (f, goal), 0).is_none(), "gates stop visitors without a pass");
         assert_eq!(path.first(), Some(&spawn));
-        assert_eq!(path.last(), Some(&(1, goal)));
-        // Ground floor -> stairwell (landing) -> floor 1.
+        assert_eq!(path.last(), Some(&(4, goal)));
+        // Ground floor -> stairwell -> floor 3 -> upper stairwell -> floor 4.
         let floors: Vec<u8> = path.iter().map(|p| p.0).fold(Vec::new(), |mut v, f| {
             if v.last() != Some(&f) {
                 v.push(f);
             }
             v
         });
-        assert_eq!(floors, [0, 4, 1]);
-        let i = path.iter().position(|p| p.0 == 1).unwrap();
-        assert_eq!(b.floor(4).unwrap().tile_char(path[i - 1].1.x, path[i - 1].1.y), Some('S'));
+        assert_eq!(floors, [0, 5, 3, 6, 4]);
+        let i = path.iter().position(|p| p.0 == 4).unwrap();
+        assert_eq!(b.floor(6).unwrap().tile_char(path[i - 1].1.x, path[i - 1].1.y), Some('S'));
         assert_eq!(path[i].1, Tile { x: 25, y: 41 }, "arrival tile (the stairwell upstairs)");
         for w in path.windows(2) {
             if w[0].0 == w[1].0 {
@@ -258,7 +267,7 @@ mod tests {
     }
 
     #[test]
-    fn path_to_floor_3_goes_through_the_upper_stairwell() {
+    fn path_to_floor_3_goes_through_the_lower_stairwell() {
         let b = b();
         let (f, room) = b.find_room("Pokój wypoczynkowy").unwrap();
         assert_eq!(f, 3);
@@ -270,22 +279,22 @@ mod tests {
             }
             v
         });
-        assert_eq!(floors, [0, 4, 1, 5, 3], "ground floor, stairwell, floor 1, upper stairwell, floor 3");
+        assert_eq!(floors, [0, 5, 3], "ground floor, stairwell, floor 3");
     }
 
     #[test]
     fn the_balcony_is_off_the_kitchenette_outdoors_and_looks_down_outside() {
         let b = Building::load(&default_building_path()).unwrap();
-        let m = b.floor(1).unwrap();
+        let m = b.floor(4).unwrap();
         let balcony = m.room_by_name("Balkon").unwrap();
         assert!(balcony.outdoor);
         let kitchen = m.room_by_name("Aneks kuchenny").unwrap().id;
         let t = m.room_tiles(kitchen)[0];
-        let path = b.find_path((1, t), (1, Tile { x: 25, y: 4 }), 0).expect("from the kitchenette to the balcony");
+        let path = b.find_path((4, t), (4, Tile { x: 25, y: 4 }), 0).expect("from the kitchenette to the balcony");
         assert!(!path.is_empty());
-        let below = b.below(1, balcony.id);
+        let below = b.below(4, balcony.id);
         let street = b.floor(0).unwrap().room_by_name("Na zewnątrz").unwrap().id;
         assert_eq!(below, vec![(0, street)]);
-        assert!(b.below(1, kitchen).is_empty());
+        assert!(b.below(4, kitchen).is_empty());
     }
 }

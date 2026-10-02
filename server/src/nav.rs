@@ -77,7 +77,7 @@ mod tests {
     fn walks_from_spawn_to_every_room_upstairs() {
         let b = Building::load(&default_building_path()).unwrap();
         let spawn = b.spawns()[0];
-        let m1 = b.floor(1).unwrap();
+        let m1 = b.floor(4).unwrap();
         // Staff-only (service) rooms and the walled-up second lift aside.
         for room in m1.rooms.iter().filter(|r| !matches!(r.kind.as_str(), "service" | "elevator")) {
             // A tile off the stairs flight (standing there would teleport you).
@@ -90,14 +90,14 @@ mod tests {
             let mut body = Body::at(spawn.0, Pos::tile_center(spawn.1.x, spawn.1.y));
             // A guest; the board room needs a meeting (BOARD) on top.
             body.access = crate::map::access::GUEST | crate::map::access::BOARD;
-            let mut w = Walker::to(&b, &body, (1, goal)).unwrap_or_else(|| panic!("no path to {}", room.name));
+            let mut w = Walker::to(&b, &body, (4, goal)).unwrap_or_else(|| panic!("no path to {}", room.name));
             let mut steps = 0;
             while !w.done() && steps < 20_000 {
                 body = step(&b, body, w.next_input(&body));
                 steps += 1;
             }
             assert!(w.done(), "{} not reached", room.name);
-            assert_eq!((body.floor, body.pos.tile()), (1, (goal.x, goal.y)), "{}", room.name);
+            assert_eq!((body.floor, body.pos.tile()), (4, (goal.x, goal.y)), "{}", room.name);
         }
     }
 }

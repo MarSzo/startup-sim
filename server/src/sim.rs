@@ -318,8 +318,8 @@ mod tests {
         assert_eq!(p.x, 43 * TILE_UNITS - HALF_W);
     }
 
-    /// Stairwell map (between floors 0 and 1).
-    const MID: u8 = 4;
+    /// Stairwell map (between the ground floor and floor 3).
+    const MID: u8 = 5;
 
     #[test]
     fn stairs_go_through_the_stairwell_and_landing() {
@@ -335,17 +335,16 @@ mod tests {
         let m = b.floor(MID).unwrap();
         assert_eq!(m.room_name(m.room_at(body.pos.x, body.pos.y)), "Półpiętro");
         assert!(body.pos.tile().1 <= 6, "on the landing: {:?}", body.pos.tile());
-        // Across the landing and down the second flight: floor 1.
+        // Across the landing and down the second flight: floor 3.
         let body = walk(&b, body, IN_RIGHT, 60);
         let body = until_floor_change(&b, body, IN_DOWN, 300);
-        assert_eq!(body.floor, 1, "the second flight leads to floor 1");
-        assert_eq!(body.pos, Pos::tile_center(25, 41));
+        assert_eq!(body.floor, 3, "the second flight leads to floor 3");
+        assert_eq!(body.pos, Pos::tile_center(26, 42));
         // Keep holding DOWN: no bouncing back.
         let body = walk(&b, body, IN_DOWN, 60);
-        assert_eq!(body.floor, 1);
-        // And back: floor 1's flight -> stairwell (second flight) -> ground floor.
-        let body = walk(&b, body, IN_UP, 40);
-        let body = until_floor_change(&b, body, IN_LEFT, 300);
+        assert_eq!(body.floor, 3);
+        // And back: floor 3's flight down -> stairwell (second flight) -> ground floor.
+        let body = until_floor_change(&b, body, IN_UP, 300);
         assert_eq!((body.floor, body.pos), (MID, Pos::tile_center(36, 13)));
         let body = walk(&b, body, IN_UP, 200);
         let body = walk(&b, body, IN_LEFT, 60);

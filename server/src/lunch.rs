@@ -1,6 +1,6 @@
 //! Ordering lunch (backlog 9b): an app on the office computer. Pick a dish
 //! from a few (fictional) restaurants, pay from the computer owner's wallet,
-//! the courier brings it to the reception on floor 1 after the delivery time
+//! the courier brings it to the reception on floor 4 after the delivery time
 //! (later in the rain); the receptionist lets you know, E at the reception
 //! hands over the box.
 //!

@@ -74,12 +74,12 @@ client/                 projekt Godota 4.7
   sounds/               pliki WAV z tools/sounds/gen_sounds.py (syntetyzowane)
   ui/office/            aplikacje firmowego komputera: okno (os_window), tablica kanban, poczta (mail_box = dane, mail_view = skrzynka / kosz)
   icons/                ikona gry (icon.svg — źródło; icon.icns / icon.ico do eksportu) i ekran startowy splash.png
-  maps/building.json    lista pięter (piętro 2 zablokowane)
+  maps/building.json    lista pięter (piętra 1 i 2 zablokowane)
   maps/floor0.json      parter + teren zewnętrzny
-  maps/floor1.json      piętro 1
   maps/floor3.json      piętro 3 (wg planu architekta)
-  maps/floor4.json      klatka schodowa parter–1 (półpiętro)
-  maps/floor5.json      klatka schodowa 1–3 (półpiętro)
+  maps/floor4.json      piętro 4 (biurowe: recepcja, działy, zarząd, chill room)
+  maps/floor5.json      klatka schodowa parter–3 (półpiętro)
+  maps/floor6.json      klatka schodowa 3–4 (półpiętro)
   main.gd / main.tscn   wejście: start screen <-> gra, argumenty dev
   net/protocol.gd       lustro protocol/
   net/net_client.gd     połączenie UDP (PacketPeerUDP)
@@ -175,12 +175,12 @@ które serwer wykonuje.
 
 **Portier** (definicja w `floor0.json` → `npcs`): w spoczynku stoi w portierni.
 Gość bez przepustki rozmawia z nim (E) → dostaje przepustkę gościa, a portier
-prowadzi go na recepcję piętra 1 (bramki, schody). Czeka, jeśli gościa nie ma
+prowadzi go na recepcję piętra 4 (bramki, schody). Czeka, jeśli gościa nie ma
 ani obok niego (4 kafle), ani dalej na trasie, ani w recepcji; przypomina co
 6 s, po 30 s rezygnuje i odbiera przepustkę. Po dojściu mówi, że przepustka jest
 ważna do końca dnia, i wraca. Prowadzi jedną osobę naraz.
 
-**Recepcja** (piętro 1, za ladą) używa tej samej logiki odprowadzania: gościa
+**Recepcja** (piętro 4, za ladą) używa tej samej logiki odprowadzania: gościa
 z przepustką prowadzi do HR (bez zmiany uprawnień, rezygnując nie odbiera
 przepustki); osobę z kartą tylko wita. **HR** stoi za biurkiem: gościowi
 „podpisuje umowę” — `Grant CARD` + `Revoke GUEST`; bez przepustki odsyła na
@@ -501,9 +501,9 @@ uprawnień obsługi. BFS (`Building::find_path`) stosuje te same reguły.
 **Przejścia między piętrami**:
 - **Schody** (część kroku, więc przewidywane przez klienta): wejście środkiem
   postaci na kafel schodów (`links` typu `stairs`) przenosi na kafel przyjścia
-  na innej mapie. Między parterem a piętrem 1 oraz między piętrem 1 a 3 są
-  osobne mapy **klatek schodowych** (w `building.json` jako „piętra” 4 i 5 z
-  `stairwell: true`): bieg w górę, półpiętro, drugi bieg — widać tylko klatkę
+  na innej mapie. Między parterem a piętrem 3 oraz między piętrem 3 a 4
+  są osobne mapy **klatek schodowych** (w `building.json` jako „piętra” 5 i 6
+  z `stairwell: true`): bieg w górę, półpiętro, drugi bieg — widać tylko klatkę
   i osoby na niej. Zaraz po
   przejściu działa blokada: schody nie zadziałają, dopóki nie zmienisz
   klawiszy ruchu *i* nie zejdziesz z obszaru schodów.
@@ -515,7 +515,7 @@ uprawnień obsługi. BFS (`Building::find_path`) stosuje te same reguły.
   nie rusza; w czasie jazdy klient wygasza wszystko poza kabiną (`ride_mask.gd`,
   między mapą a postaciami); E w kabinie otwiera **panel pięter** — pakiet
   `Dialog` z `npc` 0 (`Player::lift_panel`, `doors.rs`): przycisk na każde
-  piętro, na którym winda staje (bez bieżącego; zablokowane 2 pomija), i
+  piętro, na którym winda staje (bez bieżącego; zablokowane 1 i 2 pomija), i
   „Zostań”; `DialogAnswer` wciska przycisk (`Elevator::press_floor`, drzwi
   zamykają się po 1 s), panel znika, gdy winda ruszy albo gracz wyjdzie z
   kabiny. Drzwi windy są w nakładce `closed` mapy (jak
@@ -681,7 +681,7 @@ stojąc w drzwiach widzisz korytarz.
 
 | funkcja | gdzie się wepnie |
 |---------|------------------|
-| **Piętro 2** | wpis w `building.json` z `locked: true`; odblokowanie = plik mapy + `locked: false` (winda i schody same go obsłużą; do ustalenia: odblokowanie w trakcie gry wymaga zmiany CRC albo osobnego komunikatu). |
+| **Piętra 1 i 2** | wpisy w `building.json` z `locked: true`; odblokowanie = plik mapy + `locked: false` (winda i schody same go obsłużą; do ustalenia: odblokowanie w trakcie gry wymaga zmiany CRC albo osobnego komunikatu). |
 | **Trwałość karty** | karta żyje tyle, co sesja; zapis między sesjami wymaga kont (backend). |
 | **Kolejne NPC** | np. Zarząd: nowy `kind` w `npcs` mapy + `Role` w `npc.rs`; rozmowa, odprowadzanie, dymki i widoczność są wspólne. |
 | **Skutki działu** | dział jest w stanie gracza i w `PlayerInfo`; ograniczenia (np. drzwi działów, zadania) dojdą z zadaniami. |
@@ -695,7 +695,7 @@ Jeden wątek, N gniazd nieblokujących, pętla 60 Hz. Każdy bot przechodzi peł
 handshake, predykuje ruch tym samym `sim::step` i robi rekoncyliację (log
 pokazuje liczbę błędnych predykcji), chodzi (`nav::Walker`) po ścieżkach BFS
 przez cały budynek, schodami między piętrami — `--room-share` z nich wybiera
-cele tylko w `--room` (domyślnie „Chill room” na piętrze 1). Za bramki boty
+cele tylko w `--room` (domyślnie „Chill room” na piętrze 4). Za bramki boty
 przejdą tylko, gdy serwer działa z `--start-with-card`. Log co 5 s:
 połączeni, liczba w docelowym pokoju, RTT, odbierany transfer, widoczni.
 

@@ -83,7 +83,7 @@ mod tests {
             let r = m.room_at_tile(x, y);
             assert!(r == s.room || m.tile_type(x, y).is_some_and(|t| t.contains("door")), "{} at {x},{y}", m.room_name(s.room));
         }
-        let m1 = b.floor(1).unwrap();
+        let m1 = b.floor(4).unwrap();
         assert!(!m1.room_by_name("Łazienka męska").unwrap().windows);
         assert!(m1.room_by_name("Produkt / IT").unwrap().windows);
         assert_eq!(m1.room_by_name("WC męskie").unwrap().lit_by.as_deref(), Some("Łazienka męska"));

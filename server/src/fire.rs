@@ -236,9 +236,9 @@ mod tests {
     #[test]
     fn smoke_fills_a_room_drifts_next_door_and_clears() {
         let (b, mut s) = setup();
-        let stall = room(&b, 1, "WC męskie");
-        let bath = room(&b, 1, "Łazienka męska");
-        let corridor = room(&b, 1, "Korytarz");
+        let stall = room(&b, 4, "WC męskie");
+        let bath = room(&b, 4, "Łazienka męska");
+        let corridor = room(&b, 4, "Korytarz");
         for t in 0..600 {
             if t == 40 {
                 assert!(s.get(stall) >= ALARM, "a stall is thick at once: {:?}", s.levels());
@@ -263,7 +263,7 @@ mod tests {
         let outside = room(&b, 0, "Strefa palenia");
         s.puff(outside, 1, Pos::tile_center(45, 65));
         assert_eq!(s.get(outside), 0);
-        let m1 = b.floor(1).unwrap();
+        let m1 = b.floor(4).unwrap();
         let has = |name: &str| m1.room_by_name(name).unwrap().detector;
         assert!(has("Korytarz") && has("Produkt / IT") && has("Zarząd"));
         assert!(!has("Łazienka męska") && !has("WC męskie") && !has("Chill room"));

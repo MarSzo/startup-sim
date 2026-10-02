@@ -17,20 +17,20 @@ func run() -> void:
 	await until(func(): return not game().screen.visible, 5.0, "standing up")
 	log_step("Kuba answered")
 
-	if not await walk(1, 34, 10):  # the chill room
+	if not await walk(4, 34, 10):  # the chill room
 		return
 	if not await until(func(): return sees("Kuba"), 40.0, "Kuba in the chill room"):
 		return
 	log_step("met Kuba")
 
 	# The left lift (A) down to the ground floor.
-	if not await walk(1, 37, 44):
+	if not await walk(4, 37, 44):
 		return
 	await press_e()
-	var floor1 = game().building.get_floor(1)
-	if not await until(func(): return not floor1.is_closed(37, 43), 10.0, "the lift open"):
+	var floor4 = game().building.get_floor(4)
+	if not await until(func(): return not floor4.is_closed(37, 43), 20.0, "the lift open"):
 		return
-	if not await walk(1, 37, 42):  # into the cabin
+	if not await walk(4, 37, 42):  # into the cabin
 		return
 	await press_e()  # the panel of floor buttons
 	if not await until(func(): return game().dialog.visible, 5.0, "the floor panel"):
@@ -38,4 +38,4 @@ func run() -> void:
 	game().dialog._choose(0)  # the first button: the ground floor
 	if not await hear("Jedziemy na: Parter"):
 		return
-	await until(func(): return floor_now() == 0, 10.0, "down on the ground floor")
+	await until(func(): return floor_now() == 0, 20.0, "down on the ground floor")

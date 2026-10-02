@@ -26,12 +26,12 @@ func run() -> void:
 	await until(func(): return not game().screen.visible, 5.0, "standing up")
 	log_step("lunch ordered")
 
-	if not await walk(1, 21, 8):  # the cupboard with mugs
+	if not await walk(4, 21, 8):  # the cupboard with mugs
 		return
 	await press_e()
 	if not await until(func(): return holding(Item.CUP), 5.0, "a mug from the cupboard"):
 		return
-	if not await walk(1, 25, 8):  # the coffee machine
+	if not await walk(4, 25, 8):  # the coffee machine
 		return
 	await press_e()
 	if not await hear("Kawa gotowa", 8.0):
@@ -43,7 +43,7 @@ func run() -> void:
 	await item(Protocol.ITEM_DROP)  # free hands for the lunch box
 	log_step("coffee drunk")
 
-	if not await walk(1, 36, 36):  # in front of the reception desk
+	if not await walk(4, 36, 36):  # in front of the reception desk
 		return
 	if not await hear("Kurier był!", 40.0):
 		return

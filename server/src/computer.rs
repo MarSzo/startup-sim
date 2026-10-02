@@ -39,7 +39,11 @@ pub struct Workstation {
 
 pub fn find_workstations(b: &Building) -> Vec<Workstation> {
     let mut out = Vec::new();
-    for (f, m) in b.active_floors() {
+    // Top floor first: the saved laptops point at desks by index, and the
+    // office floor (4, once "floor 1") must keep its desks' numbers when
+    // floors below it get maps.
+    let floors: Vec<(u8, &crate::map::Map)> = b.active_floors().collect();
+    for (f, m) in floors.into_iter().rev() {
         for y in 0..m.height {
             for x in 0..m.width {
                 // Desks in the departments; the board works at its meeting table.

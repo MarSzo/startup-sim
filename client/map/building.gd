@@ -76,6 +76,22 @@ func elevator_floors(id: String) -> Array[int]:
 	return out
 
 
+## The floor a balcony looks down on: the nearest active floor below `f`
+## with the rooms it names (the street from floor 4, past floor 3), or -1.
+func floor_below(f: int, rid: int) -> int:
+	var m = get_floor(f)
+	if m == null or not m.room_below.has(rid):
+		return -1
+	for g in range(f - 1, -1, -1):
+		var down = get_floor(g)
+		if down == null:
+			continue
+		for name in m.room_below[rid]:
+			if down.room_names.values().has(name):
+				return g
+	return -1
+
+
 ## Which elevator a door tile belongs to (it touches that cabin), or -1.
 func lift_at_door(f: int, t: Vector2i) -> int:
 	var m = get_floor(f)

@@ -77,7 +77,7 @@ impl Server {
             self.log(format!("* calendar: {} books {} at {}{who}", self.nick(account), board::topic_name(topic), clock::hhmm(start)));
             let nick = self.nick(account).to_string();
             let body = format!(
-                "Temat: {}.\nGodzina: {} w sali zarządu (piętro 1). Drzwi otworzą się 10 min wcześniej.",
+                "Temat: {}.\nGodzina: {} w sali zarządu (piętro 4). Drzwi otworzą się 10 min wcześniej.",
                 board::topic_name(topic),
                 clock::hhmm(start)
             );

@@ -573,7 +573,7 @@ func _build() -> void:
 	_pages["lunch"] = lunch_pad
 	var lh := Label.new()
 	_style_label(lh, 20, Color("#1c2430"))
-	lh.text = "Obiady do biura — dostawa na recepcję (piętro 1)"
+	lh.text = "Obiady do biura — dostawa na recepcję (piętro 4)"
 	_lunch_view.add_child(lh)
 	_style_label(_lunch_status, 15, Ink.ACCENT)
 	_lunch_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

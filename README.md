@@ -67,7 +67,7 @@ z puli 25 na stanowisko, bez powtórek dopóki nie przejdziesz całej puli;
 2 poprawne = przyjęcie), a potem zaproszenie na dzień próbny — „Idę do biura”.
 Na miejscu startujesz przed budynkiem bez przepustki: bramki w holu go nie wpuszczą,
 więc trzeba podejść do portierni i porozmawiać z portierem (E) — da przepustkę
-gościa i zaprowadzi na recepcję na piętrze 1 (schodami). Recepcja (E) zaprowadzi
+gościa i zaprowadzi na recepcję na piętrze 4 (schodami). Recepcja (E) zaprowadzi
 do HR, a HR (E) podpisze umowę i wyda kartę pracownika.
 
 ### Serwer — opcje

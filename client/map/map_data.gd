@@ -34,7 +34,7 @@ var room_names := {}  # id -> name
 var room_types := {}  # id -> type
 var room_outdoor := {}  # id -> true: under the open sky (weather)
 var room_detector := {}  # id -> true: smoke detector on the ceiling
-var room_below := {}  # id -> true: sees the floor below (a balcony)
+var room_below := {}  # id -> names of rooms seen below (a balcony)
 var room_windows := {}  # id -> true: has windows (daylight)
 var room_light := {}  # id -> "switch" / "always" (missing = outdoors / none)
 var room_switch := {}  # id -> Vector2i: tile by the light switch
@@ -90,7 +90,7 @@ func parse(bytes: PackedByteArray) -> void:
 		if defs[key].get("detector", false):
 			room_detector[rid] = true
 		if not defs[key].get("below", []).is_empty():
-			room_below[rid] = true
+			room_below[rid] = defs[key]["below"]
 		if defs[key].get("windows", false):
 			room_windows[rid] = true
 		if defs[key].get("light", "") != "":

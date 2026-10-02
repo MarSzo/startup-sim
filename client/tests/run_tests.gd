@@ -235,12 +235,12 @@ func test_movement(path: String) -> void:
 	expect(floor_changes >= 3, "vectors exercise stairs/elevator (%d floor changes)" % floor_changes)
 	# Two lifts: the door tiles know theirs (the Doors packet's order).
 	expect(building.lift_ids == ["A", "B"], "lift ids %s" % [building.lift_ids])
-	expect(building.lift_at_door(0, Vector2i(37, 43)) == 0 and building.lift_at_door(1, Vector2i(41, 43)) == 1
+	expect(building.lift_at_door(0, Vector2i(37, 43)) == 0 and building.lift_at_door(4, Vector2i(41, 43)) == 1
 		and building.lift_at_door(0, Vector2i(30, 50)) == -1, "doors belong to their lift")
 	# Locked stall door (dynamic overlay): same result as stalls.rs in Rust.
-	var m = building.get_floor(1)
+	var m = building.get_floor(4)
 	var walk_left := func() -> Dictionary:
-		var bd := Movement.body(1, Movement.tile_center(7, 45), 0, Movement.LOCK_NONE, MapData.ACCESS_CARD)
+		var bd := Movement.body(4, Movement.tile_center(7, 45), 0, Movement.LOCK_NONE, MapData.ACCESS_CARD)
 		for i in 60:
 			bd = Movement.step(building, bd, Movement.IN_LEFT)
 		return bd

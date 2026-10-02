@@ -15,7 +15,7 @@ func run() -> void:
 	await pc("close")
 	await until(func(): return not game().screen.visible, 5.0, "standing up")
 	log_step("answered Ola")
-	if not await walk(1, 36, 12):  # the chill room
+	if not await walk(4, 36, 12):  # the chill room
 		return
 	if not await until(func(): return sees("Ola"), 40.0, "Ola in the chill room"):
 		return

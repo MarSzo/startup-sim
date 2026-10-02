@@ -1,7 +1,7 @@
 {
  "version": 1,
- "id": "floor5",
- "floor": 5,
+ "id": "floor6",
+ "floor": 6,
  "tile_px": 16,
  "width": 70,
  "height": 72,
@@ -188,7 +188,7 @@
  "room_defs": {
   "P": {
    "id": 1,
-   "name": "Półpiętro",
+   "name": "Półpiętro (wyżej)",
    "type": "stairs",
    "light": "always"
   }
@@ -202,9 +202,9 @@
     3,
     1
    ],
-   "to_floor": 0,
+   "to_floor": 3,
    "to": [
-    24,
+    30,
     42
    ]
   },
@@ -216,10 +216,10 @@
     3,
     1
    ],
-   "to_floor": 3,
+   "to_floor": 4,
    "to": [
-    26,
-    42
+    25,
+    41
    ]
   }
  ],

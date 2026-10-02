@@ -9,8 +9,9 @@ Everything a floor file holds comes from here (edit this, not the JSON).
     python3 tools/build_maps.py --preview  # print ASCII only
 
 The layout follows the hand-drawn plan (numbers in the comments are the
-numbers on the drawing): ground floor 1-12, floor 1 13-58. Floor 3 follows
-the architect's plan of the third storey (room numbers 301-319).
+numbers on the drawing): ground floor 1-12, floor 4 (the office floor)
+13-58. Floor 3 follows the architect's plan of the third storey (room
+numbers 301-319). Floors 1 and 2 are locked (no map yet).
 """
 import json
 import os
@@ -193,7 +194,7 @@ def stall(f, key, rid, name, bath, gender, toilet, stand, door, bath_name):
 
 # ------------------------------------------------------------------ shared
 # Shared building geometry (must line up between floors): two elevators
-# side by side, doors facing down (8/9 on the ground floor, 14/15 upstairs),
+# side by side, doors facing down (8/9 on the ground floor, 14/15 on floor 4),
 # each running on its own.
 ELEV_A = (36, 41, 38, 42)    # cabin interior: 3 x 2, a tight fit for 6
 ELEV_B = (40, 41, 42, 42)
@@ -201,26 +202,26 @@ SHAFT = (35, 40, 43, 43)     # walls around both (a pillar between the doors)
 ELEV_A_DOOR = (36, 43, 38, 43)
 ELEV_B_DOOR = (40, 43, 42, 43)
 
-# The stairwells are maps of their own ("floors" 4 and 5 in the building
+# The stairwells are maps of their own ("floors" 5 and 6 in the building
 # list, not real storeys): a U-shaped staircase - flight up from the lower
 # floor on the left, the landing (półpiętro) at the top, flight on the right
 # leading to the upper floor. Walking it takes a few seconds and you only
-# see the stairwell. Map 4 joins the ground floor and floor 1, map 5 floor 1
-# and floor 3 (floor 2 is locked; its stairwell door stays shut).
-STAIRWELL_FLOOR = 4              # between 0 and 1
-STAIRWELL_UP_FLOOR = 5           # between 1 and 3
+# see the stairwell. Map 5 joins the ground floor and floor 3 (the doors to
+# the locked floors 1 and 2 stay shut on the way), map 6 floors 3 and 4.
+STAIRWELL_FLOOR = 5              # between 0 and 3
+STAIRWELL_UP_FLOOR = 6           # between 3 and 4
 MID_FLIGHT_A = (31, 7, 33, 14)   # from / to the lower floor
 MID_FLIGHT_B = (35, 7, 37, 14)   # from / to the upper floor
 MID_ARRIVAL_A = (32, 13)
 MID_ARRIVAL_B = (36, 13)
 STAIRS0 = (19, 41, 21, 42)       # the flight in 4 (ground floor)
 STAIRS0_ARRIVAL = (24, 42)
-STAIRS1 = (19, 39, 21, 40)       # the flight in 24 (floor 1), down
-STAIRS1_ARRIVAL = (25, 41)
-STAIRS1_UP = (26, 39, 28, 40)    # the flight in 24 (floor 1), up to floor 3
-STAIRS1_UP_ARRIVAL = (27, 42)
-STAIRS3 = (25, 39, 27, 40)       # the flight in 301 (floor 3)
-STAIRS3_ARRIVAL = (30, 41)
+STAIRS4 = (19, 39, 21, 40)       # the flight in 24 (floor 4), down to floor 3
+STAIRS4_ARRIVAL = (25, 41)
+STAIRS3 = (25, 39, 27, 40)       # the flights in 301 (floor 3): down to the ground floor
+STAIRS3_ARRIVAL = (26, 42)
+STAIRS3_UP = (29, 39, 31, 40)    # and up to floor 4
+STAIRS3_UP_ARRIVAL = (30, 42)
 
 # Outside (south of the building): sidewalk, street, the car park, the tram.
 STREET_Y = 61
@@ -342,7 +343,7 @@ def floor0():
     })
     f.npcs = [
         # The porter sits behind the desk; escorts newcomers to the reception.
-        {"kind": "porter", "name": "Portier", "home": [37, 49], "escort_to": [1, 36, 36]},
+        {"kind": "porter", "name": "Portier", "home": [37, 49], "escort_to": [4, 36, 36]},
         # Behind the till; customers pay from the other side of the counter.
         {"kind": "cashier", "name": "Kasa", "home": [20, 55]},
         {"kind": "guard", "name": "Ochrona", "home": [25, 55]},
@@ -352,9 +353,10 @@ def floor0():
     return f
 
 
-# ----------------------------------------------------------------- floor 1
-def floor1():
-    f = Floor(1, "~")
+# ----------------------------------------------------------------- floor 4
+def floor4():
+    """The office floor (the hand-drawn plan's "floor 1", 13-58)."""
+    f = Floor(4, "~")
     f.switch_doors = {}
 
     # 48: the balcony (over the drive; smoking allowed, out in the open).
@@ -458,8 +460,7 @@ def floor1():
     f.door(29, 36, 29, 36, "D", "K")
     f.walls(18, 38, 29, 43, ".", "Q")
     f.room("Q", 21, "Klatka schodowa", "stairs", light="always")
-    f.area(*STAIRS1, "S", "Q")                           # down to the ground floor
-    f.area(*STAIRS1_UP, "S", "Q")                        # up to floor 3
+    f.area(*STAIRS4, "S", "Q")                           # down to floor 3
 
     # Right column: 47 meeting room, 46 HR, 44 marketing (45 cleaning
     # cupboard), 43 sales, 42 customer service, 41 storeroom.
@@ -589,7 +590,7 @@ def floor1():
     f.npcs = [
         # 56: the receptionist behind the desk (guests come to its front,
         # row 36); takes newcomers to HR.
-        {"kind": "receptionist", "name": "Recepcja", "home": [36, 34], "escort_to": [1, 47, 14]},
+        {"kind": "receptionist", "name": "Recepcja", "home": [36, 34], "escort_to": [4, 47, 14]},
         {"kind": "hr", "name": "HR", "home": [47, 12]},
         # The board: the CEO and the co-founder at the table in 37.
         {"kind": "ceo", "name": "Prezes", "home": [20, 19]},
@@ -727,7 +728,8 @@ def floor3():
     f.put(23, 49, 23, 49, "V")
     f.walls(24, 38, 32, 43, ".", "Q")
     f.room("Q", 24, "Klatka schodowa", "stairs", light="always")
-    f.area(*STAIRS3, "S", "Q")
+    f.area(*STAIRS3, "S", "Q")                           # down to the ground floor
+    f.area(*STAIRS3_UP, "S", "Q")                        # up to floor 4
     f.area(33, 38, 34, 43, ".", "C")                     # passage to the lifts
     f.walls(35, 38, 43, 40, ":", "q")
     f.room("q", 25, "Pomieszczenie użytkowe", "service", light="always")
@@ -820,18 +822,18 @@ def links():
 
     return {
         0: lifts + [stairs(rect(STAIRS0), STAIRWELL_FLOOR, MID_ARRIVAL_A)],
-        1: lifts + [
-            stairs(rect(STAIRS1), STAIRWELL_FLOOR, MID_ARRIVAL_B),
-            stairs(rect(STAIRS1_UP), STAIRWELL_UP_FLOOR, MID_ARRIVAL_A),
+        3: lifts + [
+            stairs(rect(STAIRS3), STAIRWELL_FLOOR, MID_ARRIVAL_B),
+            stairs(rect(STAIRS3_UP), STAIRWELL_UP_FLOOR, MID_ARRIVAL_A),
         ],
-        3: lifts + [stairs(rect(STAIRS3), STAIRWELL_UP_FLOOR, MID_ARRIVAL_B)],
+        4: lifts + [stairs(rect(STAIRS4), STAIRWELL_UP_FLOOR, MID_ARRIVAL_B)],
         STAIRWELL_FLOOR: [
             stairs([31, 15, 3, 1], 0, STAIRS0_ARRIVAL),
-            stairs([35, 15, 3, 1], 1, STAIRS1_ARRIVAL),
+            stairs([35, 15, 3, 1], 3, STAIRS3_ARRIVAL),
         ],
         STAIRWELL_UP_FLOOR: [
-            stairs([31, 15, 3, 1], 1, STAIRS1_UP_ARRIVAL),
-            stairs([35, 15, 3, 1], 3, STAIRS3_ARRIVAL),
+            stairs([31, 15, 3, 1], 3, STAIRS3_UP_ARRIVAL),
+            stairs([35, 15, 3, 1], 4, STAIRS4_ARRIVAL),
         ],
     }
 
@@ -878,8 +880,8 @@ def check(f):
 def main():
     floors = [
         floor0(),
-        floor1(),
         floor3(),
+        floor4(),
         stairwell(STAIRWELL_FLOOR, "Półpiętro"),
         stairwell(STAIRWELL_UP_FLOOR, "Półpiętro (wyżej)"),
     ]
@@ -902,11 +904,12 @@ def main():
         "version": 1,
         "floors": [
             {"floor": 0, "file": "floor0.json", "name": "Parter"},
-            {"floor": 1, "file": "floor1.json", "name": "Piętro 1"},
+            {"floor": 1, "file": None, "name": "Piętro 1", "locked": True},
             {"floor": 2, "file": None, "name": "Piętro 2", "locked": True},
             {"floor": 3, "file": "floor3.json", "name": "Piętro 3"},
-            {"floor": 4, "file": "floor4.json", "name": "Klatka schodowa (półpiętro)", "stairwell": True},
-            {"floor": 5, "file": "floor5.json", "name": "Klatka schodowa (półpiętro 1–3)", "stairwell": True},
+            {"floor": 4, "file": "floor4.json", "name": "Piętro 4"},
+            {"floor": 5, "file": "floor5.json", "name": "Klatka schodowa (półpiętro parter–3)", "stairwell": True},
+            {"floor": 6, "file": "floor6.json", "name": "Klatka schodowa (półpiętro 3–4)", "stairwell": True},
         ],
     }
     with open(os.path.join(OUT, "building.json"), "w", encoding="utf-8") as fh:

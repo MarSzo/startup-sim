@@ -129,20 +129,20 @@ mod tests {
         let (b, m) = setup();
         assert_eq!(m.len(), 2);
         let map = b.floor(m[0].floor).unwrap();
-        assert_eq!(m[0].floor, 1);
-        assert_eq!(map.room_name(map.room_at_tile(m[0].tile.x, m[0].tile.y + 1)), "Aneks kuchenny");
+        assert_eq!(m[0].floor, 3);
+        assert_eq!(map.room_name(map.room_at_tile(m[0].tile.x, m[0].tile.y + 1)), "Kuchnia");
         let map = b.floor(m[1].floor).unwrap();
-        assert_eq!(m[1].floor, 3);
-        assert_eq!(map.room_name(map.room_at_tile(m[1].tile.x, m[1].tile.y + 1)), "Kuchnia");
+        assert_eq!(m[1].floor, 4);
+        assert_eq!(map.room_name(map.room_at_tile(m[1].tile.x, m[1].tile.y + 1)), "Aneks kuchenny");
     }
 
     #[test]
     fn reach_is_about_one_tile_away() {
         let (_, m) = setup();
-        let t = m[0].tile;
-        let front = Body::at(1, Pos::tile_center(t.x, t.y + 1));
-        assert_eq!(machine_in_reach(&m, &front), Some(0));
-        assert_eq!(machine_in_reach(&m, &Body::at(1, Pos::tile_center(t.x, t.y + 3))), None);
+        let t = m[1].tile; // the kitchenette's, on floor 4
+        let front = Body::at(4, Pos::tile_center(t.x, t.y + 1));
+        assert_eq!(machine_in_reach(&m, &front), Some(1));
+        assert_eq!(machine_in_reach(&m, &Body::at(4, Pos::tile_center(t.x, t.y + 3))), None);
         assert_eq!(machine_in_reach(&m, &Body::at(0, front.pos)), None, "other floor");
     }
 

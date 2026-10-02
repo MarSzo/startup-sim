@@ -583,7 +583,7 @@ mod tests {
             if says(&ev).contains(&lines::ARRIVED) {
                 arrived = Some(t);
                 let m = b.floor(porter.body.floor).unwrap();
-                assert_eq!(porter.body.floor, 1);
+                assert_eq!(porter.body.floor, 4);
                 assert_eq!(m.room_name(porter.room), "Korytarz", "in front of the reception desk");
                 break;
             }
@@ -606,7 +606,7 @@ mod tests {
         let (b, mut porter) = setup();
         porter.interact(&b, 7, 0, None, true);
         // Guest already waiting upstairs (in a corner, off his route).
-        let ahead = Body::at(1, Pos::tile_center(31, 16));
+        let ahead = Body::at(4, Pos::tile_center(31, 16));
         let players = HashMap::from([(7u16, ahead)]);
         let arrived = (0..3000).any(|_| says(&porter.tick(&b, &players)).contains(&lines::ARRIVED));
         assert!(arrived);
@@ -659,7 +659,7 @@ mod tests {
         let at_desk = Body::at(0, Pos::tile_center(34, 49)); // across the porter's desk
         assert!(porter.in_talk_range(&at_desk));
         assert!(!porter.in_talk_range(&Body::at(0, Pos::tile_center(29, 49))));
-        assert!(!porter.in_talk_range(&Body::at(1, porter.body.pos)), "other floor");
+        assert!(!porter.in_talk_range(&Body::at(4, porter.body.pos)), "other floor");
     }
 
     #[test]
@@ -725,11 +725,11 @@ mod tests {
     #[test]
     fn guest_arriving_with_the_porter_can_talk_to_reception_and_hr_from_the_drop_off_spots() {
         let (b, mut npcs) = everyone();
-        let porter_drop = Body::at(1, Pos::tile_center(36, 36));
+        let porter_drop = Body::at(4, Pos::tile_center(36, 36));
         assert!(by_role(&mut npcs, Role::Receptionist).in_talk_range(&porter_drop));
-        let reception_drop = Body::at(1, Pos::tile_center(47, 14));
+        let reception_drop = Body::at(4, Pos::tile_center(47, 14));
         assert!(by_role(&mut npcs, Role::Hr).in_talk_range(&reception_drop));
-        let m = b.floor(1).unwrap();
+        let m = b.floor(4).unwrap();
         assert_eq!(m.room_name(m.room_at_tile(47, 14)), "HR");
     }
 
@@ -746,7 +746,7 @@ mod tests {
             says(&r.tick(&b, &players)).contains(&lines::RECEPTION_ARRIVED)
         });
         assert!(arrived);
-        let m = b.floor(1).unwrap();
+        let m = b.floor(4).unwrap();
         assert_eq!(m.room_name(r.room), "HR");
     }
 

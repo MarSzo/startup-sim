@@ -1218,8 +1218,7 @@ var _below_floor := -1
 
 
 func _update_below_view() -> void:
-	var m = building.get_floor(floor_index)
-	var want := floor_index - 1 if m and floor_index > 0 and m.room_below.has(room_id) else -1
+	var want: int = building.floor_below(floor_index, room_id)
 	if want == _below_floor:
 		return
 	if _below_floor >= 0 and views.has(_below_floor):

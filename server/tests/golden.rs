@@ -85,9 +85,9 @@ fn movement_vectors() {
         Body::at(0, Pos::tile_center(23, 18)),                        // parking between cars
         Body::at(0, Pos::tile_center(24, 42)),                        // stairwell by the flight
         Body::at(0, Pos::tile_center(37, 41)),                        // elevator cabin
-        Body::at(1, Pos::tile_center(25, 41)),                        // stairs arrival upstairs
-        Body::at(1, Pos::tile_center(32, 20)),                        // corridor upstairs
-        Body { slow: true, ..Body::at(1, Pos::tile_center(34, 10)) }, // exhausted, chill room
+        Body::at(4, Pos::tile_center(25, 41)),                        // stairs arrival upstairs
+        Body::at(4, Pos::tile_center(32, 20)),                        // corridor upstairs
+        Body { slow: true, ..Body::at(4, Pos::tile_center(34, 10)) }, // exhausted, chill room
         Body { slow: true, ..Body::at(0, Pos::tile_center(24, 42)) }, // slow on the stairs
     ];
     for start in starts {
@@ -115,8 +115,8 @@ fn movement_vectors() {
         states.push(body_json(body));
     };
     let chill = b.find_room("Chill room").unwrap().1.id;
-    let goal = b.floor(1).unwrap().room_tiles(chill)[20];
-    let mut w = Walker::to(&b, &body, (1, goal)).unwrap();
+    let goal = b.floor(4).unwrap().room_tiles(chill)[20];
+    let mut w = Walker::to(&b, &body, (4, goal)).unwrap();
     while !w.done() {
         let i = w.next_input(&body);
         record(&mut body, i);

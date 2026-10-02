@@ -46,10 +46,10 @@ startupu do korporacji.
 - Wejście z portiernią — bramki na kartę; portier (NPC) wpuszcza osoby bez karty
 - Parking wewnętrzny
 - Sklep — zakupy (np. kawa, przekąski, papierosy)
-- Winda — panel pięter w kabinie (parter, piętro 1, piętro 3); piętro 2 zablokowane
+- Winda — panel pięter w kabinie (parter, piętro 3, piętro 4); piętra 1 i 2 zablokowane
 - Schody — alternatywa dla windy
 
-### Piętro 1 (aktywne od startu)
+### Piętro 4 (biurowe, aktywne od startu)
 - Recepcja przy wejściu na piętro
 - Pokoje zespołów — każdy dział ma swój (rozdz. 5)
 - Pokój działu Biznesu (marketing + sprzedaż)
@@ -70,7 +70,7 @@ Gracze mogą swobodnie chodzić po korytarzu, pokojach i wspólnych przestrzenia
 - Korytarz do skrzydła sal: sale konferencyjne 1, 3 (16 osób) i 4, pokój
   biurowy, poczekalnia; balkon 7
 
-### Piętro 2 (zablokowane)
+### Piętra 1 i 2 (zablokowane)
 Odblokowywane wraz z rozwojem firmy (patrz sekcja 6).
 
 ## 4. Ścieżka nowego gracza
@@ -115,7 +115,7 @@ Praca graczy przynosi firmie przychody, a firma odblokowuje kolejne etapy:
 
 | Etap | Co się odblokowuje |
 |------|--------------------|
-| Startup | IT, Biznes, Zarząd, HR — tylko piętro 1 |
+| Startup | IT, Biznes, Zarząd, HR — tylko piętro 4 |
 | Scale-up | Podział IT na backend / frontend / mobile, osobne działy marketingu i sprzedaży, DevOps |
 | Korporacja | Piętro 2, dział data science / AI, sala konferencyjna na eventy dla wszystkich |
 
@@ -152,7 +152,7 @@ Docelowo role w Zarządzie i HR mogą stać się dostępne dla graczy (awanse).
 - [ ] Nazwa gry i nazwa firmy
 
 ## 9. Proponowany zakres MVP
-- Parter + piętro 1
+- Parter + piętro 4
 - Dwa działy (IT, Biznes) + NPC: portier, recepcja, Zarząd, HR
 - Uproszczona rekrutacja
 - Jedno–dwa zadania na dział
@@ -314,9 +314,9 @@ graczy; testy jednostkowe serializacji i ruchu/kolizji.
 
 Układ wg odręcznego planu (numery w nawiasach to numery z rysunku). Mapy
 70×72 kafli po 16 px (1 kafel ≈ 1 m; skala: pokój 18 mieści 8 biurek);
-pliki `client/maps/building.json`, `floor0.json`, `floor1.json`, `floor3.json`,
-`floor4.json` i `floor5.json` (klatki schodowe) generuje `tools/build_maps.py`
-— jedyne miejsce, gdzie się je zmienia. Piętro 2 jest w `building.json` jako
+pliki `client/maps/building.json`, `floor0.json`, `floor3.json`, `floor4.json`,
+`floor5.json` i `floor6.json` (klatki schodowe) generuje `tools/build_maps.py`
+— jedyne miejsce, gdzie się je zmienia. Piętra 1 i 2 są w `building.json` jako
 zablokowane (bez pliku).
 
 **Parter + teren zewnętrzny** — gracz startuje na chodniku przed wejściem.
@@ -395,7 +395,7 @@ FttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttF
 FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
 ```
 
-**Piętro 1** — z klatki schodowej (24) na korytarz zachodni (17), hol windowy
+**Piętro 4** — z klatki schodowej (24) na korytarz zachodni (17), hol windowy
 (13, nad windami 14/15 zamknięta szafa 58) i główny korytarz (33) z wyspą:
 WC damskie (54), łazienka damska (53), WC męskie (52) przez łazienkę męską (51),
 przejście, WC dla niepełnosprawnych (50), szafa (55), lada recepcji (49,
@@ -511,7 +511,7 @@ taca ze słodyczami, miejsce założyciela i półki sklepu są w `places` mapy.
 
 **Poruszanie między piętrami:** schody — wejście na biegi schodów przenosi do
 klatki schodowej (osobny widok: bieg, półpiętro, drugi bieg), a jej koniec
-na sąsiednie piętro (parter–1 i 1–3 mają osobne klatki); winda — trzeba ją
+na następne piętro z mapą (parter–3 i 3–4 mają osobne klatki); winda — trzeba ją
 wezwać (E przy drzwiach), poczekać, wejść i wybrać piętro na panelu (E w
 kabinie) — szczegóły w 10.18.
 
@@ -525,7 +525,7 @@ Przebieg: gracz startuje przed budynkiem bez przepustki → bramki w holu go
 zatrzymują (podpowiedź: „porozmawiaj z portierem”) → przy portierni wciska E →
 portier: „Dzień dobry! Pierwszy dzień? Zaprowadzę na recepcję — proszę za mną.”,
 gracz dostaje przepustkę → portier idzie przez bramki i schodami na recepcję
-piętra 1, czekając na gracza, gdy ten zostaje w tyle („Proszę za mną!”) → na
+piętra 4, czekając na gracza, gdy ten zostaje w tyle („Proszę za mną!”) → na
 recepcji: „To recepcja — tutaj proszę się zgłosić. Przepustka gościa jest ważna
 do końca dnia.” → portier wraca na portiernię. Jeśli gracz nie idzie za nim
 przez 30 s, portier rezygnuje i odbiera przepustkę. Prowadzi jedną osobę naraz
@@ -713,10 +713,10 @@ Zastępuje prosty portal z 10.8. Po połączeniu gracz widzi pulpit komputera
   osobno: własne wezwania, drzwi i wyświetlacz. Stojąc między nimi, E wzywa
   bliższą.
 - Drzwi są zamknięte, dopóki winda nie stoi na piętrze. **E przy drzwiach
-  wzywa windę**; przy drzwiach (po lewej) wyświetlacz: piętro (P, 1, 3) i
+  wzywa windę**; przy drzwiach (po lewej) wyświetlacz: piętro (P, 3, 4) i
   strzałka jazdy.
-- Jazda: ~3 s na piętro (na piętro 3 mija zablokowane 2, więc z 1 jedzie
-  ~6 s); po przyjeździe drzwi otwarte ~4 s (nie zamkną się na kimś w
+- Jazda: ~3 s na piętro (z parteru na 3 mija zablokowane 1 i 2, więc jedzie
+  ~9 s, na 4 ~12 s); po przyjeździe drzwi otwarte ~4 s (nie zamkną się na kimś w
   drzwiach). **E w kabinie** otwiera **panel pięter** (okno jak w rozmowie):
   przycisk na każde piętro, na którym winda staje, bez bieżącego, i „Zostań”;
   wybór przyciskiem albo klawiszami 1–4. Po wyborze drzwi zamykają się po 1 s
@@ -730,11 +730,12 @@ Zastępuje prosty portal z 10.8. Po połączeniu gracz widzi pulpit komputera
 
 ### 10.19 Klatka schodowa i półpiętro
 
-- Schody między parterem a piętrem 1 oraz między piętrem 1 a 3 prowadzą
+- Schody między parterem a piętrem 3 oraz między piętrem 3 a 4 prowadzą
   przez **osobne widoki klatek schodowych**: bieg w górę, **półpiętro**
   (podest), drugi bieg. Widać tylko klatkę i osoby na niej; przejście trwa
-  kilka sekund. W klatce na piętrze 1 są dwa biegi: w dół i w górę.
-- Przy wyjściach etykiety, dokąd prowadzą (Parter / Piętro 1 / Piętro 3 /
+  kilka sekund. W klatce na piętrze 3 są dwa biegi: w dół i w górę (zablokowane
+  piętra 1 i 2 się mija).
+- Przy wyjściach etykiety, dokąd prowadzą (Parter / Piętro 3 / Piętro 4 /
   Klatka schodowa).
 
 ### 10.20 Sklep i pieniądze
@@ -823,7 +824,7 @@ Zastępuje prosty portal z 10.8. Po połączeniu gracz widzi pulpit komputera
 ### 10.24 Kalendarz i spotkania z zarządem
 
 - **Zarząd** to dwoje NPC: **Prezes** (podwyżki, skargi, luźne rozmowy) i
-  **Wspólniczka** (pomysły na produkt), w pokoju zarządu na piętrze 1.
+  **Wspólniczka** (pomysły na produkt), w pokoju zarządu na piętrze 4.
 - **Drzwi zarządu są zamknięte** — wchodzi tylko osoba z umówionym
   spotkaniem, **od 10 min przed do 10 min po jego początku**; wyjść można
   zawsze. Przy drzwiach podpowiedź „wstęp tylko na umówione spotkanie”.
@@ -868,7 +869,7 @@ Zastępuje prosty portal z 10.8. Po połączeniu gracz widzi pulpit komputera
 - **Zamówienia 10:00–15:00**, jedno naraz; płaci **konto właściciela
   komputera** (z cudzego odblokowanego laptopa można więc komuś zamówić
   obiad na jego koszt).
-- **Dostawa na recepcję** (piętro 1) po czasie dostawy ±10 min, w deszczu +15
+- **Dostawa na recepcję** (piętro 4) po czasie dostawy ±10 min, w deszczu +15
   min. Recepcja daje znać zamawiającemu („Kurier był! Kebab czeka na
   recepcji.”), E przy recepcji = pudełko do rąk (trzeba mieć wolne ręce), F =
   zjedz. Nieodebrane obiady wieczorem trafiają do kosza.
@@ -1030,7 +1031,7 @@ pełnym ekranie — zastąpiona stylem inspirowanym Don't Starve:
 
 ### 10.33 Balkon
 
-- Na piętrze 1 przy chill roomie są drzwi na **balkon** nad wejściem do budynku
+- Na piętrze 4 przy chill roomie są drzwi na **balkon** nad wejściem do budynku
   (drewniany pomost z barierką). Balkon jest pod gołym niebem: pada deszcz,
   można palić bez czujek, dym od razu się rozwiewa.
 - **Z balkonu widać, co się dzieje na dole**: chodnik, ulicę, parking
@@ -1297,7 +1298,7 @@ pełnym ekranie — zastąpiona stylem inspirowanym Don't Starve:
 
 *Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie,
 automatyczne ponowne łączenie, budynek wg GDD (parter z terenem zewnętrznym,
-piętro 1, schody, winda), uprawnienia (bramki) oraz cała ścieżka nowego
+piętro 4, schody, winda), uprawnienia (bramki) oraz cała ścieżka nowego
 gracza: portal z ofertami → rekrutacja → portier → recepcja → HR → karta
 pracownika z działem; oprawa graficzna w pixel arcie (10.9). 2026-09-30:
 nowy układ budynku wg odręcznego planu (10.5) — generator map znów jest
@@ -1312,8 +1313,9 @@ protokół 37).*
   meblami; snapshoty z interest management po `(piętro, pokój)`,
   fragmentowane ≤ 1200 B; nicki przez `PlayerInfo`/`InfoRequest`; ping;
   statystyki co 5 s; symulator `--lag-ms/--jitter-ms/--loss`.
-- **Budynek**: parter (z parkingiem zewnętrznym i strefą palenia), piętro 1
-  i piętro 3 (wg planu architekta) wg sekcji 3, piętro 2 zablokowane; schody
+- **Budynek**: parter (z parkingiem zewnętrznym i strefą palenia), piętro 3
+  (wg planu architekta) i piętro 4 (biurowe) wg sekcji 3, piętra 1 i 2
+  zablokowane; schody
   i winda (E, panel pięter w kabinie) jako część
   deterministycznej symulacji, przewidywane przez klienta; JSON-y wspólne dla
   serwera i klienta, weryfikowane jednym CRC32 budynku (protokół v2).
@@ -1340,7 +1342,7 @@ protokół 37).*
 - **Okna, światło, kamera, nowa mapa**: okna, włączniki i jasność
   pomieszczeń, zoom kamery, ręcznie rysowane podłogi, ściany i meble (10.34);
   protokół v27.
-- **Balkon** na piętrze 1 z widokiem na ulicę i ludzi na dole (10.33).
+- **Balkon** na piętrze 4 z widokiem na ulicę i ludzi na dole (10.33).
 - **Wygląd „papier i atrament”**: skalowanie z oknem, odręczna czcionka,
   papierowe panele, tarcze statystyk, pasek ekwipunku, efekt tuszu i papieru na
   świecie, postacie z większymi głowami (10.32).
@@ -1391,7 +1393,7 @@ protokół 37).*
   osoba naraz (10.10); protokół v5.
 - **Boty** (`cargo run --release --bin bots`): 50 domyślnie, chodzą po BFS po
   całym budynku (schodami), część zbiera się w wybranym pokoju (domyślnie
-  Chill room na piętrze 1).
+  Chill room na piętrze 4).
 - **Sieć mobilna**: serwer dual-stack IPv4/IPv6; gracz identyfikowany tokenem
   (zmiana adresu w trakcie gry przenosi sesję); klient przepina gniazdo po
   ciszy/powrocie z tła i sam łączy się ponownie po utracie sesji.
@@ -1411,8 +1413,8 @@ protokół 37).*
 | RTT ~117 ms, jitter 10 ms, 2% strat | 60 FPS, 0 korekt, bufor interpolacji pusty w 0,40% klatek |
 | RTT ~226 ms, jitter 20 ms, 2% strat | 60 FPS, 0 korekt, bufor pusty w 0,25% klatek |
 | przejście z Wejścia do Korytarza (stara mapa) | widoczni: 42 → 5 |
-| 40 botów po całym budynku, połowa w Chill roomie (piętro 1) | serwer: 0 zgubionych ticków, tick śr. ~1,1 ms; boty: 0 błędnych predykcji mimo schodów |
-| klient w recepcji piętra 1, 26 widocznych | 60 FPS, 0 korekt, bufor interpolacji pusty w 0,00% klatek |
+| 40 botów po całym budynku, połowa w Chill roomie (piętro 4) | serwer: 0 zgubionych ticków, tick śr. ~1,1 ms; boty: 0 błędnych predykcji mimo schodów |
+| klient w recepcji piętra 4, 26 widocznych | 60 FPS, 0 korekt, bufor interpolacji pusty w 0,00% klatek |
 | gość bez przepustki: bramka → rozmowa z portierem → schody → recepcja | zatrzymany na bramce, przepustka po rozmowie, portier doprowadza na recepcję; 0 korekt |
 | pełne wdrożenie w oknie klienta: portier → recepcja → HR | karta pracownika w ~35 s gry, 0 korekt, 60 FPS |
 | rekrutacja + wdrożenie w oknie klienta (zgadywanie odpowiedzi) | przyjęta (2/3) po kilku próbach, umowa „IT / Produkt”, przy nicku „Zosia · IT” |
