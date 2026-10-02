@@ -17,6 +17,8 @@ use crate::sim::{Body, Pos, TILE_UNITS};
 
 /// Mugs the office has.
 pub const MUGS: u8 = 8;
+/// Kitchen knives in the cupboard (back every morning).
+pub const KNIVES: u8 = 2;
 pub const DISHWASHER_CAP: u8 = 8;
 /// A dishwasher cycle (game minutes).
 pub const WASH_MINUTES: u32 = 30;
@@ -59,6 +61,8 @@ pub struct Kitchen {
     pub milk: u8,
     pub water: u8,
     pub juice: u8,
+    /// Knives in the cupboard.
+    pub knives: u8,
 }
 
 impl Kitchen {
@@ -88,6 +92,7 @@ impl Kitchen {
                     milk: 5,
                     water: FREE_WATER,
                     juice: FREE_JUICE,
+                    knives: KNIVES,
                 });
             }
         }
@@ -139,6 +144,7 @@ impl Kitchen {
     pub fn restock(&mut self) {
         self.water = FREE_WATER;
         self.juice = FREE_JUICE;
+        self.knives = KNIVES;
     }
 }
 
@@ -148,6 +154,21 @@ pub fn fridge_worthy(k: u8) -> bool {
 }
 
 pub mod lines {
+    /// Looking into the cupboard (a dialog): what's inside.
+    pub fn cupboard(mugs: u8, knives: u8) -> String {
+        let knives = match knives {
+            0 => "noży brak (ktoś zabrał)".to_string(),
+            1 => "1 nóż kuchenny".to_string(),
+            n => format!("{n} noże kuchenne"),
+        };
+        format!("Szafka: kubki ({mugs}), {knives}, sztućce, okruszki.")
+    }
+    pub const TAKE_MUG: &str = "Weź kubek";
+    pub const TAKE_KNIFE: &str = "Weź nóż";
+    pub const CLOSE: &str = "Zamknij szafkę";
+    pub const TOOK_KNIFE: &str = "Nóż kuchenny. Do chleba… oczywiście.";
+    pub const PUT_KNIFE: &str = "Nóż z powrotem do szafki.";
+    pub const NO_KNIVES: &str = "Noży nie ma — ktoś już zabrał.";
     pub fn took_mug(left: u8) -> String {
         format!("Kubek z szafki (zostało {left}).")
     }

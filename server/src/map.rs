@@ -74,6 +74,8 @@ struct NpcFile {
     home: [i32; 2],
     #[serde(default)]
     escort_to: Option<[i32; 3]>,
+    #[serde(default)]
+    patrol: Vec<[i32; 2]>,
 }
 
 /// NPC placed on this floor (server-side characters).
@@ -84,6 +86,8 @@ pub struct NpcDef {
     pub home: Tile,
     /// Where the porter escorts newcomers: (floor, tile).
     pub escort_to: Option<(u8, Tile)>,
+    /// Points the guard walks between (same floor) when nothing happens.
+    pub patrol: Vec<Tile>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -349,6 +353,7 @@ impl Map {
                     name: n.name.clone(),
                     home: Tile { x: n.home[0], y: n.home[1] },
                     escort_to: n.escort_to.map(|e| (e[0] as u8, Tile { x: e[1], y: e[2] })),
+                    patrol: n.patrol.iter().map(|p| Tile { x: p[0], y: p[1] }).collect(),
                 })
                 .collect(),
             places: file.places,
@@ -656,9 +661,16 @@ mod tests {
     fn porter_sits_in_the_hall_and_takes_guests_up() {
         let b = b();
         let m = b.floor(0).unwrap();
-        assert_eq!(m.npcs.len(), 4, "porter + shop cashier + shop guard + cleaner");
+        assert_eq!(m.npcs.len(), 5, "porter + shop cashier + shop guard + two cleaners");
         let p = &m.npcs[0];
-        assert_eq!((p.kind.as_str(), p.name.as_str()), ("porter", "Portier"));
+        assert_eq!((p.kind.as_str(), p.name.as_str()), ("porter", "Pani Wiesia"));
+        let guard = &m.npcs[2];
+        assert!(guard.patrol.len() >= 3, "the guard walks between the shelves");
+        for t in &guard.patrol {
+            assert!(!m.is_blocked(t.x, t.y) && m.room_name(m.room_at_tile(t.x, t.y)) == "Sklep");
+        }
+        let paulina = &m.npcs[4];
+        assert_eq!(m.tile_type(paulina.home.x, paulina.home.y), Some("armchair"), "Paulina in her armchair");
         assert_eq!(m.room_name(m.room_at_tile(p.home.x, p.home.y)), "Hol");
         let (f, t) = p.escort_to.unwrap();
         let m1 = b.floor(f).unwrap();

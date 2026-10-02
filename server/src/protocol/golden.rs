@@ -176,6 +176,8 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
                 bladder: 64,
                 hygiene: 22,
                 alcohol: 77,
+                bowels: 41,
+                health: 63,
                 flags: STATS_DIRTY_HANDS,
                 money: 187_50,
             },
@@ -298,6 +300,7 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
         ("fridge", Packet::Fridge { items: vec![(11, "Kanapka z szynką (Ola)".into())], milk: 7, water: 4, juice: 2 }),
         ("fridge_action", Packet::FridgeAction { token: 0x01020304, action: 2, arg: 0 }),
         ("skip_wait", Packet::SkipWait { token: 0x01020304 }),
+        ("action", Packet::Action { token: 0x01020304, action: 2 }),
         (
             "task_action",
             Packet::TaskAction {

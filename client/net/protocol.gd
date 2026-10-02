@@ -3,7 +3,7 @@
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 39
+const VERSION := 40
 const MAX_PACKET := 1152  # a game packet; sealed it grows to at most MAX_DATAGRAM
 const MAX_DATAGRAM := 1200
 const MAX_NICK_BYTES := 16
@@ -66,6 +66,7 @@ const T_MAIL_STATE := 51
 const T_VOICE := 52
 const T_VOICE_FROM := 53
 const T_DEPARTMENTS := 54
+const T_ACTION := 55
 const MAX_VOICE_BYTES := 800
 # TaskAction.action / MailAction.action (server/src/protocol/mod.rs)
 const TA_SYNC := 0
@@ -89,7 +90,8 @@ const MAIL_BODY_MAX := 400
 ## Sound.kind -> file in res://sounds (server/src/protocol/mod.rs `sound`).
 const SOUND_FILES := {1: "coffee", 2: "till", 3: "gate_alarm", 4: "ding", 5: "lock", 6: "switch",
 	7: "flush", 8: "tap", 9: "lighter", 10: "dishwasher", 11: "fridge", 12: "cupboard",
-	13: "pickup", 14: "drop", 15: "eat", 16: "drink", 17: "whistle", 18: "burp", 19: "vomit"}
+	13: "pickup", 14: "drop", 15: "eat", 16: "drink", 17: "whistle", 18: "burp", 19: "vomit",
+	20: "punch", 21: "stab", 22: "pee", 23: "poop"}
 const SOUND_BURP := 18
 # FridgeAction.action (server/src/kitchen.rs)
 const FRIDGE_TAKE := 1
@@ -178,6 +180,19 @@ const ACT_RIDING := 7
 const ACT_HELD := 8  # stopped by the guard / the police
 const ACT_VOMITING := 9
 const ACT_PASSED_OUT := 10
+const ACT_KNOCKED_OUT := 11
+const ACT_ATTACKING := 12
+const ACT_PEEING := 13
+const ACT_POOPING := 14
+## Can't walk meanwhile (the server ignores the inputs).
+const ACT_STUCK := [ACT_RIDING, ACT_HELD, ACT_VOMITING, ACT_PASSED_OUT, ACT_KNOCKED_OUT, ACT_PEEING, ACT_POOPING]
+# Puddle entity `held` (server/src/protocol/mod.rs `puddle`).
+const PUDDLE_PEE := 0
+const PUDDLE_VOMIT := 1
+const PUDDLE_POOP := 2
+# Action.action: R = the menu of mischief (a Dialog comes back), X = attack.
+const ACTION_MENU := 1
+const ACTION_ATTACK := 2
 # Entity flags bit 6: walks slowly (exhausted / needs the toilet).
 const FLAG_SLOW := 0x40
 # Entity flags bit 7: low hygiene (smell cloud).
@@ -413,6 +428,13 @@ static func encode_voice(token: int, seq: int, whisper: bool, data: PackedByteAr
 	return b.data_array
 
 
+static func encode_action(token: int, action: int) -> PackedByteArray:
+	var b := _writer(T_ACTION)
+	b.put_u32(token)
+	b.put_u8(action)
+	return b.data_array
+
+
 static func encode_skip_wait(token: int) -> PackedByteArray:
 	var b := _writer(T_SKIP_WAIT)
 	b.put_u32(token)
@@ -632,6 +654,8 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			p.bladder = r.u8()
 			p.hygiene = r.u8()
 			p.alcohol = r.u8()
+			p.bowels = r.u8()
+			p.health = r.u8()
 			p.stats_flags = r.u8()
 			p.money = r.u32()
 		T_CLOCK:

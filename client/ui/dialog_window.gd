@@ -1,5 +1,6 @@
-## A conversation with an NPC (board meeting): the question and the answers
-## as buttons (or keys 1-3). The server drives it; id 0 closes it.
+## A conversation with an NPC (board meeting), the breathalyser's question,
+## the R menu or the kitchen cupboard: the text and the answers as buttons
+## (or keys 1-9). The server drives it; id 0 closes it.
 extends Control
 
 const Ink = preload("res://ui/ink_ui.gd")
@@ -49,6 +50,7 @@ func on_dialog(p: Dictionary) -> void:
 	if p.id == 0:
 		visible = false
 		dialog_id = 0
+		_answered = -1  # the same id may come again (the menu, the cupboard)
 		return
 	if p.id == dialog_id and visible:
 		# Resend of what is shown; if our answer got lost, send it again.
@@ -57,7 +59,7 @@ func on_dialog(p: Dictionary) -> void:
 			answer.emit(dialog_id, _answer_choice)
 		return
 	dialog_id = p.id
-	_who.text = "Spotkanie — %s" % name_of.call(p.npc)
+	_who.text = _title(p)
 	_text.text = p.text
 	for c in _opts.get_children():
 		c.queue_free()
@@ -73,6 +75,23 @@ func on_dialog(p: Dictionary) -> void:
 	_place.call_deferred()
 
 
+## Ids (server): 1..199 board talks, 200..249 the breathalyser, 250 the R
+## menu, 251 the kitchen cupboard.
+func _title(p: Dictionary) -> String:
+	if p.id == 250:
+		return "Co zrobić?"
+	if p.id == 251:
+		return "Szafka w kuchni"
+	if p.id >= 200:
+		return "Alkomat — %s" % name_of.call(p.npc)
+	return "Spotkanie — %s" % name_of.call(p.npc)
+
+
+## The header shown (for tests).
+func _title_text() -> String:
+	return _who.text
+
+
 func _choose(choice: int) -> void:
 	if dialog_id != 0 and _answered != dialog_id:
 		_answered = dialog_id
@@ -83,6 +102,9 @@ func _choose(choice: int) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if visible and event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode >= KEY_1 and event.keycode <= KEY_4:
+		if event.keycode >= KEY_1 and event.keycode <= KEY_9:
 			_choose(event.keycode - KEY_1)
+			get_viewport().set_input_as_handled()
+		elif event.keycode == KEY_ESCAPE and dialog_id >= 250:
+			_choose(_opts.get_child_count() - 1)  # the last option: never mind / close
 			get_viewport().set_input_as_handled()

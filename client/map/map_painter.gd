@@ -408,7 +408,7 @@ func _tile_object(x: int, y: int) -> void:
 
 const PROP_TYPES := ["desk", "counter", "shelf", "sofa", "table", "plant", "rack", "bench", "ashtray", "toilet", "sink",
 	"car", "coffee_machine", "kitchen_counter", "fruit_bowl", "partition", "sanitizer", "bike_rack",
-	"cupboard", "dishwasher", "kitchen_sink", "fridge", "urinal", "wardrobe", "bin"]
+	"cupboard", "dishwasher", "kitchen_sink", "fridge", "urinal", "wardrobe", "bin", "armchair"]
 
 
 ## Connected tiles of the same furniture char = one object.
@@ -449,6 +449,7 @@ func _prop(t: String, tr: Rect2i, index: int) -> void:
 		"counter": _counter(r)
 		"shelf": _shelf(r, index)
 		"sofa": _sofa(r)
+		"armchair": _armchair(r)
 		"table": _table(tr, r)
 		"plant": _plant(r, index)
 		"rack": _racks(r, index)
@@ -536,6 +537,16 @@ func _sofa(r: Rect2) -> void:
 	var n := int(r.size.x / TP)
 	for i in range(1, n):
 		draw_line(Vector2(r.position.x + i * TP, r.position.y + 7), Vector2(r.position.x + i * TP, r.end.y - 4), c.darkened(0.2), 0.5)
+
+
+## A deep old armchair (Paulina's): a high back, two armrests, a cushion.
+func _armchair(r: Rect2) -> void:
+	var c := Color("#8a4a5a")
+	_shadow(r)
+	_box(Rect2(r.position + Vector2(1, 0), Vector2(r.size.x - 2, 6)), c.darkened(0.25), true, 2.0)
+	_box(Rect2(r.position + Vector2(0, 3), Vector2(3.5, r.size.y - 4)), c.darkened(0.15), true, 1.2)
+	_box(Rect2(Vector2(r.end.x - 3.5, r.position.y + 3), Vector2(3.5, r.size.y - 4)), c.darkened(0.15), true, 1.2)
+	_box(Rect2(r.position + Vector2(3.5, 5), Vector2(r.size.x - 7, r.size.y - 7)), c, true, 1.2)
 
 
 func _table(tr: Rect2i, r: Rect2) -> void:

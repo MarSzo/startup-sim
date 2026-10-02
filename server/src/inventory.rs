@@ -54,6 +54,8 @@ pub mod kind {
     pub const MALPKA: u8 = 38;
     /// The board's breathalyser (F: test the person next to you).
     pub const BREATHALYSER: u8 = 39;
+    /// A kitchen knife from the cupboard (for bread… or a fight).
+    pub const KNIFE: u8 = 40;
 }
 
 pub const POCKETS: usize = 3;
@@ -64,7 +66,7 @@ pub fn is_small(k: u8) -> bool {
         // Shop goods fit in a pocket, except the bulky ones.
         kind::BURGER | kind::FRIES | kind::WINE => false,
         10..=27 => true,
-        kind::MILK | kind::MALPKA | kind::BREATHALYSER => true,
+        kind::MILK | kind::MALPKA | kind::BREATHALYSER | kind::KNIFE => true,
         28..=33 => false, // lunch boxes: both hands
         _ => false,
     }
@@ -81,6 +83,7 @@ pub fn display_name(k: u8) -> &'static str {
         kind::LATTE => "Kawa z mlekiem",
         kind::FRUIT => "Owoc",
         kind::BREATHALYSER => "Alkomat",
+        kind::KNIFE => "Nóż kuchenny",
         k => crate::shop::product(k).map_or("?", |p| p.name),
     }
 }
@@ -102,6 +105,8 @@ pub struct Item {
     pub unpaid: bool,
     /// Food past its best (fruit): upsets the stomach.
     pub stale: bool,
+    /// Somebody peed in it (a drink): disgusting, maybe sick. Not saved.
+    pub tainted: bool,
 }
 
 /// Use up one piece of a pack in `slot` (a cigarette); the empty pack goes.
@@ -275,7 +280,7 @@ mod tests {
     use super::*;
 
     fn item(id: u32, k: u8) -> Item {
-        Item { id, kind: k, label: String::new(), expires: None, owner: 0, count: 1, unpaid: false, stale: false }
+        Item { id, kind: k, label: String::new(), expires: None, owner: 0, count: 1, unpaid: false, stale: false, tainted: false }
     }
 
     #[test]
@@ -339,6 +344,7 @@ mod tests {
             count: 1,
             unpaid: false,
             stale: false,
+            tainted: false,
         })
         .unwrap();
         assert!(inv.expire(99).is_empty());

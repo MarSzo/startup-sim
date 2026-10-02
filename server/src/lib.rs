@@ -29,6 +29,7 @@ pub mod kitchen;
 pub mod lights;
 pub mod lunch;
 pub mod map;
+pub mod mischief;
 pub mod nav;
 pub mod needs;
 pub mod net;

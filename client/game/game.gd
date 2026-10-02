@@ -445,7 +445,7 @@ func _refresh_own_label() -> void:
 
 
 func _sample_input(delta: float) -> int:
-	if input_blocked or me.status in [Protocol.ACT_RIDING, Protocol.ACT_HELD, Protocol.ACT_VOMITING, Protocol.ACT_PASSED_OUT]:
+	if input_blocked or me.status in Protocol.ACT_STUCK:
 		return 0
 	if script_driver != null:
 		return 0 if screen.visible or dialog.visible else script_driver.next_input(delta)
@@ -822,7 +822,7 @@ func _on_snapshot(p: Dictionary) -> void:
 			var pv = puddles.get(e.id)
 			if pv == null:
 				pv = PuddleView.new()
-				pv.setup(e.id, e.held == 1)
+				pv.setup(e.id, e.held)
 				puddle_layer.add_child(pv)
 				puddles[e.id] = pv
 			pv.position = Vector2(e.x, e.y) / float(Movement.SUBPIXELS)
@@ -983,6 +983,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		KEY_L:
 			if net.is_playing():
 				net.send(Protocol.encode_door_action(net.token))
+		KEY_R:
+			if net.is_playing():
+				net.send(Protocol.encode_action(net.token, Protocol.ACTION_MENU))
+		KEY_X:
+			if net.is_playing():
+				net.send(Protocol.encode_action(net.token, Protocol.ACTION_ATTACK))
 
 
 ## Pocket key: take it out, or put back what's in hands if that pocket is empty.
@@ -1012,8 +1018,8 @@ func _update_hint() -> void:
 		hint_label.text = "Zatrzymano cię — chwilę stoisz w miejscu…"
 		hint_label.visible = true
 		return
-	if me.status in [Protocol.ACT_VOMITING, Protocol.ACT_PASSED_OUT]:
-		hint_label.text = "Wymiotujesz…" if me.status == Protocol.ACT_VOMITING else "Odsypiasz… (chwilę potrwa)"
+	if STUCK_HINTS.has(me.status):
+		hint_label.text = STUCK_HINTS[me.status]
 		hint_label.visible = true
 		return
 	if voice.talking != 0:
@@ -1058,7 +1064,7 @@ func _update_hint() -> void:
 			text = "[E] Kasa — zapłać za zakupy" if who == "Kasa" else "[E] Porozmawiaj: %s" % who
 	if text == "" and map:
 		# Kitchenette things (the nearest within 1.5 tiles).
-		var kitchen_names := {"cupboard": "[E] Szafka z kubkami", "dishwasher": "[E] Zmywarka", "fridge": "[E] Lodówka", "kitchen_sink": "[E] Zlew"}
+		var kitchen_names := {"cupboard": "[E] Zajrzyj do szafki", "dishwasher": "[E] Zmywarka", "fridge": "[E] Lodówka", "kitchen_sink": "[E] Zlew"}
 		var best_d := INF
 		for dy in range(-2, 3):
 			for dx in range(-2, 3):
@@ -1299,7 +1305,12 @@ func _stall_hint(map, t: Vector2i, text: String) -> String:
 	return text
 
 
-const SPOT_HINTS := {"shelf": "[E] Zobacz półkę", "sofa": "[E] Usiądź na sofie", "toilet": "[E] Skorzystaj z toalety", "ashtray": "[E] Zapal", "fruit_bowl": "[E] Weź owoc", "sink": "[E] Umyj ręce", "sanitizer": "[E] Zdezynfekuj ręce"}
+## What you can't walk away from, and the hint meanwhile.
+const STUCK_HINTS := {Protocol.ACT_VOMITING: "Wymiotujesz…", Protocol.ACT_PASSED_OUT: "Odsypiasz… (chwilę potrwa)",
+	Protocol.ACT_KNOCKED_OUT: "Znokautowany… gwiazdki krążą (chwilę potrwa)", Protocol.ACT_PEEING: "Sikasz…",
+	Protocol.ACT_POOPING: "Kucasz… (natura wzywa)"}
+const SPOT_HINTS := {"shelf": "[E] Zobacz półkę", "sofa": "[E] Usiądź na sofie", "toilet": "[E] Skorzystaj z toalety", "urinal": "[E] Pisuar",
+	"ashtray": "[E] Zapal", "fruit_bowl": "[E] Weź owoc", "sink": "[E] Umyj ręce", "sanitizer": "[E] Zdezynfekuj ręce"}
 
 
 ## Next to the elevator doors (outside the cabin): call it / wait / step in.

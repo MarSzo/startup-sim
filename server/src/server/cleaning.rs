@@ -118,6 +118,10 @@ impl Server {
         if !self.clock.is_night() && self.clock.minute() >= self.cleaning.start.1 && self.cleaning.last_day != day {
             self.cleaning.last_day = day;
             self.cleaning.round = Some(Round::default());
+            // She rinses the coffee machines first (whatever got in them).
+            for m in &mut self.machines {
+                m.tainted = 0;
+            }
             self.says.push(Say::new(cleaner, cleaning::lines::START));
             self.log("* cleaning round starts");
         }

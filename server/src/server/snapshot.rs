@@ -72,7 +72,7 @@ impl Server {
             put((p.body.floor, p.room), e);
         }
         for n in &self.npcs {
-            put((n.body.floor, n.room), entity(n.id, proto::kind::NPC, n.body.pos, n.flags, 0, 0));
+            put((n.body.floor, n.room), entity(n.id, proto::kind::NPC, n.body.pos, n.flags, 0, n.activity()));
         }
         for c in &self.computers {
             let Some(w) = self.workstations.get(c.station) else { continue };
@@ -83,7 +83,7 @@ impl Server {
             put(at(floor, pos), entity(t.handle, proto::kind::TRAY, pos, 0, t.kind, t.pieces));
         }
         for p in &self.puddles {
-            put(at(p.floor, p.pos), entity(p.handle, proto::kind::PUDDLE, p.pos, 0, p.vomit as u8, 0));
+            put(at(p.floor, p.pos), entity(p.handle, proto::kind::PUDDLE, p.pos, 0, p.kind, 0));
         }
         for d in &self.dropped {
             put(at(d.floor, d.pos), entity(d.handle, proto::kind::ITEM, d.pos, 0, d.item.kind, 0));
@@ -274,5 +274,16 @@ fn stats_packet(p: &Player) -> Packet {
     let [hunger, energy, stress, bladder, hygiene] = p.needs.points();
     let flags = if p.needs.dirty_hands { proto::STATS_DIRTY_HANDS } else { 0 } | if p.needs.upset { proto::STATS_UPSET } else { 0 };
     let money = u32::try_from(p.money.max(0)).unwrap_or(u32::MAX);
-    Packet::Stats { hunger, energy, stress, bladder, hygiene, alcohol: p.needs.alcohol_points(), flags, money }
+    Packet::Stats {
+        hunger,
+        energy,
+        stress,
+        bladder,
+        hygiene,
+        alcohol: p.needs.alcohol_points(),
+        bowels: p.needs.bowels_points(),
+        health: p.needs.health_points(),
+        flags,
+        money,
+    }
 }

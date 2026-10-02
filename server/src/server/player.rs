@@ -131,6 +131,20 @@ pub(super) struct Player {
     pub(super) reprimands: u8,
     /// A board member asked "reprimand?": (dialog id, the tested player).
     pub(super) reprimand_ask: Option<(u8, u16)>,
+    /// Knocked out in a fight: comes round when `held_until` comes.
+    pub(super) knocked_out: bool,
+    /// Cigarettes one after another, and when the last one went out.
+    pub(super) chain_smokes: u8,
+    pub(super) last_smoke_end: u32,
+    /// The next punch / stab not before this tick; the swing shows until.
+    pub(super) next_attack: u32,
+    pub(super) swing_until: u32,
+    /// Hit somebody: the guard (police) is after them; true = with a knife.
+    pub(super) assault: Option<bool>,
+    /// The R menu shown: what each option does.
+    pub(super) deeds: Vec<super::actions::Deed>,
+    /// The cupboard dialog shown: its options (item kinds, 0 = close).
+    pub(super) cupboard: Vec<u8>,
     /// At home: asked to skip the waiting (`SkipWait`).
     pub(super) skip_wait: bool,
     /// Last applied TaskAction / MailAction nonces (retries are ignored).
@@ -218,6 +232,14 @@ impl Player {
             passed_out: false,
             reprimands: 0,
             reprimand_ask: None,
+            knocked_out: false,
+            chain_smokes: 0,
+            last_smoke_end: 0,
+            next_attack: 0,
+            swing_until: 0,
+            assault: None,
+            deeds: Vec::new(),
+            cupboard: Vec::new(),
             skip_wait: false,
             task_nonce: 0,
             mail_nonce: 0,
@@ -269,9 +291,13 @@ pub(super) fn activity(p: &Player, tick: u32) -> u8 {
     if tick < p.held_until {
         return p.held_activity;
     }
+    if tick < p.swing_until {
+        return a::ATTACKING;
+    }
     match (p.at_computer, p.rest.map(|r| r.0)) {
         (Some(_), _) => a::COMPUTER,
         (_, Some(Rest::Toilet)) => a::TOILET,
+        (_, Some(Rest::Urinal)) => a::PEEING,
         (_, Some(Rest::Sofa)) => a::SOFA,
         (_, Some(Rest::Smoking { .. })) => a::SMOKING,
         (_, Some(Rest::Washing { .. })) => a::WASHING,

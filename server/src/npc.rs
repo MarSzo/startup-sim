@@ -16,7 +16,7 @@ use std::collections::HashMap;
 
 use crate::building::{Building, Place};
 use crate::inventory::kind as item;
-use crate::map::{access, NpcDef};
+use crate::map::{access, NpcDef, Tile};
 use crate::nav::Walker;
 use crate::sim::{self, Body, Pos, SUBPIXELS};
 
@@ -42,6 +42,8 @@ const CHASE_STEPS_PER_TICK: usize = 4;
 pub const CATCH_RADIUS: i32 = 24 * SUBPIXELS;
 /// The chase path is re-planned this often (1 s).
 const REPATH_TICKS: u32 = 20;
+/// On the round, the guard stands this long at each point (6 s).
+const PATROL_WAIT_TICKS: u32 = 120;
 /// The guard gives up after 20 s, the police after 3 min.
 const GUARD_GIVE_UP_TICKS: u32 = 400;
 const POLICE_GIVE_UP_TICKS: u32 = 3600;
@@ -55,6 +57,8 @@ pub mod look {
     pub const POLICE: u8 = 4;
     pub const CLEANER: u8 = 5;
     pub const FIREFIGHTER: u8 = 6;
+    /// The shop's cashier: a green uniform.
+    pub const SHOP: u8 = 7;
 }
 
 pub mod lines {
@@ -87,6 +91,40 @@ pub mod lines {
     pub const GUARD_STOP: &str = "Stać! Ochrona! Proszę wrócić z towarem!";
     pub const GUARD_BUSY: &str = "Nie teraz — jestem w pościgu!";
     pub const POLICE_BUSY: &str = "Proszę się odsunąć, trwa interwencja.";
+    pub const GUARD_FIGHT: &str = "Hej! Bez bijatyk! Stój!";
+    // The cashier, when someone comes up to the counter with goods.
+    pub const CASHIER_HOTDOG: &str = "Jaka parówka jest, wariacie?";
+    // Paulina in her armchair (all day).
+    pub const IDLER: [&str; 5] = [
+        "Nie teraz, kochanie, mam przerwę.",
+        "Ja tu tylko siedzę. Od rana.",
+        "Sprzątanie? To Krysia. Ja pilnuję fotela.",
+        "Jak coś się rozleje, to niech poleży, samo wyschnie.",
+        "Zaraz wstanę. Może po obiedzie.",
+    ];
+}
+
+/// Pani Wiesia at the porter's desk: a hello and a word (an auntie at a
+/// wedding) for everybody coming into the building.
+pub mod porter {
+    pub fn hello(nick: &str, n: usize) -> String {
+        format!("Dzień dobry, {nick}! {}", JOKES[n % JOKES.len()])
+    }
+
+    pub const JOKES: [&str; 12] = [
+        "A kiedy ślub? Bo zegar tyka, tyka!",
+        "Ale wyrosłeś! Ostatnio to taki malutki byłeś… a nie, to nie ty.",
+        "Coś chudo wyglądasz, jedz więcej, bo cię wiatr porwie!",
+        "A ile tam płacą w tym IT? No, tak między nami.",
+        "Wiesz, co mówi informatyk na weselu? Nic, siedzi w telefonie! Ha!",
+        "Ja w twoim wieku to już trójkę dzieci miałam.",
+        "Ładna kurtka. Moja siostrzenica ma taką samą, tylko ładniejszą.",
+        "Znasz ten? Przychodzi baba do lekarza… a nie, dziś nie ma czasu.",
+        "Pada? Nie pada? A u mnie na działce to wczoraj lało!",
+        "Ty to jesteś ten od komputerów? To mi potem telefon zobaczysz.",
+        "Następnym razem to na moim weselu tańczysz! Znaczy, na wnuczki.",
+        "Tylko nie pracuj za dużo, bo ci się zmarszczki porobią!",
+    ];
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -107,6 +145,8 @@ pub enum Role {
     Cleaner,
     /// Comes with the fire engine on a fire alarm (fire.rs).
     Firefighter,
+    /// Sits in her armchair all day (Paulina): never gets up.
+    Idler,
 }
 
 impl Role {
@@ -120,6 +160,7 @@ impl Role {
             "cofounder" => Some(Role::CoFounder),
             "guard" => Some(Role::Guard),
             "cleaner" => Some(Role::Cleaner),
+            "idler" => Some(Role::Idler),
             _ => None,
         }
     }
@@ -127,10 +168,11 @@ impl Role {
     fn look(self) -> u8 {
         match self {
             Role::Porter => look::PORTER,
-            Role::Receptionist | Role::Hr | Role::Cashier | Role::Ceo | Role::CoFounder => look::OFFICE,
+            Role::Receptionist | Role::Hr | Role::Ceo | Role::CoFounder => look::OFFICE,
+            Role::Cashier => look::SHOP,
             Role::Guard => look::GUARD,
             Role::Police => look::POLICE,
-            Role::Cleaner => look::CLEANER,
+            Role::Cleaner | Role::Idler => look::CLEANER,
             Role::Firefighter => look::FIREFIGHTER,
         }
     }
@@ -199,6 +241,10 @@ enum State {
     Errand {
         walker: Walker,
     },
+    /// The guard on his round (between `patrol` points).
+    Patrolling {
+        walker: Walker,
+    },
 }
 
 pub struct Npc {
@@ -214,6 +260,12 @@ pub struct Npc {
     /// (floor, room) of `escort_to`: a guest already there counts as "with me".
     escort_room: Option<(u8, u16)>,
     state: State,
+    /// The guard's round: points, the next one, ticks standing at the last.
+    patrol: Vec<Tile>,
+    patrol_next: usize,
+    idle_ticks: u32,
+    /// Paulina: which line next.
+    said: usize,
 }
 
 impl Npc {
@@ -245,6 +297,10 @@ impl Npc {
             escort_to: def.escort_to,
             escort_room: def.escort_to.and_then(|(f, t)| b.floor(f).map(|m| (f, m.room_at_tile(t.x, t.y)))),
             state: State::Idle,
+            patrol: def.patrol.clone(),
+            patrol_next: 0,
+            idle_ticks: 0,
+            said: 0,
         }
     }
 
@@ -263,7 +319,7 @@ impl Npc {
     /// car), allowed everywhere.
     fn visitor(b: &Building, id: u16, pos: Pos, role: Role, name: &str) -> Npc {
         let (x, y) = pos.tile();
-        let def = NpcDef { kind: String::new(), name: name.into(), home: crate::map::Tile { x, y }, escort_to: None };
+        let def = NpcDef { kind: String::new(), name: name.into(), home: Tile { x, y }, escort_to: None, patrol: Vec::new() };
         let mut n = Npc::new(b, id, 0, &def, role);
         n.body.pos = pos;
         n.body.access = access::GUEST | access::CARD | access::SERVICE | access::BOARD;
@@ -306,6 +362,20 @@ impl Npc {
         matches!(self.state, State::Idle)
     }
 
+    /// Free to be sent after somebody (idle, or just on the round).
+    pub fn available(&self) -> bool {
+        matches!(self.state, State::Idle | State::Patrolling { .. })
+    }
+
+    /// What others see it doing (`protocol::activity`): Paulina sits.
+    pub fn activity(&self) -> u8 {
+        if self.role == Role::Idler {
+            crate::protocol::activity::SOFA
+        } else {
+            crate::protocol::activity::NONE
+        }
+    }
+
     pub fn escorting(&self) -> Option<u16> {
         match self.state {
             State::Escorting { guest, .. } => Some(guest),
@@ -339,6 +409,10 @@ impl Npc {
         }
         if self.role == Role::Firefighter {
             return vec![say(crate::fire::lines::GET_OUT)];
+        }
+        if self.role == Role::Idler {
+            self.said += 1;
+            return vec![say(lines::IDLER[(self.said - 1) % lines::IDLER.len()])];
         }
         if self.role == Role::Cleaner {
             let line = if self.at_home() { crate::cleaning::lines::HELLO } else { crate::cleaning::lines::BUSY };
@@ -393,7 +467,7 @@ impl Npc {
             State::Escorting { guest, .. } if *guest == player => vec![say(l.on_the_way)],
             State::Escorting { .. } => vec![say(lines::BUSY)],
             State::Returning { .. } | State::Lingering { .. } => vec![say(l.back_soon)],
-            State::Chasing { .. } | State::Errand { .. } => vec![],
+            State::Chasing { .. } | State::Errand { .. } | State::Patrolling { .. } => vec![],
         }
     }
 
@@ -404,7 +478,18 @@ impl Npc {
         let l = self.escort_lines();
         let role = self.role;
         match &mut self.state {
-            State::Idle => {}
+            State::Idle => {
+                // The guard doesn't stand still: off to the next point of the round.
+                self.idle_ticks += 1;
+                if !self.patrol.is_empty() && self.idle_ticks >= PATROL_WAIT_TICKS {
+                    self.idle_ticks = 0;
+                    let goal = self.patrol[self.patrol_next % self.patrol.len()];
+                    self.patrol_next += 1;
+                    if let Some(walker) = Walker::to(b, &self.body, (self.home.0, goal)) {
+                        self.state = State::Patrolling { walker };
+                    }
+                }
+            }
             State::Escorting { guest, waited, walker } => {
                 let guest = *guest;
                 match players.get(&guest) {
@@ -436,7 +521,7 @@ impl Npc {
                     }
                 }
             }
-            State::Returning { .. } | State::Errand { .. } => walk = true,
+            State::Returning { .. } | State::Errand { .. } | State::Patrolling { .. } => walk = true,
             State::Lingering { ticks } => {
                 *ticks += 1;
                 if *ticks >= LINGER_TICKS {
@@ -471,13 +556,17 @@ impl Npc {
         if walk {
             self.walk_steps(b);
             let finished = match &self.state {
-                State::Escorting { walker, .. } | State::Returning { walker } | State::Errand { walker } => walker.done(),
+                State::Escorting { walker, .. } | State::Returning { walker } | State::Errand { walker } | State::Patrolling { walker } => {
+                    walker.done()
+                }
                 State::Idle | State::Chasing { .. } | State::Lingering { .. } => false,
             };
             if finished {
                 if let State::Errand { .. } = self.state {
                     self.state = State::Idle;
                     events.push(Event::Arrived { npc: self.id });
+                } else if let State::Patrolling { .. } = self.state {
+                    self.state = State::Idle; // a look around here, then on
                 } else if let State::Escorting { guest, .. } = self.state {
                     events.push(Event::Say { npc: self.id, text: l.arrived.into(), to: Some(guest) });
                     self.state = State::Lingering { ticks: 0 };
@@ -501,7 +590,9 @@ impl Npc {
 
     fn walk_steps(&mut self, b: &Building) {
         let (walker, steps) = match &mut self.state {
-            State::Escorting { walker, .. } | State::Returning { walker } | State::Errand { walker } => (walker, STEPS_PER_TICK),
+            State::Escorting { walker, .. } | State::Returning { walker } | State::Errand { walker } | State::Patrolling { walker } => {
+                (walker, STEPS_PER_TICK)
+            }
             State::Chasing { walker: Some(walker), .. } => (walker, CHASE_STEPS_PER_TICK),
             _ => return,
         };
@@ -680,10 +771,11 @@ mod tests {
         }
         assert!(caught, "the guard reached the thief");
         assert!(guard.chasing().is_none());
-        for _ in 0..2000 {
+        let back = (0..2000).any(|_| {
             guard.tick(&b, &HashMap::new());
-        }
-        assert!(guard.is_idle() && guard.body.pos == home.pos, "back at the shop door");
+            guard.at_home()
+        });
+        assert!(back && guard.body.pos == home.pos, "back at the shop door");
         // Out of the game (not in the world): gives up at once.
         guard.chase(9);
         let ev = guard.tick(&b, &HashMap::new());
@@ -702,16 +794,42 @@ mod tests {
     }
 
     #[test]
+    fn the_guard_walks_between_the_shelves_and_paulina_never_gets_up() {
+        let (b, mut npcs) = everyone();
+        let shop = b.floor(0).unwrap().room_by_name("Sklep").unwrap().id;
+        let guard = by_role(&mut npcs, Role::Guard);
+        let mut spots = std::collections::HashSet::new();
+        for _ in 0..3000 {
+            guard.tick(&b, &HashMap::new());
+            assert_eq!(guard.room, shop, "stays in the shop");
+            if guard.is_idle() {
+                spots.insert(guard.body.pos.tile());
+            }
+        }
+        assert!(spots.len() >= 4, "stood at several points: {spots:?}");
+        let paulina = by_role(&mut npcs, Role::Idler);
+        let seat = paulina.body.pos;
+        for _ in 0..3000 {
+            paulina.tick(&b, &HashMap::new());
+        }
+        assert_eq!((paulina.body.pos, paulina.activity()), (seat, crate::protocol::activity::SOFA));
+        let a = says(&paulina.interact(&b, 1, 0, None, true))[0].to_string();
+        let c = says(&paulina.interact(&b, 1, 0, None, true))[0].to_string();
+        assert!(a != c && lines::IDLER.contains(&a.as_str()), "different excuses");
+    }
+
+    #[test]
     fn spawns_the_staff_with_looks() {
         let (_, npcs) = everyone();
         let roles: Vec<(Role, &str, u8)> = npcs.iter().map(|n| (n.role, n.name.as_str(), n.flags >> 3)).collect();
         assert_eq!(
             roles,
             vec![
-                (Role::Porter, "Portier", look::PORTER),
-                (Role::Cashier, "Kasa", look::OFFICE),
+                (Role::Porter, "Pani Wiesia", look::PORTER),
+                (Role::Cashier, "Kasa", look::SHOP),
                 (Role::Guard, "Ochrona", look::GUARD),
                 (Role::Cleaner, "Pani Krysia", look::CLEANER),
+                (Role::Idler, "Paulina", look::CLEANER),
                 (Role::Receptionist, "Recepcja", look::OFFICE),
                 (Role::Hr, "HR", look::OFFICE),
                 (Role::Ceo, "Prezes", look::OFFICE),
@@ -719,7 +837,7 @@ mod tests {
             ]
         );
         let ids: Vec<u16> = npcs.iter().map(|n| n.id).collect();
-        assert_eq!(ids, (0..8).map(|i| NPC_ID_BASE + i).collect::<Vec<_>>());
+        assert_eq!(ids, (0..9).map(|i| NPC_ID_BASE + i).collect::<Vec<_>>());
     }
 
     #[test]

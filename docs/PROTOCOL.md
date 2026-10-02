@@ -1,4 +1,4 @@
-# Protokół sieciowy (wersja 39)
+# Protokół sieciowy (wersja 40)
 
 Własny binarny protokół na UDP. Implementacje:
 - serwer: `server/src/protocol/` (źródło prawdy),
@@ -23,7 +23,7 @@ przez `cargo test` i czytane przez `client/tests/run_tests.gd`.
 | pole    | typ | wartość |
 |---------|-----|---------|
 | magic   | u16 | `0x5354` (bajty `54 53`, „TS”) |
-| version | u8  | `39` |
+| version | u8  | `40` |
 | type    | u8  | typ pakietu (niżej) |
 
 ## Jednostki
@@ -109,8 +109,8 @@ aplikuje max 6 (średnio 3 = 60/20). Kolejka ponad 30 jest przycinana od najstar
 
 Encja (14 B): `id u16 | kind u8 | x i32 | y i32 | flags u8 | held u8 | activity u8`.
 - `kind`: 0 gracz, 1 NPC, 2 przedmiot na podłodze, 3 laptop na biurku,
-  4 pojazd, 5 taca słodyczy, 6 kałuża po wpadce (`held` 0) albo wymiociny
-  (`held` 1); sprzątaczka ją ściera, inaczej znika o 22:00.
+  4 pojazd, 5 taca słodyczy, 6 kałuża po wpadce (`held` 0), wymiociny
+  (`held` 1) albo kupa (`held` 2); sprzątaczka ją ściera, inaczej znika o 22:00.
   Id: gracze 1..0xDFFF, przedmioty na podłodze i laptopy na biurkach od
   `0xE000` (wspólna pula), NPC od `0xF000`. `PlayerInfo` laptopa niesie imię
   i dział jego właściciela.
@@ -118,11 +118,13 @@ Encja (14 B): `id u16 | kind u8 | x i32 | y i32 | flags u8 | held u8 | activity 
   pracownika, 3 laptop, 4 kawa, 5 owoc); dla `kind` 2 i 3 — sam przedmiot.
 - `activity`: 0 nic, 1 przy komputerze, 2 parzy kawę, 3 odpoczywa na sofie,
   4 w toalecie, 5 pali (strefa palenia), 6 myje ręce, 7 w pojeździe,
-  8 zatrzymany (ochrona / policja), 9 wymiotuje, 10 śpi pijany (odsypia).
+  8 zatrzymany (ochrona / policja), 9 wymiotuje, 10 śpi pijany (odsypia),
+  11 znokautowany, 12 zadaje cios, 13 sika (pisuar, podłoga, ekspres, kubek),
+  14 kuca (kupa na podłodze). NPC: Paulina (fotel) ma 3.
 - `flags`: bity 0–1 kierunek (0 dół, 1 góra, 2 lewo, 3 prawo), bit 2 „w ruchu”,
   bity 3–5 wygląd (0 gracz, 1 portier — mundur z czapką, 2 pracownik biurowy —
   koszula z krawatem, 3 ochroniarz — czarny strój z żółtą opaską, 4 policjant —
-  granatowy mundur z czapką, 5 sprzątaczka — turkusowy fartuch i mop, 6 strażak — czerwony hełm, odblaski), bit 6 wolny chód (zmęczenie / pilna toaleta), bit 7
+  granatowy mundur z czapką, 5 sprzątaczka — turkusowy fartuch i mop, 6 strażak — czerwony hełm, odblaski, 7 kasjer — zielona koszulka i czapka; portier 1 to pani Wiesia — siwy kok, okulary, sweter), bit 6 wolny chód (zmęczenie / pilna toaleta), bit 7
   niska higiena (chmurka). U graczy (nie NPC) bit 3 = rozłożony parasol, bity 4–5
   = upojenie (0 trzeźwy, 1 od 25%, 2 od 50%, 3 od 75%).
   Dla laptopa (`kind` 3): bit 0 zablokowany, bit 1 ktoś przy nim siedzi.
@@ -287,9 +289,9 @@ widzą pokój mówiącego.
 ### 24 `Stats` (S→C)
 
 Potrzeby postaci odbiorcy, co 0,5 s (tylko w budynku): `hunger u8`, `energy
-u8`, `stress u8`, `bladder u8`, `hygiene u8`, `alcohol u8` (każda 0..100), `flags u8` (bit 0
-brudne ręce, bit 1 rozstrój żołądka), `money u32` (portfel w groszach). Głód, stres, toaleta i
-upojenie: 100 = źle; energia i higiena: 0 = źle. Liczy je tylko serwer.
+u8`, `stress u8`, `bladder u8`, `hygiene u8`, `alcohol u8`, `bowels u8`, `health u8` (każda 0..100),
+`flags u8` (bit 0 brudne ręce, bit 1 rozstrój żołądka), `money u32` (portfel w groszach). Głód,
+stres, toaleta, upojenie i jelita: 100 = źle; energia, higiena i zdrowie: 0 = źle. Liczy je tylko serwer.
 
 ### 29 `Clock` (S→C)
 
@@ -461,7 +463,18 @@ dźwięk po prostu przepada.
 Rodzaje: 1 ekspres, 2 kasa, 3 bramka sklepu, 4 winda, 5 zamek kabiny, 6
 włącznik, 7 spłuczka, 8 kran, 9 zapalniczka, 10 zmywarka, 11 lodówka, 12
 szafka, 13 podniesienie, 14 upuszczenie, 15 jedzenie, 16 picie, 17 gwizdek,
-18 beknięcie (po alkoholu; klient gra je ~1 s później, po łyku), 19 wymioty.
+18 beknięcie (po alkoholu; klient gra je ~1 s później, po łyku), 19 wymioty,
+20 cios, 21 dźgnięcie, 22 sikanie, 23 kupa.
+
+### 55 `Action` (C→S)
+
+token u32, `action u8`: 1 menu psot (R) — serwer odpowiada `Dialog` o id 250
+z tym, co da się tu zrobić (nasikać na podłogę, zesrać się na podłogę,
+nasikać do ekspresu w zasięgu, nasikać do kubka osoby obok; ostatnia opcja =
+nic); 2 atak (X) — cios pięścią albo, z nożem w rękach, dźgnięcie najbliższej
+osoby w zasięgu 1,5 kafla. Odpowiedź na menu to zwykły `DialogAnswer`. Szafka
+w kuchni (E z wolnymi rękami) to `Dialog` o id 251 (kubek, nóż, zamknij);
+id 200–249 to pytanie o naganę po alkomacie.
 
 ### 44 `SkipWait` (C→S)
 
@@ -499,7 +512,8 @@ Rodzaje przedmiotów sklepowych (`held`, `Inventory.kind`): 10 kanapka z serem,
 11 z szynką, 12 wrap wege, 13 hamburger, 14 frytki, 15 drożdżówka, 16 batonik,
 17 chipsy, 18 woda, 19 energetyk, 20 sok, 21 piwo, 22 wino, 23 papierosy,
 38 małpka (setka wódki; nazwa z serwera, więc starszy klient pokaże ją bez ikony).
-39 alkomat (nie ze sklepu — dostaje go Zarząd przy założeniu firmy).
+39 alkomat (nie ze sklepu — dostaje go Zarząd przy założeniu firmy), 40 nóż
+kuchenny (z szafki w kuchni).
 
 ## Połączenie i timeouty
 
@@ -559,6 +573,7 @@ szyfrowaniem.
 
 ## Historia wersji
 
+- **40** — psoty i bójki: `Stats` + `bowels`, `health` (po `alcohol`); czynności 11 nokaut, 12 cios, 13 sikanie, 14 kucanie; dźwięki 20 cios, 21 dźgnięcie, 22 sikanie, 23 kupa; kałuża `held` 2 = kupa; przedmiot 40 nóż; wygląd NPC 7 = kasjer; `Action` (55, C→S); `Dialog` 250 (menu R) i 251 (szafka).
 - **39** — upojenie alkoholem: `Stats` + `alcohol` (po `hygiene`); `Snapshot` + `self_drunk` (po `self_slow`, zataczanie w symulacji — też w wektorach golden ruchu); flagi encji gracza bity 4–5 = upojenie; czynności 9 wymioty, 10 odsypianie; dźwięki 18 beknięcie, 19 wymioty; kałuża `held` 1 = wymiociny; `CompanyPeople` pracownik + `reprimands u8` (przed `nick`); przedmiot 39 alkomat (pytanie o naganę to zwykły `Dialog`).
 - **38** — kałuża po wpadce: encja `kind` 6 (`flags`, `held`, `activity` = 0), id z puli od `0xE000`; widoczna jak przedmioty w pokoju; ściera ją sprzątaczka, inaczej znika o 22:00.
 - **37** — osobne działy: pakiet `Departments` (54, S→C) z listą działów; działy 4–10 (Mobile, DevOps, AI, Finanse, Sales, Marketing, Obsługa klienta), dział 1 nazywa się „Produkt / IT”.

@@ -220,6 +220,8 @@ impl Packet {
                 bladder: r.u8()?,
                 hygiene: r.u8()?,
                 alcohol: r.u8()?,
+                bowels: r.u8()?,
+                health: r.u8()?,
                 flags: r.u8()?,
                 money: r.u32()?,
             },
@@ -267,6 +269,7 @@ impl Packet {
                 Packet::Fridge { items, milk: r.u8()?, water: r.u8()?, juice: r.u8()? }
             }
             ty::SKIP_WAIT => Packet::SkipWait { token: r.u32()? },
+            ty::ACTION => Packet::Action { token: r.u32()?, action: r.u8()? },
             ty::TASK_ACTION => Packet::TaskAction {
                 token: r.u32()?,
                 nonce: r.u16()?,

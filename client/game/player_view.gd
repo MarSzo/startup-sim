@@ -15,8 +15,9 @@ const FACING_RIGHT := 3
 const BUBBLE_WIDTH := 260.0
 const HEAD_TOP := -27.0  # top of the head relative to the feet
 
-## Appearance (entity flags bits 3..5): 0 player, 1 porter (uniform + cap),
-## 2 office staff (shirt + tie).
+## Appearance (entity flags bits 3..5): 0 player, 1 porter (Pani Wiesia:
+## grey bun, glasses, a cardigan), 2 office staff (shirt + tie), ... 7 the
+## shop's cashier (green polo and cap).
 const LOOK_PLAYER := 0
 const LOOK_PORTER := 1
 const LOOK_OFFICE := 2
@@ -24,6 +25,7 @@ const LOOK_GUARD := 3      # shop security
 const LOOK_POLICE := 4
 const LOOK_CLEANER := 5
 const LOOK_FIREFIGHTER := 6
+const LOOK_SHOP := 7
 
 const SKINS := [Color("#f2cfae"), Color("#e3b08c"), Color("#c68c63"), Color("#8d5a3b")]
 const HAIRS := [Color("#2b2118"), Color("#5a3b22"), Color("#a0703a"), Color("#d9b66b"), Color("#8a8a8a"), Color("#b5462e"), Color("#1d1d27")]
@@ -41,6 +43,12 @@ const ACT_SMOKING := 5
 const ACT_WASHING := 6
 const ACT_VOMITING := 9
 const ACT_PASSED_OUT := 10
+const ACT_KNOCKED_OUT := 11
+const ACT_ATTACKING := 12
+const ACT_PEEING := 13
+const ACT_POOPING := 14
+## Lying on the floor.
+const LYING := [ACT_PASSED_OUT, ACT_KNOCKED_OUT]
 
 var slow := false
 var smelly := false
@@ -148,9 +156,15 @@ func set_seed(seed_id: int) -> void:
 	pants = PANTS[(h / 1237) % PANTS.size()]
 	tie = [Color("#c0392b"), Color("#2e86de"), Color("#27ae60")][(h / 17) % 3]
 	match look:
-		LOOK_PORTER:
-			shirt = Color("#2c3e6b")
-			pants = Color("#1f2a44")
+		LOOK_PORTER:  # Pani Wiesia
+			skin = SKINS[0]
+			hair = Color("#c4c0bc")
+			hair_style = 2
+			shirt = Color("#9b4a55")
+			pants = Color("#4a4250")
+		LOOK_SHOP:
+			shirt = Color("#3aa845")
+			pants = Color("#2d3a2f")
 		LOOK_OFFICE:
 			shirt = Color("#f4f6f8")
 			pants = Color("#2d3036")
@@ -161,6 +175,8 @@ func set_seed(seed_id: int) -> void:
 			shirt = Color("#1f3358")
 			pants = Color("#17233d")
 		LOOK_CLEANER:
+			if hair_style in [3, 5]:
+				hair_style = 1  # the cleaners: long hair (no spikes, no bald heads)
 			shirt = Color("#2bb3a8")
 			pants = Color("#3d4f5c")
 		LOOK_FIREFIGHTER:
@@ -270,11 +286,11 @@ func _process(delta: float) -> void:
 			bubble.visible = false
 		else:
 			_place_bubble()
-	if status in [ACT_BREWING, ACT_SOFA, ACT_SMOKING, ACT_COMPUTER, ACT_WASHING, ACT_VOMITING, ACT_PASSED_OUT] \
-			or slow or smelly or drunk > 0:
+	if status in [ACT_BREWING, ACT_SOFA, ACT_SMOKING, ACT_COMPUTER, ACT_WASHING, ACT_VOMITING, ACT_PASSED_OUT,
+			ACT_KNOCKED_OUT, ACT_ATTACKING, ACT_PEEING, ACT_POOPING] or slow or smelly or drunk > 0:
 		queue_redraw()  # animated dots / zzz / smoke / sweat / hiccups
 	# Lying on the floor when passed out; swaying (from the feet) when drunk.
-	if status == ACT_PASSED_OUT:
+	if status in LYING:
 		rotation = -PI / 2.0
 	elif drunk > 0:
 		var t := Time.get_ticks_msec() / 1000.0
@@ -356,10 +372,10 @@ func _draw() -> void:
 	var side := facing == FACING_LEFT or facing == FACING_RIGHT
 	var dir := -1.0 if facing == FACING_LEFT else 1.0
 	var back := facing == FACING_UP
-	var sit := status in [ACT_SOFA, ACT_TOILET, ACT_COMPUTER] and not walking
+	var sit := status in [ACT_SOFA, ACT_TOILET, ACT_COMPUTER, ACT_POOPING] and not walking
 	var drop := 3.0 if sit else 0.0
 	var ink := _ink()
-	var asleep := status == ACT_PASSED_OUT
+	var asleep := status in LYING
 	var retching := status == ACT_VOMITING
 
 	# Soft shadow at the feet.
@@ -418,17 +434,25 @@ func _draw() -> void:
 			LOOK_CLEANER:
 				_shape(PackedVector2Array([Vector2(-2.3, shoulder_y + 1.5), Vector2(2.3, shoulder_y + 1.5),
 					Vector2(2.6, hip.y + 0.5), Vector2(-2.6, hip.y + 0.5)]), Color("#eef5f0"))
-			LOOK_POLICE, LOOK_PORTER:
+			LOOK_POLICE:
 				if not side:
 					draw_circle(Vector2(1.5, shoulder_y + 1.8), 0.7, Color("#e0b84a"))
+			LOOK_PORTER:  # cardigan buttons and a string of pearls
+				for i in 3:
+					draw_circle(Vector2(0, shoulder_y + 2.0 + i * 1.8), 0.35, Color("#f4ead0"))
+				if not side:
+					draw_arc(Vector2(0, shoulder_y - 0.6), 2.2, 0.3, PI - 0.3, 8, Color("#f8f4ea"), 0.6, true)
+			LOOK_SHOP:  # a name tag
+				if not side:
+					draw_rect(Rect2(Vector2(0.6, shoulder_y + 1.4), Vector2(2.0, 1.0)), Color("#f4f6f8"))
 	match look:
 		LOOK_FIREFIGHTER:
 			draw_line(Vector2(-sw + 0.3, shoulder_y + 2.2), Vector2(sw - 0.3, shoulder_y + 2.2), Color("#f1e05a"), 0.9)
 			draw_line(Vector2(-hw, hip.y - 1.2), Vector2(hw, hip.y - 1.2), Color("#f1e05a"), 0.9)
 		LOOK_GUARD:
 			draw_line(Vector2(-sw + 0.2, shoulder_y + 2.0), Vector2(sw - 0.2, shoulder_y + 2.0), Color("#f1c40f"), 1.4)
-		LOOK_POLICE, LOOK_PORTER:
-			draw_line(Vector2(-hw, hip.y - 0.4), Vector2(hw, hip.y - 0.4), Color("#141414") if look == LOOK_POLICE else Color("#d4ac2b"), 0.8)
+		LOOK_POLICE:
+			draw_line(Vector2(-hw, hip.y - 0.4), Vector2(hw, hip.y - 0.4), Color("#141414"), 0.8)
 
 	# Arms: thin, swinging opposite to the legs; hands as small blobs.
 	if side:
@@ -460,6 +484,10 @@ func _draw() -> void:
 		var eyes: Array = [Vector2(-2.2, 0.6), Vector2(2.2, 0.6)] if not side else [Vector2(dir * 2.6, 0.6)]
 		for e in eyes:
 			var ep: Vector2 = head + e
+			if status == ACT_KNOCKED_OUT:  # x_x
+				draw_line(ep + Vector2(-0.9, -0.9), ep + Vector2(0.9, 0.9), INK, 0.6, true)
+				draw_line(ep + Vector2(-0.9, 0.9), ep + Vector2(0.9, -0.9), INK, 0.6, true)
+				continue
 			if asleep or retching:
 				draw_line(ep + Vector2(-1.0, 0), ep + Vector2(1.0, 0), INK, 0.6, true)  # eyes shut
 				continue
@@ -488,11 +516,12 @@ func _draw() -> void:
 	_draw_headwear(head, side, dir)
 	_draw_status(head, shoulder_y, hip.y, side, dir)
 	_draw_drunk(head, side, dir)
+	_draw_deeds(head, shoulder_y, hip.y, side, dir)
 
 
 ## Hair over the head: short, long, bun, spiky (Wilson-like), ponytail, bald.
 func _draw_hair(head: Vector2, side: bool, dir: float) -> void:
-	if look in [LOOK_PORTER, LOOK_POLICE, LOOK_FIREFIGHTER]:
+	if look in [LOOK_POLICE, LOOK_FIREFIGHTER]:
 		return  # under the cap / helmet
 	var h := hair
 	var r := HEAD_R + 0.5
@@ -551,8 +580,21 @@ func _draw_headwear(head: Vector2, side: bool, dir: float) -> void:
 			_shape(_arc_pts(head + Vector2(0, -0.5), r + 0.3, PI, TAU, 16), Color("#d62f2f"))
 			_shape(PackedVector2Array([head + Vector2(-r - 1.8, -0.2), head + Vector2(r + 1.8, -0.2), head + Vector2(r + 1.2, 0.9), head + Vector2(-r - 1.2, 0.9)]), Color("#a31f1f"))
 			_blob(head + Vector2(0, -r + 1.4), 0.9, Color("#f1e05a"))
-		LOOK_POLICE, LOOK_PORTER:
-			var cap_col := Color("#17233d") if look == LOOK_POLICE else Color("#1b2440")
+		LOOK_SHOP:  # a green cap with a visor
+			_shape(_arc_pts(head + Vector2(0, -0.8), r, PI, TAU, 14), Color("#3aa845"))
+			if facing != FACING_UP:
+				var gx := dir * 2.5 if side else 0.0
+				_shape(PackedVector2Array([head + Vector2(gx - 3.6, -1.2), head + Vector2(gx + 3.6, -1.2),
+					head + Vector2(gx + 2.8, 0.2), head + Vector2(gx - 2.8, 0.2)]), Color("#2b7f33"))
+		LOOK_PORTER:  # Pani Wiesia's glasses
+			if facing != FACING_UP:
+				var ex: Array = [Vector2(-2.2, 0.6), Vector2(2.2, 0.6)] if not side else [Vector2(dir * 2.6, 0.6)]
+				for e in ex:
+					draw_arc(head + e, 1.9, 0, TAU, 14, INK, 0.5, true)
+				if not side:
+					draw_line(head + Vector2(-0.3, 0.4), head + Vector2(0.3, 0.4), INK, 0.5)
+		LOOK_POLICE:
+			var cap_col := Color("#17233d")
 			_shape(PackedVector2Array([head + Vector2(-r, -1.0), head + Vector2(-r + 0.6, -r - 0.6), head + Vector2(r - 0.6, -r - 0.6), head + Vector2(r, -1.0)]), cap_col)
 			if look == LOOK_POLICE:
 				draw_line(head + Vector2(-r + 0.3, -2.0), head + Vector2(r - 0.3, -2.0), Color("#e8e8e8"), 1.0)
@@ -635,6 +677,64 @@ func _draw_status(head: Vector2, shoulder_y: float, hip_y: float, side: bool, di
 	if slow and (ms / 500) % 2 == 0:
 		var d := head + Vector2(HEAD_R - 0.5, -1.5)
 		_shape(PackedVector2Array([d + Vector2(0, -1.4), d + Vector2(0.8, 0.2), d + Vector2(0, 0.9), d + Vector2(-0.8, 0.2)]), Color("#9fd8ff"))
+
+
+## Peeing, pooping, fighting.
+func _draw_deeds(head: Vector2, shoulder_y: float, hip_y: float, side: bool, dir: float) -> void:
+	var ms := Time.get_ticks_msec()
+	match status:
+		ACT_PEEING:
+			if facing == FACING_UP:
+				return  # facing the urinal / the wall: nothing to see
+			# A wobbly yellow arc from the zip to the floor, and drops.
+			var from := Vector2(dir * 1.6 if side else 0.4, hip_y + 0.8)
+			var to := Vector2(dir * 7.0 if side else 1.4, 0.6)
+			var pts := PackedVector2Array()
+			for j in 7:
+				var k := j / 6.0
+				var p := from.lerp(to, k) + Vector2(0, -sin(k * PI) * (3.0 if side else 0.8))
+				pts.append(p + Vector2(sin(ms / 70.0 + k * 6.0) * 0.2, 0))
+			draw_polyline(pts, Color("#e8d23a"), 0.9, true)
+			for i in 2:
+				var k := float((ms + i * 200) % 400) / 400.0
+				draw_circle(to + Vector2((i - 0.5) * 2.0 * k, -k * 1.5), 0.4, Color("#f2e36a"))
+		ACT_POOPING:
+			# Squatting, red in the face; something drops.
+			draw_circle(head + Vector2(0, 2.4), 2.2, Color(0.85, 0.2, 0.2, 0.25))
+			var k := float(ms % 900) / 900.0
+			var drop := Vector2(dir * -0.8 if side else 0.0, lerpf(hip_y + 2.0, 0.0, k))
+			draw_circle(drop, 1.0, Color("#6b4423"))
+			for i in 2:  # effort marks
+				var a := -PI / 2 + (i - 0.5) * 1.2
+				var c := head + Vector2(cos(a), sin(a)) * (HEAD_R + 1.5)
+				draw_line(c, c + Vector2(cos(a), sin(a)) * 1.6, INK, 0.5, true)
+		ACT_KNOCKED_OUT:
+			# Stars circling the head (the body is rotated, so undo it).
+			draw_set_transform(head, PI / 2.0, Vector2.ONE)
+			for i in 3:
+				var a := ms / 300.0 + i * TAU / 3.0
+				_star(Vector2(cos(a) * 5.0, -HEAD_R - 2.0 + sin(a) * 1.5), 1.3)
+			draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+		ACT_ATTACKING:
+			# The fist (or the knife) thrown forward, with motion lines.
+			var fwd := Vector2(dir, 0) if side else (Vector2(0, -1) if facing == FACING_UP else Vector2(0, 1))
+			var fist := Vector2(0, shoulder_y + 2.0) + fwd * Vector2(7.0, 5.0)
+			for i in 3:
+				var o := fwd.orthogonal() * (i - 1) * 1.4
+				draw_line(fist - fwd * 6.0 + o, fist - fwd * 2.5 + o, Color(INK, 0.5), 0.4, true)
+			if held == ItemArt.KNIFE:
+				ItemArt.draw(self, ItemArt.KNIFE, fist - Vector2(2.4, 2.4), 0.3)
+			_blob(fist, 1.2, skin)
+
+
+func _star(c: Vector2, r: float) -> void:
+	var pts := PackedVector2Array()
+	for k in 11:
+		var rr := r if k % 2 == 0 else r * 0.45
+		var a := -PI / 2 + k * PI / 5.0
+		pts.append(c + Vector2(cos(a), sin(a)) * rr)
+	draw_colored_polygon(pts, Color("#f4d03f"))
+	draw_polyline(pts, INK, 0.3, true)
 
 
 ## Drinking: hiccups, throwing up, sleeping it off.

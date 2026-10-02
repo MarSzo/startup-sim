@@ -46,6 +46,7 @@ server/                 crate Rusta (lib `game` + binarki)
   src/stalls.rs         kabiny toaletowe: znajdowanie drzwi, zamykanie od środka
   src/needs.rs          potrzeby postaci (głód, energia, stres, toaleta, higiena, upojenie), sofa / toaleta / papieros / owoce
   src/drunk.rs          alkohol: punkty za napoje, bełkot (`slur`), odczyt alkomatu, kwestie
+  src/mischief.rs       psoty i bójki: zasięgi, obrażenia, czasy, kwestie
   data/recruitment.json oferty i pule pytań (pierwsza odpowiedź = poprawna)
   src/protocol/         pakiety: mod.rs (typy, stałe), codec.rs (bajty), encode.rs / decode.rs,
                         snapshot.rs (fragmentacja), golden.rs (wektory parytetu z GDScriptem)
@@ -444,7 +445,30 @@ flag encji. Bełkot: `drunk::slur(tekst, poziom, ziarno)` — deterministyczny
 przedmiotem 39 tylko dla działu Zarządu; najbliższy gracz w 2 kaflach, odczyt
 `promille_milli`, powyżej `LIMIT_MILLI` zwykły `Dialog` o id 200–249
 (`answer_reprimand` przed rozmowami z zarządem): nagana = `reprimands` (w
-zapisie postaci), mail od Zarządu, przy 3 `fire`.
+zapisie postaci), mail od Zarządu, przy 3 `fire` (`breath.rs::reprimand` —
+też za nóż).
+
+**Psoty i bójki** (`mischief.rs` + `server/actions.rs`, `fight.rs`,
+`greetings.rs`): `Action` (R/X). R buduje listę `Deed` (podłoga: siku / kupa,
+`PeeMachine` w zasięgu, `PeeCup` osoby z kawą w rękach) i wysyła ją jako
+`Dialog` 250; `answer_mischief` (przed rozmowami z zarządem) wykonuje wybór:
+`Needs::pee_now` / `poop_now` (trzeba mieć ≥ 15), chwila w miejscu
+(`held_activity` PEEING / POOPING), kałuża `puddle::*`, `Machine::tainted` (3
+kawy, płucze sprzątaczka na początku obchodu) albo `Item::tainted` w kubku;
+wypicie skażonego: `drank_pee` — stres, 50% `throw_up`. Świadek w tym samym
+pokoju reaguje. Szafka w kuchni: `Dialog` 251 (kubek / nóż, `Kitchen::knives`
+2, rano znów). Atak: najbliższy gracz w 1,5 kafla, nie leżący; `Needs::hurt`
+(pięść 10, nóż 35, odstęp 1 / 1,5 s), przy 0 nokaut na minutę (`knocked_out`,
+budzi `simulate_players`, 30 zdrowia), `Player::assault` = ścigany: ochroniarz
+(`caught_fighting`), za nóż `call_police` i nagana. Pięć papierosów pod rząd
+(zapalony ≤ 30 s po poprzednim) — `throw_up`. `Needs::bowels` rośnie powoli i po
+jedzeniu (połowa zjedzonego głodu); `Rest::Toilet` opróżnia pęcherz i jelita,
+`Rest::Urinal` (pisuar) tylko pęcherz; 100 = kupa na podłodze. NPC:
+`Role::Idler` (Paulina, zawsze siedzi), patrol ochroniarza (`NpcDef::patrol`,
+`State::Patrolling`, 6 s w każdym punkcie; przy półce E łapie tylko ktoś tuż
+obok), pani Wiesia wita wchodzących z wiatrołapu / parkingu (`greet_entering`,
+raz na 10 min), kasjer pyta o parówkę, gdy podejdzie się do lady z towarem
+(`tick_cashier`).
 
 **Komputery** (`computer.rs`): stanowiska to kafle typu `desk` w pokojach typu
 `department` (nazwa pokoju = nazwa działu). E z laptopem w rękach przy
@@ -734,5 +758,5 @@ mieć wyłączone wygasanie (panel Tailscale); awaryjnie — konsola Hetznera. S
 |-----------|-------------|
 | `cd server && cargo test` | 51 testów jednostkowych (budynek i mapy wg GDD, osiągalność zależna od uprawnień, bramki, ruch/kolizje, schody, winda, nawigacja, portier, recepcja, HR, rekrutacja: zaliczenie/oblanie, ignorowanie nieaktualnych odpowiedzi, losowanie i tasowanie; ekspres; protokół), 2 golden, 9 e2e (m.in. ekspres: parzenie, zajętość, kubek widoczny dla innych; portal: odrzucenie → przyjęcie → spawn; całe wdrożenie aż do karty; widoczność między piętrami; stan serwera = predykcja) |
 | `godot --headless --path client -s tests/run_tests.gd` | parytet protokołu (bajt w bajt) i ruchu — z bramkami, uprawnieniami i przejściami między piętrami — z Rustem, zgodność CRC budynku, parsowanie adresów |
-| `python3 tests/e2e/run.py` | scenariusze rozgrywki: prawdziwy klient Godot (headless) na prawdziwym serwerze — `workday` (laptop, obiad z aplikacji, kawa, odbiór obiadu, powrót tramwajem z wypłatą), `onboarding` (rejestracja, postać, portal i rozmowa, portier, recepcja, HR, laptop na biurku działu), `together` (dwóch graczy: komunikator, spotkanie w chill roomie, winda), `founder` (firma z portalu, stanowisko w dziale Mobile, zatrudnienie kandydata), `persistence` (laptop na biurku, restart serwera, powrót postaci), `drinking` (wino i dwie małpki ze sklepu, wymioty z plamą, zataczanie). Scenariusz (`client/tests/e2e/scenario.gd`) steruje postacią przez `game.script_driver`, ma własny folder w `user://e2e/` i kończy się `E2E PASS` / `E2E FAIL` z kodem wyjścia. |
+| `python3 tests/e2e/run.py` | scenariusze rozgrywki: prawdziwy klient Godot (headless) na prawdziwym serwerze — `workday` (laptop, obiad z aplikacji, kawa, odbiór obiadu, powrót tramwajem z wypłatą), `onboarding` (rejestracja, postać, portal i rozmowa, portier, recepcja, HR, laptop na biurku działu), `together` (dwóch graczy: komunikator, spotkanie w chill roomie, winda), `founder` (firma z portalu, stanowisko w dziale Mobile, zatrudnienie kandydata), `persistence` (laptop na biurku, restart serwera, powrót postaci), `drinking` (wino i dwie małpki ze sklepu, wymioty z plamą, zataczanie), `fight` (dwóch graczy: nóż z szafki, nokaut, ochrona łapie napastnika, menu R). Scenariusz (`client/tests/e2e/scenario.gd`) steruje postacią przez `game.script_driver`, ma własny folder w `user://e2e/` i kończy się `E2E PASS` / `E2E FAIL` z kodem wyjścia. |
 | `python3 tests/load/soak.py` | obciążenie: N botów (`src/bin/bots.rs`) przez kilka minut — zero zgubionych ticków, najdłuższy tick < 25 ms, brak awarii, pamięć bez wzrostu; w CI co noc (`.github/workflows/soak.yml`). |

@@ -23,7 +23,7 @@ pub use golden::{golden_samples, to_hex};
 pub use snapshot::{snapshot_fragments, SelfState};
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 39;
+pub const VERSION: u8 = 40;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
 /// A game packet at most (sealed, it grows by up to 48 B to `MAX_DATAGRAM`).
@@ -106,6 +106,7 @@ pub mod ty {
     pub const VOICE: u8 = 52;
     pub const VOICE_FROM: u8 = 53;
     pub const DEPARTMENTS: u8 = 54;
+    pub const ACTION: u8 = 55;
 }
 
 /// `ItemAction::action`.
@@ -243,6 +244,29 @@ pub mod activity {
     pub const VOMITING: u8 = 9;
     /// Passed out drunk (asleep on the floor for a while).
     pub const PASSED_OUT: u8 = 10;
+    /// Knocked out in a fight (on the floor, stars).
+    pub const KNOCKED_OUT: u8 = 11;
+    /// Throwing a punch / stabbing (a moment).
+    pub const ATTACKING: u8 = 12;
+    /// Peeing standing up (urinal, floor, a machine, a mug).
+    pub const PEEING: u8 = 13;
+    /// Squatting: pooping on the floor.
+    pub const POOPING: u8 = 14;
+}
+
+/// `EntityState::held` of a puddle (`kind::PUDDLE`).
+pub mod puddle {
+    pub const PEE: u8 = 0;
+    pub const VOMIT: u8 = 1;
+    pub const POOP: u8 = 2;
+}
+
+/// `Action::action` (C→S).
+pub mod action {
+    /// R: the menu of what can be done here (answered with a `Dialog`).
+    pub const MENU: u8 = 1;
+    /// X: punch (or stab, with a knife in hands) the nearest person.
+    pub const ATTACK: u8 = 2;
 }
 
 /// `Sound` kinds: things happening in the world that others hear too.
@@ -267,6 +291,10 @@ pub mod sound {
     /// A burp after a beer (the client plays it a moment later).
     pub const BURP: u8 = 18;
     pub const VOMIT: u8 = 19;
+    pub const PUNCH: u8 = 20;
+    pub const STAB: u8 = 21;
+    pub const PEE: u8 = 22;
+    pub const POOP: u8 = 23;
 }
 
 /// A department of the company in `Departments`.
@@ -663,6 +691,10 @@ pub enum Packet {
         hygiene: u8,
         /// Alcohol, 0..100 (75 throws up, 100 after that: passes out).
         alcohol: u8,
+        /// Bowels, 0..100 (100 = an accident).
+        bowels: u8,
+        /// Health, 100 = fine, 0 = knocked out.
+        health: u8,
         flags: u8,
         money: u32,
     },
@@ -807,6 +839,11 @@ pub enum Packet {
     /// everybody at home asked).
     SkipWait {
         token: u32,
+    },
+    /// R (menu of actions) / X (attack): `action::*`.
+    Action {
+        token: u32,
+        action: u8,
     },
     /// Sounds heard this tick on the receiver's floor: (kind, x, y) in
     /// sub-pixels (`sound::*`), at most `MAX_SOUNDS`.

@@ -15,12 +15,14 @@ const ROWS := [
 	["Toaleta", true, Color("#4f8fc0"), "drop"],
 	["Higiena", false, Color("#5aa89a"), "soap"],
 	["Upojenie", true, Color("#d9a032"), "mug"],
+	["Jelita", true, Color("#8a5a3a"), "roll"],
+	["Zdrowie", false, Color("#c8463c"), "heart"],
 ]
 const CRITICAL := 80
 const SIZE := 64.0
 const GAP := 10.0
 
-var values := [0, 100, 0, 0, 100, 0]
+var values := [0, 100, 0, 0, 100, 0, 0, 100]
 var dirty_hands := false
 var money := 0
 var have := false
@@ -98,7 +100,7 @@ func _place() -> void:
 
 
 func update_stats(p: Dictionary) -> void:
-	values = [p.hunger, p.energy, p.stress, p.bladder, p.hygiene, p.alcohol]
+	values = [p.hunger, p.energy, p.stress, p.bladder, p.hygiene, p.alcohol, p.bowels, p.health]
 	money = p.money
 	dirty_hands = (p.stats_flags & 1) != 0
 	var upset: bool = (p.stats_flags & 2) != 0
@@ -273,6 +275,24 @@ func _draw_icon(b: Control, kind: String, c: Vector2) -> void:
 			for p in [Vector2(-7, -10), Vector2(-1, -12), Vector2(4, -10)]:
 				b.draw_circle(c + p, 3.2, Color("#fffaf0"))
 			b.draw_line(c + Vector2(-5, -3), c + Vector2(-5, 10), Color(1, 1, 1, 0.6), 2.0, true)
+		"roll":  # a toilet roll
+			b.draw_circle(c + Vector2(0, 2), 12, ink)
+			b.draw_circle(c + Vector2(0, 2), 9.5, Color("#fbf8ef"))
+			b.draw_circle(c + Vector2(0, 2), 4, ink)
+			b.draw_circle(c + Vector2(0, 2), 2.4, Color("#c9b48a"))
+			var tail := PackedVector2Array([c + Vector2(6, 9), c + Vector2(12, 9), c + Vector2(13, 16), c + Vector2(7, 15)])
+			b.draw_colored_polygon(tail, Color("#fbf8ef"))
+			b.draw_polyline(tail, ink, 2.0, true)
+		"heart":
+			var pts := PackedVector2Array()
+			for k in 25:
+				var a := TAU * k / 24.0
+				var hx := 16.0 * pow(sin(a), 3)
+				var hy := -(13.0 * cos(a) - 5.0 * cos(2 * a) - 2.0 * cos(3 * a) - cos(4 * a))
+				pts.append(c + Vector2(hx, hy) * 0.75 + Vector2(0, 1))
+			b.draw_colored_polygon(pts, Color("#e25a4e"))
+			b.draw_polyline(pts, ink, 2.5, true)
+			b.draw_arc(c + Vector2(-5, -4), 3, PI * 1.1, PI * 1.6, 6, Color.WHITE, 2.0, true)
 		"soap":
 			var r := Rect2(c + Vector2(-12, -2), Vector2(22, 12))
 			b.draw_rect(r, Color("#f1c9d8"))

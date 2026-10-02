@@ -59,6 +59,7 @@ func test_protocol(path: String) -> void:
 		"company_action": Protocol.encode_company_action(0x01020304, Protocol.CO_SET_PLACES, 1, 2, ""),
 		"fridge_action": Protocol.encode_fridge_action(0x01020304, Protocol.FRIDGE_PUT, 0),
 		"skip_wait": Protocol.encode_skip_wait(0x01020304),
+		"action": Protocol.encode_action(0x01020304, Protocol.ACTION_ATTACK),
 		"task_action": Protocol.encode_task_action(0x01020304, 7, Protocol.TA_CREATE, 0, 2, "Naprawić logowanie\nPo zmianie hasła."),
 		"voice": Protocol.encode_voice(0x01020304, 9, true, PackedByteArray([0x10, 0x00, 0x05, 0x7f, 0x80])),
 		"mail_action": Protocol.encode_mail_action(0x01020304, 4, Protocol.MA_SEND, 0, "Kuba", "Kawa?", "O 12 w kuchni."),
@@ -102,7 +103,7 @@ func test_protocol(path: String) -> void:
 		"departments store (no board for positions)")
 	var st := Protocol.decode(golden["stats"].hex_decode())
 	expect(st.get("type") == Protocol.T_STATS and st.hunger == 35 and st.energy == 80 and st.stress == 12 and st.bladder == 64
-		and st.hygiene == 22 and st.alcohol == 77 and st.stats_flags == Protocol.STATS_DIRTY_HANDS and st.money == 18750, "decode stats %s" % st)
+		and st.hygiene == 22 and st.alcohol == 77 and st.bowels == 41 and st.health == 63 and st.stats_flags == Protocol.STATS_DIRTY_HANDS and st.money == 18750, "decode stats %s" % st)
 	var ck := Protocol.decode(golden["clock"].hex_decode())
 	expect(ck.get("type") == Protocol.T_CLOCK and ck.day == 2 and ck.minute == 492 and not ck.night
 		and ck.place == Protocol.PLACE_COMMUTING and ck.arrive == 545 and ck.pay == 23000 and ck.pay_minutes == 460

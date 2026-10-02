@@ -55,6 +55,8 @@ impl Server {
         true
     }
 
+    /// E at the cupboard: a mug / knife in hands goes back; with free
+    /// hands, a look inside (what to take).
     fn use_cupboard(&mut self, pid: u16) {
         self.sound(crate::protocol::sound::CUPBOARD, pid);
         let Some(p) = self.players.get_mut(&pid) else { return };
@@ -66,15 +68,10 @@ impl Server {
                 refresh(p);
                 lines::PUT_MUG.to_string()
             }
+            item_kind::KNIFE => return self.put_knife_back(pid),
             item_kind::EMPTY_CUP => lines::DIRTY_NOT_HERE.to_string(),
             _ if !p.inventory.hands_free() => lines::HANDS_FULL.to_string(),
-            _ if k.mugs == 0 => lines::NO_MUGS.to_string(),
-            _ => {
-                k.mugs -= 1;
-                let left = k.mugs;
-                self.give_new(pid, item_kind::CUP);
-                lines::took_mug(left)
-            }
+            _ => return self.open_cupboard(pid),
         };
         self.says.push(Say::new(pid, line));
     }

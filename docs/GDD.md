@@ -633,7 +633,7 @@ Zastępuje prosty portal z 10.8. Po połączeniu gracz widzi pulpit komputera
 
 - Paski w prawym górnym rogu: **Głód**, **Energia**, **Stres**, **Toaleta**
   (0–100, z zielonego na czerwony; krytyczne migają); później **Higiena**
-  (10.17) i **Upojenie** (10.47).
+  (10.17), **Upojenie** (10.47), **Jelita** i **Zdrowie** (10.48).
 - Tempo (czas rzeczywisty): głód 0→100 w ~25 min, energia 100→0 w ~35 min,
   toaleta 0→100 w ~20 min; stres rośnie, gdy któraś potrzeba jest zaniedbana
   (głód ≥ 70, energia ≤ 25, toaleta ≥ 80), a bez tego powoli spada.
@@ -1291,6 +1291,38 @@ pełnym ekranie — zastąpiona stylem inspirowanym Don't Starve:
   „w normie” do 0,2 ‰. Powyżej normy pytanie: *Wystaw naganę* / *Daruję tym
   razem*. Nagana: mail od Zarządu do pracownika, licznik nagan w panelu
   założyciela; **3 nagany = zwolnienie**. Nie-Zarząd: „to nie dla mnie”.
+
+### 10.48 Psoty, bójki i obsługa na parterze
+
+- **Kasjer** w zielonej koszulce i czapce; gdy ktoś podejdzie do lady z
+  towarem do zapłaty, pyta: „Jaka parówka jest, wariacie?” (raz, aż się
+  odejdzie).
+- **Ochroniarz** nie stoi w miejscu: chodzi między półkami (kilka punktów, w
+  każdym chwilę stoi). E przy półce działa, nawet gdy przechodzi obok.
+- **Pani Wiesia** na portierni (portierka po sześćdziesiątce): każdego, kto
+  wchodzi do budynku (z wiatrołapu albo parkingu), wita „Dzień dobry, …!” i
+  dorzuca dowcip cioci z wesela („A kiedy ślub?”, „A ile tam płacą w tym
+  IT?”…). Tę samą osobę najwyżej raz na 10 minut.
+- **Paulina**, druga sprzątaczka, cały dzień siedzi w fotelu w holu i nic nie
+  robi (zagadnięta — wymówki: „Nie teraz, kochanie, mam przerwę.”).
+- **Jelita** — nowa statystyka: rosną powoli i po jedzeniu (połowa zjedzonego).
+  Kibel (siedząc) opróżnia pęcherz i jelita, **pisuar** tylko pęcherz; widać,
+  co kto robi (siedzi na kiblu / stoi przy pisuarze ze strumieniem). Przy 100
+  — kupa na podłodze (brązowa kupka z muchami; sprząta ją sprzątaczka).
+- **Menu psot (R)**: nasikaj na podłogę, zesraj się na podłogę, nasikaj do
+  ekspresu (w zasięgu), nasikaj do kubka (komuś obok z kawą w rękach). Trzeba
+  mieć „zapas” (≥ 15). Skażony ekspres daje 3 „specjalne” kawy (płucze go
+  sprzątaczka na obchodzie); kto taką wypije — „Fuj! Co to za smak?!”, stres
+  +20 i w połowie przypadków wymioty. Świadkowie w pokoju komentują.
+- **Bójki (X)**: cios pięścią −10 zdrowia (co 1 s), nóż −35 (co 1,5 s; F z
+  nożem też dźga). Przy 0 zdrowia **nokaut**: minuta na podłodze (oczy w X,
+  gwiazdki), potem 30 zdrowia; zdrowie wraca samo (10 na godzinę gry). Leżącego
+  się nie bije. Ochroniarz biegnie za napastnikiem i zatrzymuje go; nóż to
+  dodatkowo **policja** (mandat) i **nagana od Zarządu** (3 = zwolnienie).
+- **Szafka w kuchni** (E) pokazuje zawartość: kubki, noże kuchenne (2, rano
+  wracają), sztućce — bierze się kubek albo nóż; E z nożem w rękach odkłada go.
+- **Pięć papierosów pod rząd** (każdy zapalony do 30 s po zgaszeniu
+  poprzedniego) — wymioty.
 
 ### 10.6 Stan implementacji
 

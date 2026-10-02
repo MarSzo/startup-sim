@@ -65,6 +65,7 @@ impl SavedItem {
             count: self.count.max(1),
             unpaid: self.unpaid,
             stale: self.stale,
+            tainted: false,
         }
     }
 }
@@ -435,6 +436,7 @@ mod tests {
             count: 1,
             unpaid: false,
             stale: false,
+            tainted: false,
         };
         let s = SavedItem::from_item(&item, |_| "Ola".into());
         assert_eq!((s.kind, s.owner.as_str()), (item_kind::EMPTY_CUP, "Ola"));

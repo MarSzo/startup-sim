@@ -46,6 +46,7 @@ LEGEND = {
     "K": {"type": "counter", "solid": True, "color": "#c9a37a"},
     "H": {"type": "shelf", "solid": True, "color": "#7a7f8a"},
     "Q": {"type": "sofa", "solid": True, "color": "#5b7fbf"},
+    "a": {"type": "armchair", "solid": True, "color": "#8a4a5a"},
     "P": {"type": "plant", "solid": True, "color": "#3f8a3a"},
     "R": {"type": "rack", "solid": True, "color": "#2a2d34"},
     "N": {"type": "bench", "solid": True, "color": "#8a6a45"},
@@ -301,6 +302,7 @@ def floor0():
     f.door(43, 45, 43, 45, "x", "Z")
     f.door(43, 55, 43, 55, "x", "Z")
     f.plants([(28, 41), (28, 56), (42, 56)])
+    f.put(41, 54, 41, 54, "a")                           # Paulina's armchair
 
     # --- outside ---
     f.area(12, 9, 16, STREET_Y - 1, "=", "O")            # the drive to the garage
@@ -335,12 +337,17 @@ def floor0():
     })
     f.npcs = [
         # The porter sits behind the desk; escorts newcomers to the reception.
-        {"kind": "porter", "name": "Portier", "home": [37, 49], "escort_to": [1, 36, 36]},
+        # Pani Wiesia greets (and chats up) everybody coming in.
+        {"kind": "porter", "name": "Pani Wiesia", "home": [37, 49], "escort_to": [1, 36, 36]},
         # Behind the till; customers pay from the other side of the counter.
         {"kind": "cashier", "name": "Kasa", "home": [20, 55]},
-        {"kind": "guard", "name": "Ochrona", "home": [25, 55]},
+        # The guard walks between the shelves.
+        {"kind": "guard", "name": "Ochrona", "home": [25, 55],
+         "patrol": [[24, 47], [20, 48], [24, 50], [20, 52], [25, 55]]},
         # 10: the cleaner sits in the hall all day (her round in the afternoon).
         {"kind": "cleaner", "name": "Pani Krysia", "home": [38, 56]},
+        # Paulina, also a cleaner, sits in her armchair all day. That's it.
+        {"kind": "idler", "name": "Paulina", "home": [41, 54]},
     ]
     return f
 

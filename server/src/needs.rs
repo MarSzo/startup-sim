@@ -1,6 +1,6 @@
-//! Character needs (GDD 9a, step 5): hunger, energy, stress, bladder, and
-//! hygiene with "dirty hands" after the toilet (washed at a sink or with
-//! hand sanitizer).
+//! Character needs (GDD 9a, step 5): hunger, energy, stress, bladder,
+//! bowels, hygiene with "dirty hands" after the toilet (washed at a sink or
+//! with hand sanitizer), alcohol and health (fights).
 //!
 //! Values are fixed-point (`SCALE` units per point, 0..=100 points) so the
 //! per-tick drift stays an integer. Hunger, stress and bladder grow (100 =
@@ -51,6 +51,17 @@ pub const PASS_OUT_AT: i32 = 100;
 const VOMIT_REARM: i32 = 40;
 /// Throwing up gets rid of some of it.
 const VOMIT_RELIEF: i32 = 10;
+/// Bowels fill slowly on their own (100 in 90 real minutes), faster after
+/// a meal (half of the hunger it took away).
+pub const BOWELS_UP: i32 = per_tick(90);
+/// Sitting on the toilet empties full bowels in 10 s.
+pub const BOWELS_RELIEF: i32 = MAX / (10 * 20);
+/// Health comes back by itself: 100 in 50 real minutes (10 a game hour).
+pub const HEALTH_UP: i32 = per_tick(50);
+/// Knocked out: wakes up with this much health.
+pub const WAKE_HEALTH: i32 = 30;
+/// Enough in the bladder / bowels to go on purpose (floor, machine, mug).
+pub const ON_PURPOSE: i32 = 15;
 
 /// Reach for the sofa, toilet, ashtray and fruit bowl (like the coffee machine).
 pub const USE_RADIUS: i32 = TILE_UNITS * 3 / 2;
@@ -65,6 +76,7 @@ const SLOW_BLADDER: i32 = 90;
 /// Below this you smell (visible to others) and it stresses you.
 pub const SMELLY: i32 = 25;
 const UNWASHED: i32 = 35;
+const MUST_POOP: i32 = 85;
 
 pub mod lines {
     pub const HUNGRY: &str = "Burczy mi w brzuchu… Może owoc z chill roomu?";
@@ -87,6 +99,10 @@ pub mod lines {
     pub const SANITIZED: &str = "Psik, psik — zdezynfekowane.";
     pub const UNWASHED: &str = "Przydałoby się trochę higieny…";
     pub const YUCK: &str = "Fuj… brudnymi rękami.";
+    pub const MUST_POOP: &str = "Coś mi się kotłuje w brzuchu… Szybko do kibla!";
+    pub const POOP_ACCIDENT: &str = "O nie… Za późno. I to na grubo.";
+    pub const RELIEVED_BIG: &str = "Uff… lżej o kilogram.";
+    pub const URINAL: &str = "Pisuar, zamek w dół…";
 }
 
 /// Something to use with E (found on the map by tile type).
@@ -94,6 +110,8 @@ pub mod lines {
 pub enum SpotKind {
     Sofa,
     Toilet,
+    /// Standing: only the bladder.
+    Urinal,
     Ashtray,
     FruitBowl,
     Sink,
@@ -116,7 +134,8 @@ pub fn find_spots(b: &Building) -> Vec<Spot> {
             for x in 0..m.width {
                 let kind = match m.tile_type(x, y) {
                     Some("sofa") => SpotKind::Sofa,
-                    Some("toilet" | "urinal") => SpotKind::Toilet,
+                    Some("toilet") => SpotKind::Toilet,
+                    Some("urinal") => SpotKind::Urinal,
                     Some("ashtray") => SpotKind::Ashtray,
                     Some("fruit_bowl") => SpotKind::FruitBowl,
                     Some("sink") | Some("kitchen_sink") => SpotKind::Sink,
@@ -157,9 +176,16 @@ pub fn spot_in_reach<'a>(spots: &'a [Spot], body: &Body) -> Option<&'a Spot> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Rest {
     Sofa,
+    /// Sitting on the toilet: bladder and bowels.
     Toilet,
-    Smoking { until: u32 },
-    Washing { until: u32 },
+    /// Standing at a urinal: only the bladder.
+    Urinal,
+    Smoking {
+        until: u32,
+    },
+    Washing {
+        until: u32,
+    },
 }
 
 /// Things to tell the player (speech bubble "to self") or the room.
@@ -174,6 +200,8 @@ pub enum Event {
     Vomit,
     /// Drank on after throwing up: falls asleep where they stand.
     PassOut,
+    /// Bowels hit 100: a pile on the floor (said to the room).
+    PoopAccident,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -194,6 +222,15 @@ pub struct Needs {
     /// Has thrown up since last being (almost) sober.
     #[serde(default)]
     pub vomited: bool,
+    /// Bowels, 0..100 (100 = an accident on the floor).
+    #[serde(default)]
+    pub bowels: i32,
+    /// Health, 100 = fine, 0 = knocked out (fights).
+    #[serde(default = "full")]
+    pub health: i32,
+    /// This visit to the toilet was a big one (for the line at the end).
+    #[serde(skip)]
+    big_one: bool,
     /// Warnings already given (bit per threshold), re-armed on recovery.
     warned: u8,
 }
@@ -210,6 +247,9 @@ impl Default for Needs {
             upset: false,
             alcohol: 0,
             vomited: false,
+            bowels: 10 * SCALE,
+            health: MAX,
+            big_one: false,
             warned: 0,
         }
     }
@@ -221,6 +261,11 @@ const W_MUST_GO: u8 = 4;
 const W_STRESSED: u8 = 8;
 const W_EXHAUSTED: u8 = 16;
 const W_UNWASHED: u8 = 32;
+const W_MUST_POOP: u8 = 64;
+
+fn full() -> i32 {
+    MAX
+}
 
 fn pts(v: i32) -> i32 {
     v / SCALE
@@ -237,14 +282,22 @@ impl Needs {
         self.energy -= if pts(self.hunger) >= 100 { 2 * ENERGY_DOWN } else { ENERGY_DOWN };
         self.bladder += BLADDER_UP + if self.upset { UPSET_RATE } else { 0 };
         self.hygiene -= HYGIENE_DOWN;
+        self.bowels += BOWELS_UP;
+        self.health += HEALTH_UP;
         self.alcohol = (self.alcohol - ALCOHOL_DOWN).max(0);
         if self.vomited && pts(self.alcohol) < VOMIT_REARM {
             self.vomited = false;
         }
-        let neglected = [pts(self.hunger) >= HUNGRY, pts(self.energy) <= TIRED, pts(self.bladder) >= MUST_GO, pts(self.hygiene) < SMELLY]
-            .iter()
-            .filter(|&&b| b)
-            .count() as i32;
+        let neglected = [
+            pts(self.hunger) >= HUNGRY,
+            pts(self.energy) <= TIRED,
+            pts(self.bladder) >= MUST_GO,
+            pts(self.hygiene) < SMELLY,
+            pts(self.bowels) >= MUST_POOP,
+        ]
+        .iter()
+        .filter(|&&b| b)
+        .count() as i32;
         self.stress += if neglected > 0 { neglected * STRESS_NEGLECT } else { -STRESS_CALM };
         match rest {
             Some(Rest::Sofa) => {
@@ -252,10 +305,21 @@ impl Needs {
                 self.stress -= SOFA_STRESS;
             }
             Some(Rest::Toilet) => {
+                // Anything more than this tick's drift: a big one.
+                self.big_one |= self.bowels > 2 * BOWELS_UP;
+                self.bladder -= TOILET_RELIEF + BLADDER_UP + if self.upset { UPSET_RATE } else { 0 };
+                self.bowels -= BOWELS_RELIEF + BOWELS_UP;
+                if self.bladder <= 0 && self.bowels <= 0 {
+                    rest = None;
+                    self.upset = false; // the toilet sorts the stomach out
+                    ev.push(Event::RestDone(if self.big_one { lines::RELIEVED_BIG } else { lines::RELIEVED }));
+                    self.big_one = false;
+                }
+            }
+            Some(Rest::Urinal) => {
                 self.bladder -= TOILET_RELIEF + BLADDER_UP + if self.upset { UPSET_RATE } else { 0 };
                 if self.bladder <= 0 {
                     rest = None;
-                    self.upset = false; // the toilet sorts the stomach out
                     ev.push(Event::RestDone(lines::RELIEVED));
                 }
             }
@@ -274,10 +338,16 @@ impl Needs {
             }
             Some(Rest::Washing { .. }) | None => {}
         }
-        if self.bladder >= MAX && rest != Some(Rest::Toilet) {
+        if self.bladder >= MAX && !matches!(rest, Some(Rest::Toilet | Rest::Urinal)) {
             self.bladder = 0;
             self.stress += 30 * SCALE;
             ev.push(Event::Accident);
+        }
+        if self.bowels >= MAX && rest != Some(Rest::Toilet) {
+            self.bowels = 0;
+            self.stress += 30 * SCALE;
+            self.hygiene -= 25 * SCALE;
+            ev.push(Event::PoopAccident);
         }
         self.clamp();
         self.warn(&mut ev);
@@ -292,6 +362,7 @@ impl Needs {
             (W_STRESSED, pts(self.stress) >= STRESSED, pts(self.stress) < STRESSED - 10, lines::STRESSED),
             (W_EXHAUSTED, pts(self.energy) <= SLOW_ENERGY, pts(self.energy) > SLOW_ENERGY + 5, lines::EXHAUSTED),
             (W_UNWASHED, pts(self.hygiene) <= UNWASHED, pts(self.hygiene) > UNWASHED + 10, lines::UNWASHED),
+            (W_MUST_POOP, pts(self.bowels) >= MUST_POOP, pts(self.bowels) < MUST_POOP - 10, lines::MUST_POOP),
         ];
         for (bit, bad, ok, line) in checks {
             if bad && self.warned & bit == 0 {
@@ -304,7 +375,9 @@ impl Needs {
     }
 
     fn clamp(&mut self) {
-        for v in [&mut self.hunger, &mut self.energy, &mut self.stress, &mut self.bladder, &mut self.hygiene] {
+        for v in
+            [&mut self.hunger, &mut self.energy, &mut self.stress, &mut self.bladder, &mut self.hygiene, &mut self.bowels, &mut self.health]
+        {
             *v = (*v).clamp(0, MAX);
         }
     }
@@ -376,6 +449,7 @@ impl Needs {
     /// Returns true if eaten with dirty hands (yuck: stress).
     pub fn eat_fruit(&mut self) -> bool {
         self.hunger -= 20 * SCALE;
+        self.bowels += 10 * SCALE;
         self.energy += 3 * SCALE;
         let yuck = self.dirty_hands;
         if yuck {
@@ -421,6 +495,8 @@ impl Needs {
     /// Eating / drinking shop goods.
     pub fn apply(&mut self, e: crate::shop::Effect) {
         self.hunger += e.hunger * SCALE;
+        // What goes in must come out: half of a meal ends up in the bowels.
+        self.bowels += (-e.hunger).max(0) * SCALE / 2;
         self.energy += e.energy * SCALE;
         self.stress += e.stress * SCALE;
         self.bladder += e.bladder * SCALE;
@@ -435,6 +511,58 @@ impl Needs {
 
     pub fn is_full(&self) -> bool {
         pts(self.hunger) < 5
+    }
+
+    /// Peeing on purpose (the floor, a machine, a mug): needs something in
+    /// the bladder; empties it.
+    pub fn pee_now(&mut self) -> bool {
+        if pts(self.bladder) < ON_PURPOSE {
+            return false;
+        }
+        self.bladder = 0;
+        self.upset = false;
+        self.dirty_hands = true;
+        true
+    }
+
+    /// Pooping on the floor on purpose: needs something in the bowels.
+    pub fn poop_now(&mut self) -> bool {
+        if pts(self.bowels) < ON_PURPOSE {
+            return false;
+        }
+        self.bowels = 0;
+        self.dirty_hands = true;
+        self.hygiene -= 10 * SCALE;
+        self.clamp();
+        true
+    }
+
+    /// Something was off with that drink (someone peed in it).
+    pub fn disgusted(&mut self) {
+        self.stress += 20 * SCALE;
+        self.clamp();
+    }
+
+    /// Hit for `points`; true = knocked out (health at 0).
+    pub fn hurt(&mut self, points: i32) -> bool {
+        self.health -= points * SCALE;
+        self.stress += points / 2 * SCALE;
+        self.clamp();
+        self.health <= 0
+    }
+
+    /// Coming round after a knockout.
+    pub fn come_round(&mut self) {
+        self.health = self.health.max(WAKE_HEALTH * SCALE);
+        self.clamp();
+    }
+
+    pub fn bowels_points(&self) -> u8 {
+        ((self.bowels + SCALE / 2) / SCALE).clamp(0, 100) as u8
+    }
+
+    pub fn health_points(&self) -> u8 {
+        ((self.health + SCALE / 2) / SCALE).clamp(0, 100) as u8
     }
 
     /// Rounded points for the HUD: hunger, energy, stress, bladder, hygiene.
@@ -484,7 +612,7 @@ mod tests {
 
     #[test]
     fn toilet_sofa_and_smoking_restore() {
-        let mut n = Needs { bladder: 95 * SCALE, ..Needs::default() };
+        let mut n = Needs { bladder: 95 * SCALE, bowels: 0, ..Needs::default() };
         let (rest, ev) = run(&mut n, Some(Rest::Toilet), 9 * 20);
         assert_eq!((rest, n.points()[3]), (None, 0));
         assert!(ev.contains(&Event::RestDone(lines::RELIEVED)));
@@ -539,7 +667,51 @@ mod tests {
         n.upset_stomach();
         let (rest, ev) = run(&mut n, Some(Rest::Toilet), 20 * 20);
         assert_eq!(rest, None);
-        assert!(ev.contains(&Event::RestDone(lines::RELIEVED)) && !n.upset, "cured");
+        assert!(ev.contains(&Event::RestDone(lines::RELIEVED_BIG)) && !n.upset, "cured");
+    }
+
+    #[test]
+    fn bowels_fill_after_meals_and_empty_only_sitting_down() {
+        let mut n = Needs { bowels: 0, bladder: 50 * SCALE, ..Needs::default() };
+        n.apply(crate::shop::Effect { hunger: -40, energy: 0, stress: 0, bladder: 0 });
+        assert_eq!(n.bowels_points(), 20, "half of the meal");
+        // The urinal: only the bladder.
+        let (rest, ev) = run(&mut n, Some(Rest::Urinal), 6 * 20);
+        assert_eq!(rest, None);
+        assert!(ev.contains(&Event::RestDone(lines::RELIEVED)));
+        assert!(n.bowels_points() >= 20 && n.points()[3] == 0);
+        // Sitting: the bowels too.
+        let (rest, ev) = run(&mut n, Some(Rest::Toilet), 6 * 20);
+        assert_eq!((rest, n.bowels_points()), (None, 0));
+        assert!(ev.contains(&Event::RestDone(lines::RELIEVED_BIG)));
+        // Nothing to give: no pooping on purpose; full: an accident.
+        assert!(!n.poop_now() && !n.pee_now());
+        n.bowels = MAX - 10;
+        let (_, ev) = run(&mut n, None, 20);
+        assert!(ev.contains(&Event::PoopAccident) && n.bowels_points() < 5);
+        n.bowels = 30 * SCALE;
+        assert!(n.poop_now() && n.bowels_points() == 0 && n.dirty_hands);
+    }
+
+    #[test]
+    fn hits_hurt_knock_out_and_health_comes_back() {
+        let mut n = Needs::default();
+        assert_eq!(n.health_points(), 100);
+        for _ in 0..2 {
+            assert!(!n.hurt(35));
+        }
+        assert!(n.hurt(35), "the third stab: out");
+        assert_eq!(n.health_points(), 0);
+        n.come_round();
+        assert_eq!(n.health_points(), 30);
+        run(&mut n, None, 6000); // a game hour
+        assert_eq!(n.health_points(), 40);
+        // Old saves (no health): full.
+        let old: Needs = serde_json::from_str(
+            r#"{"hunger":0,"energy":0,"stress":0,"bladder":0,"hygiene":0,"dirty_hands":false,"upset":false,"warned":0}"#,
+        )
+        .unwrap();
+        assert_eq!((old.health_points(), old.bowels_points()), (100, 0));
     }
 
     #[test]

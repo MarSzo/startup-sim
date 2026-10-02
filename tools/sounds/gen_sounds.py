@@ -387,6 +387,28 @@ def drunk():
     write("vomit", mix(retch, at(gush, 0.4), at(gain(splash, 0.6), 0.6)), 0.7)
 
 
+
+def mischief():
+    # Punch: a dull thump with a slap on top.
+    thump = env(mix(lowpass(noise(0.18), 400), gain(tone(lambda t: 120 - 200 * t, 0.18), 0.9)), a=0.001, d=25)
+    slap = env(bandpass(noise(0.05), 1200, 5000), a=0.0005, d=90)
+    write("punch", mix(thump, gain(slap, 0.6)), 0.8)
+    # Stab: a swish, then a wet thunk.
+    swish = env(sweep_lowpass(highpass(noise(0.2), 1500), 2000, 7000), a=0.05, r=0.05)
+    thunk = env(mix(lowpass(noise(0.12), 600), gain(tone(90, 0.12), 0.7)), a=0.002, d=35)
+    write("stab", mix(gain(swish, 0.5), at(thunk, 0.17)), 0.75)
+    # Peeing: a trickle (filtered noise, wobbling) for 2.5 s.
+    tr = bandpass(noise(2.5), 1500, 4500)
+    tr = [v * (0.6 + 0.4 * math.sin(TAU * 13 * i / SR) * math.sin(TAU * 1.1 * i / SR)) for i, v in enumerate(tr)]
+    write("pee", env(tr, a=0.15, r=0.4), 0.45)
+    # Pooping: a strain, a rude trumpet and a plop.
+    fart = tone(lambda t: 90 + 25 * math.sin(TAU * 9 * t) - 30 * t, 0.7, "saw")
+    fart = [v * (0.6 + 0.4 * math.sin(TAU * 31 * i / SR)) for i, v in enumerate(fart)]
+    fart = env(lowpass(mix(fart, gain(noise(0.7), 0.25)), 600), a=0.03, r=0.15)
+    plop = env(mix(lowpass(tone(lambda t: 500 - 1200 * t, 0.15), 1500), gain(lowpass(noise(0.15), 900), 0.3)), a=0.002, d=20)
+    write("poop", mix(fart, at(plop, 0.85)), 0.7)
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     steps()
@@ -404,6 +426,7 @@ def main():
     night_mel = [(0, 72, 2), (2, 71, 1), (3, 67, 1), (4, 69, 3), (8, 72, 1), (9, 74, 1), (10, 76, 2), (12, 74, 2), (14, 71, 2)]
     music("music_home", 70, night_chords, [33, 29, 31, 28], night_mel, False, 12, 0.05)
     drunk()
+    mischief()
 
 
 if __name__ == "__main__":

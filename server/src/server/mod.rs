@@ -25,6 +25,7 @@
 //! [`Server::new`]), a `tick_*` method called from [`Server::tick`], packet
 //! handlers dispatched from `session::handle_datagram`.
 
+mod actions;
 mod alarm;
 mod board;
 mod breath;
@@ -33,6 +34,8 @@ mod company;
 mod computers;
 mod day;
 mod doors;
+mod fight;
+mod greetings;
 mod interact;
 mod items;
 mod kitchen;
@@ -58,7 +61,7 @@ mod voice;
 #[cfg(test)]
 mod tests;
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::net::SocketAddr;
 use std::time::{Duration, Instant};
 
@@ -212,6 +215,11 @@ pub struct Server {
     shop_rooms: Vec<(u8, u16)>,
     /// The cashier NPC (says the alarm line).
     cashier: Option<u16>,
+    /// Players the cashier already asked about the hot dog (until they step away).
+    cashier_asked: HashSet<u16>,
+    /// Pani Wiesia: when she last greeted each player, and the next joke.
+    porter_greeted: HashMap<u16, u32>,
+    porter_joke: usize,
     /// Some elevator was moving last tick (resend `Doors` when it starts/stops).
     lift_was_moving: bool,
     clock: Clock,
@@ -308,6 +316,9 @@ impl Server {
         let npcs = Npc::spawn_all(&building);
         let mut server = Server {
             cashier: npcs.iter().find(|n| n.role == npc::Role::Cashier).map(|n| n.id),
+            cashier_asked: HashSet::new(),
+            porter_greeted: HashMap::new(),
+            porter_joke: 0,
             npcs,
             machines: coffee::find_machines(&building),
             dropped: Vec::new(),
@@ -460,6 +471,7 @@ impl Server {
         self.tick_vehicles();
         self.tick_police();
         self.tick_cleaning();
+        self.tick_cashier();
         self.tick_kitchen();
         self.tick_meetings();
         self.tick_lunch();
@@ -515,7 +527,7 @@ impl Server {
     fn mint_item(&mut self, kind: u8, label: impl Into<String>) -> Item {
         let id = self.next_item_id;
         self.next_item_id = self.next_item_id.wrapping_add(1).max(1);
-        Item { id, kind, label: label.into(), expires: None, owner: 0, count: 1, unpaid: false, stale: false }
+        Item { id, kind, label: label.into(), expires: None, owner: 0, count: 1, unpaid: false, stale: false, tainted: false }
     }
 }
 

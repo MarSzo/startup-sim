@@ -44,6 +44,11 @@ SCENARIOS = {
         {"server": EMPLOYED + ["--start-time", "10:00"],
          "clients": [["drinking", ["--nick=Kuba", "--autoconnect"]]]},
     ],
+    "fight": [
+        {"server": EMPLOYED + ["--start-time", "10:00"],
+         "clients": [["fight_ola", ["--nick=Ola", "--autoconnect"]],
+                     ["fight_kuba", ["--nick=Kuba", "--autoconnect"], 1.5]]},
+    ],
     "together": [
         {"server": EMPLOYED + ["--start-time", "10:00"],
          "clients": [["together_ola", ["--nick=Ola", "--autoconnect"]],

@@ -29,6 +29,9 @@ func run() -> void:
 	if not await walk(1, 21, 8):  # the cupboard with mugs
 		return
 	await press_e()
+	if not await until(func(): return game().dialog.visible, 5.0, "the cupboard open"):
+		return
+	game().dialog._choose(0)  # Weź kubek
 	if not await until(func(): return holding(Item.CUP), 5.0, "a mug from the cupboard"):
 		return
 	if not await walk(1, 25, 8):  # the coffee machine

@@ -485,7 +485,7 @@ fn onboarding_porter_reception_hr_card() {
                 welcomed |= text == lines::WELCOME_ESCORT;
             }
             Some(Packet::Snapshot { self_access, .. }) => got_pass |= self_access == access::GUEST,
-            Some(Packet::PlayerInfo { players }) => porter_named |= players.iter().any(|p| p.nick == "Portier"),
+            Some(Packet::PlayerInfo { players }) => porter_named |= players.iter().any(|p| p.nick == "Pani Wiesia"),
             _ => {}
         }
     }
@@ -647,6 +647,7 @@ fn a_mug_left_in_the_chill_room_is_collected_by_the_cleaner() {
     std::thread::sleep(Duration::from_millis(100));
     let at = ola.walk_to(&b, body, (1, CUPBOARD), &[]);
     let at = ola.press_e(&b, at);
+    cupboard_take(&ola, 0);
     assert!(hands(&ola, item_kind::CUP), "a clean mug from the cupboard");
     let at = ola.walk_to(&b, at, (1, COFFEE), &[]);
     let at = ola.press_e(&b, at);
@@ -782,6 +783,7 @@ fn kitchenette_mugs_dishwasher_and_fridge() {
     // Mug -> coffee -> dirty mug -> dishwasher, switched on.
     let at = ola.walk_to(&b, at, (1, CUPBOARD), &[]);
     let at = ola.press_e(&b, at);
+    cupboard_take(&ola, 0);
     assert!(hands(&ola, item_kind::CUP));
     let at = ola.walk_to(&b, at, (1, COFFEE), &[]);
     let at = ola.press_e(&b, at);
@@ -798,6 +800,7 @@ fn kitchenette_mugs_dishwasher_and_fridge() {
     // Another coffee, with milk from the fridge; a free water.
     let at = ola.walk_to(&b, at, (1, CUPBOARD), &[]);
     let at = ola.press_e(&b, at);
+    cupboard_take(&ola, 0);
     assert!(hands(&ola, item_kind::CUP));
     let at = ola.walk_to(&b, at, (1, COFFEE), &[]);
     let at = ola.press_e(&b, at);
@@ -866,10 +869,12 @@ fn coffee_machine_brews_one_cup_at_a_time() {
     // Both take a mug from the cupboard and go to the machine.
     let at_a = a.walk_to(&b, spawn(0), (1, CUPBOARD), &[&c]);
     let at_a = a.press_e(&b, at_a);
+    cupboard_take(&a, 0);
     assert!(a.wait_for_line(&game::kitchen::lines::took_mug(7), Duration::from_millis(800)).is_some());
     let at_a = a.walk_to(&b, at_a, (1, COFFEE), &[&c]);
     let at_c = c.walk_to(&b, spawn(1), (1, CUPBOARD), &[&a]);
     let at_c = c.press_e(&b, at_c);
+    cupboard_take(&c, 0);
     assert!(c.wait_for_line(&game::kitchen::lines::took_mug(6), Duration::from_millis(800)).is_some());
     let at_c = c.walk_to(&b, at_c, (1, Tile { x: 24, y: 8 }), &[&a]);
 
@@ -1016,6 +1021,15 @@ fn access_card_can_be_dropped_picked_up_and_handed_over() {
 }
 
 /// Wait (pinging `keep` too) for a packet matching `f`.
+/// E at the cupboard opened its window (mugs, knives): take option `choice`
+/// (0 = a mug).
+fn cupboard_take(c: &Client, choice: u8) {
+    let id = game::mischief::CUPBOARD_ID;
+    let open = wait_for(c, &[], Duration::from_secs(2), |p| matches!(p, Packet::Dialog { id: d, .. } if *d == id).then_some(()));
+    assert!(open.is_some(), "the cupboard opens");
+    c.send(&Packet::DialogAnswer { token: c.token, id, choice });
+}
+
 fn wait_for<T>(me: &Client, keep: &[&Client], wait: Duration, mut f: impl FnMut(&Packet) -> Option<T>) -> Option<T> {
     let deadline = Instant::now() + wait;
     while Instant::now() < deadline {

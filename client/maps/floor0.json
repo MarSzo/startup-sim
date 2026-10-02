@@ -85,6 +85,11 @@
    "solid": true,
    "color": "#7a7f8a"
   },
+  "a": {
+   "type": "armchair",
+   "solid": true,
+   "color": "#8a4a5a"
+  },
   "P": {
    "type": "plant",
    "solid": true,
@@ -211,7 +216,7 @@
   "Fvvvvvvvvvvv=====v#..HHH...#_______K___#:::#..........#vvvvvvvvvvvvvvF",
   "Fvvvvvvvvvvv=====v#.......H#___________##k##..........#vvvvvvvvvvvvvvF",
   "Fvvvvvvvvvvv=====v#.......H####DD###_______#..........#vvvvvvvvvvvvvvF",
-  "Fvvvvvvvvvvv=====v#KKK.....#_______#_______#..........#vvvvvvvvvvvvvvF",
+  "Fvvvvvvvvvvv=====v#KKK.....#_______#_____a_#..........#vvvvvvvvvvvvvvF",
   "Fvvvvvvvvvvv=====v#........#_______#_______x..........#vvvvvvvvvvvvvvF",
   "Fvvvvvvvvvvv=====v#........#P______#______P#..........#vvvvvvvvvvvvvvF",
   "Fvvvvvvvvvvv=====v####GG######GGG######################vvvvvvvvvvvvvvF",
@@ -510,7 +515,7 @@
  "npcs": [
   {
    "kind": "porter",
-   "name": "Portier",
+   "name": "Pani Wiesia",
    "home": [
     37,
     49
@@ -535,6 +540,28 @@
    "home": [
     25,
     55
+   ],
+   "patrol": [
+    [
+     24,
+     47
+    ],
+    [
+     20,
+     48
+    ],
+    [
+     24,
+     50
+    ],
+    [
+     20,
+     52
+    ],
+    [
+     25,
+     55
+    ]
    ]
   },
   {
@@ -543,6 +570,14 @@
    "home": [
     38,
     56
+   ]
+  },
+  {
+   "kind": "idler",
+   "name": "Paulina",
+   "home": [
+    41,
+    54
    ]
   }
  ],

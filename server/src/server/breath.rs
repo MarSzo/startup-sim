@@ -68,26 +68,36 @@ impl Server {
             self.says.push(Say::new(pid, lines::SPARED));
             return true;
         }
+        let Some(nick) = self.players.get(&target).map(|t| t.nick.clone()) else { return true };
+        let n = self.reprimand(target, |n, fired| {
+            if fired {
+                format!("{nick},\n\nalkomat nie kłamie: to już {n}. nagana za alkohol w pracy. Rozwiązujemy umowę.\n\nZarząd")
+            } else {
+                format!(
+                    "{nick},\n\nkontrola trzeźwości wykazała alkohol powyżej normy. Udzielamy nagany ({n}/{}). Przy {} — zwolnienie.\n\nZarząd",
+                    drunk::REPRIMANDS_TO_FIRE,
+                    drunk::REPRIMANDS_TO_FIRE
+                )
+            }
+        });
+        self.says.push(Say::new(pid, lines::reprimanded(&nick, n)));
+        true
+    }
+
+    /// A reprimand for `target` (the mail's text from `body(n, fired)`):
+    /// counted, mailed, and the third one fires them. Returns how many now.
+    pub(super) fn reprimand(&mut self, target: u16, body: impl Fn(u8, bool) -> String) -> u8 {
         let company = self.company.name.clone();
-        let Some(t) = self.players.get_mut(&target) else { return true };
+        let Some(t) = self.players.get_mut(&target) else { return 0 };
         t.reprimands = t.reprimands.saturating_add(1);
         let (n, nick) = (t.reprimands, t.nick.clone());
-        self.says.push(Say::new(pid, lines::reprimanded(&nick, n)));
-        let body = if n >= drunk::REPRIMANDS_TO_FIRE {
-            format!("{nick},\n\nalkomat nie kłamie: to już {n}. nagana za alkohol w pracy. Rozwiązujemy umowę.\n\nZarząd")
-        } else {
-            format!(
-                "{nick},\n\nkontrola trzeźwości wykazała alkohol powyżej normy. Udzielamy nagany ({n}/{}). Przy {} — zwolnienie.\n\nZarząd",
-                drunk::REPRIMANDS_TO_FIRE,
-                drunk::REPRIMANDS_TO_FIRE
-            )
-        };
-        self.office_mail(&nick, &format!("{company} — Zarząd"), "Nagana", &body);
+        let fired = n >= drunk::REPRIMANDS_TO_FIRE;
+        self.office_mail(&nick, &format!("{company} — Zarząd"), "Nagana", &body(n, fired));
         self.log(format!("* reprimand: {nick} ({n})"));
         self.save_soon = true;
-        if n >= drunk::REPRIMANDS_TO_FIRE {
+        if fired {
             self.fire(target);
         }
-        true
+        n
     }
 }

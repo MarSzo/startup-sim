@@ -48,6 +48,7 @@ impl Packet {
             Packet::Fridge { .. } => ty::FRIDGE,
             Packet::FridgeAction { .. } => ty::FRIDGE_ACTION,
             Packet::SkipWait { .. } => ty::SKIP_WAIT,
+            Packet::Action { .. } => ty::ACTION,
             Packet::Sound { .. } => ty::SOUND,
             Packet::TaskAction { .. } => ty::TASK_ACTION,
             Packet::TaskBoard { .. } => ty::TASK_BOARD,
@@ -274,13 +275,15 @@ impl Packet {
                 }
             }
             Packet::DoorAction { token } => w.u32(*token),
-            Packet::Stats { hunger, energy, stress, bladder, hygiene, alcohol, flags, money } => {
+            Packet::Stats { hunger, energy, stress, bladder, hygiene, alcohol, bowels, health, flags, money } => {
                 w.u8(*hunger);
                 w.u8(*energy);
                 w.u8(*stress);
                 w.u8(*bladder);
                 w.u8(*hygiene);
                 w.u8(*alcohol);
+                w.u8(*bowels);
+                w.u8(*health);
                 w.u8(*flags);
                 w.u32(*money);
             }
@@ -345,6 +348,10 @@ impl Packet {
                 w.u8(*juice);
             }
             Packet::SkipWait { token } => w.u32(*token),
+            Packet::Action { token, action } => {
+                w.u32(*token);
+                w.u8(*action);
+            }
             Packet::TaskAction { token, nonce, action, task, arg, text } => {
                 w.u32(*token);
                 w.u16(*nonce);

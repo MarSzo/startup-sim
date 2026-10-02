@@ -41,6 +41,7 @@ const MILK := 36
 const LATTE := 37
 const MALPKA := 38
 const BREATHALYSER := 39
+const KNIFE := 40
 
 const NAMES := {GUEST_PASS: "Przepustka gościa", EMPLOYEE_CARD: "Karta pracownika", LAPTOP: "Laptop", COFFEE: "Kawa", FRUIT: "Owoc",
 	SANDWICH_CHEESE: "Kanapka z serem", SANDWICH_HAM: "Kanapka z szynką", WRAP: "Wrap wege", BURGER: "Hamburger",
@@ -49,9 +50,9 @@ const NAMES := {GUEST_PASS: "Przepustka gościa", EMPLOYEE_CARD: "Karta pracowni
 	DONUT: "Pączek", COOKIE: "Ciastko", CHEESECAKE: "Kawałek sernika",
 	PIEROGI: "Pierogi ruskie", PIZZA: "Pizza margherita", SUSHI: "Zestaw sushi", SCHNITZEL: "Schabowy z ziemniakami",
 	SALAD: "Sałatka z kurczakiem", KEBAB: "Kebab", EMPTY_CUP: "Brudny kubek", CUP: "Kubek", MILK: "Mleko (karton)",
-	LATTE: "Kawa z mlekiem", MALPKA: "Małpka", BREATHALYSER: "Alkomat"}
+	LATTE: "Kawa z mlekiem", MALPKA: "Małpka", BREATHALYSER: "Alkomat", KNIFE: "Nóż kuchenny"}
 const SMALL := [GUEST_PASS, EMPLOYEE_CARD, FRUIT, SANDWICH_CHEESE, SANDWICH_HAM, WRAP, BUN, BAR, CHIPS, WATER,
-	ENERGY_DRINK, JUICE, BEER, CIGARETTES, UMBRELLA, DONUT, COOKIE, CHEESECAKE, MILK, MALPKA, BREATHALYSER]
+	ENERGY_DRINK, JUICE, BEER, CIGARETTES, UMBRELLA, DONUT, COOKIE, CHEESECAKE, MILK, MALPKA, BREATHALYSER, KNIFE]
 
 
 static func item_name(kind: int) -> String:
@@ -204,6 +205,12 @@ static func draw(c: CanvasItem, kind: int, o: Vector2, s: float) -> void:
 			ln.call(6, 6.8, 7.6, 6.8, Color("#2c4a22"), 0.6)
 			ln.call(8.4, 6.8, 10, 6.8, Color("#2c4a22"), 0.6)
 			dot.call(8, 11.4, 1.1, Color("#d9443a"))
+		KNIFE:
+			# A kitchen knife, diagonally: a black handle, a steel blade.
+			poly.call([Vector2(2, 14.5), Vector2(6.4, 10.1), Vector2(7.6, 11.3), Vector2(3.2, 15.7)], Color("#2a2a2e"))
+			dot.call(4, 13.6, 0.35, Color("#c9c9c9"))
+			poly.call([Vector2(6.6, 9.4), Vector2(14.6, 1.4), Vector2(13.4, 5.2), Vector2(8.4, 11.2)], Color("#d8dde2"))
+			ln.call(7.6, 9.6, 13.8, 2.6, Color(1, 1, 1, 0.8), 0.4)
 		DONUT:
 			circ.call(8, 8.5, 6.2, Color("#d9a15a"))
 			c.draw_arc(pt.call(8, 8.5), 3.8 * s, 0, TAU, 24, Color("#e889a8"), 3.6 * s, true)

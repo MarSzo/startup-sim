@@ -169,7 +169,7 @@ impl Server {
     }
 
     pub(super) fn handle_dialog_answer(&mut self, pid: u16, dialog: u8, choice: u8) {
-        if self.answer_reprimand(pid, dialog, choice) {
+        if self.answer_reprimand(pid, dialog, choice) || self.answer_mischief(pid, dialog, choice) {
             return;
         }
         let Some(t) = self.players.get(&pid).and_then(|p| p.talk) else { return };
