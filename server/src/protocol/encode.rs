@@ -51,6 +51,7 @@ impl Packet {
             Packet::Action { .. } => ty::ACTION,
             Packet::HrAction { .. } => ty::HR_ACTION,
             Packet::HrInfo(_) => ty::HR_INFO,
+            Packet::Media { .. } => ty::MEDIA,
             Packet::Sound { .. } => ty::SOUND,
             Packet::TaskAction { .. } => ty::TASK_ACTION,
             Packet::TaskBoard { .. } => ty::TASK_BOARD,
@@ -459,6 +460,25 @@ impl Packet {
                     w.u8(*id);
                     w.u16(*day);
                     w.u8(*status);
+                }
+            }
+            Packet::Media { screens, music } => {
+                w.u8(screens.len().min(MAX_MEDIA) as u8);
+                for &(floor, x, y, channel, started) in screens.iter().take(MAX_MEDIA) {
+                    w.u8(floor);
+                    w.u8(x);
+                    w.u8(y);
+                    w.u8(channel);
+                    w.u32(started);
+                }
+                w.u8(music.len().min(MAX_MEDIA) as u8);
+                for &(track, started, floor, x, y, holder) in music.iter().take(MAX_MEDIA) {
+                    w.u8(track);
+                    w.u32(started);
+                    w.u8(floor);
+                    w.i32(x);
+                    w.i32(y);
+                    w.u16(holder);
                 }
             }
             Packet::Departments { list } => {

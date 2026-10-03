@@ -44,6 +44,9 @@ pub struct Building {
     /// Where the treats tray stands; where a new founder appears.
     pub tray: Option<Place>,
     pub founder: Option<Place>,
+    /// Where the TV remote and the boombox are put every morning.
+    pub remote: Option<Place>,
+    pub boombox: Option<Place>,
 }
 
 /// A position in the building: (floor, tile).
@@ -90,7 +93,8 @@ impl Building {
         };
         let tray = place(|p| p.tray);
         let founder = place(|p| p.founder);
-        let b = Building { floors, crc: hasher.finalize(), outside, tray, founder };
+        let (remote, boombox) = (place(|p| p.remote), place(|p| p.boombox));
+        let b = Building { floors, crc: hasher.finalize(), outside, tray, founder, remote, boombox };
         if b.spawns().is_empty() {
             return Err("building has no spawns".into());
         }

@@ -409,6 +409,106 @@ def mischief():
     write("poop", mix(fart, at(plop, 0.85)), 0.7)
 
 
+
+def boombox():
+    """Four loops for the chill room's boombox (boombox_1..4): disco polo,
+    lo-fi, techno, a sea shanty. Short (8 bars) and seamless."""
+    def midi(m):
+        return 440.0 * 2 ** ((m - 69) / 12)
+
+    def track(name, bpm, bars, fill):
+        beat = 60 / bpm
+        total = bars * 4 * beat
+        buf = [0.0] * int((total + 2) * SR)
+
+        def add(t0, x, g):
+            s = int(t0 * SR)
+            for i, v in enumerate(x):
+                if s + i < len(buf):
+                    buf[s + i] += v * g
+
+        fill(add, beat, bars, midi)
+        write(name, fold_loop(lowpass(buf, 7000), total), 0.75)
+
+    kick = env(tone(lambda t: 45 + 90 * math.exp(-t * 35), 0.35), a=0.001, d=10)
+    snare = env(mix(gain(highpass(noise(0.2), 1500), 0.8), gain(tone(200, 0.2), 0.3)), a=0.001, d=18)
+    hat = env(highpass(noise(0.05), 6000), a=0.0005, d=70)
+    ohat = env(highpass(noise(0.18), 5000), a=0.001, d=18)
+
+    def disco(add, beat, bars, midi):
+        # Disco polo: four on the floor, "um-pa" bass, a cheesy square riff.
+        prog = [[60, 64, 67], [55, 59, 62], [57, 60, 64], [53, 57, 60]]  # C G Am F
+        riff = [72, 76, 79, 76, 74, 77, 81, 77]
+        for b in range(bars):
+            ch = prog[b % 4]
+            for bt in range(4):
+                t = (b * 4 + bt) * beat
+                add(t, kick, 0.45)
+                add(t + beat / 2, ohat, 0.06)
+                if bt in (1, 3):
+                    add(t, snare, 0.2)
+                add(t, env(lowpass(tone(midi(ch[0] - 24), beat / 2, "saw"), 700), a=0.005, r=0.03), 0.18)
+                add(t + beat / 2, env(lowpass(tone(midi(ch[0] - 12), beat / 2, "saw"), 900), a=0.005, r=0.03), 0.16)
+                for m in ch:
+                    add(t + beat / 2, env(tone(midi(m), beat / 3, "square"), a=0.003, r=0.04), 0.025)
+            for k in range(8):
+                note = riff[k] + (ch[0] - 60)
+                add((b * 4) * beat + k * beat / 2, env(tone(midi(note), beat / 2.2, "square"), a=0.003, d=3, r=0.02), 0.045)
+
+    def lofi(add, beat, bars, midi):
+        # Lo-fi to code to: soft keys, lazy drums, a vinyl crackle.
+        prog = [[50, 57, 60, 65], [55, 62, 65, 69], [48, 55, 59, 64], [52, 59, 62, 67]]
+        for b in range(bars):
+            ch = prog[b % 4]
+            t0 = b * 4 * beat
+            for m in ch:
+                add(t0, env(tone(midi(m), 4 * beat), a=0.05, d=0.8, r=0.2), 0.05)
+            add(t0, env(tone(midi(ch[0] - 12), 3.5 * beat), a=0.02, r=0.2), 0.14)
+            for bt in range(4):
+                t = t0 + bt * beat
+                add(t + (0.05 if bt % 2 else 0), kick if bt in (0, 2) else snare, 0.25 if bt in (0, 2) else 0.1)
+                add(t + beat / 2 + 0.03, hat, 0.03)
+
+    def techno(add, beat, bars, midi):
+        # Techno from the basement: kick on every beat, rolling bass, stabs.
+        for b in range(bars):
+            for bt in range(4):
+                t = (b * 4 + bt) * beat
+                add(t, kick, 0.55)
+                add(t + beat / 2, ohat, 0.07)
+                for q in range(4):
+                    add(t + q * beat / 4, hat, 0.02)
+                    if q != 0:
+                        add(t + q * beat / 4, env(lowpass(tone(midi(33 + (12 if q == 2 else 0)), beat / 4, "saw"), 500 + 400 * (b % 4)), a=0.002, d=12), 0.16)
+                if (b * 4 + bt) % 3 == 2:
+                    for m in (57, 60, 64):
+                        add(t + beat * 0.75, env(highpass(tone(midi(m), 0.15, "saw"), 300), a=0.002, d=18), 0.03)
+
+    def shanty(add, beat, bars, midi):
+        # A sea shanty: accordion chords on the off-beats, bass on the beats.
+        prog = [[62, 66, 69], [62, 66, 69], [55, 59, 62], [57, 61, 64]]  # D D G A
+        mel = [69, 69, 71, 69, 66, 62, 64, 66, 67, 67, 66, 64, 62, 64, 66, 62]
+        for b in range(bars):
+            ch = prog[b % 4]
+            for bt in range(4):
+                t = (b * 4 + bt) * beat
+                add(t, env(tone(midi(ch[0] - 24 + (7 if bt % 2 else 0)), beat * 0.6, "tri"), a=0.005, r=0.05), 0.2)
+                if bt in (0, 2):
+                    add(t, kick, 0.25)
+                for m in ch:
+                    acc = mix(tone(lambda x, f=midi(m): f * (1 + 0.004 * math.sin(TAU * 6 * x)), beat * 0.4, "square"),
+                              gain(tone(midi(m) * 1.003, beat * 0.4, "saw"), 0.6))
+                    add(t + beat / 2, env(lowpass(acc, 2500), a=0.01, r=0.05), 0.02)
+            for k in range(4):
+                note = mel[(b % 4) * 4 + k]
+                add((b * 4 + k) * beat, env(tone(midi(note), beat * 0.9, "tri"), a=0.01, d=1.5, r=0.05), 0.07)
+
+    track("boombox_1", 128, 8, disco)
+    track("boombox_2", 80, 8, lofi)
+    track("boombox_3", 132, 8, techno)
+    track("boombox_4", 104, 8, shanty)
+
+
 def main():
     os.makedirs(OUT, exist_ok=True)
     steps()
@@ -427,6 +527,7 @@ def main():
     music("music_home", 70, night_chords, [33, 29, 31, 28], night_mel, False, 12, 0.05)
     drunk()
     mischief()
+    boombox()
 
 
 if __name__ == "__main__":

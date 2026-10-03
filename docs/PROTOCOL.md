@@ -1,4 +1,4 @@
-# Protokół sieciowy (wersja 42)
+# Protokół sieciowy (wersja 43)
 
 Własny binarny protokół na UDP. Implementacje:
 - serwer: `server/src/protocol/` (źródło prawdy),
@@ -23,7 +23,7 @@ przez `cargo test` i czytane przez `client/tests/run_tests.gd`.
 | pole    | typ | wartość |
 |---------|-----|---------|
 | magic   | u16 | `0x5354` (bajty `54 53`, „TS”) |
-| version | u8  | `42` |
+| version | u8  | `43` |
 | type    | u8  | typ pakietu (niżej) |
 
 ## Jednostki
@@ -478,6 +478,18 @@ dnia urlopu, z 5), aneksy n u8 (≤ 10, najnowsze na końcu) × {`day u16`, `tex
 str16}, wnioski n u8 (≤ 10) × {`id u8`, `day u16`, `status u8` (1
 zaakceptowany, 2 odrzucony, 3 anulowany, 4 wykorzystany)}.
 
+### 58 `Media` (S→C)
+
+Telewizory i boomboxy, do wszystkich w budynku co 1 s i po każdej zmianie:
+ekrany n u8 (≤ 8) × {`floor u8`, `x u8`, `y u8` (lewy kafel ekranu), `channel
+u8` (0 wyłączony, 1 kreskówki, 2 wiadomości, 3 pogoda, 4 mecz, 5 przyroda),
+`started u32` (tick serwera, od którego leci)}, muzyka n u8 (≤ 8) × {`track
+u8` (1 disco polo, 2 lo-fi, 3 techno, 4 szanty — pliki `boombox_<n>`),
+`started u32`, `floor u8`, `x i32`, `y i32` (sub-piksele), `holder u16` (gracz
+z boomboxem; 0 = stoi na podłodze)}. Klient liczy, ile minęło od `started`,
+więc wszyscy widzą i słyszą ten sam moment. Wybór kanału / utworu: F z pilotem
+(41) / boomboxem (42) w rękach → `Dialog` 253 / 254.
+
 ### 55 `Action` (C→S)
 
 token u32, `action u8`: 1 menu psot (R) — serwer odpowiada `Dialog` o id 250
@@ -585,6 +597,7 @@ szyfrowaniem.
 
 ## Historia wersji
 
+- **43** — telewizor i boombox: `Media` (58, S→C), przedmioty 41 pilot, 42 boombox, `Dialog` 253 (kanały), 254 (utwory).
 - **42** — Kadry: `HrAction` (56, C→S), `HrInfo` (57, S→C); `Clock` + `leave u8` na końcu (dzień urlopu: w domu).
 - **41** — widełki i umowa: `JobOffers` oferta + `salary_min u32`, `salary_max u32` (zł brutto / mies., po `vacancies`); `Apply` + `salary u32`, `form u8` (1 umowa o pracę, 2 B2B, 3 umowa zlecenie — tylko student < 26 lat), `student u8` (po `motivation`); `Dialog` 252 = umowa w HR (0 podpisuję, 1 rezygnuję).
 - **40** — psoty i bójki: `Stats` + `bowels`, `health` (po `alcohol`); czynności 11 nokaut, 12 cios, 13 sikanie, 14 kucanie; dźwięki 20 cios, 21 dźgnięcie, 22 sikanie, 23 kupa; kałuża `held` 2 = kupa; przedmiot 40 nóż; wygląd NPC 7 = kasjer; `Action` (55, C→S); `Dialog` 250 (menu R) i 251 (szafka).

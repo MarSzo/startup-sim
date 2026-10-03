@@ -1369,6 +1369,21 @@ pełnym ekranie — zastąpiona stylem inspirowanym Don't Starve:
   install`… i easter eggi (`sudo rm -rf /` — dzwoni prezes, `make coffee` — 418).
   Nic nie uruchamia się na komputerze gracza.
 
+### 10.51 Telewizor i boombox w chill roomie
+
+- **Telewizor** na ścianie chill roomu (naprzeciw sof). Kanały rysowane w
+  grze: *Kreskówki*, *Wiadomości* (pasek z newsami z biura), *Pogoda* (z
+  pogody w grze), *Mecz* (gol co ~40 s) i *Przyroda* (akwarium).
+- **Pilot** leży przy stoliku: kto ma go w rękach w chill roomie, F — wybór
+  kanału albo „Wyłącz”. Wszyscy widzą to samo i w tym samym momencie
+  (serwer pamięta, kiedy kanał się zaczął).
+- **Boombox** (tylko w rękach): F — *Disco polo na full*, *Lo-fi do
+  kodowania*, *Techno z piwnicy*, *Szanty z biura* albo „Wyłącz”. Muzyka gra
+  tam, gdzie jest boombox — idzie za tym, kto go niesie, a odłożony gra z
+  podłogi; słychać ją na tym samym piętrze, ciszej z daleka. Wyniesiony z
+  budynku — cisza.
+- Pilot i boombox wracają rano na swoje miejsca, jeśli nikt ich nie ma.
+
 ### 10.6 Stan implementacji
 
 *Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie,

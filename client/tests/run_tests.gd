@@ -113,6 +113,9 @@ func test_protocol(path: String) -> void:
 		and ck.today_minutes == 0 and ck.mode == 2 and ck.depart == 520 and ck.money == 18600
 		and ck.weather == Protocol.WEATHER_RAIN and ck.company == "Pixel Pierogi sp. z o.o." and ck.founded and ck.alarm == 1 and ck.skip == 1
 		and ck.leave, "decode clock %s" % ck)
+	var md := Protocol.decode(golden["media"].hex_decode())
+	expect(md.get("type") == Protocol.T_MEDIA and md.screens == [{"floor": 1, "x": 35, "y": 14, "channel": 4, "started": 12345}]
+		and md.music == [{"track": 2, "started": 12000, "floor": 1, "x": 10496, "y": 3200, "holder": 7}], "decode media %s" % md)
 	var hr := Protocol.decode(golden["hr_info"].hex_decode())
 	expect(hr.get("type") == Protocol.T_HR_INFO and hr.title == "Programista/ka" and hr.form == Protocol.EMPLOYMENT_B2B
 		and hr.salary == 10200 and hr.pay_rate == 6071 and hr.start_day == 2 and hr.today == 7 and hr.reprimands == 1

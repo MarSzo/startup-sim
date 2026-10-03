@@ -47,6 +47,7 @@ LEGEND = {
     "H": {"type": "shelf", "solid": True, "color": "#7a7f8a"},
     "Q": {"type": "sofa", "solid": True, "color": "#5b7fbf"},
     "a": {"type": "armchair", "solid": True, "color": "#8a4a5a"},
+    "I": {"type": "tv", "solid": True, "color": "#1e1f29"},
     "P": {"type": "plant", "solid": True, "color": "#3f8a3a"},
     "R": {"type": "rack", "solid": True, "color": "#2a2d34"},
     "N": {"type": "bench", "solid": True, "color": "#8a6a45"},
@@ -392,6 +393,8 @@ def floor1():
     f.put(41, 7, 41, 7, "O")                             # fruit bowl (free fruit)
     f.put(42, 7, 42, 7, "Y")                             # sanitizer by the food
     f.places["tray"] = [36, 11]
+    f.places["remote"] = [34, 12]                        # the TV remote, by the table
+    f.places["boombox"] = [41, 12]
 
     f.area(30, 14, 42, 37, ".", "K")
     f.room("K", 5, "Korytarz", "corridor", detector=True, light="always")
@@ -596,6 +599,9 @@ def floor1():
         {"kind": "ceo", "name": "Prezes", "home": [20, 19]},
         {"kind": "cofounder", "name": "Wspólniczka", "home": [27, 20]},
     ]
+    # The TV on the chill room's wall, facing the sofas (after the walls
+    # of the rooms below, which share it).
+    f.put(35, 14, 37, 14, "I")
     return f
 
 

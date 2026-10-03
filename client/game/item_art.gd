@@ -42,6 +42,8 @@ const LATTE := 37
 const MALPKA := 38
 const BREATHALYSER := 39
 const KNIFE := 40
+const REMOTE := 41
+const BOOMBOX := 42
 
 const NAMES := {GUEST_PASS: "Przepustka gościa", EMPLOYEE_CARD: "Karta pracownika", LAPTOP: "Laptop", COFFEE: "Kawa", FRUIT: "Owoc",
 	SANDWICH_CHEESE: "Kanapka z serem", SANDWICH_HAM: "Kanapka z szynką", WRAP: "Wrap wege", BURGER: "Hamburger",
@@ -50,9 +52,9 @@ const NAMES := {GUEST_PASS: "Przepustka gościa", EMPLOYEE_CARD: "Karta pracowni
 	DONUT: "Pączek", COOKIE: "Ciastko", CHEESECAKE: "Kawałek sernika",
 	PIEROGI: "Pierogi ruskie", PIZZA: "Pizza margherita", SUSHI: "Zestaw sushi", SCHNITZEL: "Schabowy z ziemniakami",
 	SALAD: "Sałatka z kurczakiem", KEBAB: "Kebab", EMPTY_CUP: "Brudny kubek", CUP: "Kubek", MILK: "Mleko (karton)",
-	LATTE: "Kawa z mlekiem", MALPKA: "Małpka", BREATHALYSER: "Alkomat", KNIFE: "Nóż kuchenny"}
+	LATTE: "Kawa z mlekiem", MALPKA: "Małpka", BREATHALYSER: "Alkomat", KNIFE: "Nóż kuchenny", REMOTE: "Pilot do telewizora", BOOMBOX: "Boombox"}
 const SMALL := [GUEST_PASS, EMPLOYEE_CARD, FRUIT, SANDWICH_CHEESE, SANDWICH_HAM, WRAP, BUN, BAR, CHIPS, WATER,
-	ENERGY_DRINK, JUICE, BEER, CIGARETTES, UMBRELLA, DONUT, COOKIE, CHEESECAKE, MILK, MALPKA, BREATHALYSER, KNIFE]
+	ENERGY_DRINK, JUICE, BEER, CIGARETTES, UMBRELLA, DONUT, COOKIE, CHEESECAKE, MILK, MALPKA, BREATHALYSER, KNIFE, REMOTE]
 
 
 static func item_name(kind: int) -> String:
@@ -205,6 +207,20 @@ static func draw(c: CanvasItem, kind: int, o: Vector2, s: float) -> void:
 			ln.call(6, 6.8, 7.6, 6.8, Color("#2c4a22"), 0.6)
 			ln.call(8.4, 6.8, 10, 6.8, Color("#2c4a22"), 0.6)
 			dot.call(8, 11.4, 1.1, Color("#d9443a"))
+		REMOTE:
+			rr.call(5.2, 1.6, 5.6, 13.2, Color("#2d3036"), 1.6)
+			dot.call(8, 3.8, 0.9, Color("#e74c3c"))
+			for k in 6:
+				dot.call(6.8 + (k % 2) * 2.4, 6.6 + (k / 2) * 2.2, 0.55, Color("#c9c9c9"))
+		BOOMBOX:
+			rr.call(1.2, 5, 13.6, 9, Color("#b8bec4"), 1.2)
+			ln.call(3, 5, 4.5, 2, INK, 0.8)
+			ln.call(13, 5, 11.5, 2, INK, 0.8)
+			ln.call(4.5, 2, 11.5, 2, INK, 0.8)
+			for x in [4.8, 11.2]:
+				circ.call(x, 9.6, 2.6, Color("#2d3036"))
+				dot.call(x, 9.6, 1.0, Color("#6b6f75"))
+			rr.call(6.6, 6.4, 2.8, 2.2, Color("#9fd46a"), 0.3)
 		KNIFE:
 			# A kitchen knife, diagonally: a black handle, a steel blade.
 			poly.call([Vector2(2, 14.5), Vector2(6.4, 10.1), Vector2(7.6, 11.3), Vector2(3.2, 15.7)], Color("#2a2a2e"))

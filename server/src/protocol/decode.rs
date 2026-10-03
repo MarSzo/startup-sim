@@ -393,6 +393,25 @@ impl Packet {
                 }
                 Packet::HrInfo(Box::new(h))
             }
+            ty::MEDIA => {
+                let n = r.u8()? as usize;
+                if n > MAX_MEDIA {
+                    return Err(DecodeError::Invalid("too many screens"));
+                }
+                let mut screens = Vec::with_capacity(n);
+                for _ in 0..n {
+                    screens.push((r.u8()?, r.u8()?, r.u8()?, r.u8()?, r.u32()?));
+                }
+                let n = r.u8()? as usize;
+                if n > MAX_MEDIA {
+                    return Err(DecodeError::Invalid("too many boomboxes"));
+                }
+                let mut music = Vec::with_capacity(n);
+                for _ in 0..n {
+                    music.push((r.u8()?, r.u32()?, r.u8()?, r.i32()?, r.i32()?, r.u16()?));
+                }
+                Packet::Media { screens, music }
+            }
             ty::DEPARTMENTS => {
                 let n = r.u8()? as usize;
                 if n > MAX_DEPARTMENTS {

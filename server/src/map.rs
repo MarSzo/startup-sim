@@ -158,6 +158,11 @@ pub struct Places {
     /// The chill-room table where the treats tray stands.
     #[serde(default)]
     pub tray: Option<[i32; 2]>,
+    /// Where the TV remote and the boombox lie (and come back every morning).
+    #[serde(default)]
+    pub remote: Option<[i32; 2]>,
+    #[serde(default)]
+    pub boombox: Option<[i32; 2]>,
     /// Where a new founder appears (by the board table).
     #[serde(default)]
     pub founder: Option<[i32; 2]>,

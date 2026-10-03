@@ -46,6 +46,7 @@ mod office;
 mod positions;
 pub use positions::lines as position_lines;
 mod lunch;
+mod media;
 mod movement;
 mod player;
 mod police;
@@ -217,6 +218,10 @@ pub struct Server {
     shop_rooms: Vec<(u8, u16)>,
     /// The cashier NPC (says the alarm line).
     cashier: Option<u16>,
+    /// The TVs (channels) and the boombox's track (track, started on tick).
+    screens: Vec<media::Screen>,
+    music: Option<(u8, u32)>,
+    media_dirty: bool,
     /// Players the cashier already asked about the hot dog (until they step away).
     cashier_asked: HashSet<u16>,
     /// Pani Wiesia: when she last greeted each player, and the next joke.
@@ -326,6 +331,9 @@ impl Server {
         let mut server = Server {
             cashier: npcs.iter().find(|n| n.role == npc::Role::Cashier).map(|n| n.id),
             cashier_asked: HashSet::new(),
+            screens: media::find_screens(&building),
+            music: None,
+            media_dirty: false,
             porter_greeted: HashMap::new(),
             porter_joke: 0,
             lunch_asked: HashMap::new(),
@@ -398,6 +406,7 @@ impl Server {
         };
         server.load_save().map_err(std::io::Error::other)?;
         server.schedule_treats();
+        server.ensure_media_items();
         if server.cfg.treats_now {
             server.put_tray();
         }
@@ -488,6 +497,7 @@ impl Server {
         self.tick_reception();
         self.tick_maria();
         self.tick_to_portal();
+        self.tick_media();
         self.tick_kitchen();
         self.tick_meetings();
         self.tick_lunch();

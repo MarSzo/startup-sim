@@ -569,3 +569,54 @@ fn the_hr_app_plans_leave_and_a_day_off_is_spent_at_home_paid() {
     assert_eq!(p.money, money + hr::LEAVE_HOURS * p.pay_rate);
     assert!(matches!(s.clock_packet(p), Packet::Clock { leave: true, .. }));
 }
+
+#[test]
+fn the_remote_switches_the_tv_and_the_boombox_plays_where_it_is() {
+    use crate::media;
+    let mut s = server();
+    add_player(&mut s, 1);
+    assert_eq!(s.screens.len(), 1, "one TV, in the chill room");
+    let (floor, tile, room) = (s.screens[0].floor, s.screens[0].tile, s.screens[0].room);
+    assert_eq!(s.building.floor(floor).unwrap().room_name(room), "Chill room");
+    // The remote and the boombox lie in the chill room from the start.
+    let kinds: Vec<u8> = s.dropped.iter().map(|d| d.item.kind).collect();
+    assert!(kinds.contains(&item_kind::REMOTE) && kinds.contains(&item_kind::BOOMBOX));
+    // Pick up the remote (it's gone from the floor), in front of the TV.
+    let at = s.dropped.iter().position(|d| d.item.kind == item_kind::REMOTE).unwrap();
+    let remote = s.dropped.remove(at).item;
+    let m = s.building.floor(floor).unwrap();
+    let spot = Pos::tile_center(tile.x, tile.y - 2);
+    let p = s.players.get_mut(&1).unwrap();
+    p.inventory.hands = Some(remote);
+    p.body = Body::at(floor, spot);
+    p.room = m.room_at(spot.x, spot.y);
+    s.tick = 500;
+    s.use_held(1); // the channel list
+    s.answer_media(1, media::TV_DIALOG, 3);
+    assert_eq!((s.screens[0].channel, s.screens[0].started), (4, 500), "Mecz");
+    assert!(s.says.iter().any(|l| l.text == media::lines::tv_on("Mecz")));
+    s.answer_media(1, media::TV_DIALOG, media::CHANNELS.len() as u8);
+    assert_eq!(s.screens[0].channel, 0, "off");
+    // Somewhere else the remote does nothing.
+    s.players.get_mut(&1).unwrap().room = 0;
+    s.says.clear();
+    s.use_held(1);
+    assert!(s.says.iter().any(|l| l.text == media::lines::NOT_HERE));
+    // The boombox: a track, carried around, put down, gone.
+    let at = s.dropped.iter().position(|d| d.item.kind == item_kind::BOOMBOX).unwrap();
+    let boombox = s.dropped.remove(at).item;
+    s.players.get_mut(&1).unwrap().inventory.put_away().unwrap(); // the remote into a pocket
+    s.players.get_mut(&1).unwrap().inventory.hands = Some(boombox);
+    s.answer_media(1, media::BOOMBOX_DIALOG, 1);
+    assert_eq!(s.music, Some((2, 500)), "Lo-fi");
+    assert_eq!(s.boombox_at(), Some((floor, spot, 1)), "plays where the holder is");
+    s.handle_item_action(1, crate::protocol::item_action::DROP, 0);
+    assert_eq!(s.boombox_at().map(|b| b.2), Some(0), "on the floor");
+    s.dropped.retain(|d| d.item.kind != item_kind::BOOMBOX);
+    s.tick_media();
+    assert_eq!(s.music, None, "gone: silence");
+    // Next morning it's back (the remote too, unless somebody has it).
+    s.ensure_media_items();
+    let kinds: Vec<u8> = s.dropped.iter().map(|d| d.item.kind).collect();
+    assert!(kinds.contains(&item_kind::BOOMBOX) && !kinds.contains(&item_kind::REMOTE), "{kinds:?}");
+}

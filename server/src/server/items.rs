@@ -269,6 +269,8 @@ impl Server {
                 return self.breath_test(id, department);
             }
             item_kind::KNIFE => return self.attack(id),
+            item_kind::REMOTE => return self.use_remote(id),
+            item_kind::BOOMBOX => return self.use_boombox(id),
             k => {
                 let Some(prod) = shop::product(k) else { return };
                 p.inventory.take_hands();

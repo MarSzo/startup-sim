@@ -14,6 +14,8 @@ const DebugOverlay = preload("res://ui/debug_overlay.gd")
 const MapData = preload("res://map/map_data.gd")
 const ItemArt = preload("res://game/item_art.gd")
 const ItemView = preload("res://game/item_view.gd")
+const TvView = preload("res://game/tv_view.gd")
+const Audio = preload("res://audio/audio.gd")
 const InventoryHud = preload("res://ui/inventory_hud.gd")
 const ComputerView = preload("res://game/computer_view.gd")
 const ComputerScreen = preload("res://ui/computer_screen.gd")
@@ -69,6 +71,10 @@ var kinds := {}          # id -> entity kind (player / NPC)
 var floor_items := {}    # entity id -> ItemView (items lying on the floor)
 var puddles := {}        # entity id -> PuddleView (toilet accidents)
 var puddle_layer := Node2D.new()  # on the floor, under the people and items
+## The TVs ("floor:x:y" -> [TvView, floor]) and the boombox's music (Media).
+var tvs := {}
+var boombox := AudioStreamPlayer2D.new()
+var boombox_music := {}  # the Media entry playing (track, started, floor, x, y, holder)
 var inventory: Array = [] # hands + pockets (from the server)
 var hud := InventoryHud.new()
 var computers := {}      # entity id -> ComputerView (laptops on desks)
@@ -177,7 +183,7 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 	voice.send.connect(func(s: int, w: bool, data: PackedByteArray):
 		if net.is_playing():
 			net.send(Protocol.encode_voice(net.token, s, w, data)))
-	var audio = preload("res://audio/audio.gd").inst
+	var audio = Audio.inst
 	if audio:
 		audio.world = world
 
@@ -201,6 +207,10 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 	add_child(puddle_layer)
 	add_child(ride_mask)  # between the map and the people
 	add_child(world)
+	boombox.bus = "Music"
+	boombox.max_distance = 320.0
+	boombox.attenuation = 1.6
+	world.add_child(boombox)
 	light_view.setup(building)
 	add_child(light_view)  # over the world (and inked with it)
 	# Smoke over the ink effect (drawn in its own style), under the weather.
@@ -602,7 +612,54 @@ func _physics_process(delta: float) -> void:
 	net.send(Protocol.encode_input(net.token, latest_tick, seq, inputs))
 
 
+## Media: what the TVs show and where the boombox plays.
+func _on_media(p: Dictionary) -> void:
+	for s in p.screens:
+		var key := "%d:%d:%d" % [s.floor, s.x, s.y]
+		if not tvs.has(key):
+			var tv := TvView.new()
+			tv.position = Vector2(s.x * 16, s.y * 16)
+			world.add_child(tv)
+			tvs[key] = [tv, s.floor]
+		var view = tvs[key][0]
+		view.weather = Protocol.WEATHER_NAMES.get(weather, "")
+		view.show_channel(s.channel, (est_tick - s.started) / float(tick_hz))
+	boombox_music = p.music[0] if not p.music.is_empty() else {}
+	if boombox_music.is_empty():
+		boombox.stop()
+		return
+	if Audio.inst == null:
+		return
+	var stream = Audio.inst.stream("boombox_%d" % boombox_music.track, true)
+	if stream == null:
+		return
+	var length: float = stream.get_length()
+	var at := fposmod((est_tick - boombox_music.started) / float(tick_hz), length)
+	if boombox.stream != stream or not boombox.playing:
+		boombox.stream = stream
+		boombox.play(at)
+	elif absf(boombox.get_playback_position() - at) > 0.6 and absf(boombox.get_playback_position() - at) < length - 0.6:
+		boombox.seek(at)  # drifted: everybody hears the same bar
+
+
+## TVs only on our floor; the boombox follows whoever carries it.
+func _update_media() -> void:
+	for key in tvs:
+		tvs[key][0].visible = tvs[key][1] == floor_index
+	if boombox_music.is_empty():
+		return
+	var holder: int = boombox_music.holder
+	var pos := Vector2(boombox_music.x, boombox_music.y) / float(Movement.SUBPIXELS)
+	if holder == net.player_id:
+		pos = me.position
+	elif holder != 0 and remotes.has(holder):
+		pos = remotes[holder].position
+	boombox.position = pos
+	boombox.volume_db = -4.0 if boombox_music.floor == floor_index else -80.0
+
+
 func _process(delta: float) -> void:
+	_update_media()
 	# Fire alarm: the screen pulses red.
 	var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 1000.0 * TAU * 1.5)
 	alarm_tint.color.a = 0.16 * pulse if fire_alarm else 0.0
@@ -714,6 +771,8 @@ func _on_packet(p: Dictionary) -> void:
 			me.set_drunk(Protocol.drunk_tier(p.alcohol))
 		Protocol.T_COMPUTER:
 			screen.on_computer(p)
+		Protocol.T_MEDIA:
+			_on_media(p)
 		Protocol.T_HR_INFO:
 			screen.on_hr(p)
 		Protocol.T_CALENDAR:

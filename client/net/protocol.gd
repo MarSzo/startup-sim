@@ -3,7 +3,7 @@
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 42
+const VERSION := 43
 const MAX_PACKET := 1152  # a game packet; sealed it grows to at most MAX_DATAGRAM
 const MAX_DATAGRAM := 1200
 const MAX_NICK_BYTES := 16
@@ -69,6 +69,7 @@ const T_DEPARTMENTS := 54
 const T_ACTION := 55
 const T_HR_ACTION := 56
 const T_HR_INFO := 57
+const T_MEDIA := 58
 const MAX_VOICE_BYTES := 800
 # TaskAction.action / MailAction.action (server/src/protocol/mod.rs)
 const TA_SYNC := 0
@@ -199,6 +200,8 @@ const MANDATE_AGE := 26
 const DIALOG_MENU := 250
 const DIALOG_CUPBOARD := 251
 const DIALOG_CONTRACT := 252
+const DIALOG_TV := 253
+const DIALOG_BOOMBOX := 254
 # HrAction.action (server/src/hr.rs `action`): show the file, ask for leave on
 # a day, cancel a request.
 const HR_SHOW := 1
@@ -690,6 +693,21 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			p.health = r.u8()
 			p.stats_flags = r.u8()
 			p.money = r.u32()
+		T_MEDIA:
+			var screens := []
+			var n := r.u8()
+			if n > 8:
+				return {}
+			for i in n:
+				screens.append({"floor": r.u8(), "x": r.u8(), "y": r.u8(), "channel": r.u8(), "started": r.u32()})
+			p.screens = screens
+			var music := []
+			n = r.u8()
+			if n > 8:
+				return {}
+			for i in n:
+				music.append({"track": r.u8(), "started": r.u32(), "floor": r.u8(), "x": r.i32(), "y": r.i32(), "holder": r.u16()})
+			p.music = music
 		T_HR_INFO:
 			p.title = r.str16(MAX_TEXT_BYTES)
 			p.department = r.u8()

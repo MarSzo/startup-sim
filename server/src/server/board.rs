@@ -172,6 +172,7 @@ impl Server {
         if self.answer_reprimand(pid, dialog, choice)
             || self.answer_mischief(pid, dialog, choice)
             || self.answer_contract(pid, dialog, choice)
+            || self.answer_media(pid, dialog, choice)
         {
             return;
         }

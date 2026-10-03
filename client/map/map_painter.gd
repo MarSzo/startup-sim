@@ -408,7 +408,7 @@ func _tile_object(x: int, y: int) -> void:
 
 const PROP_TYPES := ["desk", "counter", "shelf", "sofa", "table", "plant", "rack", "bench", "ashtray", "toilet", "sink",
 	"car", "coffee_machine", "kitchen_counter", "fruit_bowl", "partition", "sanitizer", "bike_rack",
-	"cupboard", "dishwasher", "kitchen_sink", "fridge", "urinal", "wardrobe", "bin", "armchair"]
+	"cupboard", "dishwasher", "kitchen_sink", "fridge", "urinal", "wardrobe", "bin", "armchair", "tv"]
 
 
 ## Connected tiles of the same furniture char = one object.
@@ -450,6 +450,7 @@ func _prop(t: String, tr: Rect2i, index: int) -> void:
 		"shelf": _shelf(r, index)
 		"sofa": _sofa(r)
 		"armchair": _armchair(r)
+		"tv": _tv(r)
 		"table": _table(tr, r)
 		"plant": _plant(r, index)
 		"rack": _racks(r, index)
@@ -547,6 +548,12 @@ func _armchair(r: Rect2) -> void:
 	_box(Rect2(r.position + Vector2(0, 3), Vector2(3.5, r.size.y - 4)), c.darkened(0.15), true, 1.2)
 	_box(Rect2(Vector2(r.end.x - 3.5, r.position.y + 3), Vector2(3.5, r.size.y - 4)), c.darkened(0.15), true, 1.2)
 	_box(Rect2(r.position + Vector2(3.5, 5), Vector2(r.size.x - 7, r.size.y - 7)), c, true, 1.2)
+
+
+## The TV's wall bracket; the set itself (and what's on) is game/tv_view.gd.
+func _tv(r: Rect2) -> void:
+	draw_rect(r, Color("#3b3b4f"))
+	draw_rect(Rect2(r.get_center() - Vector2(4, 2), Vector2(8, 4)), Color("#2b2b33"))
 
 
 func _table(tr: Rect2i, r: Rect2) -> void:

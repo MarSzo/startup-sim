@@ -23,7 +23,7 @@ pub use golden::{golden_samples, to_hex};
 pub use snapshot::{snapshot_fragments, SelfState};
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 42;
+pub const VERSION: u8 = 43;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
 /// A game packet at most (sealed, it grows by up to 48 B to `MAX_DATAGRAM`).
@@ -109,6 +109,7 @@ pub mod ty {
     pub const ACTION: u8 = 55;
     pub const HR_ACTION: u8 = 56;
     pub const HR_INFO: u8 = 57;
+    pub const MEDIA: u8 = 58;
 }
 
 /// `ItemAction::action`.
@@ -415,6 +416,8 @@ pub const MAX_VOICE_BYTES: usize = 800;
 pub const MAX_SOUNDS: usize = 64;
 /// Annexes / leave requests in `HrInfo`.
 pub const MAX_HR_ROWS: usize = 10;
+/// Screens / boomboxes in `Media`.
+pub const MAX_MEDIA: usize = 8;
 
 /// `Clock::place`: where the receiver is.
 pub mod place {
@@ -897,6 +900,16 @@ pub enum Packet {
     },
     /// The HR app's view of the receiver's file.
     HrInfo(Box<HrInfo>),
+    /// What the TVs show and the boomboxes play (`media`), everybody in the
+    /// building, every second and on change.
+    Media {
+        /// (floor, tile x, tile y of the screen's left end, channel 0 = off,
+        /// started on server tick).
+        screens: Vec<(u8, u8, u8, u8, u32)>,
+        /// (track, started on server tick, floor, x, y in sub-pixels, holder
+        /// player id - 0 = it stands on the floor).
+        music: Vec<(u8, u32, u8, i32, i32, u16)>,
+    },
     /// R (menu of actions) / X (attack): `action::*`.
     Action {
         token: u32,

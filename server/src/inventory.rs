@@ -56,6 +56,9 @@ pub mod kind {
     pub const BREATHALYSER: u8 = 39;
     /// A kitchen knife from the cupboard (for bread… or a fight).
     pub const KNIFE: u8 = 40;
+    /// The chill room's TV remote; the boombox (hands only).
+    pub const REMOTE: u8 = 41;
+    pub const BOOMBOX: u8 = 42;
 }
 
 pub const POCKETS: usize = 3;
@@ -66,7 +69,7 @@ pub fn is_small(k: u8) -> bool {
         // Shop goods fit in a pocket, except the bulky ones.
         kind::BURGER | kind::FRIES | kind::WINE => false,
         10..=27 => true,
-        kind::MILK | kind::MALPKA | kind::BREATHALYSER | kind::KNIFE => true,
+        kind::MILK | kind::MALPKA | kind::BREATHALYSER | kind::KNIFE | kind::REMOTE => true,
         28..=33 => false, // lunch boxes: both hands
         _ => false,
     }
@@ -84,6 +87,8 @@ pub fn display_name(k: u8) -> &'static str {
         kind::FRUIT => "Owoc",
         kind::BREATHALYSER => "Alkomat",
         kind::KNIFE => "Nóż kuchenny",
+        kind::REMOTE => "Pilot do telewizora",
+        kind::BOOMBOX => "Boombox",
         k => crate::shop::product(k).map_or("?", |p| p.name),
     }
 }
