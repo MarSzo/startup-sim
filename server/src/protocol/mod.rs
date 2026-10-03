@@ -23,7 +23,7 @@ pub use golden::{golden_samples, to_hex};
 pub use snapshot::{snapshot_fragments, SelfState};
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 43;
+pub const VERSION: u8 = 44;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
 /// A game packet at most (sealed, it grows by up to 48 B to `MAX_DATAGRAM`).
@@ -110,6 +110,7 @@ pub mod ty {
     pub const HR_ACTION: u8 = 56;
     pub const HR_INFO: u8 = 57;
     pub const MEDIA: u8 = 58;
+    pub const ROLL: u8 = 59;
 }
 
 /// `ItemAction::action`.
@@ -897,6 +898,11 @@ pub enum Packet {
         token: u32,
         action: u8,
         arg: u16,
+    },
+    /// Rolled a cigarette (the minigame, tobacco in hands): how well, 0..100.
+    Roll {
+        token: u32,
+        quality: u8,
     },
     /// The HR app's view of the receiver's file.
     HrInfo(Box<HrInfo>),

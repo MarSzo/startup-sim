@@ -1384,6 +1384,25 @@ pełnym ekranie — zastąpiona stylem inspirowanym Don't Starve:
   budynku — cisza.
 - Pilot i boombox wracają rano na swoje miejsca, jeśli nikt ich nie ma.
 
+### 10.52 Skręty, apteczka i magazynek
+
+- **Tytoń do skręcania** w sklepie (półka z alkoholem i papierosami, 22 zł,
+  10 skrętów). F z tytoniem w rękach — **mini-gra** w trzech krokach (spacja):
+  napchaj tytoń (przytrzymaj, puść na zielonym), zwiń bibułkę (gdy znacznik na
+  środku), poliż i sklej (na „TERAZ!”). Średnia to jakość skrętu: rozsypujący
+  się (< 30, rozsypie się w palcach), krzywy, zgrabny, idealny. F ze skrętem —
+  palenie jak papieros, a dobry skręt odstresowuje bardziej (liczy się też do
+  „pięciu pod rząd”).
+- **Apteczka** za ladą recepcji (E): Apap (+20 zdrowia, mniej kaca), węgiel
+  aktywny (brzuch: koniec rozstroju, jelita −30), witamina C (+10 energii, −5
+  stresu), plaster (+10 zdrowia); po 3 sztuki dziennie, F — połknij / przyklej.
+- **Magazynek** na piętrze: drzwi na klucz. **Klucz** wisi na haczyku przy
+  recepcji i można go wziąć tylko pod nieobecność recepcjonistki (prowadzi
+  kogoś do HR albo ma **przerwę obiadową 12:00–12:30** — idzie do aneksu
+  kuchennego); przy niej: „Klucz do magazynku? Nie ma mowy.” Klucz odkłada się
+  na haczyk (E z kluczem w rękach); jeśli zginie, rano wraca. W magazynku na
+  regałach: Coca-Cola (energia +15) i ciastka (głód −12), po 6 dziennie.
+
 ### 10.6 Stan implementacji
 
 *Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie,

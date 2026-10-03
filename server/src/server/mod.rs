@@ -58,6 +58,7 @@ mod shop;
 mod snapshot;
 mod spots;
 mod stats;
+mod supplies;
 mod treats;
 mod voice;
 
@@ -222,6 +223,8 @@ pub struct Server {
     screens: Vec<media::Screen>,
     music: Option<(u8, u32)>,
     media_dirty: bool,
+    /// The first-aid cabinet, the storeroom, the key hook.
+    supplies: supplies::Supplies,
     /// Players the cashier already asked about the hot dog (until they step away).
     cashier_asked: HashSet<u16>,
     /// Pani Wiesia: when she last greeted each player, and the next joke.
@@ -334,6 +337,7 @@ impl Server {
             screens: media::find_screens(&building),
             music: None,
             media_dirty: false,
+            supplies: supplies::Supplies::find(&building),
             porter_greeted: HashMap::new(),
             porter_joke: 0,
             lunch_asked: HashMap::new(),
@@ -495,6 +499,7 @@ impl Server {
         self.tick_cleaning();
         self.tick_cashier();
         self.tick_reception();
+        self.tick_lunch_break();
         self.tick_maria();
         self.tick_to_portal();
         self.tick_media();
@@ -553,7 +558,7 @@ impl Server {
     fn mint_item(&mut self, kind: u8, label: impl Into<String>) -> Item {
         let id = self.next_item_id;
         self.next_item_id = self.next_item_id.wrapping_add(1).max(1);
-        Item { id, kind, label: label.into(), expires: None, owner: 0, count: 1, unpaid: false, stale: false, tainted: false }
+        Item { id, kind, label: label.into(), expires: None, owner: 0, count: 1, unpaid: false, stale: false, tainted: false, quality: 0 }
     }
 }
 

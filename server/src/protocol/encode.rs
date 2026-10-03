@@ -52,6 +52,7 @@ impl Packet {
             Packet::HrAction { .. } => ty::HR_ACTION,
             Packet::HrInfo(_) => ty::HR_INFO,
             Packet::Media { .. } => ty::MEDIA,
+            Packet::Roll { .. } => ty::ROLL,
             Packet::Sound { .. } => ty::SOUND,
             Packet::TaskAction { .. } => ty::TASK_ACTION,
             Packet::TaskBoard { .. } => ty::TASK_BOARD,
@@ -461,6 +462,10 @@ impl Packet {
                     w.u16(*day);
                     w.u8(*status);
                 }
+            }
+            Packet::Roll { token, quality } => {
+                w.u32(*token);
+                w.u8(*quality);
             }
             Packet::Media { screens, music } => {
                 w.u8(screens.len().min(MAX_MEDIA) as u8);

@@ -142,7 +142,7 @@ func _ground(x: int, y: int) -> void:
 	if t == "fence":
 		_floor(x, y, "grass")
 		return
-	if _solid(c) or t in ["door", "glass_door", "card_gate", "garage_gate", "board_door", "stall_door", "service_door", "locked_door"]:
+	if _solid(c) or t in ["door", "glass_door", "card_gate", "garage_gate", "board_door", "stall_door", "service_door", "locked_door", "storeroom_door"]:
 		t = _type_of(_floor_under(x, y))
 	_floor(x, y, t)
 
@@ -240,7 +240,7 @@ func _floor(x: int, y: int, t: String) -> void:
 
 func _is_floorish(x: int, y: int) -> bool:
 	var c := _ch(x, y)
-	return c != "#" and _type_of(c) not in ["void", "fence", "service_door", "locked_door"] and map.legend.has(c)
+	return c != "#" and _type_of(c) not in ["void", "fence", "service_door", "locked_door", "storeroom_door"] and map.legend.has(c)
 
 
 ## Outside: beyond the map, open air, a hedge, or an outdoor room.
@@ -383,6 +383,11 @@ func _tile_object(x: int, y: int) -> void:
 			_box(r.grow(-0.3), Color("#6b4128"))
 			_box(Rect2(o + Vector2(4, 4), Vector2(8, 3)), Color("#a8402f"), true, 0.3, 0.45)
 			draw_circle(o + Vector2(11, 9), 0.8, Color("#d4b870"))
+		"storeroom_door":  # the storeroom: a door with a keyhole (the key is at the reception)
+			_box(r.grow(-0.3), Color("#7a5a3a"))
+			_box(Rect2(o + Vector2(3, 3), Vector2(10, 10)), Color("#8f6c48"), true, 0.3, 0.45)
+			draw_circle(o + Vector2(8, 7.5), 1.3, INK)
+			draw_rect(Rect2(o + Vector2(7.5, 7.5), Vector2(1, 2.6)), INK)
 		"locked_door":  # shut for good: dark door, red band, a padlock
 			_box(r.grow(-0.3), Color("#4a2f24"))
 			_box(Rect2(o + Vector2(2, 6.5), Vector2(12, 3)), Color("#b0382c"), true, 0.3, 0.45)
@@ -408,7 +413,7 @@ func _tile_object(x: int, y: int) -> void:
 
 const PROP_TYPES := ["desk", "counter", "shelf", "sofa", "table", "plant", "rack", "bench", "ashtray", "toilet", "sink",
 	"car", "coffee_machine", "kitchen_counter", "fruit_bowl", "partition", "sanitizer", "bike_rack",
-	"cupboard", "dishwasher", "kitchen_sink", "fridge", "urinal", "wardrobe", "bin", "armchair", "tv"]
+	"cupboard", "dishwasher", "kitchen_sink", "fridge", "urinal", "wardrobe", "bin", "armchair", "tv", "medicine_cabinet", "key_hook"]
 
 
 ## Connected tiles of the same furniture char = one object.
@@ -451,6 +456,8 @@ func _prop(t: String, tr: Rect2i, index: int) -> void:
 		"sofa": _sofa(r)
 		"armchair": _armchair(r)
 		"tv": _tv(r)
+		"medicine_cabinet": _medicine_cabinet(r)
+		"key_hook": _key_hook(r)
 		"table": _table(tr, r)
 		"plant": _plant(r, index)
 		"rack": _racks(r, index)
@@ -548,6 +555,25 @@ func _armchair(r: Rect2) -> void:
 	_box(Rect2(r.position + Vector2(0, 3), Vector2(3.5, r.size.y - 4)), c.darkened(0.15), true, 1.2)
 	_box(Rect2(Vector2(r.end.x - 3.5, r.position.y + 3), Vector2(3.5, r.size.y - 4)), c.darkened(0.15), true, 1.2)
 	_box(Rect2(r.position + Vector2(3.5, 5), Vector2(r.size.x - 7, r.size.y - 7)), c, true, 1.2)
+
+
+## The first-aid cabinet: a white box with a red cross.
+func _medicine_cabinet(r: Rect2) -> void:
+	var b := r.grow(-1.5)
+	_shadow(b)
+	_box(b, Color("#f4f6f8"), true, 1.0)
+	var c := b.get_center()
+	draw_rect(Rect2(c - Vector2(1.2, 3.6), Vector2(2.4, 7.2)), Color("#d9443a"))
+	draw_rect(Rect2(c - Vector2(3.6, 1.2), Vector2(7.2, 2.4)), Color("#d9443a"))
+
+
+## The key hook: a little board, and the key on it (the server knows if it's there).
+func _key_hook(r: Rect2) -> void:
+	var b := Rect2(r.position + Vector2(3, 3), Vector2(10, 7))
+	_box(b, Color("#8a6a45"), true, 0.6)
+	draw_circle(b.position + Vector2(5, 2.5), 0.7, Color("#d4b870"))
+	draw_line(b.position + Vector2(5, 3), b.position + Vector2(5, 7.5), Color("#d4b870"), 1.0)
+	draw_line(b.position + Vector2(5, 6.5), b.position + Vector2(6.5, 6.5), Color("#d4b870"), 0.8)
 
 
 ## The TV's wall bracket; the set itself (and what's on) is game/tv_view.gd.

@@ -66,6 +66,7 @@ impl SavedItem {
             unpaid: self.unpaid,
             stale: self.stale,
             tainted: false,
+            quality: if self.kind == crate::inventory::kind::ROLLED { 60 } else { 0 },
         }
     }
 }
@@ -452,6 +453,7 @@ mod tests {
             unpaid: false,
             stale: false,
             tainted: false,
+            quality: 0,
         };
         let s = SavedItem::from_item(&item, |_| "Ola".into());
         assert_eq!((s.kind, s.owner.as_str()), (item_kind::EMPTY_CUP, "Ola"));

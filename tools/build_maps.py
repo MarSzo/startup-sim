@@ -48,6 +48,10 @@ LEGEND = {
     "Q": {"type": "sofa", "solid": True, "color": "#5b7fbf"},
     "a": {"type": "armchair", "solid": True, "color": "#8a4a5a"},
     "I": {"type": "tv", "solid": True, "color": "#1e1f29"},
+    # The storeroom door: only with the key from the reception.
+    "M": {"type": "storeroom_door", "solid": False, "color": "#7a5a3a", "access": "key"},
+    "j": {"type": "medicine_cabinet", "solid": True, "color": "#e8eef2"},
+    "y": {"type": "key_hook", "solid": True, "color": "#8a6a45"},
     "P": {"type": "plant", "solid": True, "color": "#3f8a3a"},
     "R": {"type": "rack", "solid": True, "color": "#2a2d34"},
     "N": {"type": "bench", "solid": True, "color": "#8a6a45"},
@@ -559,7 +563,7 @@ def floor1():
     f.area(48, 49, 57, 53, ".", "U")
     f.room("U", 37, "Korytarz wschodni", "corridor", detector=True, light="always")
     f.door(43, 45, 43, 46, "D", "U")                     # hall 13 <-> 25
-    f.door(48, 43, 48, 43, "D", "U")                     # storeroom 41
+    f.door(48, 43, 48, 43, "M", "U")                     # storeroom 41 (the key: at the reception)
     f.walls(53, 37, 65, 49, ",", "V")
     f.room("V", 31, "DevOps (Mordor)", "department", detector=True, light="switch", switch_door=(53, 45),
            windows=True, department=DEVOPS)
@@ -599,6 +603,10 @@ def floor1():
         {"kind": "ceo", "name": "Prezes", "home": [20, 19]},
         {"kind": "cofounder", "name": "Wspólniczka", "home": [27, 20]},
     ]
+    # Behind the reception desk: the first-aid cabinet and the storeroom
+    # key on its hook.
+    f.put(39, 33, 39, 33, "j")
+    f.put(35, 33, 35, 33, "y")
     # The TV on the chill room's wall, facing the sofas (after the walls
     # of the rooms below, which share it).
     f.put(35, 14, 37, 14, "I")

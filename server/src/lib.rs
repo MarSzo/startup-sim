@@ -46,6 +46,7 @@ pub mod server;
 pub mod shop;
 pub mod sim;
 pub mod stalls;
+pub mod supplies;
 pub mod tasks;
 pub mod treats;
 pub mod weather;

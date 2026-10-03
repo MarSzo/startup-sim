@@ -317,6 +317,7 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
         ("skip_wait", Packet::SkipWait { token: 0x01020304 }),
         ("action", Packet::Action { token: 0x01020304, action: 2 }),
         ("hr_action", Packet::HrAction { token: 0x01020304, action: 2, arg: 9 }),
+        ("roll", Packet::Roll { token: 0x01020304, quality: 87 }),
         ("media", Packet::Media { screens: vec![(1, 35, 14, 4, 12_345)], music: vec![(2, 12_000, 1, 10_496, 3_200, 7)] }),
         (
             "hr_info",

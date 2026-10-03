@@ -44,6 +44,15 @@ const BREATHALYSER := 39
 const KNIFE := 40
 const REMOTE := 41
 const BOOMBOX := 42
+const TOBACCO := 43
+const ROLLED := 44
+const STORE_KEY := 45
+const COLA := 46
+const STORE_COOKIES := 47
+const PAINKILLER := 48
+const CHARCOAL := 49
+const VITAMIN := 50
+const PLASTER := 51
 
 const NAMES := {GUEST_PASS: "Przepustka gościa", EMPLOYEE_CARD: "Karta pracownika", LAPTOP: "Laptop", COFFEE: "Kawa", FRUIT: "Owoc",
 	SANDWICH_CHEESE: "Kanapka z serem", SANDWICH_HAM: "Kanapka z szynką", WRAP: "Wrap wege", BURGER: "Hamburger",
@@ -52,9 +61,12 @@ const NAMES := {GUEST_PASS: "Przepustka gościa", EMPLOYEE_CARD: "Karta pracowni
 	DONUT: "Pączek", COOKIE: "Ciastko", CHEESECAKE: "Kawałek sernika",
 	PIEROGI: "Pierogi ruskie", PIZZA: "Pizza margherita", SUSHI: "Zestaw sushi", SCHNITZEL: "Schabowy z ziemniakami",
 	SALAD: "Sałatka z kurczakiem", KEBAB: "Kebab", EMPTY_CUP: "Brudny kubek", CUP: "Kubek", MILK: "Mleko (karton)",
-	LATTE: "Kawa z mlekiem", MALPKA: "Małpka", BREATHALYSER: "Alkomat", KNIFE: "Nóż kuchenny", REMOTE: "Pilot do telewizora", BOOMBOX: "Boombox"}
+	LATTE: "Kawa z mlekiem", MALPKA: "Małpka", BREATHALYSER: "Alkomat", KNIFE: "Nóż kuchenny", REMOTE: "Pilot do telewizora", BOOMBOX: "Boombox", TOBACCO: "Tytoń do skręcania", ROLLED: "Skręt", STORE_KEY: "Klucz do magazynku",
+	COLA: "Coca-Cola", STORE_COOKIES: "Ciastka z magazynu", PAINKILLER: "Apap", CHARCOAL: "Węgiel aktywny", VITAMIN: "Witamina C",
+	PLASTER: "Plaster"}
 const SMALL := [GUEST_PASS, EMPLOYEE_CARD, FRUIT, SANDWICH_CHEESE, SANDWICH_HAM, WRAP, BUN, BAR, CHIPS, WATER,
-	ENERGY_DRINK, JUICE, BEER, CIGARETTES, UMBRELLA, DONUT, COOKIE, CHEESECAKE, MILK, MALPKA, BREATHALYSER, KNIFE, REMOTE]
+	ENERGY_DRINK, JUICE, BEER, CIGARETTES, UMBRELLA, DONUT, COOKIE, CHEESECAKE, MILK, MALPKA, BREATHALYSER, KNIFE, REMOTE, TOBACCO, ROLLED, STORE_KEY,
+	COLA, STORE_COOKIES, PAINKILLER, CHARCOAL, VITAMIN, PLASTER]
 
 
 static func item_name(kind: int) -> String:
@@ -207,6 +219,33 @@ static func draw(c: CanvasItem, kind: int, o: Vector2, s: float) -> void:
 			ln.call(6, 6.8, 7.6, 6.8, Color("#2c4a22"), 0.6)
 			ln.call(8.4, 6.8, 10, 6.8, Color("#2c4a22"), 0.6)
 			dot.call(8, 11.4, 1.1, Color("#d9443a"))
+		TOBACCO:  # a pouch with a leaf
+			rr.call(2.2, 4, 11.6, 9.6, Color("#3f6b3a"), 1.6)
+			ln.call(2.6, 7, 13.4, 7, Color("#2c4a28"), 0.6)
+			poly.call([Vector2(8, 8.6), Vector2(11, 10.4), Vector2(8, 12.4), Vector2(5, 10.4)], Color("#c9a24a"))
+		ROLLED:
+			ln.call(3, 12, 12.4, 4.6, INK, 2.8)
+			ln.call(3, 12, 12.4, 4.6, Color("#f4ead0"), 1.8)
+			ln.call(3, 12, 5, 10.4, Color("#b88a4e"), 1.8)
+		STORE_KEY:
+			circ.call(5, 6, 3, Color("#d4b870"))
+			dot.call(5, 6, 1.2, Color("#8a6a45"))
+			ln.call(7.4, 7.6, 13.4, 13.4, Color("#d4b870"), 1.6)
+			ln.call(11, 11, 12.6, 9.6, Color("#d4b870"), 1.4)
+		COLA:
+			bottle.call(Color("#3a1f14"), Color("#d9443a"), Color("#c0392b"))
+		STORE_COOKIES:
+			rr.call(2, 5, 12, 8, Color("#e8c46a"), 1.2)
+			for q in [Vector2(5, 8), Vector2(9, 7.5), Vector2(11, 10), Vector2(6.5, 10.5)]:
+				dot.call(q.x, q.y, 0.7, Color("#4a2e1e"))
+		PAINKILLER, CHARCOAL, VITAMIN:
+			var col: Color = {PAINKILLER: Color("#f4f6f8"), CHARCOAL: Color("#2d3036"), VITAMIN: Color("#f39c12")}[kind]
+			rr.call(3, 4.5, 10, 7, Color("#dfe6ea"), 1.2)
+			for q in [Vector2(6, 8), Vector2(10, 8)]:
+				circ.call(q.x, q.y, 1.8, col)
+		PLASTER:
+			poly.call([Vector2(2, 9), Vector2(10, 2), Vector2(14, 6), Vector2(6, 13)], Color("#e8c09a"))
+			rr.call(6.4, 5.6, 3.4, 3.4, Color("#f4ead0"), 0.6)
 		REMOTE:
 			rr.call(5.2, 1.6, 5.6, 13.2, Color("#2d3036"), 1.6)
 			dot.call(8, 3.8, 0.9, Color("#e74c3c"))

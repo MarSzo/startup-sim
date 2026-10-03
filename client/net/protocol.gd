@@ -3,7 +3,7 @@
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 43
+const VERSION := 44
 const MAX_PACKET := 1152  # a game packet; sealed it grows to at most MAX_DATAGRAM
 const MAX_DATAGRAM := 1200
 const MAX_NICK_BYTES := 16
@@ -70,6 +70,7 @@ const T_ACTION := 55
 const T_HR_ACTION := 56
 const T_HR_INFO := 57
 const T_MEDIA := 58
+const T_ROLL := 59
 const MAX_VOICE_BYTES := 800
 # TaskAction.action / MailAction.action (server/src/protocol/mod.rs)
 const TA_SYNC := 0
@@ -202,6 +203,7 @@ const DIALOG_CUPBOARD := 251
 const DIALOG_CONTRACT := 252
 const DIALOG_TV := 253
 const DIALOG_BOOMBOX := 254
+const DIALOG_SUPPLIES := 255  # the first-aid cabinet / the storeroom shelves
 # HrAction.action (server/src/hr.rs `action`): show the file, ask for leave on
 # a day, cancel a request.
 const HR_SHOW := 1
@@ -466,6 +468,14 @@ static func encode_hr_action(token: int, action: int, arg: int) -> PackedByteArr
 	b.put_u32(token)
 	b.put_u8(action)
 	b.put_u16(arg)
+	return b.data_array
+
+
+## The rolling minigame's result: quality 0..100.
+static func encode_roll(token: int, quality: int) -> PackedByteArray:
+	var b := _writer(T_ROLL)
+	b.put_u32(token)
+	b.put_u8(clampi(quality, 0, 100))
 	return b.data_array
 
 

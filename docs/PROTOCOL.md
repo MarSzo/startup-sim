@@ -1,4 +1,4 @@
-# Protokół sieciowy (wersja 43)
+# Protokół sieciowy (wersja 44)
 
 Własny binarny protokół na UDP. Implementacje:
 - serwer: `server/src/protocol/` (źródło prawdy),
@@ -23,7 +23,7 @@ przez `cargo test` i czytane przez `client/tests/run_tests.gd`.
 | pole    | typ | wartość |
 |---------|-----|---------|
 | magic   | u16 | `0x5354` (bajty `54 53`, „TS”) |
-| version | u8  | `43` |
+| version | u8  | `44` |
 | type    | u8  | typ pakietu (niżej) |
 
 ## Jednostki
@@ -478,6 +478,15 @@ dnia urlopu, z 5), aneksy n u8 (≤ 10, najnowsze na końcu) × {`day u16`, `tex
 str16}, wnioski n u8 (≤ 10) × {`id u8`, `day u16`, `status u8` (1
 zaakceptowany, 2 odrzucony, 3 anulowany, 4 wykorzystany)}.
 
+### 59 `Roll` (C→S)
+
+token u32, `quality u8` (0..100) — wynik mini-gry skręcania; serwer zabiera
+porcję z zapłaconego tytoniu (43) w rękach i daje skręt (44) z jakością w
+nazwie (< 30 rozsypie się przy paleniu). Przedmioty: 45 klucz do magazynku
+(daje uprawnienie 16 — drzwi „storeroom_door”), 46 Coca-Cola, 47 ciastka z
+magazynu, 48 Apap, 49 węgiel aktywny, 50 witamina C, 51 plaster. Apteczka i
+regały magazynku: `Dialog` 255.
+
 ### 58 `Media` (S→C)
 
 Telewizory i boomboxy, do wszystkich w budynku co 1 s i po każdej zmianie:
@@ -597,6 +606,7 @@ szyfrowaniem.
 
 ## Historia wersji
 
+- **44** — skręty i zapasy: `Roll` (59, C→S), przedmioty 43–51, uprawnienie 16 (klucz do magazynku), `Dialog` 255 (apteczka / magazynek).
 - **43** — telewizor i boombox: `Media` (58, S→C), przedmioty 41 pilot, 42 boombox, `Dialog` 253 (kanały), 254 (utwory).
 - **42** — Kadry: `HrAction` (56, C→S), `HrInfo` (57, S→C); `Clock` + `leave u8` na końcu (dzień urlopu: w domu).
 - **41** — widełki i umowa: `JobOffers` oferta + `salary_min u32`, `salary_max u32` (zł brutto / mies., po `vacancies`); `Apply` + `salary u32`, `form u8` (1 umowa o pracę, 2 B2B, 3 umowa zlecenie — tylko student < 26 lat), `student u8` (po `motivation`); `Dialog` 252 = umowa w HR (0 podpisuję, 1 rezygnuję).

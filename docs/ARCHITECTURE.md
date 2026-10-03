@@ -50,6 +50,7 @@ server/                 crate Rusta (lib `game` + binarki)
   src/pay.rs            widełki, oczekiwania, formy zatrudnienia, kwota na umowie, stawka godzinowa
   src/hr.rs             teczka pracownika: aneksy, pula urlopu, wnioski, poranek urlopu
   src/media.rs          telewizor i boombox: kanały, utwory, kwestie
+  src/supplies.rs       apteczka, magazynek, zapasy na dzień, jakość skrętów, kwestie
   data/recruitment.json oferty i pule pytań (pierwsza odpowiedź = poprawna)
   src/protocol/         pakiety: mod.rs (typy, stałe), codec.rs (bajty), encode.rs / decode.rs,
                         snapshot.rs (fragmentacja), golden.rs (wektory parytetu z GDScriptem)
@@ -512,6 +513,17 @@ rysowane z czasu od startu), muzyka w `game.gd` (`AudioStreamPlayer2D` na
 szynie Music, za trzymającym, poprawka dryfu > 0,6 s), pętle z
 `gen_sounds.py` (`boombox_1..4`).
 
+**Zapasy i skręty** (`supplies.rs` + `server/supplies.rs`): `Supplies::find`
+szuka kafli „key_hook”, „medicine_cabinet” i regałów pokoju „storage”;
+`use_supplies` (E, przed rozmową z NPC) — haczyk (klucz tylko gdy
+recepcjonistka nie `at_home`), apteczka / regały → `Dialog` 255 →
+`answer_supplies` (`Stock` na dzień, `restock_supplies` rano, klucz wraca).
+`access::KEY` z klucza w ekwipunku otwiera drzwi z `access: "key"` (też w
+`map_data.gd` — parytet symulacji). `tick_lunch_break` wysyła recepcjonistkę do
+aneksu 12:00–12:30. Skręty: klient (`ui/roll_game.gd`, punktacja w funkcjach
+statycznych, testowana) wysyła `Roll` → `handle_roll` (porcja z tytoniu,
+`Item::quality`); `smoke_roll` przy F.
+
 **Komputery** (`computer.rs`): stanowiska to kafle typu `desk` w pokojach typu
 `department` (nazwa pokoju = nazwa działu). E z laptopem w rękach przy
 najbliższym wolnym stanowisku swojego działu (≤ 1,25 kafla) kładzie go
@@ -800,5 +812,5 @@ mieć wyłączone wygasanie (panel Tailscale); awaryjnie — konsola Hetznera. S
 |-----------|-------------|
 | `cd server && cargo test` | 51 testów jednostkowych (budynek i mapy wg GDD, osiągalność zależna od uprawnień, bramki, ruch/kolizje, schody, winda, nawigacja, portier, recepcja, HR, rekrutacja: zaliczenie/oblanie, ignorowanie nieaktualnych odpowiedzi, losowanie i tasowanie; ekspres; protokół), 2 golden, 9 e2e (m.in. ekspres: parzenie, zajętość, kubek widoczny dla innych; portal: odrzucenie → przyjęcie → spawn; całe wdrożenie aż do karty; widoczność między piętrami; stan serwera = predykcja) |
 | `godot --headless --path client -s tests/run_tests.gd` | parytet protokołu (bajt w bajt) i ruchu — z bramkami, uprawnieniami i przejściami między piętrami — z Rustem, zgodność CRC budynku, parsowanie adresów |
-| `python3 tests/e2e/run.py` | scenariusze rozgrywki: prawdziwy klient Godot (headless) na prawdziwym serwerze — `workday` (laptop, obiad z aplikacji, kawa, odbiór obiadu, powrót tramwajem z wypłatą), `onboarding` (rejestracja, postać, portal i rozmowa, portier, recepcja, HR, laptop na biurku działu), `together` (dwóch graczy: komunikator, spotkanie w chill roomie, winda), `founder` (firma z portalu, stanowisko w dziale Mobile, zatrudnienie kandydata), `persistence` (laptop na biurku, restart serwera, powrót postaci), `drinking` (wino i dwie małpki ze sklepu, wymioty z plamą, zataczanie), `fight` (dwóch graczy: nóż z szafki, nokaut, ochrona łapie napastnika, menu R), `resign` (jak onboarding, ale w HR „Rezygnuję”: odprowadzenie na portiernię, oddanie przepustki, powrót na portal), `office_apps` (Kadry: umowa i urlop na jutro, terminal, Plotek.pl), `chill` (dwóch graczy: pilot — mecz w telewizorze, boombox — disco polo, drugi widzi i słyszy to samo). Scenariusz (`client/tests/e2e/scenario.gd`) steruje postacią przez `game.script_driver`, ma własny folder w `user://e2e/` i kończy się `E2E PASS` / `E2E FAIL` z kodem wyjścia. |
+| `python3 tests/e2e/run.py` | scenariusze rozgrywki: prawdziwy klient Godot (headless) na prawdziwym serwerze — `workday` (laptop, obiad z aplikacji, kawa, odbiór obiadu, powrót tramwajem z wypłatą), `onboarding` (rejestracja, postać, portal i rozmowa, portier, recepcja, HR, laptop na biurku działu), `together` (dwóch graczy: komunikator, spotkanie w chill roomie, winda), `founder` (firma z portalu, stanowisko w dziale Mobile, zatrudnienie kandydata), `persistence` (laptop na biurku, restart serwera, powrót postaci), `drinking` (wino i dwie małpki ze sklepu, wymioty z plamą, zataczanie), `fight` (dwóch graczy: nóż z szafki, nokaut, ochrona łapie napastnika, menu R), `resign` (jak onboarding, ale w HR „Rezygnuję”: odprowadzenie na portiernię, oddanie przepustki, powrót na portal), `office_apps` (Kadry: umowa i urlop na jutro, terminal, Plotek.pl), `chill` (dwóch graczy: pilot — mecz w telewizorze, boombox — disco polo, drugi widzi i słyszy to samo), `storeroom` (witamina z apteczki, klucz: odmowa przy recepcjonistce, wzięty w jej przerwie, cola z magazynku). Scenariusz (`client/tests/e2e/scenario.gd`) steruje postacią przez `game.script_driver`, ma własny folder w `user://e2e/` i kończy się `E2E PASS` / `E2E FAIL` z kodem wyjścia. |
 | `python3 tests/load/soak.py` | obciążenie: N botów (`src/bin/bots.rs`) przez kilka minut — zero zgubionych ticków, najdłuższy tick < 25 ms, brak awarii, pamięć bez wzrostu; w CI co noc (`.github/workflows/soak.yml`). |

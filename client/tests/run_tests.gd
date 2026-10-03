@@ -21,6 +21,7 @@ func _init() -> void:
 	test_parse_address()
 	test_shell()
 	test_scripts_compile()
+	test_roll_scores()
 	print("%d checks, %d failures" % [checks, failures])
 	quit(1 if failures > 0 else 0)
 
@@ -63,6 +64,7 @@ func test_protocol(path: String) -> void:
 		"skip_wait": Protocol.encode_skip_wait(0x01020304),
 		"action": Protocol.encode_action(0x01020304, Protocol.ACTION_ATTACK),
 		"hr_action": Protocol.encode_hr_action(0x01020304, Protocol.HR_REQUEST, 9),
+		"roll": Protocol.encode_roll(0x01020304, 87),
 		"task_action": Protocol.encode_task_action(0x01020304, 7, Protocol.TA_CREATE, 0, 2, "Naprawić logowanie\nPo zmianie hasła."),
 		"voice": Protocol.encode_voice(0x01020304, 9, true, PackedByteArray([0x10, 0x00, 0x05, 0x7f, 0x80])),
 		"mail_action": Protocol.encode_mail_action(0x01020304, 4, Protocol.MA_SEND, 0, "Kuba", "Kawa?", "O 12 w kuchni."),
@@ -301,6 +303,14 @@ func test_scripts_compile() -> void:
 				expect(script != null and script.can_instantiate(), "compiles: %s" % dir.path_join(f))
 				count += 1
 	expect(count > 40, "scripts found (%d)" % count)
+
+
+## The rolling minigame's scoring.
+func test_roll_scores() -> void:
+	var RollGame = preload("res://ui/roll_game.gd")
+	expect(RollGame.fill_score(0.7) == 100 and RollGame.fill_score(0.3) == 0 and RollGame.fill_score(0.85) == 80, "fill score")
+	expect(RollGame.roll_score(0.5) == 100 and RollGame.roll_score(0.0) == 0, "roll score")
+	expect(RollGame.seal_score(0.0) == 100 and RollGame.seal_score(-1.0) == 20 and RollGame.seal_score(1.0) == 0, "seal score")
 
 
 ## The office terminal's make-believe shell.

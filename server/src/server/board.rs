@@ -173,6 +173,7 @@ impl Server {
             || self.answer_mischief(pid, dialog, choice)
             || self.answer_contract(pid, dialog, choice)
             || self.answer_media(pid, dialog, choice)
+            || self.answer_supplies(pid, dialog, choice)
         {
             return;
         }

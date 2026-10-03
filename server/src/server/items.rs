@@ -196,7 +196,8 @@ impl Server {
         let Some(p) = self.players.get_mut(&id) else { return };
         let Some(held) = &p.inventory.hands else { return };
         let snd = match held.kind {
-            item_kind::COFFEE | item_kind::LATTE => Some(crate::protocol::sound::DRINK),
+            item_kind::COFFEE | item_kind::LATTE | item_kind::COLA => Some(crate::protocol::sound::DRINK),
+            item_kind::STORE_COOKIES => Some(crate::protocol::sound::EAT),
             item_kind::FRUIT if !p.needs.is_full() => Some(crate::protocol::sound::EAT),
             item_kind::CIGARETTES if !held.unpaid => Some(crate::protocol::sound::LIGHTER),
             item_kind::WATER
@@ -270,6 +271,34 @@ impl Server {
             }
             item_kind::KNIFE => return self.attack(id),
             item_kind::REMOTE => return self.use_remote(id),
+            item_kind::ROLLED if !held.unpaid => return self.smoke_roll(id),
+            item_kind::TOBACCO if !held.unpaid => crate::supplies::lines::ROLL_FIRST.into(),
+            item_kind::STORE_KEY => crate::supplies::lines::KEY.into(),
+            item_kind::COLA => {
+                p.inventory.take_hands();
+                p.needs.apply(crate::shop::Effect { hunger: 0, energy: 15, stress: -3, bladder: 12 });
+                refresh(p);
+                crate::supplies::lines::COLA.into()
+            }
+            item_kind::STORE_COOKIES => {
+                p.inventory.take_hands();
+                p.needs.apply(crate::shop::Effect { hunger: -12, energy: 3, stress: -5, bladder: 0 });
+                refresh(p);
+                crate::supplies::lines::COOKIES.into()
+            }
+            item_kind::PAINKILLER | item_kind::CHARCOAL | item_kind::VITAMIN | item_kind::PLASTER => {
+                let k = held.kind;
+                p.inventory.take_hands();
+                p.needs.medicine(k);
+                refresh(p);
+                match k {
+                    item_kind::PAINKILLER => crate::supplies::lines::PAINKILLER,
+                    item_kind::CHARCOAL => crate::supplies::lines::CHARCOAL,
+                    item_kind::VITAMIN => crate::supplies::lines::VITAMIN,
+                    _ => crate::supplies::lines::PLASTER,
+                }
+                .into()
+            }
             item_kind::BOOMBOX => return self.use_boombox(id),
             k => {
                 let Some(prod) = shop::product(k) else { return };

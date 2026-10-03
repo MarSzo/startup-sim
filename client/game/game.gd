@@ -16,6 +16,7 @@ const ItemArt = preload("res://game/item_art.gd")
 const ItemView = preload("res://game/item_view.gd")
 const TvView = preload("res://game/tv_view.gd")
 const Audio = preload("res://audio/audio.gd")
+const RollGame = preload("res://ui/roll_game.gd")
 const InventoryHud = preload("res://ui/inventory_hud.gd")
 const ComputerView = preload("res://game/computer_view.gd")
 const ComputerScreen = preload("res://ui/computer_screen.gd")
@@ -110,6 +111,7 @@ var label_layer := CanvasLayer.new()
 var smoke_layer := CanvasLayer.new()
 var weather_layer := CanvasLayer.new()
 var dialog := DialogWindow.new()
+var roll_game := RollGame.new()  # rolling a cigarette (F with tobacco)
 var shelf_window := ShelfWindow.new()
 var _shelf_at := Vector2.ZERO     # where the shelf window was opened (walk away = close)
 var fridge_window := FridgeWindow.new()
@@ -361,6 +363,10 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 			if net.is_playing():
 				net.send(Protocol.encode_calendar_book(net.token, start, topic)))
 	status_layer.add_child(dialog)
+	status_layer.add_child(roll_game)
+	roll_game.rolled.connect(func(q: int):
+		if net.is_playing():
+			net.send(Protocol.encode_roll(net.token, q)))
 	dialog.name_of = func(id: int) -> String: return nicks.get(id, "?")
 	dialog.answer.connect(func(id: int, choice: int):
 			if net.is_playing():
@@ -465,7 +471,7 @@ func _sample_input(delta: float) -> int:
 	if not goto_legs.is_empty() or not _goto_path.is_empty():
 		var g := _goto_input(delta)  # dev script also drives the computer screen / dialogs
 		return 0 if screen.visible or dialog.visible else g
-	if dialog.visible:
+	if dialog.visible or roll_game.visible:
 		return 0
 	if screen.visible:
 		return 0
@@ -997,7 +1003,7 @@ func _reconcile(server_body: Dictionary, ack: int) -> void:
 
 ## Something in the game takes Esc itself (a window is open).
 func window_open() -> bool:
-	return screen.visible or shelf_window.visible or fridge_window.visible or dialog.visible
+	return screen.visible or shelf_window.visible or fridge_window.visible or dialog.visible or roll_game.visible
 
 
 ## Settings changed in the Esc menu.
@@ -1045,7 +1051,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		KEY_G:
 			_item_action(Protocol.ITEM_GIVE, 0)
 		KEY_F:
-			_item_action(Protocol.ITEM_USE, 0)
+			if me.held == ItemArt.TOBACCO:
+				roll_game.start()  # roll one first (the server checks it's paid for)
+			else:
+				_item_action(Protocol.ITEM_USE, 0)
 		KEY_L:
 			if net.is_playing():
 				net.send(Protocol.encode_door_action(net.token))
@@ -1221,6 +1230,8 @@ func _update_hint() -> void:
 				if need != 0 and (pred.access & need) == 0:
 					if need & MapData.ACCESS_BOARD:
 						text = "Zarząd — wstęp tylko na umówione spotkanie (kalendarz na komputerze)"
+					elif need & MapData.ACCESS_KEY:
+						text = "Magazynek zamknięty — klucz wisi przy recepcji (gdy nikogo tam nie ma…)"
 					elif need & MapData.ACCESS_GUEST:
 						text = "Bramka wymaga przepustki — porozmawiaj z portierem (portiernia)"
 					else:
@@ -1375,7 +1386,7 @@ func _stall_hint(map, t: Vector2i, text: String) -> String:
 const STUCK_HINTS := {Protocol.ACT_VOMITING: "Wymiotujesz…", Protocol.ACT_PASSED_OUT: "Odsypiasz… (chwilę potrwa)",
 	Protocol.ACT_KNOCKED_OUT: "Znokautowany… gwiazdki krążą (chwilę potrwa)", Protocol.ACT_PEEING: "Sikasz…",
 	Protocol.ACT_POOPING: "Kucasz… (natura wzywa)"}
-const SPOT_HINTS := {"shelf": "[E] Zobacz półkę", "sofa": "[E] Usiądź na sofie", "toilet": "[E] Skorzystaj z toalety", "urinal": "[E] Pisuar",
+const SPOT_HINTS := {"shelf": "[E] Zobacz półkę", "medicine_cabinet": "[E] Apteczka", "key_hook": "[E] Klucz do magazynku", "sofa": "[E] Usiądź na sofie", "toilet": "[E] Skorzystaj z toalety", "urinal": "[E] Pisuar",
 	"ashtray": "[E] Zapal", "fruit_bowl": "[E] Weź owoc", "sink": "[E] Umyj ręce", "sanitizer": "[E] Zdezynfekuj ręce"}
 
 

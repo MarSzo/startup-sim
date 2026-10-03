@@ -393,6 +393,7 @@ impl Packet {
                 }
                 Packet::HrInfo(Box::new(h))
             }
+            ty::ROLL => Packet::Roll { token: r.u32()?, quality: r.u8()? },
             ty::MEDIA => {
                 let n = r.u8()? as usize;
                 if n > MAX_MEDIA {

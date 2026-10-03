@@ -620,3 +620,102 @@ fn the_remote_switches_the_tv_and_the_boombox_plays_where_it_is() {
     let kinds: Vec<u8> = s.dropped.iter().map(|d| d.item.kind).collect();
     assert!(kinds.contains(&item_kind::BOOMBOX) && !kinds.contains(&item_kind::REMOTE), "{kinds:?}");
 }
+
+#[test]
+fn the_storeroom_key_is_free_only_while_the_receptionist_is_away() {
+    use crate::supplies::{self, lines};
+    let mut s = server();
+    add_player(&mut s, 1);
+    let (hf, hook) = s.supplies.hook.expect("a key hook at the reception");
+    stand_next_to(&mut s, 1, hf, hook);
+    let body = s.players[&1].body;
+    // She's at her desk: no key.
+    assert!(s.use_supplies(1, &body));
+    assert!(s.says.iter().any(|l| l.text == lines::KEY_NO));
+    assert!(s.supplies.key_on_hook);
+    // Lunch break: she's off to the kitchenette - the key is free.
+    s.clock.ds = supplies::BREAK_FROM * crate::clock::DS_PER_MIN;
+    s.tick_lunch_break();
+    assert!(s.supplies.on_break);
+    s.use_supplies(1, &body);
+    assert!(s.players[&1].inventory.has(item_kind::STORE_KEY) && !s.supplies.key_on_hook);
+    assert_eq!(s.players[&1].body.access & crate::map::access::KEY, crate::map::access::KEY, "the key opens the storeroom");
+    // The storeroom door needs it.
+    let (sf, room) = s.supplies.storeroom.unwrap();
+    let m = s.building.floor(sf).unwrap();
+    let door =
+        (0..m.height).flat_map(|y| (0..m.width).map(move |x| (x, y))).find(|&(x, y)| m.tile_type(x, y) == Some("storeroom_door")).unwrap();
+    assert!(
+        m.blocks(door.0, door.1, crate::map::access::CARD, crate::map::dir::DOWN)
+            && !m.blocks(door.0, door.1, crate::map::access::KEY, crate::map::dir::DOWN)
+    );
+    // Inside: cola from the shelf, until it runs out.
+    let shelf = s.supplies.shelves[0].1;
+    stand_next_to(&mut s, 1, sf, shelf);
+    assert_eq!(s.players[&1].room, room);
+    let body = s.players[&1].body;
+    for _ in 0..supplies::STOREROOM_STOCK {
+        s.use_supplies(1, &body);
+        s.answer_supplies(1, supplies::DIALOG, 0);
+        let p = s.players.get_mut(&1).unwrap();
+        let has = p.inventory.has(item_kind::COLA);
+        assert!(has, "a cola");
+        p.inventory.remove_kind(item_kind::COLA);
+    }
+    s.says.clear();
+    s.use_supplies(1, &body);
+    s.answer_supplies(1, supplies::DIALOG, 0);
+    assert!(s.says.iter().any(|l| l.text == lines::EMPTY), "all gone for today");
+    // Back at the hook: hang it up. The next morning: all full again.
+    s.players.get_mut(&1).unwrap().inventory.take_out(0).ok();
+    stand_next_to(&mut s, 1, hf, hook);
+    let body = s.players[&1].body;
+    let key_in_hands = s.players[&1].inventory.held_kind() == item_kind::STORE_KEY;
+    if !key_in_hands {
+        let at = s.players[&1].inventory.pockets.iter().position(|i| i.as_ref().is_some_and(|i| i.kind == item_kind::STORE_KEY)).unwrap();
+        s.players.get_mut(&1).unwrap().inventory.take_out(at).unwrap();
+    }
+    s.use_supplies(1, &body);
+    assert!(s.supplies.key_on_hook && !s.players[&1].inventory.has(item_kind::STORE_KEY));
+    s.restock_supplies();
+    assert_eq!(s.supplies.stock.left(item_kind::COLA), supplies::STOREROOM_STOCK);
+}
+
+#[test]
+fn medicines_help_and_a_rolled_cigarette_is_as_good_as_the_rolling() {
+    use crate::supplies::{self, lines};
+    let mut s = server();
+    add_player(&mut s, 1);
+    let (cf, cabinet) = s.supplies.cabinet.expect("a first-aid cabinet");
+    stand_next_to(&mut s, 1, cf, cabinet);
+    let body = s.players[&1].body;
+    s.players.get_mut(&1).unwrap().needs.health = 50 * crate::needs::SCALE;
+    s.use_supplies(1, &body);
+    assert_eq!(s.players[&1].supply_menu[0], item_kind::PAINKILLER);
+    s.answer_supplies(1, supplies::DIALOG, 0);
+    let at = s.players[&1].inventory.pockets.iter().position(|i| i.as_ref().is_some_and(|i| i.kind == item_kind::PAINKILLER)).unwrap();
+    s.players.get_mut(&1).unwrap().inventory.take_out(at).unwrap();
+    s.use_held(1);
+    assert_eq!(s.players[&1].needs.health_points(), 70);
+    assert_eq!(s.supplies.stock.left(item_kind::PAINKILLER), supplies::MEDICINE_STOCK - 1);
+    // Tobacco from the shop (paid): roll one - a bad one crumbles, a good one smokes.
+    let pack = crate::inventory::Item { count: 10, ..s.mint_item(item_kind::TOBACCO, "") };
+    s.players.get_mut(&1).unwrap().inventory.hands = Some(pack);
+    s.handle_roll(1, 12);
+    s.handle_roll(1, 92);
+    let rolls: Vec<(u8, String)> =
+        s.players[&1].inventory.items().filter(|i| i.kind == item_kind::ROLLED).map(|i| (i.quality, i.label.clone())).collect();
+    assert_eq!(rolls, vec![(12, "Skręt (rozsypujący się)".into()), (92, "Skręt (idealny)".into())]);
+    assert_eq!(s.players[&1].inventory.hands.as_ref().unwrap().count, 8, "two rolls from the pack");
+    s.players.get_mut(&1).unwrap().inventory.put_away().unwrap(); // the pack into a pocket
+    let slot = |s: &Server, q: u8| s.players[&1].inventory.pockets.iter().position(|i| i.as_ref().is_some_and(|i| i.quality == q)).unwrap();
+    let bad = slot(&s, 12);
+    s.players.get_mut(&1).unwrap().inventory.take_out(bad).unwrap();
+    s.says.clear();
+    s.use_held(1);
+    assert!(s.says.iter().any(|l| l.text == lines::CRUMBLED) && s.players[&1].rest.is_none());
+    let good = slot(&s, 92);
+    s.players.get_mut(&1).unwrap().inventory.take_out(good).unwrap();
+    s.use_held(1);
+    assert!(matches!(s.players[&1].rest, Some((crate::needs::Rest::Smoking { .. }, _, _))), "smoking the good one");
+}

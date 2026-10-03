@@ -68,6 +68,7 @@ impl Server {
                 self.schedule_treats();
                 self.open_vacancy();
                 self.ensure_media_items();
+                self.restock_supplies();
                 if let Some(k) = self.kitchen.as_mut() {
                     k.restock();
                 }

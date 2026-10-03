@@ -10,7 +10,8 @@ const ACCESS_GUEST := 1
 const ACCESS_CARD := 2
 const ACCESS_SERVICE := 4
 const ACCESS_BOARD := 8
-const ACCESS_REQUIRED := {"card": ACCESS_GUEST | ACCESS_CARD, "service": ACCESS_SERVICE, "board": ACCESS_BOARD}
+const ACCESS_KEY := 16  # the storeroom key
+const ACCESS_REQUIRED := {"card": ACCESS_GUEST | ACCESS_CARD, "service": ACCESS_SERVICE, "board": ACCESS_BOARD, "key": ACCESS_KEY}
 
 # Movement directions (map::dir in Rust).
 const DIR_UP := 1

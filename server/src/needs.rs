@@ -543,6 +543,29 @@ impl Needs {
         self.clamp();
     }
 
+    /// A pill from the first-aid cabinet (`inventory::kind`).
+    pub fn medicine(&mut self, kind: u8) {
+        use crate::inventory::kind as k;
+        match kind {
+            k::PAINKILLER => {
+                self.health += 20 * SCALE;
+                self.alcohol -= 15 * SCALE; // the headache, at least
+            }
+            k::CHARCOAL => {
+                self.upset = false;
+                self.bowels -= 30 * SCALE;
+            }
+            k::VITAMIN => {
+                self.energy += 10 * SCALE;
+                self.stress -= 5 * SCALE;
+            }
+            k::PLASTER => self.health += 10 * SCALE,
+            _ => {}
+        }
+        self.alcohol = self.alcohol.max(0);
+        self.clamp();
+    }
+
     /// Hit for `points`; true = knocked out (health at 0).
     pub fn hurt(&mut self, points: i32) -> bool {
         self.health -= points * SCALE;

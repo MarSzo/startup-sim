@@ -135,6 +135,7 @@ impl Server {
             Packet::SkipWait { .. } => self.handle_skip_wait(id),
             Packet::Action { action, .. } => self.handle_action(id, action),
             Packet::HrAction { action, arg, .. } => self.handle_hr_action(id, action, arg),
+            Packet::Roll { quality, .. } => self.handle_roll(id, quality),
             Packet::Voice { seq, whisper, data, .. } => self.handle_voice(id, seq, whisper, data),
             Packet::TaskAction { nonce, action, task, arg, text, .. } => self.handle_task_action(id, nonce, action, task, arg, &text),
             Packet::MailAction { nonce, action, id: mid, to, subject, body, .. } => {
@@ -434,6 +435,7 @@ fn session_token(packet: &Packet) -> Option<u32> {
         | Packet::SkipWait { token }
         | Packet::Action { token, .. }
         | Packet::HrAction { token, .. }
+        | Packet::Roll { token, .. }
         | Packet::Voice { token, .. }
         | Packet::TaskAction { token, .. }
         | Packet::MailAction { token, .. }

@@ -38,6 +38,11 @@ impl Server {
             self.use_desk_and_say(pid, body);
             return;
         }
+        // The key hook / the cabinet right behind the reception desk win
+        // over talking to the receptionist; the storeroom's shelves too.
+        if self.use_supplies(pid, body) {
+            return;
+        }
         // NPCs at their post first (a porter still standing next to the
         // guest he just brought mustn't shadow the receptionist). At a shop
         // shelf only somebody right next to you (the guard walks the aisles).

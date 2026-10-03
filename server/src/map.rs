@@ -23,6 +23,8 @@ pub mod access {
     pub const SERVICE: u8 = 4;
     /// Board room: only during your meeting (calendar).
     pub const BOARD: u8 = 8;
+    /// The storeroom key (from the hook at the reception).
+    pub const KEY: u8 = 16;
 
     /// Rights that satisfy a tile's `access` requirement from the legend.
     pub fn required(name: &str) -> Option<u8> {
@@ -30,6 +32,7 @@ pub mod access {
             "card" => Some(GUEST | CARD),
             "service" => Some(SERVICE),
             "board" => Some(BOARD),
+            "key" => Some(KEY),
             _ => None,
         }
     }
@@ -637,14 +640,20 @@ mod tests {
                 let target = (f, tile);
                 let guest = b.find_path(spawn, target, access::GUEST).is_some();
                 let nobody = b.find_path(spawn, target, 0).is_some();
-                let staff = b.find_path(spawn, target, access::CARD | access::SERVICE | access::BOARD).is_some();
+                let staff = b.find_path(spawn, target, access::CARD | access::SERVICE | access::BOARD | access::KEY).is_some();
                 if SEALED.contains(&r.name.as_str()) {
                     assert!(!staff, "floor {f} {} should be locked for everyone", r.name);
                     continue;
                 }
                 assert!(staff, "floor {f} {} unreachable even for staff", r.name);
-                // Board room: only with a meeting (BOARD), service rooms: staff.
-                assert_eq!(guest, !matches!(r.kind.as_str(), "service" | "management"), "floor {f} {} with a guest pass", r.name);
+                // Board room: only with a meeting (BOARD), service rooms: staff,
+                // the storeroom: the key from the reception.
+                assert_eq!(
+                    guest,
+                    !matches!(r.kind.as_str(), "service" | "management" | "storage"),
+                    "floor {f} {} with a guest pass",
+                    r.name
+                );
                 let is_public = f == 0 && public.contains(&r.kind.as_str()) && r.name != "Parking wewnętrzny";
                 assert_eq!(nobody, is_public, "floor {f} {} without any pass", r.name);
             }

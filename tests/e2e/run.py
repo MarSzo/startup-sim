@@ -62,6 +62,10 @@ SCENARIOS = {
          "clients": [["chill_ola", ["--nick=Ola", "--autoconnect"]],
                      ["chill_kuba", ["--nick=Kuba", "--autoconnect"], 1.5]]},
     ],
+    "storeroom": [
+        {"server": EMPLOYED + ["--start-time", "11:58"],
+         "clients": [["storeroom", ["--nick=Ola", "--autoconnect"]]]},
+    ],
     "together": [
         {"server": EMPLOYED + ["--start-time", "10:00"],
          "clients": [["together_ola", ["--nick=Ola", "--autoconnect"]],
