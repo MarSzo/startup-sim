@@ -413,7 +413,7 @@ func _tile_object(x: int, y: int) -> void:
 
 const PROP_TYPES := ["desk", "counter", "shelf", "sofa", "table", "plant", "rack", "bench", "ashtray", "toilet", "sink",
 	"car", "coffee_machine", "kitchen_counter", "fruit_bowl", "partition", "sanitizer", "bike_rack",
-	"cupboard", "dishwasher", "kitchen_sink", "fridge", "urinal", "wardrobe", "bin", "armchair", "tv", "medicine_cabinet", "key_hook"]
+	"cupboard", "dishwasher", "kitchen_sink", "fridge", "urinal", "wardrobe", "bin", "armchair", "tv", "medicine_cabinet", "key_hook", "liquor_cabinet"]
 
 
 ## Connected tiles of the same furniture char = one object.
@@ -458,6 +458,7 @@ func _prop(t: String, tr: Rect2i, index: int) -> void:
 		"tv": _tv(r)
 		"medicine_cabinet": _medicine_cabinet(r)
 		"key_hook": _key_hook(r)
+		"liquor_cabinet": _liquor_cabinet(r)
 		"table": _table(tr, r)
 		"plant": _plant(r, index)
 		"rack": _racks(r, index)
@@ -565,6 +566,18 @@ func _medicine_cabinet(r: Rect2) -> void:
 	var c := b.get_center()
 	draw_rect(Rect2(c - Vector2(1.2, 3.6), Vector2(2.4, 7.2)), Color("#d9443a"))
 	draw_rect(Rect2(c - Vector2(3.6, 1.2), Vector2(7.2, 2.4)), Color("#d9443a"))
+
+
+## The liquor cabinet: dark wood, glass doors, bottles behind them, a keyhole.
+func _liquor_cabinet(r: Rect2) -> void:
+	var b := r.grow(-1.0)
+	_shadow(b)
+	_box(b, Color("#5e2f22"), true, 1.0)
+	var g := Rect2(b.position + Vector2(1.5, 1.5), b.size - Vector2(3, 5))
+	draw_rect(g, Color("#a9d4e0", 0.5))
+	for i in 3:
+		draw_rect(Rect2(g.position + Vector2(1.5 + i * 3.5, 2.5), Vector2(2, 5)), [Color("#b8742a"), Color("#dfe8ee"), Color("#7a3a1a")][i])
+	draw_circle(Vector2(b.get_center().x, b.end.y - 1.8), 0.6, Color("#d4b870"))
 
 
 ## The key hook: a little board, and the key on it (the server knows if it's there).

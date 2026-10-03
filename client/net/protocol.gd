@@ -3,7 +3,7 @@
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 44
+const VERSION := 45
 const MAX_PACKET := 1152  # a game packet; sealed it grows to at most MAX_DATAGRAM
 const MAX_DATAGRAM := 1200
 const MAX_NICK_BYTES := 16
@@ -71,6 +71,8 @@ const T_HR_ACTION := 56
 const T_HR_INFO := 57
 const T_MEDIA := 58
 const T_ROLL := 59
+const T_CHAT_SAY := 60
+const T_NOTICE := 61
 const MAX_VOICE_BYTES := 800
 # TaskAction.action / MailAction.action (server/src/protocol/mod.rs)
 const TA_SYNC := 0
@@ -471,6 +473,14 @@ static func encode_hr_action(token: int, action: int, arg: int) -> PackedByteArr
 	return b.data_array
 
 
+## Typed chat: to the room, "/s text" a whisper, "/k text" a shout.
+static func encode_chat_say(token: int, text: String) -> PackedByteArray:
+	var b := _writer(T_CHAT_SAY)
+	b.put_u32(token)
+	_put_str16(b, text, MAX_SAY_BYTES)
+	return b.data_array
+
+
 ## The rolling minigame's result: quality 0..100.
 static func encode_roll(token: int, quality: int) -> PackedByteArray:
 	var b := _writer(T_ROLL)
@@ -703,6 +713,9 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			p.health = r.u8()
 			p.stats_flags = r.u8()
 			p.money = r.u32()
+		T_NOTICE:
+			p.icon = r.u8()
+			p.text = r.str16(MAX_TEXT_BYTES)
 		T_MEDIA:
 			var screens := []
 			var n := r.u8()

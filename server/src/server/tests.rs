@@ -719,3 +719,107 @@ fn medicines_help_and_a_rolled_cigarette_is_as_good_as_the_rolling() {
     s.use_held(1);
     assert!(matches!(s.players[&1].rest, Some((crate::needs::Rest::Smoking { .. }, _, _))), "smoking the good one");
 }
+
+#[test]
+fn typed_chat_reaches_the_room_a_whisper_one_person_a_shout_the_floor() {
+    use super::Reach;
+    let mut s = server();
+    add_player(&mut s, 1);
+    add_player(&mut s, 2);
+    s.players.get_mut(&2).unwrap().body.pos = Pos::tile_center(6, 5);
+    s.handle_chat_say(1, "Cześć wszystkim");
+    s.handle_chat_say(1, "drugi raz od razu"); // flood guard: dropped
+    assert_eq!(s.says.len(), 1);
+    assert!(s.says[0].text == "Cześć wszystkim" && s.says[0].reach == Reach::Room);
+    s.tick += 20;
+    s.handle_chat_say(1, "/s idziemy na kawę?");
+    let w = s.says.last().unwrap();
+    assert!(w.reach == Reach::Whisper && w.to == Some(2) && w.text == "(szeptem) idziemy na kawę?");
+    s.tick += 20;
+    s.handle_chat_say(1, "/k pożar");
+    let k = s.says.last().unwrap();
+    assert!(k.reach == Reach::Floor && k.text == "(krzyczy) POŻAR");
+    // Nobody close: the whisper goes nowhere (a note to self).
+    s.players.get_mut(&2).unwrap().body.pos = Pos::tile_center(30, 30);
+    s.tick += 20;
+    s.handle_chat_say(1, "/s halo?");
+    assert_eq!(s.says.last().unwrap().text, super::chat::lines::NOBODY_TO_WHISPER);
+}
+
+#[test]
+fn the_liquor_cabinet_key_is_hidden_and_found_by_searching() {
+    use crate::supplies::{self, lines};
+    let mut s = server();
+    add_player(&mut s, 1);
+    assert!(s.supplies.hiding.len() >= 5, "plants, bins, wardrobes: {}", s.supplies.hiding.len());
+    let (lf, lt) = s.supplies.liquor.expect("a liquor cabinet");
+    assert_eq!(s.building.floor(lf).unwrap().room_name(s.building.floor(lf).unwrap().room_at_tile(lt.x + 1, lt.y)), "Sala spotkań 2");
+    // Locked without the key.
+    stand_next_to(&mut s, 1, lf, lt);
+    let body = s.players[&1].body;
+    s.use_supplies(1, &body);
+    assert!(s.says.iter().any(|l| l.text == lines::BAR_LOCKED));
+    // Search the wrong place, then the right one.
+    let at = s.supplies.bar_key_at.expect("hidden");
+    let wrong = (at + 1) % s.supplies.hiding.len();
+    let (f, t, _) = s.supplies.hiding[wrong];
+    stand_next_to(&mut s, 1, f, t);
+    let body = s.players[&1].body;
+    // (If two hiding places are next to each other, the nearest is searched.)
+    s.search_hideout(1, &body);
+    let (f, t, _) = s.supplies.hiding[at];
+    stand_next_to(&mut s, 1, f, t);
+    let body = s.players[&1].body;
+    s.search_hideout(1, &body);
+    assert!(s.players[&1].inventory.has(item_kind::BAR_KEY), "found it");
+    assert_eq!(s.supplies.bar_key_at, None);
+    // Now the cabinet opens: a whisky, and it's alcohol.
+    stand_next_to(&mut s, 1, lf, lt);
+    let body = s.players[&1].body;
+    s.use_supplies(1, &body);
+    s.answer_supplies(1, supplies::DIALOG, 0);
+    let at = s.players[&1].inventory.pockets.iter().position(|i| i.as_ref().is_some_and(|i| i.kind == item_kind::WHISKY)).unwrap();
+    s.players.get_mut(&1).unwrap().inventory.take_out(at).unwrap();
+    s.use_held(1);
+    assert_eq!(s.players[&1].needs.alcohol_points(), 25);
+    // Somebody has the key: the next morning it stays with them.
+    s.hide_bar_key();
+    assert_eq!(s.supplies.bar_key_at, None);
+}
+
+#[test]
+fn a_lost_passerby_asks_the_way_to_number_50() {
+    let mut s = server();
+    add_player(&mut s, 1);
+    let p = s.players.get_mut(&1).unwrap();
+    p.body = Body::at(0, Pos::tile_center(30, 59)); // the sidewalk
+    p.room = s.building.floor(0).unwrap().room_at_tile(30, 59);
+    let npcs = s.npcs.len();
+    s.send_passerby(1);
+    assert_eq!(s.npcs.len(), npcs + 1, "somebody walks up");
+    let id = s.npcs.last().unwrap().id;
+    let mut asked = None;
+    for _ in 0..2000 {
+        s.tick += 1;
+        let ev = s.tick_npcs();
+        s.apply_npc_events(ev);
+        if let Some(super::lost::Lost { phase: super::lost::Phase::Asking(d, _), .. }) = s.passersby.now {
+            asked = Some(d);
+            break;
+        }
+    }
+    let dialog = asked.expect("asks the way");
+    assert!(s.says.iter().any(|l| l.speaker == id && l.text == super::lost::lines::ASK));
+    // "Yes, it's here": in through the door, back out with a complaint, gone.
+    assert!(s.answer_lost(1, dialog, 1));
+    for _ in 0..4000 {
+        s.tick += 1;
+        let ev = s.tick_npcs();
+        s.apply_npc_events(ev);
+        if s.passersby.now.is_none() {
+            break;
+        }
+    }
+    assert!(s.says.iter().any(|l| l.text == super::lost::lines::TRICKED), "tricked");
+    assert!(s.passersby.now.is_none() && !s.npcs.iter().any(|n| n.id == id), "walked off");
+}

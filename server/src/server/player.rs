@@ -178,6 +178,8 @@ pub(super) struct Player {
     pub(super) hr: crate::hr::HrFile,
     /// A cabinet / the storeroom shelves dialog shown: its options (kinds, 0 = close).
     pub(super) supply_menu: Vec<u8>,
+    /// Typed chat: not before this tick (flood guard).
+    pub(super) next_chat: u32,
     /// World day of the last raise request (cooldown).
     pub(super) last_raise_day: Option<u32>,
     /// Talking to a board member: meeting index, NPC, dialog id, good answers.
@@ -272,6 +274,7 @@ impl Player {
             to_portal_at: None,
             hr: crate::hr::HrFile::default(),
             supply_menu: Vec::new(),
+            next_chat: 0,
             last_raise_day: None,
             talk: None,
             next_dialog_id: 0,

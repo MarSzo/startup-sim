@@ -52,6 +52,7 @@ LEGEND = {
     "M": {"type": "storeroom_door", "solid": False, "color": "#7a5a3a", "access": "key"},
     "j": {"type": "medicine_cabinet", "solid": True, "color": "#e8eef2"},
     "y": {"type": "key_hook", "solid": True, "color": "#8a6a45"},
+    "l": {"type": "liquor_cabinet", "solid": True, "color": "#5e2f22"},
     "P": {"type": "plant", "solid": True, "color": "#3f8a3a"},
     "R": {"type": "rack", "solid": True, "color": "#2a2d34"},
     "N": {"type": "bench", "solid": True, "color": "#8a6a45"},
@@ -464,6 +465,7 @@ def floor1():
     f.walls(18, 34, 29, 38, ",", "n")
     f.room("n", 17, "Sala spotkań 2", "meeting", detector=True, light="switch", switch_door=(29, 36), windows=True)
     f.put(21, 36, 25, 36, "T")
+    f.put(19, 35, 19, 35, "l")                           # the liquor cabinet (the key is hidden somewhere)
     f.door(29, 36, 29, 36, "D", "K")
     f.walls(18, 38, 29, 43, ".", "Q")
     f.room("Q", 21, "Klatka schodowa", "stairs", light="always")

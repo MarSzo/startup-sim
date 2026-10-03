@@ -318,6 +318,8 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
         ("action", Packet::Action { token: 0x01020304, action: 2 }),
         ("hr_action", Packet::HrAction { token: 0x01020304, action: 2, arg: 9 }),
         ("roll", Packet::Roll { token: 0x01020304, quality: 87 }),
+        ("chat_say", Packet::ChatSay { token: 0x01020304, text: "/s Idziemy na kawę?".into() }),
+        ("notice", Packet::Notice { icon: 2, text: "Nowa poczta: Witamy!".into() }),
         ("media", Packet::Media { screens: vec![(1, 35, 14, 4, 12_345)], music: vec![(2, 12_000, 1, 10_496, 3_200, 7)] }),
         (
             "hr_info",

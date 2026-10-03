@@ -17,6 +17,11 @@ pub const MEDICINES: [(u8, &str); 4] = [
 pub const MEDICINE_STOCK: u8 = 3;
 pub const STOREROOM: [(u8, &str); 2] = [(kind::COLA, "Coca-Cola"), (kind::STORE_COOKIES, "Ciastka")];
 pub const STOREROOM_STOCK: u8 = 6;
+/// The liquor cabinet in a meeting room (its key hidden somewhere).
+pub const BAR: [(u8, &str); 3] = [(kind::WHISKY, "Whisky"), (kind::COGNAC, "Koniak"), (kind::VODKA, "Wódka")];
+pub const BAR_STOCK: u8 = 2;
+/// Where the cabinet's key may be hidden (tile types you can search with E).
+pub const HIDING: [&str; 3] = ["plant", "bin", "wardrobe"];
 /// The receptionist's lunch break (minutes of the day): the key is free.
 pub const BREAK_FROM: u32 = 12 * 60;
 pub const BREAK_UNTIL: u32 = 12 * 60 + 30;
@@ -37,6 +42,9 @@ impl Stock {
         }
         for (k, _) in STOREROOM {
             s.0.insert(k, STOREROOM_STOCK);
+        }
+        for (k, _) in BAR {
+            s.0.insert(k, BAR_STOCK);
         }
         s
     }
@@ -89,6 +97,20 @@ pub mod lines {
     pub const COLA: &str = "Zimna cola z magazynu. Smakuje lepiej, bo za darmo.";
     pub const COOKIES: &str = "Ciastka z magazynu. Kradzione nie tuczy.";
     pub const KEY: &str = "Klucz do magazynku na piętrze (piwnica, a jednak na piętrze).";
+    pub const BAR: &str = "Barek: co nalewamy?";
+    pub const BAR_LOCKED: &str = "Barek zamknięty na kluczyk. Ciekawe, gdzie go schowali…";
+    pub const BAR_KEY: &str = "Mały kluczyk. Pasuje do barku w sali spotkań?";
+    pub const FOUND_KEY: &str = "O! Mały kluczyk… Do czego on może być?";
+    pub fn nothing(kind: &str) -> &'static str {
+        match kind {
+            "plant" => "Grzebiesz w doniczce… tylko ziemia i pet.",
+            "bin" => "W koszu? Ogryzek, kubek i stare CV. Nic.",
+            _ => "W szafie płaszcz i parasol. Nic więcej.",
+        }
+    }
+    pub const WHISKY: &str = "Whisky z barku zarządu. Smakuje jak premia.";
+    pub const COGNAC: &str = "Koniak. Elegancko, jak na spotkaniu z inwestorem.";
+    pub const VODKA: &str = "Wódeczka z barku. Na zdrowie!";
 }
 
 #[cfg(test)]

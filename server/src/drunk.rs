@@ -11,6 +11,8 @@ pub fn alcohol_of(kind: u8) -> i32 {
         kind::BEER => 15,
         kind::WINE => 30,
         kind::MALPKA => 25,
+        kind::WHISKY | kind::COGNAC => 25,
+        kind::VODKA => 30,
         _ => 0,
     }
 }

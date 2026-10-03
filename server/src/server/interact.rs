@@ -88,6 +88,8 @@ impl Server {
             // Went home just now.
         } else if let Some(line) = self.try_pickup(pid, body) {
             self.says.push(Say::new(pid, line));
+        } else {
+            self.search_hideout(pid, body);
         }
     }
 
@@ -150,9 +152,11 @@ impl Server {
                         }
                     }
                 }
-                npc::Event::Say { npc, text, to } => self.says.push(Say { speaker: npc, text, to }),
+                npc::Event::Say { npc, text, to } => self.says.push(Say { speaker: npc, text, to, reach: super::Reach::Room }),
                 npc::Event::Caught { npc, player } => self.caught(npc, player),
-                npc::Event::Arrived { .. } => {} // the cleaner: see tick_cleaning
+                npc::Event::Arrived { npc } => {
+                    self.passerby_arrived(npc); // (the cleaner: see tick_cleaning)
+                }
                 npc::Event::Escaped { npc, player } => self.escaped(npc, player),
                 npc::Event::Meeting { npc, player } => {
                     if let Some(line) = self.start_meeting(npc, player) {

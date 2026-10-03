@@ -24,6 +24,11 @@ pub(super) struct Supplies {
     pub(super) shelves: Vec<(u8, Tile)>,
     /// The receptionist is on her lunch break.
     pub(super) on_break: bool,
+    /// The liquor cabinet; the places its key may hide; where it is today
+    /// (an index in `hiding`; None = somebody found it).
+    pub(super) liquor: Option<(u8, Tile)>,
+    pub(super) hiding: Vec<(u8, Tile, &'static str)>,
+    pub(super) bar_key_at: Option<usize>,
 }
 
 impl Supplies {
@@ -35,7 +40,18 @@ impl Supplies {
                     match m.tile_type(x, y) {
                         Some("key_hook") => s.hook = Some((f, Tile { x, y })),
                         Some("medicine_cabinet") => s.cabinet = Some((f, Tile { x, y })),
-                        _ => {}
+                        Some("liquor_cabinet") => s.liquor = Some((f, Tile { x, y })),
+                        Some(t) => {
+                            // Somewhere a player can get to (not outdoors, not the closed zone).
+                            let room =
+                                [(0, 1), (0, -1), (1, 0), (-1, 0)].iter().map(|(dx, dy)| m.room_at_tile(x + dx, y + dy)).find(|&r| r != 0);
+                            let inside =
+                                room.and_then(|r| m.rooms.iter().find(|d| d.id == r)).is_some_and(|d| !d.outdoor && d.kind != "service");
+                            if let Some(&kind) = supplies::HIDING.iter().find(|&&h| h == t).filter(|_| inside) {
+                                s.hiding.push((f, Tile { x, y }, kind));
+                            }
+                        }
+                        None => {}
                     }
                 }
             }
@@ -65,6 +81,13 @@ impl Server {
     pub(super) fn use_supplies(&mut self, pid: u16, body: &Body) -> bool {
         if near(self.supplies.hook, body) {
             self.use_hook(pid);
+        } else if near(self.supplies.liquor, body) {
+            if self.players.get(&pid).is_some_and(|p| p.inventory.has(item_kind::BAR_KEY)) {
+                let options = supplies::BAR.to_vec();
+                self.supply_dialog(pid, lines::BAR, &options);
+            } else {
+                self.says.push(Say::new(pid, lines::BAR_LOCKED));
+            }
         } else if near(self.supplies.cabinet, body) {
             let options = supplies::MEDICINES.to_vec();
             self.supply_dialog(pid, lines::CABINET, &options);
@@ -178,10 +201,46 @@ impl Server {
         self.says.push(Say::new(pid, lit));
     }
 
+    /// E at a plant, a bin, a wardrobe: is the liquor cabinet's key there?
+    /// false = none in reach.
+    pub(super) fn search_hideout(&mut self, pid: u16, body: &Body) -> bool {
+        let at = self
+            .supplies
+            .hiding
+            .iter()
+            .enumerate()
+            .filter(|(_, h)| near(Some((h.0, h.1)), body))
+            .min_by_key(|(_, h)| dist2(Pos::tile_center(h.1.x, h.1.y), body.pos))
+            .map(|(i, h)| (i, h.2));
+        let Some((i, kind)) = at else { return false };
+        let room = self.players.get(&pid).is_some_and(|p| p.inventory.has_room());
+        if self.supplies.bar_key_at == Some(i) && room {
+            self.supplies.bar_key_at = None;
+            self.give_new(pid, item_kind::BAR_KEY);
+            self.says.push(Say::new(pid, lines::FOUND_KEY));
+            self.log(format!("* {} found the liquor cabinet's key", self.nick_of_player(pid)));
+        } else {
+            self.says.push(Say::new(pid, lines::nothing(kind)));
+        }
+        true
+    }
+
+    /// The liquor cabinet's key: somewhere new (if nobody has it).
+    pub(super) fn hide_bar_key(&mut self) {
+        let somewhere = self.players.values().any(|p| p.inventory.has(item_kind::BAR_KEY))
+            || self.dropped.iter().any(|d| d.item.kind == item_kind::BAR_KEY);
+        if somewhere || self.supplies.hiding.is_empty() {
+            self.supplies.bar_key_at = None;
+            return;
+        }
+        self.supplies.bar_key_at = Some(self.rng.usize(..self.supplies.hiding.len()));
+    }
+
     /// The morning: the shelves and the cabinet full again, the key back on
     /// its hook if nobody has it.
     pub(super) fn restock_supplies(&mut self) {
         self.supplies.stock = Stock::morning();
+        self.hide_bar_key();
         let somewhere = self.players.values().any(|p| p.inventory.has(item_kind::STORE_KEY))
             || self.dropped.iter().any(|d| d.item.kind == item_kind::STORE_KEY);
         if !somewhere {

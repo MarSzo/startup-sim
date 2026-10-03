@@ -53,6 +53,10 @@ const PAINKILLER := 48
 const CHARCOAL := 49
 const VITAMIN := 50
 const PLASTER := 51
+const BAR_KEY := 52
+const WHISKY := 53
+const COGNAC := 54
+const VODKA := 55
 
 const NAMES := {GUEST_PASS: "Przepustka gościa", EMPLOYEE_CARD: "Karta pracownika", LAPTOP: "Laptop", COFFEE: "Kawa", FRUIT: "Owoc",
 	SANDWICH_CHEESE: "Kanapka z serem", SANDWICH_HAM: "Kanapka z szynką", WRAP: "Wrap wege", BURGER: "Hamburger",
@@ -63,10 +67,10 @@ const NAMES := {GUEST_PASS: "Przepustka gościa", EMPLOYEE_CARD: "Karta pracowni
 	SALAD: "Sałatka z kurczakiem", KEBAB: "Kebab", EMPTY_CUP: "Brudny kubek", CUP: "Kubek", MILK: "Mleko (karton)",
 	LATTE: "Kawa z mlekiem", MALPKA: "Małpka", BREATHALYSER: "Alkomat", KNIFE: "Nóż kuchenny", REMOTE: "Pilot do telewizora", BOOMBOX: "Boombox", TOBACCO: "Tytoń do skręcania", ROLLED: "Skręt", STORE_KEY: "Klucz do magazynku",
 	COLA: "Coca-Cola", STORE_COOKIES: "Ciastka z magazynu", PAINKILLER: "Apap", CHARCOAL: "Węgiel aktywny", VITAMIN: "Witamina C",
-	PLASTER: "Plaster"}
+	PLASTER: "Plaster", BAR_KEY: "Mały kluczyk", WHISKY: "Whisky", COGNAC: "Koniak", VODKA: "Wódka"}
 const SMALL := [GUEST_PASS, EMPLOYEE_CARD, FRUIT, SANDWICH_CHEESE, SANDWICH_HAM, WRAP, BUN, BAR, CHIPS, WATER,
 	ENERGY_DRINK, JUICE, BEER, CIGARETTES, UMBRELLA, DONUT, COOKIE, CHEESECAKE, MILK, MALPKA, BREATHALYSER, KNIFE, REMOTE, TOBACCO, ROLLED, STORE_KEY,
-	COLA, STORE_COOKIES, PAINKILLER, CHARCOAL, VITAMIN, PLASTER]
+	COLA, STORE_COOKIES, PAINKILLER, CHARCOAL, VITAMIN, PLASTER, BAR_KEY, WHISKY, COGNAC, VODKA]
 
 
 static func item_name(kind: int) -> String:
@@ -219,6 +223,17 @@ static func draw(c: CanvasItem, kind: int, o: Vector2, s: float) -> void:
 			ln.call(6, 6.8, 7.6, 6.8, Color("#2c4a22"), 0.6)
 			ln.call(8.4, 6.8, 10, 6.8, Color("#2c4a22"), 0.6)
 			dot.call(8, 11.4, 1.1, Color("#d9443a"))
+		BAR_KEY:  # a small brass key
+			circ.call(6, 6.5, 2.4, Color("#c9a24a"))
+			dot.call(6, 6.5, 0.9, Color("#8a6a45"))
+			ln.call(7.8, 8, 12.6, 12.8, Color("#c9a24a"), 1.2)
+			ln.call(11, 11.2, 12.2, 10, Color("#c9a24a"), 1.0)
+		WHISKY:
+			bottle.call(Color("#b8742a"), Color("#efe0b0"), Color("#2d3036"))
+		COGNAC:
+			bottle.call(Color("#7a3a1a"), Color("#e8c46a"), Color("#c9a24a"))
+		VODKA:
+			bottle.call(Color("#dfe8ee"), Color("#f4f6f8"), Color("#c0392b"))
 		TOBACCO:  # a pouch with a leaf
 			rr.call(2.2, 4, 11.6, 9.6, Color("#3f6b3a"), 1.6)
 			ln.call(2.6, 7, 13.4, 7, Color("#2c4a28"), 0.6)

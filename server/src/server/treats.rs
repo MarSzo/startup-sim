@@ -33,6 +33,7 @@ impl Server {
             let (id, name) = (hr.id, hr.name.clone());
             self.messenger.post_system(computer::conv::GENERAL, id, &name, &text);
         }
+        self.notify_building(0, crate::protocol::notice::FUN, &text);
         self.log(format!("* treats: {text}"));
     }
 

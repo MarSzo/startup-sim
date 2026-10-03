@@ -66,6 +66,11 @@ SCENARIOS = {
         {"server": EMPLOYED + ["--start-time", "11:58"],
          "clients": [["storeroom", ["--nick=Ola", "--autoconnect"]]]},
     ],
+    "chat": [
+        {"server": EMPLOYED + ["--start-time", "10:00"],
+         "clients": [["chat_ola", ["--nick=Ola", "--autoconnect"]],
+                     ["chat_kuba", ["--nick=Kuba", "--autoconnect"], 1.5]]},
+    ],
     "together": [
         {"server": EMPLOYED + ["--start-time", "10:00"],
          "clients": [["together_ola", ["--nick=Ola", "--autoconnect"]],

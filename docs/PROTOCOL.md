@@ -1,4 +1,4 @@
-# Protokół sieciowy (wersja 44)
+# Protokół sieciowy (wersja 45)
 
 Własny binarny protokół na UDP. Implementacje:
 - serwer: `server/src/protocol/` (źródło prawdy),
@@ -23,7 +23,7 @@ przez `cargo test` i czytane przez `client/tests/run_tests.gd`.
 | pole    | typ | wartość |
 |---------|-----|---------|
 | magic   | u16 | `0x5354` (bajty `54 53`, „TS”) |
-| version | u8  | `44` |
+| version | u8  | `45` |
 | type    | u8  | typ pakietu (niżej) |
 
 ## Jednostki
@@ -478,6 +478,16 @@ dnia urlopu, z 5), aneksy n u8 (≤ 10, najnowsze na końcu) × {`day u16`, `tex
 str16}, wnioski n u8 (≤ 10) × {`id u8`, `day u16`, `status u8` (1
 zaakceptowany, 2 odrzucony, 3 anulowany, 4 wykorzystany)}.
 
+### 60 `ChatSay` (C→S), 61 `Notice` (S→C)
+
+`ChatSay`: token u32, `text` str16 (≤ `MAX_SAY_BYTES`) — czat tekstowy; serwer
+odsyła go jako `Say` gracza: zwykły tekst — pomieszczenie, „/s tekst” — tylko
+najbliższa osoba w 2 kaflach („(szeptem) …”), „/k tekst” — całe piętro
+(„(krzyczy) …”); co najmniej 0,5 s między liniami. `Notice`: `icon u8` (1 info,
+2 poczta, 3 jedzenie, 4 uwaga, 5 rozrywka), `text` str16 — powiadomienie w
+rogu ekranu. Przedmioty: 52 mały kluczyk (barek), 53 whisky, 54 koniak, 55
+wódka; barek to `Dialog` 255.
+
 ### 59 `Roll` (C→S)
 
 token u32, `quality u8` (0..100) — wynik mini-gry skręcania; serwer zabiera
@@ -606,6 +616,7 @@ szyfrowaniem.
 
 ## Historia wersji
 
+- **45** — czat i powiadomienia: `ChatSay` (60, C→S), `Notice` (61, S→C); przedmioty 52–55 (barek); zagubiony przechodzień (NPC, pytanie jako zwykły `Dialog`).
 - **44** — skręty i zapasy: `Roll` (59, C→S), przedmioty 43–51, uprawnienie 16 (klucz do magazynku), `Dialog` 255 (apteczka / magazynek).
 - **43** — telewizor i boombox: `Media` (58, S→C), przedmioty 41 pilot, 42 boombox, `Dialog` 253 (kanały), 254 (utwory).
 - **42** — Kadry: `HrAction` (56, C→S), `HrInfo` (57, S→C); `Clock` + `leave u8` na końcu (dzień urlopu: w domu).

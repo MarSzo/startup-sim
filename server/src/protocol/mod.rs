@@ -23,7 +23,7 @@ pub use golden::{golden_samples, to_hex};
 pub use snapshot::{snapshot_fragments, SelfState};
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 44;
+pub const VERSION: u8 = 45;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
 /// A game packet at most (sealed, it grows by up to 48 B to `MAX_DATAGRAM`).
@@ -111,6 +111,8 @@ pub mod ty {
     pub const HR_INFO: u8 = 57;
     pub const MEDIA: u8 = 58;
     pub const ROLL: u8 = 59;
+    pub const CHAT_SAY: u8 = 60;
+    pub const NOTICE: u8 = 61;
 }
 
 /// `ItemAction::action`.
@@ -273,6 +275,15 @@ pub mod employment {
     pub const B2B: u8 = 2;
     /// Umowa zlecenie (only students under 26).
     pub const MANDATE: u8 = 3;
+}
+
+/// `Notice::icon`.
+pub mod notice {
+    pub const INFO: u8 = 1;
+    pub const MAIL: u8 = 2;
+    pub const FOOD: u8 = 3;
+    pub const ALERT: u8 = 4;
+    pub const FUN: u8 = 5;
 }
 
 /// `Action::action` (C→S).
@@ -898,6 +909,17 @@ pub enum Packet {
         token: u32,
         action: u8,
         arg: u16,
+    },
+    /// Typed chat (Enter): to the room; "/s text" whispers to the person
+    /// next to you, "/k text" shouts to the whole floor.
+    ChatSay {
+        token: u32,
+        text: String,
+    },
+    /// A notification for the corner of the screen (`notice::*` icon).
+    Notice {
+        icon: u8,
+        text: String,
     },
     /// Rolled a cigarette (the minigame, tobacco in hands): how well, 0..100.
     Roll {

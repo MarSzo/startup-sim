@@ -393,6 +393,8 @@ impl Packet {
                 }
                 Packet::HrInfo(Box::new(h))
             }
+            ty::CHAT_SAY => Packet::ChatSay { token: r.u32()?, text: r.str16(MAX_SAY_BYTES)? },
+            ty::NOTICE => Packet::Notice { icon: r.u8()?, text: r.str16(MAX_TEXT_BYTES)? },
             ty::ROLL => Packet::Roll { token: r.u32()?, quality: r.u8()? },
             ty::MEDIA => {
                 let n = r.u8()? as usize;

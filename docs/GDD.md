@@ -1403,6 +1403,28 @@ pełnym ekranie — zastąpiona stylem inspirowanym Don't Starve:
   na haczyk (E z kluczem w rękach); jeśli zginie, rano wraca. W magazynku na
   regałach: Coca-Cola (energia +15) i ciastka (głód −12), po 6 dziennie.
 
+### 10.53 Czat, dziennik i powiadomienia, barek, zagubiony przechodzień
+
+- **Czat tekstowy** (Enter): wiadomość do wszystkich w pomieszczeniu (dymek i
+  log, jak głos); `/s tekst` — szept do najbliższej osoby (do 2 kafli), `/k
+  tekst` — krzyk na całe piętro. Pijany pisze z bełkotem. Najwyżej linia na
+  pół sekundy.
+- **Log** w lewym dolnym rogu trzyma 8 linii przez 30 s; **H** — dziennik dnia
+  (wszystko, co powiedziano obok, i powiadomienia, z godziną; przewijany).
+- **Powiadomienia** (karteczki w prawym górnym rogu, ~7 s, dźwięk): nowa poczta
+  (urlop, nagana, obiad, mail od kogoś), pączki w chill roomie, telewizja /
+  muzyka włączona, ktoś obok znokautowany / zasnął pijany / zwymiotował.
+- **Barek** w Sali spotkań 2: whisky, koniak, wódka (po 2 dziennie, liczą się do
+  upojenia). Zamknięty na **mały kluczyk**, który co rano jest chowany w innym
+  losowym miejscu biura — doniczka, kosz, szafa (E — przeszukaj: „W koszu?
+  Ogryzek, kubek i stare CV. Nic.”). Kto go znajdzie, ma barek dla siebie; jeśli
+  ktoś go ma, rano nie jest chowany nowy.
+- **Zagubiony przechodzień**: gdy jesteś na zewnątrz, czasem (najwyżej raz na
+  10 minut) podchodzi ktoś z drugiego końca chodnika: „Przepraszam, gdzie jest
+  numer 50? To chyba tu obok?”. *Na drugim końcu ulicy* — dziękuje i idzie;
+  *Tak, to tutaj* — idzie do drzwi i wraca z pretensjami („tu jest 48!”); *Nie
+  wiem* — „zapytam kogoś innego”.
+
 ### 10.6 Stan implementacji
 
 *Stan na 2026-09-26 — etap 1 (sieć) ukończony; dodane IPv6, sesje po tokenie,

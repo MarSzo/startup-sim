@@ -83,7 +83,10 @@ func _title(p: Dictionary) -> String:
 	if p.id == 251:
 		return "Szafka w kuchni"
 	if p.id == 255:
-		return "Apteczka" if str(p.text).begins_with("Apteczka") else "Magazynek"
+		for t in ["Apteczka", "Barek"]:
+			if str(p.text).begins_with(t):
+				return t
+		return "Magazynek"
 	if p.id == 253:
 		return "Telewizor"
 	if p.id == 254:
@@ -92,7 +95,10 @@ func _title(p: Dictionary) -> String:
 		return "Umowa — %s" % name_of.call(p.npc)
 	if p.id >= 200:
 		return "Alkomat — %s" % name_of.call(p.npc)
-	return "Spotkanie — %s" % name_of.call(p.npc)
+	var who: String = name_of.call(p.npc)
+	if who == "Przechodzień":
+		return "Ktoś pyta o drogę"
+	return "Spotkanie — %s" % who
 
 
 ## The header shown (for tests).

@@ -29,6 +29,7 @@ mod actions;
 mod alarm;
 mod board;
 mod breath;
+mod chat;
 mod cleaning;
 mod company;
 mod computers;
@@ -45,6 +46,7 @@ mod leave;
 mod office;
 mod positions;
 pub use positions::lines as position_lines;
+mod lost;
 mod lunch;
 mod media;
 mod movement;
@@ -189,15 +191,35 @@ struct Say {
     speaker: u16,
     text: String,
     to: Option<u16>,
+    /// Who hears it: the room (and `to`), only `to` (a whisper) or the
+    /// whole floor (a shout).
+    reach: Reach,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Reach {
+    Room,
+    Whisper,
+    Floor,
 }
 
 impl Say {
     fn new(speaker: u16, text: impl Into<String>) -> Say {
-        Say { speaker, text: text.into(), to: None }
+        Say { speaker, text: text.into(), to: None, reach: Reach::Room }
     }
 
     fn addressed(speaker: u16, text: impl Into<String>, to: u16) -> Say {
-        Say { speaker, text: text.into(), to: Some(to) }
+        Say { speaker, text: text.into(), to: Some(to), reach: Reach::Room }
+    }
+
+    /// Only `to` (and the speaker) hear it.
+    fn whisper(speaker: u16, text: impl Into<String>, to: u16) -> Say {
+        Say { speaker, text: text.into(), to: Some(to), reach: Reach::Whisper }
+    }
+
+    /// Everybody on the speaker's floor hears it.
+    fn shout(speaker: u16, text: impl Into<String>) -> Say {
+        Say { speaker, text: text.into(), to: None, reach: Reach::Floor }
     }
 }
 
@@ -225,6 +247,8 @@ pub struct Server {
     media_dirty: bool,
     /// The first-aid cabinet, the storeroom, the key hook.
     supplies: supplies::Supplies,
+    /// Somebody lost asking the way (lost.rs).
+    passersby: lost::Passersby,
     /// Players the cashier already asked about the hot dog (until they step away).
     cashier_asked: HashSet<u16>,
     /// Pani Wiesia: when she last greeted each player, and the next joke.
@@ -338,6 +362,7 @@ impl Server {
             music: None,
             media_dirty: false,
             supplies: supplies::Supplies::find(&building),
+            passersby: lost::Passersby::default(),
             porter_greeted: HashMap::new(),
             porter_joke: 0,
             lunch_asked: HashMap::new(),
@@ -411,6 +436,7 @@ impl Server {
         server.load_save().map_err(std::io::Error::other)?;
         server.schedule_treats();
         server.ensure_media_items();
+        server.hide_bar_key();
         if server.cfg.treats_now {
             server.put_tray();
         }
@@ -500,6 +526,7 @@ impl Server {
         self.tick_cashier();
         self.tick_reception();
         self.tick_lunch_break();
+        self.tick_lost();
         self.tick_maria();
         self.tick_to_portal();
         self.tick_media();

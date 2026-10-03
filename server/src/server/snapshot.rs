@@ -158,7 +158,7 @@ impl Server {
     /// speaker's room or seeing into it (e.g. from a toilet stall), plus the
     /// addressee.
     fn queue_says(&mut self, out: &mut Vec<Outgoing>) {
-        for Say { speaker, text, to } in std::mem::take(&mut self.says) {
+        for Say { speaker, text, to, reach } in std::mem::take(&mut self.says) {
             // A drunk player's lines come out slurred.
             let text = match self.players.get(&speaker).map(|p| p.needs.drunk_tier()) {
                 Some(tier) if tier > 0 => crate::drunk::slur(&text, tier, (u64::from(self.tick) << 16) | u64::from(speaker)),
@@ -181,7 +181,12 @@ impl Server {
                 let sees = (p.body.floor == place.0
                     && self.building.floor(p.body.floor).is_some_and(|m| m.visible_from(p.room).contains(&place.1)))
                     || self.building.below(p.body.floor, p.room).contains(&place);
-                if here || sees || Some(p.id) == to || p.id == speaker {
+                let hears = match reach {
+                    super::Reach::Room => here || sees || Some(p.id) == to,
+                    super::Reach::Whisper => Some(p.id) == to,
+                    super::Reach::Floor => p.in_building() && p.body.floor == place.0,
+                };
+                if hears || p.id == speaker {
                     // Name first, so the line isn't shown as "?".
                     if p.id != speaker && p.known.insert(speaker) {
                         out.push((p.addr, p.id, Packet::PlayerInfo { players: vec![info.clone()] }));

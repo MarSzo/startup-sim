@@ -143,6 +143,8 @@ pub enum Role {
     Firefighter,
     /// Sits in her armchair all day (Paulina): never gets up.
     Idler,
+    /// Walks up to somebody outside and asks the way to no. 50 (lost.rs).
+    Passerby,
 }
 
 impl Role {
@@ -169,6 +171,7 @@ impl Role {
             Role::Guard => look::GUARD,
             Role::Police => look::POLICE,
             Role::Cleaner | Role::Idler => look::CLEANER,
+            Role::Passerby => look::PLAYER,
             Role::Firefighter => look::FIREFIGHTER,
         }
     }
@@ -314,6 +317,11 @@ impl Npc {
         Npc::visitor(b, id, pos, Role::Police, "Policja")
     }
 
+    /// A lost passer-by on the sidewalk at `pos` (floor 0).
+    pub fn passerby(b: &Building, id: u16, pos: Pos) -> Npc {
+        Npc::visitor(b, id, pos, Role::Passerby, "Przechodzień")
+    }
+
     /// A firefighter off the fire engine at `pos` (floor 0).
     pub fn firefighter(b: &Building, id: u16, pos: Pos) -> Npc {
         Npc::visitor(b, id, pos, Role::Firefighter, "Straż pożarna")
@@ -421,6 +429,9 @@ impl Npc {
         }
         if self.role == Role::Firefighter {
             return vec![say(crate::fire::lines::GET_OUT)];
+        }
+        if self.role == Role::Passerby {
+            return vec![say("Przepraszam, szukam numeru 50… To gdzieś tu?")];
         }
         if self.role == Role::Idler {
             self.said += 1;

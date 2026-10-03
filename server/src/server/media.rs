@@ -94,9 +94,14 @@ impl Server {
                 Some(name) => (pick as u8 + 1, lines::tv_on(name)),
                 None => (0, lines::TV_OFF.to_string()),
             };
+            let was_off = s.channel == 0;
             s.channel = channel;
             s.started = tick;
             self.says.push(Say::new(pid, line));
+            if was_off && channel > 0 {
+                let text = format!("W chill roomie leci telewizja: {}", media::CHANNELS[pick]);
+                self.notify_building(pid, crate::protocol::notice::FUN, &text);
+            }
         } else {
             if held != item_kind::BOOMBOX {
                 return true;
@@ -107,6 +112,10 @@ impl Server {
             };
             self.music = (track > 0).then_some((track, tick));
             self.says.push(Say::new(pid, line));
+            if track > 0 {
+                let text = format!("{} puszcza muzykę: {}", self.nick_of_player(pid), media::TRACKS[pick]);
+                self.notify_building(pid, crate::protocol::notice::FUN, &text);
+            }
         }
         self.media_dirty = true;
         true

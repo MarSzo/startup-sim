@@ -53,6 +53,10 @@ impl Server {
             ouch
         };
         self.says.push(Say::new(target, line));
+        if out {
+            let text = format!("{} leży znokautowany!", self.nick_of_player(target));
+            self.notify_room_of(target, proto::notice::ALERT, &text);
+        }
         let what = if knife { "stabbed" } else { "punched" };
         self.log(format!("* fight: {} {what} {}{}", self.nick_of_player(id), self.nick_of_player(target), if out { " (KO)" } else { "" }));
         self.assaulted(id, knife);

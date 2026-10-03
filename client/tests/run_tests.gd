@@ -65,6 +65,7 @@ func test_protocol(path: String) -> void:
 		"action": Protocol.encode_action(0x01020304, Protocol.ACTION_ATTACK),
 		"hr_action": Protocol.encode_hr_action(0x01020304, Protocol.HR_REQUEST, 9),
 		"roll": Protocol.encode_roll(0x01020304, 87),
+		"chat_say": Protocol.encode_chat_say(0x01020304, "/s Idziemy na kawę?"),
 		"task_action": Protocol.encode_task_action(0x01020304, 7, Protocol.TA_CREATE, 0, 2, "Naprawić logowanie\nPo zmianie hasła."),
 		"voice": Protocol.encode_voice(0x01020304, 9, true, PackedByteArray([0x10, 0x00, 0x05, 0x7f, 0x80])),
 		"mail_action": Protocol.encode_mail_action(0x01020304, 4, Protocol.MA_SEND, 0, "Kuba", "Kawa?", "O 12 w kuchni."),
@@ -115,6 +116,8 @@ func test_protocol(path: String) -> void:
 		and ck.today_minutes == 0 and ck.mode == 2 and ck.depart == 520 and ck.money == 18600
 		and ck.weather == Protocol.WEATHER_RAIN and ck.company == "Pixel Pierogi sp. z o.o." and ck.founded and ck.alarm == 1 and ck.skip == 1
 		and ck.leave, "decode clock %s" % ck)
+	var nt := Protocol.decode(golden["notice"].hex_decode())
+	expect(nt.get("type") == Protocol.T_NOTICE and nt.icon == 2 and nt.text == "Nowa poczta: Witamy!", "decode notice %s" % nt)
 	var md := Protocol.decode(golden["media"].hex_decode())
 	expect(md.get("type") == Protocol.T_MEDIA and md.screens == [{"floor": 1, "x": 35, "y": 14, "channel": 4, "started": 12345}]
 		and md.music == [{"track": 2, "started": 12000, "floor": 1, "x": 10496, "y": 3200, "holder": 7}], "decode media %s" % md)

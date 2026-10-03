@@ -53,6 +53,8 @@ impl Packet {
             Packet::HrInfo(_) => ty::HR_INFO,
             Packet::Media { .. } => ty::MEDIA,
             Packet::Roll { .. } => ty::ROLL,
+            Packet::ChatSay { .. } => ty::CHAT_SAY,
+            Packet::Notice { .. } => ty::NOTICE,
             Packet::Sound { .. } => ty::SOUND,
             Packet::TaskAction { .. } => ty::TASK_ACTION,
             Packet::TaskBoard { .. } => ty::TASK_BOARD,
@@ -462,6 +464,14 @@ impl Packet {
                     w.u16(*day);
                     w.u8(*status);
                 }
+            }
+            Packet::ChatSay { token, text } => {
+                w.u32(*token);
+                w.str16(text, MAX_SAY_BYTES);
+            }
+            Packet::Notice { icon, text } => {
+                w.u8(*icon);
+                w.str16(text, MAX_TEXT_BYTES);
             }
             Packet::Roll { token, quality } => {
                 w.u32(*token);

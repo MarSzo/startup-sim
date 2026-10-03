@@ -196,7 +196,9 @@ impl Server {
         let Some(p) = self.players.get_mut(&id) else { return };
         let Some(held) = &p.inventory.hands else { return };
         let snd = match held.kind {
-            item_kind::COFFEE | item_kind::LATTE | item_kind::COLA => Some(crate::protocol::sound::DRINK),
+            item_kind::COFFEE | item_kind::LATTE | item_kind::COLA | item_kind::WHISKY | item_kind::COGNAC | item_kind::VODKA => {
+                Some(crate::protocol::sound::DRINK)
+            }
             item_kind::STORE_COOKIES => Some(crate::protocol::sound::EAT),
             item_kind::FRUIT if !p.needs.is_full() => Some(crate::protocol::sound::EAT),
             item_kind::CIGARETTES if !held.unpaid => Some(crate::protocol::sound::LIGHTER),
@@ -274,6 +276,20 @@ impl Server {
             item_kind::ROLLED if !held.unpaid => return self.smoke_roll(id),
             item_kind::TOBACCO if !held.unpaid => crate::supplies::lines::ROLL_FIRST.into(),
             item_kind::STORE_KEY => crate::supplies::lines::KEY.into(),
+            item_kind::BAR_KEY => crate::supplies::lines::BAR_KEY.into(),
+            item_kind::WHISKY | item_kind::COGNAC | item_kind::VODKA => {
+                let k = held.kind;
+                p.inventory.take_hands();
+                p.needs.apply(crate::shop::Effect { hunger: 0, energy: -5, stress: -20, bladder: 5 });
+                drink = Some(p.needs.drink_alcohol(crate::drunk::alcohol_of(k)));
+                refresh(p);
+                match k {
+                    item_kind::WHISKY => crate::supplies::lines::WHISKY,
+                    item_kind::COGNAC => crate::supplies::lines::COGNAC,
+                    _ => crate::supplies::lines::VODKA,
+                }
+                .into()
+            }
             item_kind::COLA => {
                 p.inventory.take_hands();
                 p.needs.apply(crate::shop::Effect { hunger: 0, energy: 15, stress: -3, bladder: 12 });
@@ -331,6 +347,8 @@ impl Server {
                 p.passed_out = true;
                 p.rest = None;
                 self.says.push(Say::new(id, crate::drunk::lines::PASS_OUT));
+                let text = format!("{} zasnął/zasnęła pijany(a) na podłodze.", self.nick_of_player(id));
+                self.notify_room_of(id, crate::protocol::notice::ALERT, &text);
                 self.log(format!("* drunk: {} passed out", self.nick_of_player(id)));
             }
             _ => self.sounds.push((crate::protocol::sound::BURP, floor, pos)),
@@ -349,6 +367,8 @@ impl Server {
         self.sounds.push((crate::protocol::sound::VOMIT, floor, pos));
         self.says.push(Say::new(id, line));
         self.leave_puddle(floor, pos, crate::protocol::puddle::VOMIT);
+        let text = format!("{} zwymiotował(a) na podłogę. Fuj.", self.nick_of_player(id));
+        self.notify_room_of(id, crate::protocol::notice::ALERT, &text);
         self.log(format!("* {why}: {} threw up", self.nick_of_player(id)));
     }
 

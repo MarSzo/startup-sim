@@ -72,6 +72,12 @@ pub mod kind {
     pub const CHARCOAL: u8 = 49;
     pub const VITAMIN: u8 = 50;
     pub const PLASTER: u8 = 51;
+    /// The liquor cabinet's key (hidden somewhere in the office every day)
+    /// and what's in the cabinet.
+    pub const BAR_KEY: u8 = 52;
+    pub const WHISKY: u8 = 53;
+    pub const COGNAC: u8 = 54;
+    pub const VODKA: u8 = 55;
 }
 
 pub const POCKETS: usize = 3;
@@ -83,7 +89,7 @@ pub fn is_small(k: u8) -> bool {
         kind::BURGER | kind::FRIES | kind::WINE => false,
         10..=27 => true,
         kind::MILK | kind::MALPKA | kind::BREATHALYSER | kind::KNIFE | kind::REMOTE => true,
-        kind::TOBACCO..=kind::PLASTER => true,
+        kind::TOBACCO..=kind::VODKA => true,
         28..=33 => false, // lunch boxes: both hands
         _ => false,
     }
@@ -111,6 +117,10 @@ pub fn display_name(k: u8) -> &'static str {
         kind::CHARCOAL => "Węgiel aktywny",
         kind::VITAMIN => "Witamina C",
         kind::PLASTER => "Plaster",
+        kind::BAR_KEY => "Mały kluczyk",
+        kind::WHISKY => "Whisky",
+        kind::COGNAC => "Koniak",
+        kind::VODKA => "Wódka",
         k => crate::shop::product(k).map_or("?", |p| p.name),
     }
 }
