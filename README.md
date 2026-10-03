@@ -106,10 +106,16 @@ Rozgrywka od początku do końca — prawdziwy klient (bez okna) na prawdziwym
 serwerze, sterowany scenariuszami z `client/tests/e2e/scenarios/`:
 
 ```bash
-python3 tests/e2e/run.py              # wszystkie (ok. 3 min): workday, onboarding, resign, office_apps, chill, storeroom, chat, together, founder, persistence, drinking, fight
+python3 tests/e2e/run.py              # wszystkie (ok. 7 min): workday, onboarding, resign, office_apps, chill, storeroom, chat, together, founder, persistence, drinking, fight
 python3 tests/e2e/run.py together     # wybrane; --list wypisze nazwy
+python3 tests/e2e/run.py --shard 1/3  # jedna z trzech części (tak dzieli je CI)
 python3 tests/load/soak.py            # obciążenie: 50 botów przez 3 min (--bots, --minutes)
 ```
+
+W CI scenariusze idą tylko w pull requestach (nie drugi raz po merge'u), w 3
+równoległych częściach (~2,5 min) i tylko gdy PR zmienia klienta, serwer albo
+scenariusze; ręcznie: Actions → CI → Run workflow. Nowy scenariusz dopisz też do
+`DURATION` w `tests/e2e/run.py` (przybliżony czas — do równego podziału).
 
 Szczegóły i jak dopisać scenariusz: [tests/README.md](tests/README.md).
 

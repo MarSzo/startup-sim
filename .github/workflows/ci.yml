@@ -3,12 +3,18 @@
 # protocol / movement parity with the server's golden files), gameplay
 # scenarios with the real client against the real server, the Python tools
 # and the maps they generate, and no secrets in the repository.
+#
+# The gameplay scenarios are the slow part: they run on pull requests only
+# (not again after the merge), split into 3 parallel parts, and only when
+# the client, the server or the scenarios changed. Run them by hand any
+# time: Actions -> CI -> Run workflow.
 name: CI
 
 on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -85,9 +91,15 @@ jobs:
           grep -q ", 0 failures" /tmp/godot.log
 
   gameplay:
-    name: Rozgrywka (scenariusze e2e)
+    name: Rozgrywka (scenariusze e2e, część ${{ matrix.shard }}/3)
+    needs: changes
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && needs.changes.outputs.game == 'true')
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     env:
       GODOT_VERSION: 4.7.2
     steps:
@@ -110,13 +122,35 @@ jobs:
           unzip -q /tmp/godot.zip -d ~/godot
           mv ~/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64 ~/godot/godot
       - name: Scenariusze (prawdziwy klient + serwer)
-        run: GODOT=$HOME/godot/godot python3 tests/e2e/run.py --logs /tmp/e2e-logs
+        run: GODOT=$HOME/godot/godot python3 tests/e2e/run.py --shard ${{ matrix.shard }}/3 --logs /tmp/e2e-logs
       - name: Logi scenariuszy
         if: failure()
         uses: actions/upload-artifact@v5
         with:
-          name: e2e-logs
+          name: e2e-logs-${{ matrix.shard }}
           path: /tmp/e2e-logs
+
+  # Did the pull request touch the game (client, server, scenarios)? Docs
+  # and the like don't need the gameplay scenarios.
+  changes:
+    name: Zmiany w grze?
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      game: ${{ steps.diff.outputs.game }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: diff
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "game=true" >> "$GITHUB_OUTPUT"
+          elif git diff --name-only "${{ github.event.pull_request.base.sha }}" HEAD | grep -qE '^(client|server|tests/e2e)/'; then
+            echo "game=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "game=false" >> "$GITHUB_OUTPUT"
+          fi
 
   tools:
     name: Narzędzia i mapy (Python)
