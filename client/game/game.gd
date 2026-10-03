@@ -315,7 +315,7 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 	mat.shader = load("res://game/mood.gdshader")
 	mood.material = mat
 	Settings.load_once()
-	mood.visible = Settings.mood and not args.has("no-mood")
+	mood.visible = not args.has("no-mood")  # the ink and paper: always (off only for dev / perf runs)
 	mood_layer.add_child(mood)
 	alarm_tint.set_anchors_preset(Control.PRESET_FULL_RECT)
 	alarm_tint.color = Color(0.9, 0.05, 0.05, 0.0)
@@ -1027,7 +1027,6 @@ func window_open() -> bool:
 
 ## Settings changed in the Esc menu.
 func apply_settings() -> void:
-	mood.visible = Settings.mood
 	set_zoom_level(Settings.zoom)
 
 

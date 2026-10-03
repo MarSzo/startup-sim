@@ -132,7 +132,7 @@ Tailscale: [deploy/README.md](deploy/README.md).
 Interfejs używa odręcznej czcionki **Patrick Hand** (© Patrick Wagesreiter), na
 licencji SIL Open Font License 1.1 — plik i licencja w `client/fonts/`
 (`PatrickHand-Regular.ttf`, `OFL-PatrickHand.txt`). Klient: `--no-mood` wyłącza
-efekt „tuszu i papieru” na świecie, `--zoom=1.5` ustawia przybliżenie kamery.
+efekt „tuszu i papieru” na świecie (tylko do testów — w grze jest zawsze włączony), `--zoom=1.5` ustawia przybliżenie kamery.
 
 ## Mapy
 

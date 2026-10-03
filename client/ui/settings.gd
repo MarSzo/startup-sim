@@ -6,7 +6,6 @@ extends RefCounted
 const UserPaths = preload("res://net/user_paths.gd")
 
 static var fullscreen := false
-static var mood := true
 static var zoom := 1.0
 static var battery := false
 static var crash_reports_always := false
@@ -26,7 +25,6 @@ static func load_once() -> void:
 	if cfg.load(UserPaths.at("settings.cfg")) != OK:
 		return
 	fullscreen = cfg.get_value("video", "fullscreen", false)
-	mood = cfg.get_value("video", "mood", true)
 	zoom = clampf(float(cfg.get_value("video", "zoom", 1.0)), 0.6, 2.0)
 	battery = bool(cfg.get_value("video", "battery", false))
 	crash_reports_always = bool(cfg.get_value("privacy", "crash_reports_always", false))
@@ -40,7 +38,6 @@ static func load_once() -> void:
 static func save() -> void:
 	var cfg := ConfigFile.new()
 	cfg.set_value("video", "fullscreen", fullscreen)
-	cfg.set_value("video", "mood", mood)
 	cfg.set_value("video", "zoom", zoom)
 	cfg.set_value("video", "battery", battery)
 	cfg.set_value("privacy", "crash_reports_always", crash_reports_always)

@@ -1053,8 +1053,10 @@ pełnym ekranie — zastąpiona stylem inspirowanym Don't Starve:
   uzupełnia 10 porcji) i **firmowe napoje za darmo** (4 wody, 2 soki, co rano
   nowe).
 - **Menu startowe**: ekran tytułowy (miasto o zmierzchu, zapalające się okna,
-  chmury) — Graj (→ tworzenie postaci), Ustawienia (pełny ekran, efekt tuszu,
-  oszczędzanie baterii, przybliżenie kamery; zapisywane w
+  chmury) — Graj (→ tworzenie postaci), Ustawienia (pełny ekran,
+  oszczędzanie baterii, raporty awarii, przybliżenie kamery, głośności,
+  mikrofon; przewijane w niskim oknie; efekt tuszu jest zawsze włączony;
+  zapisywane w
   `user://settings.cfg`), Autorzy, Wyjdź.
   Z tworzenia postaci — „Wróć do menu”.
 - **Menu gry pod Esc** (gdy nie jest otwarte żadne okno): Wróć do gry,

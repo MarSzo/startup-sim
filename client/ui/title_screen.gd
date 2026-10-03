@@ -84,7 +84,6 @@ func _ready() -> void:
 	_credits.add_child(Ink.label("Autorzy", 28, Ink.TEXT_INK))
 	for line in ["Startup Sim — prototyp gry o pracy w startupie IT.", "Serwer: Rust · klient: Godot 4 · własny protokół UDP.",
 			"Czcionka: Patrick Hand (Patrick Wagesreiter), licencja SIL OFL.", "Grafika i kod narysowane w kodzie — bez gotowych assetów.",
-			"Kod pisany z pomocą Claude (Anthropic).",
 			"Kod źródłowy (licencja AGPL-3.0): github.com/mateuszpalak/startup-sim"]:
 		var l := Ink.label(line, 18, Ink.TEXT_INK, true)
 		l.custom_minimum_size = Vector2(520, 0)
