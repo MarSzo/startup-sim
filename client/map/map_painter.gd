@@ -116,13 +116,20 @@ func _tile_rect(x: int, y: int) -> Rect2:
 
 # ------------------------------------------------------------------ ground
 
+const DOOR_TYPES := ["door", "glass_door", "card_gate", "garage_gate", "elevator_door", "board_door", "stall_door", "service_door", "locked_door", "storeroom_door"]
+
+
+func _is_door(x: int, y: int) -> bool:
+	return _type(x, y) in DOOR_TYPES
+
+
 ## Floor under a solid object / a door: the most common walkable neighbour.
+## A door takes its own room's floor, so a wide doorway is all one floor.
 func _floor_under(x: int, y: int) -> String:
-	var counts := {}
-	for d in [Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 0), Vector2i(-1, 0), Vector2i(1, 1), Vector2i(-1, -1)]:
-		var c := _ch(x + d.x, y + d.y)
-		if map.legend.has(c) and not _solid(c) and _type_of(c) not in ["door", "glass_door", "card_gate", "garage_gate", "elevator_door", "stairs", "board_door", "stall_door"]:
-			counts[c] = counts.get(c, 0) + 1
+	var own: int = map.room_at_tile(x, y) if _is_door(x, y) else -1
+	var counts := _floor_counts(x, y, own)
+	if counts.is_empty() and own != -1:
+		counts = _floor_counts(x, y, -1)
 	var best := "."
 	var best_n := 0
 	for c in counts:
@@ -130,6 +137,20 @@ func _floor_under(x: int, y: int) -> String:
 			best_n = counts[c]
 			best = c
 	return best
+
+
+## Walkable floors around a tile (`room` != -1: only that room's).
+func _floor_counts(x: int, y: int, room: int) -> Dictionary:
+	var counts := {}
+	var around := [Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 0), Vector2i(-1, 0), Vector2i(1, 1), Vector2i(-1, -1)]
+	if room != -1:
+		around += [Vector2i(1, -1), Vector2i(-1, 1)]
+	for d in around:
+		var c := _ch(x + d.x, y + d.y)
+		if map.legend.has(c) and not _solid(c) and _type_of(c) not in DOOR_TYPES + ["stairs"]:
+			if room == -1 or map.room_at_tile(x + d.x, y + d.y) == room:
+				counts[c] = counts.get(c, 0) + 1
+	return counts
 
 
 func _ground(x: int, y: int) -> void:

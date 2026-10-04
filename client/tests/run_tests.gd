@@ -22,6 +22,7 @@ func _init() -> void:
 	test_shell()
 	test_scripts_compile()
 	test_roll_scores()
+	test_doorway_floors()
 	print("%d checks, %d failures" % [checks, failures])
 	quit(1 if failures > 0 else 0)
 
@@ -268,6 +269,24 @@ func test_movement(path: String) -> void:
 	m.set_closed_tiles([Vector2i(5, 45)])
 	expect(walk_left.call().pos.x == 6 * 256 + 5 * 16, "locked stall door stops at the door (%d)" % walk_left.call().pos.x)
 	m.set_closed_tiles([])
+
+
+## A wide doorway has one floor under it (not half carpet, half planks).
+func test_doorway_floors() -> void:
+	var Painter = preload("res://map/map_painter.gd")
+	var building = Building.new()
+	building.load_path("res://maps/building.json")
+	for f in [0, 1, 3]:
+		var p = Painter.new()
+		p.map = building.get_floor(f)
+		var bad := []
+		for y in p.map.height:
+			for x in p.map.width:
+				for d in [Vector2i(1, 0), Vector2i(0, 1)]:
+					if p._is_door(x, y) and p._is_door(x + d.x, y + d.y) and p._floor_under(x, y) != p._floor_under(x + d.x, y + d.y):
+						bad.append(Vector2i(x, y))
+		expect(bad.is_empty(), "floor %d: doorways with two floors at %s" % [f, bad])
+		p.free()
 
 
 ## Sealed packets: the same bytes as the server's (and back).
