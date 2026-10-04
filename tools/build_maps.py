@@ -32,11 +32,16 @@ LEGEND = {
     # access: needs a pass/card ("card") or service access ("service");
     # free_dir: direction you may always pass in (exit through the gates).
     "B": {"type": "card_gate", "solid": False, "color": "#e0b040", "access": "card", "free_dir": "down"},
+    # Doors with a card reader (a guest pass works too); going out is free:
+    # into the hall from the car park (down) / from the stairwell (right).
+    "m": {"type": "card_door", "solid": False, "color": "#7a6a50", "access": "card", "free_dir": "down"},
+    "q": {"type": "card_door", "solid": False, "color": "#7a6a50", "access": "card", "free_dir": "right"},
     "L": {"type": "service_door", "solid": False, "color": "#6a3a2a", "access": "service"},
     "g": {"type": "garage_gate", "solid": False, "color": "#9a9a9a", "access": "card", "free_dir": "up"},
     # Locked for good (the closed zone, the server room, a locked wardrobe).
     "x": {"type": "locked_door", "solid": True, "color": "#7a2a2a"},
-    "E": {"type": "elevator_door", "solid": False, "color": "#b8c4cc"},
+    # In only with a card (or a guest pass); stepping out (down) is free.
+    "E": {"type": "elevator_door", "solid": False, "color": "#b8c4cc", "access": "card", "free_dir": "down"},
     "e": {"type": "elevator", "solid": False, "color": "#9aa8b0"},
     "S": {"type": "stairs", "solid": False, "color": "#b09070"},
     "s": {"type": "steps", "solid": False, "color": "#a58a6c"},
@@ -284,16 +289,15 @@ def floor0():
         "4": [21, 51, 3, 1], "5": [19, 46, 1, 4], "6": [26, 52, 1, 2],
     }
 
-    # 3: the entrance hall. North part (lifts, stairs, the car park) behind
-    # the card gates; the porter's desk (5, the porter sits at 6) by them.
+    # 3: the entrance hall, open; the lifts, the stairwell and the car park
+    # only with a card (or the porter's guest pass) - out is free. The
+    # porter's desk (5, the porter sits at 6).
     f.walls(27, 40, 43, 57, "_", "H")
     f.room("H", 3, "Hol", "hall", detector=True, light="always", windows=True)
     elevators(f, "H")
-    f.door(27, 42, 27, 42, "D", "Q")                     # stairwell <-> hall
-    f.door(31, 40, 32, 40, "D", "H")                     # car park <-> hall
+    f.door(27, 42, 27, 42, "q", "Q")                     # stairwell <-> hall
+    f.door(31, 40, 32, 40, "m", "H")                     # car park <-> hall
     f.area(35, 46, 39, 46, "#", "-")                     # back of the porter's lodge
-    for x in range(28, 35):                              # card gates (out is free)
-        f.area(x, 46, x, 46, "B", "H")
     f.put(35, 47, 35, 51, "K")                           # 5: porter's desk
     # 7: the toilet by the lodge (one lockable stall).
     f.walls(39, 46, 43, 52, ":", "T")

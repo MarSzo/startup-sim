@@ -604,15 +604,18 @@ mod tests {
     }
 
     #[test]
-    fn gates_need_a_pass_except_on_the_way_out() {
+    fn card_doors_need_a_pass_except_on_the_way_out() {
         use super::{access, dir};
         let b = b();
         let m = b.floor(0).unwrap();
-        assert_eq!(m.tile_char(28, 46), Some('B'));
-        assert!(m.blocks(28, 46, 0, dir::UP), "no pass: can't enter");
-        assert!(!m.blocks(28, 46, 0, dir::DOWN), "no pass: can always leave");
-        assert!(!m.blocks(28, 46, access::GUEST, dir::UP), "guest pass opens");
-        assert!(!m.blocks(28, 46, access::CARD, dir::UP), "employee card opens");
+        // The lifts, the car park (north) and the stairwell (west) off the hall.
+        for (x, y, into, out) in [(37, 43, dir::UP, dir::DOWN), (31, 40, dir::UP, dir::DOWN), (27, 42, dir::LEFT, dir::RIGHT)] {
+            assert!(m.blocks(x, y, 0, into), "no pass: can't enter ({x},{y})");
+            assert!(!m.blocks(x, y, 0, out), "no pass: can always leave ({x},{y})");
+            assert!(!m.blocks(x, y, access::GUEST, into), "guest pass opens ({x},{y})");
+            assert!(!m.blocks(x, y, access::CARD, into), "employee card opens ({x},{y})");
+        }
+        assert!(!(0..m.height).any(|y| (0..m.width).any(|x| m.tile_char(x, y) == Some('B'))), "no gates left");
         assert_eq!(m.tile_char(43, 45), Some('x'));
         assert!(m.blocks(43, 45, 0xff, dir::RIGHT), "the locked door stays locked");
         let m1 = b.floor(1).unwrap();
@@ -627,7 +630,7 @@ mod tests {
         use super::access;
         let b = b();
         let spawn = (0, b.floor(0).unwrap().spawns[0]);
-        let public = ["outside", "parking", "entrance", "shop", "smoking", "stall"];
+        let public = ["outside", "parking", "entrance", "shop", "smoking", "stall", "hall"];
         for f in [0u8, 1] {
             let m = b.floor(f).unwrap();
             // (The lift cabins are reached by riding, not walking.)

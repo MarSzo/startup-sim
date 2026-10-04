@@ -94,8 +94,8 @@ Po `--`, np. `godot --path client -- --nick=Ala --autoconnect`.
   panel firmy `pc:company` / `pc:company:hire` /
   `pc:company:<akcja>:<cel>:<wartość>[:<tekst>]`.
 
-Przykład: `--goto="34,49;E;wait:2;31,44;Sklep"` — rozmowa z portierem, za
-bramki, potem do sklepu.
+Przykład: `--goto="34,49;E;wait:2;28,42;Sklep"` — rozmowa z portierem, pod
+drzwi klatki schodowej, potem do sklepu.
 
 ## CI
 

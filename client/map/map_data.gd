@@ -22,7 +22,7 @@ const DIR_NAMES := {"up": DIR_UP, "down": DIR_DOWN, "left": DIR_LEFT, "right": D
 
 ## Doors with a plaque by them (the name of the room behind): not the lifts,
 ## the card gates or the garage gate.
-const PLAQUE_DOORS := ["door", "glass_door", "board_door", "service_door", "storeroom_door", "locked_door", "stall_door"]
+const PLAQUE_DOORS := ["door", "glass_door", "card_door", "board_door", "service_door", "storeroom_door", "locked_door", "stall_door"]
 ## Rooms whose doors get no plaque: you can see where you are.
 const NO_PLAQUE := ["corridor", "hall", "outside", "entrance", "parking", "smoking"]
 const SIDES: Array[Vector2i] = [Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(1, 0)]

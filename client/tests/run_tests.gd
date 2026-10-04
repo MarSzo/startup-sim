@@ -306,6 +306,7 @@ func test_door_plaques() -> void:
 	expect(at.call(m1, 37, 44) == "", "no plaque on the lift")
 	expect(at.call(m1, 37, 20) == "", "nothing away from doors")
 	expect(at.call(m0, 22, 58) == "Sklep", "the shop from the street: %s" % at.call(m0, 22, 58))
+	expect(at.call(m0, 28, 42) == "Klatka schodowa", "the stairwell's card door: %s" % at.call(m0, 28, 42))
 	# Toilets: a sign instead of words; between two doors, the one you face.
 	var face := func(m, x: int, y: int, d: Vector2i) -> String:
 		return m.plaque_icon(m.plaque_at(x, y, m.room_at_tile(x, y), d))

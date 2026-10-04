@@ -50,7 +50,9 @@
   "E": {
    "type": "elevator_door",
    "solid": false,
-   "color": "#b8c4cc"
+   "color": "#b8c4cc",
+   "access": "card",
+   "free_dir": "down"
   },
   "e": {
    "type": "elevator",

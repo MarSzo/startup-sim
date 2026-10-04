@@ -12,8 +12,8 @@ zmienia. Piętro 2 jest w `building.json` jako zablokowane (bez pliku).
 
 **Parter + teren zewnętrzny** — gracz startuje na chodniku przed wejściem.
 Wiatrołap (2) → hol (3) z ladą portiera (5, portier siedzi na 6), toaletą (7)
-i bramkami na kartę; za bramkami windy (8, 9),
-klatka schodowa (4) i drzwi na parking wewnętrzny (12, brama od północy,
+— otwarty; windy (8, 9), drzwi na klatkę schodową (4) i drzwi na parking
+wewnętrzny (12, brama od północy,
 dojazd wzdłuż zachodniej ściany). Sklep (1) z wejściem od ulicy, strefa
 zamknięta (11) za zablokowanymi drzwiami, sprzątaczka siedzi w holu (10).
 Na zewnątrz: chodnik, ulica, parking zewnętrzny, postój taksówek, przystanek
@@ -168,7 +168,7 @@ kabiną (31).
 Legenda: `#` ściana, `.` podłoga, `,` wykładzina, `:` płytki, `_` posadzka holu,
 `=` parking / podjazd, `v` trawa, `p` chodnik, `r` ulica, `t` tory, `z` strefa
 palenia, `F` ogrodzenie, `~` pustka, `n`/`h` balkon i barierka, `D` drzwi, `G`
-szklane drzwi, `B` bramka na kartę, `L` drzwi obsługi (składzik), `x` drzwi
+szklane drzwi, `m`/`q` drzwi na kartę (z czytnikiem), `L` drzwi obsługi (składzik), `x` drzwi
 zablokowane, `Z` drzwi zarządu (tylko na spotkanie), `k` drzwi kabiny WC, `g`
 brama garażowa, `E`/`e` drzwi i kabina windy, `S` biegi schodów, `W` biurka,
 `T` stoły, `K` lady, `H` regały / półki, `Q` sofy, `P` rośliny, `X` samochody,
@@ -176,8 +176,9 @@ brama garażowa, `E`/`e` drzwi i kabina windy, `S` biegi schodów, `W` biurka,
 szafka z kubkami, `i` zlew, `d` zmywarka, `f` lodówka, `O` owoce, `w` szafa,
 `o` kosz, `R` szafy serwerowe, `A` popielniczki, `N` ławki, `b` stojak rowerowy.
 
-Bramki (`B`) i brama garażowa (`g`) wymagają przepustki lub karty przy
-wejściu, wyjście jest wolne; składzik (`L`) — uprawnień obsługi; drzwi `x`
+Drzwi na kartę (`m`, `q`: parking i klatka schodowa), drzwi wind (`E`) i
+brama garażowa (`g`) wymagają przepustki lub karty przy wejściu, wyjście jest
+wolne; bramek w holu już nie ma (2026-10-04); składzik (`L`) — uprawnień obsługi; drzwi `x`
 nie przepuszczają nikogo. Biurka należą do działu pokoju (pole `department`
 w definicji pokoju, patrz rozdział 5): każdy zespół to osobny dział; stół w
 pokoju prezesa to miejsce Zarządu; pokój z jednym biurkiem (26) jest niczyj. Punkty otoczenia

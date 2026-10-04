@@ -33,6 +33,7 @@ pub mod lines {
     pub const HERE: &str = "Winda już jest.";
     pub const RIDING: &str = "Jedziemy…";
     pub const OVERLOAD: &str = "Przeciążenie! Maksymalnie 6 osób — ktoś musi wysiąść.";
+    pub const NO_CARD: &str = "Winda tylko z kartą — przepustkę da portier.";
 }
 
 #[derive(Debug, Clone)]

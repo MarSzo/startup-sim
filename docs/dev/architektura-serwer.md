@@ -59,7 +59,7 @@ które serwer wykonuje.
 
 **Portier** (definicja w `floor0.json` → `npcs`): w spoczynku stoi w portierni.
 Gość bez przepustki rozmawia z nim (E) → dostaje przepustkę gościa, a portier
-prowadzi go na recepcję piętra 1 (bramki, schody). Czeka, jeśli gościa nie ma
+prowadzi go na recepcję piętra 1 (schodami). Czeka, jeśli gościa nie ma
 ani obok niego (4 kafle), ani dalej na trasie, ani w recepcji; przypomina co
 6 s, po 30 s rezygnuje i odbiera przepustkę. Po dojściu mówi, że przepustka jest
 ważna do końca dnia, i wraca. Prowadzi jedną osobę naraz.

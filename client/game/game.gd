@@ -1267,7 +1267,7 @@ func _update_hint() -> void:
 				break
 	var e_free := text == ""  # nothing else for E: a door plaque, if one's here
 	if text == "" and map:
-		for dy in [-1, -2]:
+		for dy in [-1, -2, 0, 1]:
 			for dx in [-1, 0, 1]:
 				var need: int = map.need_at(t.x + dx, t.y + dy)
 				if need != 0 and (pred.access & need) == 0:
@@ -1276,7 +1276,7 @@ func _update_hint() -> void:
 					elif need & MapData.ACCESS_KEY:
 						text = "Magazynek zamknięty — klucz wisi przy recepcji (gdy nikogo tam nie ma…)"
 					elif need & MapData.ACCESS_GUEST:
-						text = "Bramka wymaga przepustki — porozmawiaj z portierem (portiernia)"
+						text = "Tylko z kartą (windy, schody, parking) — przepustkę da portier w portierni"
 					else:
 						text = "Wstęp tylko dla obsługi"
 	var facing: Vector2i = [Vector2i(0, 1), Vector2i(0, -1), Vector2i(-1, 0), Vector2i(1, 0)][me.facing]
@@ -1451,6 +1451,9 @@ func _elevator_call_hint(map) -> String:
 			best = ev
 	if best == null:
 		return ""
+	var need: int = map.need_at(best.tile.x, best.tile.y)
+	if need != 0 and (pred.access & need) == 0:
+		return "Winda tylko z kartą — przepustkę da portier w portierni"
 	if not map.is_closed(best.tile.x, best.tile.y):
 		return "Winda otwarta — wejdź"
 	var l := _lift(best.lift)

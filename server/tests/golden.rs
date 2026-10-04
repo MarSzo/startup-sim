@@ -71,15 +71,15 @@ fn movement_vectors() {
     let mut cases = Vec::new();
     let body_json = |x: &Body| json!([x.floor, x.pos.x, x.pos.y, x.prev_input, x.lock, x.access, x.slow as u8, x.drunk]);
 
-    // Random walks from interesting spots (walls, furniture, doors, gates).
+    // Random walks from interesting spots (walls, furniture, doors, card doors).
     let guest = |b: Body| Body { access: access::GUEST, ..b };
     let starts = [
         Body::at(0, Pos::tile_center(30, 59)),                        // spawn, sidewalk
-        Body::at(0, Pos::tile_center(31, 48)),                        // gates without a pass
-        Body::at(0, Pos::tile_center(31, 44)),                        // gates from the lifts (free exit)
+        Body::at(0, Pos::tile_center(28, 42)),                        // the stairwell's card door, no pass
+        Body::at(0, Pos::tile_center(37, 45)),                        // at the lifts without a pass
         Body::at(0, Pos::tile_center(35, 11)),                        // garage gate, no card
         Body::at(0, Pos::tile_center(31, 55)),                        // the draught lobby
-        guest(Body::at(0, Pos::tile_center(31, 48))),                 // below the gates with a pass
+        guest(Body::at(0, Pos::tile_center(28, 42))),                 // the stairwell's door with a pass
         Body::at(0, Pos::tile_center(22, 47)),                        // shop, shelves
         Body::at(0, Pos { x: 31 * 256 + 3, y: 53 * 256 - 1 }),        // odd offsets in a door
         Body::at(0, Pos::tile_center(23, 18)),                        // parking between cars
@@ -108,7 +108,7 @@ fn movement_vectors() {
         cases.push(json!({ "start": body_json(&start), "inputs": inputs, "states": states }));
     }
 
-    // Scripted (with a guest pass): spawn -> gates -> stairs up -> chill room -> back down.
+    // Scripted (with a guest pass): spawn -> hall -> stairs up -> chill room -> back down.
     let mut body = guest(Body::at(0, Pos::tile_center(30, 59)));
     let start = body;
     let (mut inputs, mut states) = (Vec::new(), Vec::new());

@@ -468,8 +468,8 @@ fn onboarding_porter_reception_hr_card() {
     let spawn = b0.spawns()[0];
     let start = Body::at(spawn.0, Pos::tile_center(spawn.1.x, spawn.1.y));
 
-    // Without a pass the gates stop you: walking to the hall ends in the lobby.
-    assert!(Walker::to(&b0, &start, (0, Tile { x: 31, y: 44 })).is_none(), "no path without a pass");
+    // Without a pass the stairs (and the lifts) are closed.
+    assert!(Walker::to(&b0, &start, (0, Tile { x: 24, y: 42 })).is_none(), "no path without a pass");
 
     // Walk to the porter's desk and press E across it.
     let body = g.walk_to(&b0, start, (0, Tile { x: 34, y: 49 }), &[]);

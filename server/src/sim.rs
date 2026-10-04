@@ -274,33 +274,42 @@ mod tests {
     fn stops_flush_against_wall() {
         let b = building();
         let m = b.floor(0).unwrap();
-        // The hall by the gates: the porter's desk (x=35) on the right.
+        // The hall: the porter's desk (x=35) on the right.
         let p = run(m, Pos::tile_center(31, 49), IN_RIGHT, 200);
         assert_eq!(p.x, 35 * TILE_UNITS - HALF_W);
-        // The gates (row 46) stop you without a pass.
+        // The car park's card door (row 40) stops you without a pass.
         let p = run(m, Pos::tile_center(31, 49), IN_UP, 200);
-        assert_eq!(p.y, 47 * TILE_UNITS + HALF_H);
+        assert_eq!(p.y, 41 * TILE_UNITS + HALF_H);
         assert!(box_is_free(m, p));
     }
 
     #[test]
-    fn gates_need_a_pass_to_enter_but_not_to_leave() {
+    fn card_doors_need_a_pass_to_enter_but_not_to_leave() {
         use crate::map::access;
         let b = building();
         let room = |body: &Body| {
             let m = b.floor(body.floor).unwrap();
             m.room_name(m.room_at(body.pos.x, body.pos.y)).to_string()
         };
-        let lobby = Body::at(0, Pos::tile_center(31, 48)); // below the gates (row 46)
+        // The hall is open; the car park's door (row 40) needs a card.
+        let lobby = Body::at(0, Pos::tile_center(31, 48));
         let stuck = walk(&b, lobby, IN_UP, 100);
-        assert_eq!(stuck.pos.y, 47 * TILE_UNITS + HALF_H, "no pass: stopped at the gate");
+        assert_eq!(stuck.pos.y, 41 * TILE_UNITS + HALF_H, "no pass: stopped at the car park's door");
         let guest = walk(&b, Body { access: access::GUEST, ..lobby }, IN_UP, 100);
-        assert!(guest.pos.y < 46 * TILE_UNITS, "guest pass opens the gate");
+        assert!(guest.pos.y < 40 * TILE_UNITS, "guest pass opens the door");
         let employee = walk(&b, Body { access: access::CARD, ..lobby }, IN_UP, 100);
-        assert!(employee.pos.y < 46 * TILE_UNITS, "employee card opens the gate");
-        // Leaving: from the lifts, without any pass, down through the gate.
-        let out = walk(&b, Body::at(0, Pos::tile_center(31, 44)), IN_DOWN, 100);
-        assert!(out.pos.y > 47 * TILE_UNITS, "exit is free");
+        assert!(employee.pos.y < 40 * TILE_UNITS, "employee card opens the door");
+        // Leaving: from the car park, without any pass, down into the hall.
+        let out = walk(&b, Body::at(0, Pos::tile_center(31, 38)), IN_DOWN, 100);
+        assert!(out.pos.y > 41 * TILE_UNITS, "exit is free");
+        // The stairwell's door (to the west): in with a card, out for free.
+        let hall = Body::at(0, Pos::tile_center(29, 42));
+        assert_eq!(room(&walk(&b, hall, IN_LEFT, 60)), "Hol", "no pass: no stairs");
+        assert_eq!(room(&walk(&b, Body { access: access::CARD, ..hall }, IN_LEFT, 60)), "Klatka schodowa");
+        assert_eq!(room(&walk(&b, Body::at(0, Pos::tile_center(25, 42)), IN_RIGHT, 60)), "Hol", "out of the stairwell");
+        // The lifts: in only with a card.
+        let at_lift = Body::at(0, Pos::tile_center(37, 45));
+        assert_eq!(walk(&b, at_lift, IN_UP, 60).pos.y, 44 * TILE_UNITS + HALF_H, "no pass: not into the lift");
         // Garage gate (row 13, from the drive to the north): same rules.
         let garage = walk(&b, Body::at(0, Pos::tile_center(35, 11)), IN_DOWN, 100);
         assert_eq!(room(&garage), "Na zewnątrz", "no pass: can't drive in");
@@ -380,7 +389,8 @@ mod tests {
     fn stairs_go_through_the_stairwell_and_landing() {
         let b = building();
         // From the hall through the stairwell door (27,42), left onto the flight.
-        let body = until_floor_change(&b, Body::at(0, Pos::tile_center(29, 42)), IN_LEFT, 300);
+        let card = |body: Body| Body { access: crate::map::access::CARD, ..body };
+        let body = until_floor_change(&b, card(Body::at(0, Pos::tile_center(29, 42))), IN_LEFT, 300);
         assert_eq!(body.floor, MID, "into the stairwell");
         assert_eq!(body.pos, Pos::tile_center(32, 13), "bottom of the first flight");
         assert_eq!(body.lock, LOCK_HELD);
@@ -411,7 +421,8 @@ mod tests {
     #[test]
     fn interact_in_the_elevator_cabin_changes_nothing_in_the_simulation() {
         let b = building();
-        let body = walk(&b, Body::at(0, Pos::tile_center(37, 45)), IN_UP, 60); // into the cabin
+        let at_doors = Body { access: crate::map::access::CARD, ..Body::at(0, Pos::tile_center(37, 45)) };
+        let body = walk(&b, at_doors, IN_UP, 60); // into the cabin
         assert_eq!(b.floor(0).unwrap().tile_type(body.pos.tile().0, body.pos.tile().1), Some("elevator"));
         let after = step(&b, step(&b, body, 0), IN_INTERACT);
         assert_eq!(after.floor, 0, "the server moves the cabin, not the simulation");

@@ -38,6 +38,10 @@ impl Server {
         }
         // Between two lifts: the call button of the nearer one.
         let i = (0..self.elevators.len()).filter_map(|i| self.elevators[i].door_distance(body).map(|d| (i, d))).min_by_key(|&(_, d)| d)?.0;
+        // The call button needs the card, like the doors.
+        if body.access & crate::map::access::required("card").unwrap_or(0) == 0 {
+            return Some(elevator::lines::NO_CARD.to_string());
+        }
         self.doors_dirty = true; // show where the car is heading at once
         Some(self.elevators[i].call(body.floor, tick).to_string())
     }

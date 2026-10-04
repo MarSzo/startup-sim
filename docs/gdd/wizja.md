@@ -43,7 +43,7 @@ startupu do korporacji.
 - Strefa palenia — jedyne miejsce, gdzie palenie jest bez konsekwencji
 
 ### Parter
-- Wejście z portiernią — bramki na kartę; portier (NPC) wpuszcza osoby bez karty
+- Wejście z portiernią — windy, klatka schodowa i parking na kartę; portier (NPC) wpuszcza osoby bez karty
 - Parking wewnętrzny
 - Sklep — zakupy (np. kawa, przekąski, papierosy)
 - Winda — dwa piętra do wyboru, na początku aktywne tylko jedno

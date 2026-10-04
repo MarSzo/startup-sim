@@ -64,7 +64,7 @@ pub mod look {
 pub mod lines {
     // Porter
     pub const WELCOME_ESCORT: &str = "Dzień dobry! Pierwszy dzień? Zaprowadzę na recepcję — proszę za mną.";
-    pub const HAS_PASS: &str = "Dzień dobry! Przepustka działa, zapraszam przez bramki.";
+    pub const HAS_PASS: &str = "Dzień dobry! Przepustka działa — windą albo schodami na górę.";
     pub const FOLLOW_ME: &str = "Proszę za mną!";
     pub const ON_THE_WAY: &str = "Idziemy, idziemy — to niedaleko.";
     pub const BUSY: &str = "Chwileczkę, właśnie kogoś prowadzę.";

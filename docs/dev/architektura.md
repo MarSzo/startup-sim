@@ -138,11 +138,13 @@ piętro, pozycja, poprzedni input, blokada schodów i uprawnienia (`access`). Ws
 krok, jest w tym stanie i idzie w snapshocie do właściciela — dzięki temu
 rekoncyliacja odtwarza inputy od dokładnie tego samego stanu.
 
-**Uprawnienia i bramki**: jedyna reguła kolizji to `Map::blocks(kafel,
+**Uprawnienia i drzwi na kartę**: jedyna reguła kolizji to `Map::blocks(kafel,
 uprawnienia, kierunek)`: kafel blokuje, jeśli jest pełny albo wymaga
 uprawnień, których postać nie ma — chyba że porusza się w jego „wolnym
-kierunku” (`free_dir`: wyjście przez bramki i bramę garażową w dół jest wolne).
-Bramki i brama garażowa wymagają przepustki lub karty, drzwi zaplecza —
+kierunku” (`free_dir`: wyjście z windy, z parkingu i z klatki schodowej do
+holu oraz przez bramę garażową jest wolne). Drzwi na kartę (`card_door`),
+drzwi wind i brama garażowa wymagają przepustki lub karty — przycisk windy
+też (`NO_CARD`) — drzwi zaplecza —
 uprawnień obsługi. BFS (`Building::find_path`) stosuje te same reguły.
 
 **Przejścia między piętrami**:

@@ -66,7 +66,7 @@ i tekstowym.
 
 ## Co jest w grze
 
-- 🏢 **Budynek na kilka pięter** — hol z bramkami, windy i klatka schodowa,
+- 🏢 **Budynek na kilka pięter** — hol z portiernią, windy i klatka schodowa na kartę,
   open space działów, sala zarządu, chill room, aneks kuchenny, balkon,
   łazienki, magazynek i sklep na parterze.
 - 💼 **Kariera** — portal z ofertami, rozmowa online, umowa w HR (o pracę,

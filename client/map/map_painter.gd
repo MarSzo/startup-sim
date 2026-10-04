@@ -117,7 +117,7 @@ func _tile_rect(x: int, y: int) -> Rect2:
 
 # ------------------------------------------------------------------ ground
 
-const DOOR_TYPES := ["door", "glass_door", "card_gate", "garage_gate", "elevator_door", "board_door", "stall_door", "service_door", "locked_door", "storeroom_door"]
+const DOOR_TYPES := ["door", "glass_door", "card_gate", "card_door", "garage_gate", "elevator_door", "board_door", "stall_door", "service_door", "locked_door", "storeroom_door"]
 
 
 func _is_door(x: int, y: int) -> bool:
@@ -164,7 +164,7 @@ func _ground(x: int, y: int) -> void:
 	if t == "fence":
 		_floor(x, y, "grass")
 		return
-	if _solid(c) or t in ["door", "glass_door", "card_gate", "garage_gate", "board_door", "stall_door", "service_door", "locked_door", "storeroom_door"]:
+	if _solid(c) or t in ["door", "glass_door", "card_gate", "card_door", "garage_gate", "board_door", "stall_door", "service_door", "locked_door", "storeroom_door"]:
 		t = _type_of(_floor_under(x, y))
 	_floor(x, y, t)
 
@@ -400,9 +400,9 @@ func _tile_object(x: int, y: int) -> void:
 	var r := _tile_rect(x, y)
 	var o := r.position
 	match t:
-		"door", "board_door":
+		"door", "board_door", "card_door":
 			var across := _is_wall(x - 1, y) or _is_wall(x + 1, y) or _type(x - 1, y) == t or _type(x + 1, y) == t
-			var wood := Color("#8a5a36") if t == "door" else Color("#5e2f22")
+			var wood: Color = {"door": Color("#8a5a36"), "board_door": Color("#5e2f22"), "card_door": Color("#6b6f75")}[t]
 			if across:
 				_box(Rect2(o + Vector2(0, 6), Vector2(TP, 4)), Color("#a6764c"), true, 0.3, 0.45)
 				if _is_wall(x - 1, y):
@@ -415,6 +415,10 @@ func _tile_object(x: int, y: int) -> void:
 					_box(Rect2(o, Vector2(TP, 2.2)), wood, true, 0.3, 0.45)
 				if _is_wall(x, y + 1):
 					_box(Rect2(o + Vector2(0, TP - 2.2), Vector2(TP, 2.2)), wood, true, 0.3, 0.45)
+			if t == "card_door" and _type(x + 1, y) != t and _type(x, y + 1) != t:
+				# The card reader by the door: a little box with a green light.
+				_box(Rect2(o + Vector2(TP - 5, 1), Vector2(4, 5)), Color("#3a3d42"), true, 0.3, 0.45)
+				draw_circle(o + Vector2(TP - 3, 2.6), 0.7, Color("#6fd06b"))
 		"glass_door":
 			var g := Rect2(o + Vector2(0, 5), Vector2(TP, 6))
 			draw_rect(g, Color("#a9d4e0", 0.85))

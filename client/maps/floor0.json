@@ -41,12 +41,19 @@
    "solid": false,
    "color": "#8fd3e8"
   },
-  "B": {
-   "type": "card_gate",
+  "m": {
+   "type": "card_door",
    "solid": false,
-   "color": "#e0b040",
+   "color": "#7a6a50",
    "access": "card",
    "free_dir": "down"
+  },
+  "q": {
+   "type": "card_door",
+   "solid": false,
+   "color": "#7a6a50",
+   "access": "card",
+   "free_dir": "right"
   },
   "g": {
    "type": "garage_gate",
@@ -63,7 +70,9 @@
   "E": {
    "type": "elevator_door",
    "solid": false,
-   "color": "#b8c4cc"
+   "color": "#b8c4cc",
+   "access": "card",
+   "free_dir": "down"
   },
   "e": {
    "type": "elevator",
@@ -202,13 +211,13 @@
   "Fvvvvvvvvvvv=====v#===================================#vvvvvvvvvvvvvvF",
   "Fvvvvvvvvvvv=====v#===================================#vvvvvvvvvvvvvvF",
   "Fvvvvvvvvvvv=====v#===================================#vvvvvvvvvvvvvvF",
-  "Fvvvvvvvvvvv=====v#############DD######################vvvvvvvvvvvvvvF",
+  "Fvvvvvvvvvvv=====v#############mm######################vvvvvvvvvvvvvvF",
   "Fvvvvvvvvvvv=====v#SSS.....#P______#eee#eee#..........#vvvvvvvvvvvvvvF",
-  "Fvvvvvvvvvvv=====v#SSS.....D_______#eee#eee#..........#vvvvvvvvvvvvvvF",
+  "Fvvvvvvvvvvv=====v#SSS.....q_______#eee#eee#..........#vvvvvvvvvvvvvvF",
   "Fvvvvvvvvvvv=====v#........#_______#EEE#EEE#..........#vvvvvvvvvvvvvvF",
   "Fvvvvvvvvvvv=====v##########_______________#..........#vvvvvvvvvvvvvvF",
   "Fvvvvvvvvvvv=====v#........#_______________x..........#vvvvvvvvvvvvvvF",
-  "Fvvvvvvvvvvv=====v#H.HHH..H#BBBBBBB#########..........#vvvvvvvvvvvvvvF",
+  "Fvvvvvvvvvvv=====v#H.HHH..H#_______#########..........#vvvvvvvvvvvvvvF",
   "Fvvvvvvvvvvv=====v#H......H#_______K___#:U:#..........#vvvvvvvvvvvvvvF",
   "Fvvvvvvvvvvv=====v#H......H#_______K___#:::#..........#vvvvvvvvvvvvvvF",
   "Fvvvvvvvvvvv=====v#H.HHH..H#_______K___#:::#..........#vvvvvvvvvvvvvvF",

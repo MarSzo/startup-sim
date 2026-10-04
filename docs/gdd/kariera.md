@@ -4,14 +4,15 @@
 
 ## 10.7 Wdrożenie: portier, recepcja, HR (dzień próbny → karta)
 
-Ustalenia 2026-09-26: dopóki nie ma HR i umowy, dostęp za bramki daje
+Ustalenia 2026-09-26: dopóki nie ma HR i umowy, dostęp na górę (windy,
+klatka schodowa — drzwi na kartę; do 2026-10-04 były to bramki w holu) daje
 **przepustka gościa od portiera**, ważna do końca sesji; portier **odprowadza**
-na recepcję; **wyjście przez bramki jest wolne**.
+na recepcję; **wyjście jest wolne**.
 
-Przebieg: gracz startuje przed budynkiem bez przepustki → bramki w holu go
-zatrzymują (podpowiedź: „porozmawiaj z portierem”) → przy portierni wciska E →
+Przebieg: gracz startuje przed budynkiem bez przepustki → drzwi na klatkę i
+windy go nie wpuszczają (podpowiedź: „przepustkę da portier w portierni”) → przy portierni wciska E →
 portier: „Dzień dobry! Pierwszy dzień? Zaprowadzę na recepcję — proszę za mną.”,
-gracz dostaje przepustkę → portier idzie przez bramki i schodami na recepcję
+gracz dostaje przepustkę → portier idzie schodami na recepcję
 piętra 1, czekając na gracza, gdy ten zostaje w tyle („Proszę za mną!”) → na
 recepcji: „To recepcja — tutaj proszę się zgłosić. Przepustka gościa jest ważna
 do końca dnia.” → portier wraca na portiernię. Jeśli gracz nie idzie za nim

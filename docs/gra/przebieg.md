@@ -27,7 +27,8 @@ Pierwszy dzień zaczynasz w domu przy komputerze:
 
 ## Pierwszy dzień w biurze
 
-Startujesz przed budynkiem bez przepustki — bramki w holu cię nie wpuszczą.
+Startujesz przed budynkiem bez przepustki. Do holu wejdziesz, ale windy,
+klatka schodowa i parking otwierają się tylko kartą.
 
 1. **Portiernia** (E): portier da przepustkę gościa i zaprowadzi na recepcję
    na piętrze 1 (schodami).
