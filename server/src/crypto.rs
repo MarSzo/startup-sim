@@ -14,7 +14,7 @@
 //! (a sliding window over the counters). Godot has AES and HMAC-SHA256
 //! built in, so the client does the same natively.
 
-use aes::cipher::{BlockDecryptMut, BlockEncrypt, BlockEncryptMut, KeyInit, KeyIvInit};
+use aes::cipher::{BlockCipherEncrypt, BlockModeDecrypt, BlockModeEncrypt, KeyInit, KeyIvInit};
 use aes::Aes256;
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
@@ -42,7 +42,7 @@ pub struct Keys {
 }
 
 fn hmac(key: &[u8], parts: &[&[u8]]) -> [u8; 32] {
-    let mut m = <HmacSha256 as Mac>::new_from_slice(key).expect("HMAC takes any key length");
+    let mut m = <HmacSha256 as KeyInit>::new_from_slice(key).expect("HMAC takes any key length");
     for p in parts {
         m.update(p);
     }
@@ -67,7 +67,7 @@ impl Keys {
     /// `prefix` = magic, version, type and the id (token / ticket).
     pub fn seal(&self, dir: Dir, prefix: &[u8], counter: u64, inner: &[u8]) -> Vec<u8> {
         let ct = cbc::Encryptor::<Aes256>::new(&self.enc.into(), &self.iv(dir, counter).into())
-            .encrypt_padded_vec_mut::<cbc::cipher::block_padding::Pkcs7>(inner);
+            .encrypt_padded_vec::<cbc::cipher::block_padding::Pkcs7>(inner);
         let mut out = Vec::with_capacity(prefix.len() + 8 + ct.len() + MAC_BYTES);
         out.extend_from_slice(prefix);
         out.extend_from_slice(&counter.to_le_bytes());
@@ -92,7 +92,7 @@ impl Keys {
         let counter = u64::from_le_bytes(body[prefix_len..prefix_len + 8].try_into().ok()?);
         let ct = &body[prefix_len + 8..];
         let inner = cbc::Decryptor::<Aes256>::new(&self.enc.into(), &self.iv(dir, counter).into())
-            .decrypt_padded_vec_mut::<cbc::cipher::block_padding::Pkcs7>(ct)
+            .decrypt_padded_vec::<cbc::cipher::block_padding::Pkcs7>(ct)
             .ok()?;
         Some((counter, inner))
     }

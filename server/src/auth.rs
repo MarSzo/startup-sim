@@ -10,7 +10,7 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use argon2::password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString};
+use argon2::password_hash::{phc::PasswordHash, PasswordHasher, PasswordVerifier};
 use argon2::Argon2;
 use rusqlite::{params, Connection, OptionalExtension};
 use sha2::{Digest, Sha256};
@@ -126,8 +126,10 @@ fn sha256(s: &str) -> String {
 fn hash_password(password: &str) -> Result<String, AuthError> {
     let mut salt = [0u8; 16];
     getrandom::fill(&mut salt).map_err(|e| AuthError::Internal(e.to_string()))?;
-    let salt = SaltString::encode_b64(&salt).map_err(|e| AuthError::Internal(e.to_string()))?;
-    Argon2::default().hash_password(password.as_bytes(), &salt).map(|h| h.to_string()).map_err(|e| AuthError::Internal(e.to_string()))
+    Argon2::default()
+        .hash_password_with_salt(password.as_bytes(), &salt)
+        .map(|h| h.to_string())
+        .map_err(|e| AuthError::Internal(e.to_string()))
 }
 
 fn verify_password(password: &str, hash: &str) -> bool {
@@ -356,6 +358,17 @@ impl Auth {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn passwords_hashed_by_older_versions_still_verify() {
+        // Made by argon2 0.5 (accounts saved before the update to 0.6).
+        let old = "$argon2id$v=19$m=19456,t=2,p=1$HZow5dWQonsxdqEs2amrhQ$Iy7ALQiE8q4RMLsS2i2kodhdGFkwXYifYYyj+GPwD6g";
+        assert!(verify_password("stare-haslo-123", old));
+        assert!(!verify_password("stare-haslo-124", old));
+        let new = hash_password("nowe-haslo").unwrap();
+        assert!(new.starts_with("$argon2id$v=19$m=19456,t=2,p=1$"), "{new}");
+        assert!(verify_password("nowe-haslo", &new) && !verify_password("inne", &new));
+    }
 
     fn auth(name: &str) -> Auth {
         let dir = std::env::temp_dir().join(format!("startup-sim-auth-{}-{name}", std::process::id()));
