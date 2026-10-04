@@ -92,8 +92,8 @@ SCENARIOS = {
 
 
 # Rough run times (s), to split the scenarios evenly into shards.
-DURATION = {"resign": 90, "onboarding": 60, "founder": 45, "workday": 41, "together": 33, "fight": 33,
-            "drinking": 31, "persistence": 23, "chat": 23, "storeroom": 19, "chill": 18, "office_apps": 6}
+DURATION = {"resign": 90, "onboarding": 60, "workday": 41, "together": 33, "fight": 33, "drinking": 31,
+            "persistence": 23, "chat": 23, "storeroom": 19, "chill": 18, "founder": 15, "office_apps": 6}
 
 
 def shard(names, k, n):

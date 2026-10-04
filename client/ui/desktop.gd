@@ -40,6 +40,9 @@ var profile := {}
 ## Dev: apply for this offer, answer at random, go to the office (0 = off).
 var auto_offer := 0
 var auto_delay := 0.0
+## Tests: picks the answer in auto mode (question text, options -> shown
+## index; -1 = guess). Unset: always guess.
+var auto_answer := Callable()
 ## Dev (--found=<name>): found the company once the portal knows it can.
 var auto_found := ""
 
@@ -682,7 +685,8 @@ func _show_question(p: Dictionary, key: String) -> void:
 		body.add_child(b)
 	if auto_offer > 0:
 		var n: int = p.options.size()
-		_auto(func(): _send_answer(p.attempt, p.index, randi() % n))
+		var pick: int = auto_answer.call(p.text, p.options) if auto_answer.is_valid() else -1
+		_auto(func(): _send_answer(p.attempt, p.index, pick if pick >= 0 else randi() % n))
 
 
 func _send_answer(attempt: int, index: int, choice: int) -> void:
