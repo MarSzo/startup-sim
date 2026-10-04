@@ -4,6 +4,7 @@
 extends Control
 
 const Ink = preload("res://ui/ink_ui.gd")
+const ItemArt = preload("res://game/item_art.gd")
 
 signal answer(id: int, choice: int)
 
@@ -73,16 +74,56 @@ func on_dialog(p: Dictionary) -> void:
 	_text.text = p.text
 	for c in _opts.get_children():
 		c.queue_free()
+	# A cupboard / cabinet: what's inside drawn like the inventory's slots.
+	var items: Array = p.get("items", [])
+	var shelf := HBoxContainer.new()
+	shelf.alignment = BoxContainer.ALIGNMENT_CENTER
+	shelf.add_theme_constant_override("separation", 10)
+	if items.any(func(k): return k != 0):
+		_opts.add_child(shelf)
 	for i in p.options.size():
+		var choice: int = i
+		var kind: int = items[i] if i < items.size() else 0
+		if kind != 0:
+			shelf.add_child(_item_slot(kind, i, p.options[i]))
+			continue
 		var b := Ink.button("%d. %s" % [i + 1, p.options[i]])
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		b.focus_mode = Control.FOCUS_NONE
-		var choice: int = i
 		b.pressed.connect(func(): _choose(choice))
 		_opts.add_child(b)
 	visible = true
 	_panel.reset_size()
 	_place.call_deferred()
+
+
+## One thing in the cupboard: its picture in a slot, the key, what it says.
+func _item_slot(kind: int, i: int, text: String) -> Control:
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 4)
+	var box := Button.new()
+	box.custom_minimum_size = Vector2(84, 84)
+	box.focus_mode = Control.FOCUS_NONE
+	box.flat = true
+	box.tooltip_text = text
+	box.pressed.connect(func(): _choose(i))
+	box.draw.connect(func():
+		Ink.box("slot_active" if box.is_hovered() else "slot").draw(box.get_canvas_item(), Rect2(Vector2.ZERO, box.size))
+		ItemArt.draw(box, kind, Vector2(12, 10), (box.size.x - 24) / 16.0)
+		var f := Ink.font()
+		box.draw_string_outline(f, Vector2(8, box.size.y - 8), str(i + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, 4, Ink.INK)
+		box.draw_string(f, Vector2(8, box.size.y - 8), str(i + 1), HORIZONTAL_ALIGNMENT_LEFT, -1, 16, Ink.GOLD))
+	box.mouse_entered.connect(box.queue_redraw)
+	box.mouse_exited.connect(box.queue_redraw)
+	col.add_child(box)
+	var l := Label.new()
+	Ink.style_label(l, 13, Ink.TEXT_INK)
+	l.text = text
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	l.custom_minimum_size = Vector2(110, 0)
+	col.add_child(l)
+	return col
 
 
 ## Ids (server): 1..199 board talks, 200..249 the breathalyser, 250 the R
@@ -97,6 +138,8 @@ func _title(p: Dictionary) -> String:
 			if str(p.text).begins_with(t):
 				return t
 		return "Magazynek"
+	if p.id == 249:
+		return "Głosowanie"
 	if p.id == 253:
 		return "Telewizor"
 	if p.id == 254:

@@ -156,8 +156,8 @@
       "name": "calendar_book"
     },
     {
-      "debug": "Dialog { id: 3, npc: 61444, text: \"Podwyżka? Proszę mnie przekonać.\", options: [\"Pracuję tu od początku.\", \"Bo kawa podrożała.\"] }",
-      "hex": "54532e210304f02300506f647779c5bc6b613f2050726f737ac499206d6e69652070727a656b6f6e61c4872e02190050726163756ac499207475206f6420706f637ac485746b752e1400426f206b61776120706f64726fc5bc61c582612e",
+      "debug": "Dialog { id: 3, npc: 61444, text: \"Podwyżka? Proszę mnie przekonać.\", options: [\"Pracuję tu od początku.\", \"Bo kawa podrożała.\"], items: [35, 0] }",
+      "hex": "54532e210304f02300506f647779c5bc6b613f2050726f737ac499206d6e69652070727a656b6f6e61c4872e02190050726163756ac499207475206f6420706f637ac485746b752e1400426f206b61776120706f64726fc5bc61c582612e022300",
       "name": "dialog"
     },
     {

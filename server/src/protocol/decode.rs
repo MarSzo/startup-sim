@@ -539,7 +539,15 @@ impl Packet {
                 for _ in 0..n {
                     options.push(r.str16(MAX_TEXT_BYTES)?);
                 }
-                Packet::Dialog { id, npc, text, options }
+                let k = r.u8()? as usize;
+                if k > MAX_DIALOG_OPTIONS {
+                    return Err(DecodeError::Invalid("too many items"));
+                }
+                let mut items = Vec::with_capacity(k);
+                for _ in 0..k {
+                    items.push(r.u8()?);
+                }
+                Packet::Dialog { id, npc, text, options, items }
             }
             ty::DIALOG_ANSWER => Packet::DialogAnswer { token: r.u32()?, id: r.u8()?, choice: r.u8()? },
             ty::LUNCH_MENU => {

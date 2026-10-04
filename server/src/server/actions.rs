@@ -60,7 +60,7 @@ impl Server {
         let Some(p) = self.players.get_mut(&id) else { return };
         p.deeds = deeds;
         let addr = p.addr;
-        let packet = Packet::Dialog { id: mischief::MENU_ID, npc: id, text: lines::MENU.into(), options };
+        let packet = Packet::Dialog { id: mischief::MENU_ID, npc: id, text: lines::MENU.into(), options, items: Vec::new() };
         self.send(addr, &packet);
     }
 
@@ -82,7 +82,7 @@ impl Server {
         let addr = p.addr;
         let deeds = std::mem::take(&mut p.deeds);
         let cupboard = std::mem::take(&mut p.cupboard);
-        self.send(addr, &Packet::Dialog { id: 0, npc: 0, text: String::new(), options: Vec::new() });
+        self.send(addr, &Packet::Dialog { id: 0, npc: 0, text: String::new(), options: Vec::new(), items: Vec::new() });
         if dialog == mischief::CUPBOARD_ID {
             if let Some(&k) = cupboard.get(usize::from(choice)) {
                 self.take_from_cupboard(pid, k);
@@ -185,10 +185,11 @@ impl Server {
         kinds.push(0);
         options.push(kitchen::lines::CLOSE.to_string());
         let Some(p) = self.players.get_mut(&pid) else { return };
-        p.cupboard = kinds;
+        p.cupboard = kinds.clone();
         let addr = p.addr;
         let text = kitchen::lines::cupboard(mugs, knives);
-        self.send(addr, &Packet::Dialog { id: mischief::CUPBOARD_ID, npc: pid, text, options });
+        // Drawn like the inventory: a mug, a knife.
+        self.send(addr, &Packet::Dialog { id: mischief::CUPBOARD_ID, npc: pid, text, options, items: kinds });
     }
 
     fn take_from_cupboard(&mut self, pid: u16, kind: u8) {

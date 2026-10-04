@@ -1659,7 +1659,7 @@ fn sweets_tray_in_the_chill_room() {
     let ws = game::computer::find_workstations(&b);
     let w = ws.iter().find(|w| w.department == 1).unwrap();
     let body = Body { access: access::CARD, ..Body::at(w.floor, Pos::tile_center(w.tile.x, w.tile.y + 1)) };
-    let body = ola.walk_to(&b, body, (1, Tile { x: 36, y: 12 }), &[]);
+    let body = ola.walk_to(&b, body, (1, Tile { x: 35, y: 8 }), &[]);
     while ola.recv().is_some() {}
     let tray = |c: &Client| {
         wait_for(c, &[], wait, |p| match p {

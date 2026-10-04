@@ -36,7 +36,7 @@ clip c2 s2_rain 0 150 "Dojedź do pracy — nawet w deszczu"
 clip c3 s3_hall 0 150 "Pani Wiesia z portierni zawsze zagada"
 clip c4 s4_office 0 150 "Pracuj w startupie razem z innymi graczami"
 clip c5 s5_chill 0 150 "Mecz w telewizorze, disco polo z boomboxa"
-clip c6 s6_shop 0 150 "„Jaka parówka jest, wariacie?”" south
+clip c6 s6_shop 0 150 "„Jaka parówka wariacie?”" south
 
 # End card: the splash (logo + name), tagline, "wkrótce".
 magick $R/client/icons/splash.png -resize 1920x1080 \

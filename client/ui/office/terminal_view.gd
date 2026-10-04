@@ -47,6 +47,9 @@ func _init() -> void:
 	_input.flat = true
 	_input.caret_blink = true
 	_input.caret_force_displayed = true
+	# Enter runs the line and the prompt stays live (by default a LineEdit
+	# stops editing on submit: the terminal looked frozen after one command).
+	_input.keep_editing_on_text_submit = true
 	_input.add_theme_font_override("font", mono)
 	_input.add_theme_font_size_override("font_size", 15)
 	_input.add_theme_color_override("font_color", FG)
@@ -76,6 +79,7 @@ func set_context(day: int, minute: int, weather: String) -> void:
 
 func focus() -> void:
 	_input.grab_focus.call_deferred()
+	_input.edit.call_deferred()
 
 
 ## Run a line as if typed (the dev command / tests).

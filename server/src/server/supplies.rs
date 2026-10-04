@@ -139,9 +139,10 @@ impl Server {
         kinds.push(0);
         labels.push(lines::CLOSE.into());
         let Some(p) = self.players.get_mut(&pid) else { return };
-        p.supply_menu = kinds;
+        p.supply_menu = kinds.clone();
         let addr = p.addr;
-        self.send(addr, &Packet::Dialog { id: supplies::DIALOG, npc: pid, text: text.into(), options: labels });
+        // Drawn like the inventory: what each option is.
+        self.send(addr, &Packet::Dialog { id: supplies::DIALOG, npc: pid, text: text.into(), options: labels, items: kinds });
     }
 
     /// The answer to a cabinet / the storeroom; false if not that dialog.
@@ -152,7 +153,7 @@ impl Server {
         let Some(p) = self.players.get_mut(&pid) else { return true };
         let menu = std::mem::take(&mut p.supply_menu);
         let (addr, room) = (p.addr, p.inventory.has_room());
-        self.send(addr, &Packet::Dialog { id: 0, npc: pid, text: String::new(), options: Vec::new() });
+        self.send(addr, &Packet::Dialog { id: 0, npc: pid, text: String::new(), options: Vec::new(), items: Vec::new() });
         let Some(&kind) = menu.get(usize::from(choice)).filter(|&&k| k != 0) else { return true };
         if !room {
             self.says.push(Say::new(pid, lines::HANDS_FULL));

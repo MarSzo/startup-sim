@@ -84,17 +84,31 @@ impl Server {
         }
     }
 
+    /// Employees who aren't here now: on the messenger as unavailable
+    /// (conversation 0 - nothing to open).
+    pub(super) fn offline_colleagues(&self) -> Vec<String> {
+        let online = |nick: &str| self.players.values().any(|p| p.nick.eq_ignore_ascii_case(nick));
+        let mut out: Vec<String> =
+            self.offline.characters.values().filter(|c| c.contract && !online(&c.nick)).map(|c| c.nick.clone()).collect();
+        out.sort_by_key(|n| n.to_lowercase());
+        out
+    }
+
     pub(super) fn computer_packet(&self, pid: u16) -> Option<Packet> {
         let h = self.players.get(&pid)?.at_computer?;
         let c = self.computers.iter().find(|c| c.handle == h)?;
         let accounts = self.accounts();
         let convs = match accounts.iter().find(|a| a.id == c.owner()) {
-            Some(acc) if !c.locked => self
-                .messenger
-                .conversations(acc, &accounts, |d| self.cfg.recruitment.department_name(d).map(str::to_string))
-                .into_iter()
-                .map(|i| proto::ConvEntry { conv: i.conv, unread: i.unread, title: i.title })
-                .collect(),
+            Some(acc) if !c.locked => {
+                let mut convs: Vec<proto::ConvEntry> = self
+                    .messenger
+                    .conversations(acc, &accounts, |d| self.cfg.recruitment.department_name(d).map(str::to_string))
+                    .into_iter()
+                    .map(|i| proto::ConvEntry { conv: i.conv, unread: i.unread, title: i.title })
+                    .collect();
+                convs.extend(self.offline_colleagues().into_iter().map(|nick| proto::ConvEntry { conv: 0, unread: 0, title: nick }));
+                convs
+            }
             _ => Vec::new(),
         };
         Some(Packet::Computer { handle: h, owner: c.owner(), locked: c.locked, convs })

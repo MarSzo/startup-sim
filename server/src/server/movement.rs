@@ -149,6 +149,7 @@ impl Server {
         }
         let entered = std::mem::take(&mut steps.entered);
         self.greet_entering(&entered);
+        self.remark_accessible(&entered);
     }
 
     /// Somebody in the bathroom saw it.

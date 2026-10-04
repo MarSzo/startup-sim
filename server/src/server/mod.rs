@@ -254,6 +254,8 @@ pub struct Server {
     /// Pani Wiesia: when she last greeted each player, and the next joke.
     porter_greeted: HashMap<u16, u32>,
     porter_joke: usize,
+    /// "Skip the waiting": the vote going on (leave.rs).
+    skip_vote: Option<leave::SkipVote>,
     /// The receptionist asked about lunch: player -> world day.
     lunch_asked: HashMap<u16, u32>,
     /// Pani Maria: when she last told each player something, when she may
@@ -365,6 +367,7 @@ impl Server {
             passersby: lost::Passersby::default(),
             porter_greeted: HashMap::new(),
             porter_joke: 0,
+            skip_vote: None,
             lunch_asked: HashMap::new(),
             maria_told: HashMap::new(),
             maria_next: 0,
@@ -505,6 +508,7 @@ impl Server {
     fn tick(&mut self) {
         self.tick = self.tick.wrapping_add(1);
         self.update_fast_forward();
+        self.tick_skip_vote();
         self.tick_clock();
         self.drop_timed_out(Instant::now());
 

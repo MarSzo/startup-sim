@@ -37,6 +37,7 @@ impl Server {
             npc,
             text: lines::contract(&title, t.form, t.offered, t.agreed),
             options: vec![lines::SIGN.into(), lines::RESIGN.into()],
+            items: Vec::new(),
         };
         self.send(addr, &packet);
     }
@@ -49,7 +50,7 @@ impl Server {
         let Some(p) = self.players.get_mut(&pid) else { return true };
         let Some(hr) = p.contract_shown.take() else { return true };
         let addr = p.addr;
-        self.send(addr, &Packet::Dialog { id: 0, npc: hr, text: String::new(), options: Vec::new() });
+        self.send(addr, &Packet::Dialog { id: 0, npc: hr, text: String::new(), options: Vec::new(), items: Vec::new() });
         let Some(p) = self.players.get(&pid) else { return true };
         if p.contract || !p.inventory.has(item_kind::GUEST_PASS) {
             return true; // signed already, or the pass is gone

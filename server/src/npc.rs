@@ -89,7 +89,7 @@ pub mod lines {
     pub const POLICE_BUSY: &str = "Proszę się odsunąć, trwa interwencja.";
     pub const GUARD_FIGHT: &str = "Hej! Bez bijatyk! Stój!";
     // The cashier, when someone comes up to the counter with goods.
-    pub const CASHIER_HOTDOG: &str = "Jaka parówka jest, wariacie?";
+    pub const CASHIER_HOTDOG: &str = "Jaka parówka wariacie?";
     // Paulina in her armchair (all day).
     pub const IDLER: [&str; 5] = [
         "Nie teraz, kochanie, mam przerwę.",
@@ -857,7 +857,7 @@ mod tests {
             roles,
             vec![
                 (Role::Porter, "Pani Wiesia", look::PORTER),
-                (Role::Cashier, "Kasa", look::SHOP),
+                (Role::Cashier, "Kasjer", look::SHOP),
                 (Role::Guard, "Ochrona", look::GUARD),
                 (Role::Cleaner, "Pani Maria", look::CLEANER),
                 (Role::Idler, "Paulina", look::CLEANER),

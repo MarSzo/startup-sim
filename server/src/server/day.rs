@@ -44,6 +44,8 @@ impl Server {
                 self.clock_dirty = true;
             }
             Some(Transition::Morning) => {
+                // Skipped to the morning: now everybody picks how to get to work.
+                self.clock.skip = false;
                 let now = self.clock.total_minutes();
                 let mut off = Vec::new();
                 for p in self.players.values_mut() {
@@ -95,6 +97,8 @@ impl Server {
         for pid in leaving {
             let traffic = self.rng.u32(0..=commute::MAX_TRAFFIC);
             let Some(p) = self.players.get_mut(&pid) else { continue };
+            // Back to work from home: rested, fed and washed.
+            p.needs.rested_at_home();
             let mut m = commute::mode(p.commute_mode).copied().unwrap_or(commute::MODES[0]);
             if p.money < m.cost {
                 m = commute::MODES[0]; // can't afford it: on foot
@@ -143,8 +147,10 @@ impl Server {
     /// that drops them off (see `tick_vehicles`).
     pub(super) fn arrive(&mut self, pid: u16) {
         let Some(mode) = self.players.get(&pid).map(|p| p.commute_mode) else { return };
-        if let Some(p) = self.players.get_mut(&pid) {
-            p.skip_wait = false;
+        // Someone's at work again: the skipping is over.
+        if self.clock.skip {
+            self.clock.skip = false;
+            self.clock_dirty = true;
         }
         let handle = self.alloc_handle();
         let kind_of = |m: u8| Vehicle::for_mode(&self.building.outside, m, 0, 0, 0).map(|v| v.kind);
@@ -267,7 +273,7 @@ impl Server {
             company: self.company.name.clone(),
             founded: self.company.founder.is_some() || self.offline.founder.is_some(),
             alarm: self.alarm.is_some() as u8,
-            skip: if self.clock.skip { 2 } else { p.skip_wait as u8 },
+            skip: if self.clock.skip { 2 } else { u8::from(self.skip_vote.is_some()) },
             leave: p.hr.on_leave,
         }
     }

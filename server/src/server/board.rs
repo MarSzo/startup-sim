@@ -159,7 +159,13 @@ impl Server {
         let m = &self.meetings[self.talk_meeting(pid, t)?];
         let board::State::Talking(step) = m.state else { return None };
         let s = board::steps(m.topic).get(step)?;
-        Some(Packet::Dialog { id: t.id, npc: t.npc, text: s.text.into(), options: s.options.iter().map(|o| o.to_string()).collect() })
+        Some(Packet::Dialog {
+            id: t.id,
+            npc: t.npc,
+            text: s.text.into(),
+            options: s.options.iter().map(|o| o.to_string()).collect(),
+            items: Vec::new(),
+        })
     }
 
     pub(super) fn send_dialog(&mut self, pid: u16) {
@@ -170,6 +176,7 @@ impl Server {
 
     pub(super) fn handle_dialog_answer(&mut self, pid: u16, dialog: u8, choice: u8) {
         if self.answer_reprimand(pid, dialog, choice)
+            || self.answer_skip_vote(pid, dialog, choice)
             || self.answer_mischief(pid, dialog, choice)
             || self.answer_contract(pid, dialog, choice)
             || self.answer_media(pid, dialog, choice)
@@ -264,7 +271,7 @@ impl Server {
         if let Some(line) = last {
             self.says.push(Say::addressed(t.npc, line, pid));
         }
-        let close = Packet::Dialog { id: 0, npc: t.npc, text: String::new(), options: Vec::new() };
+        let close = Packet::Dialog { id: 0, npc: t.npc, text: String::new(), options: Vec::new(), items: Vec::new() };
         self.send_to(pid, &close);
         self.send_to(pid, &close); // tiny packet; a duplicate makes loss unlikely
     }

@@ -100,6 +100,7 @@ const SOUND_FILES := {1: "coffee", 2: "till", 3: "gate_alarm", 4: "ding", 5: "lo
 	13: "pickup", 14: "drop", 15: "eat", 16: "drink", 17: "whistle", 18: "burp", 19: "vomit",
 	20: "punch", 21: "stab", 22: "pee", 23: "poop"}
 const SOUND_BURP := 18
+const SOUND_STAB := 21
 # FridgeAction.action (server/src/kitchen.rs)
 const FRIDGE_TAKE := 1
 const FRIDGE_PUT := 2
@@ -207,6 +208,7 @@ const DIALOG_CONTRACT := 252
 const DIALOG_TV := 253
 const DIALOG_BOOMBOX := 254
 const DIALOG_SUPPLIES := 255  # the first-aid cabinet / the storeroom shelves
+const DIALOG_VOTE := 249  # "skip the waiting" for everybody: yes / no
 # HrAction.action (server/src/hr.rs `action`): show the file, ask for leave on
 # a day, cancel a request.
 const HR_SHOW := 1
@@ -937,6 +939,13 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			for i in n:
 				opts.append(r.str16(MAX_TEXT_BYTES))
 			p.options = opts
+			var k := r.u8()
+			if k > MAX_DIALOG_OPTIONS:
+				return {}
+			var items := []
+			for i in k:
+				items.append(r.u8())
+			p.items = items  # per option: the item (cupboards, cabinets), 0 = none
 		T_SHELF:
 			p.shelf = r.u8()
 			p.title = r.str16(MAX_TEXT_BYTES)

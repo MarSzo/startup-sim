@@ -106,6 +106,9 @@ pub struct RoomDef {
     /// Bathrooms: "female" / "male".
     #[serde(default)]
     pub gender: Option<String>,
+    /// A toilet for the disabled (the wheelchair sign; a remark on coming in).
+    #[serde(default)]
+    pub accessible: bool,
     /// Under the open sky (weather applies).
     #[serde(default)]
     pub outdoor: bool,
@@ -518,7 +521,7 @@ mod tests {
     }
 
     /// Rooms behind locked doors (or walled up): nobody gets in.
-    const SEALED: [&str; 3] = ["Strefa zamknięta", "Serwerownia", "Szafa"];
+    const SEALED: [&str; 2] = ["Serwerownia", "Szafa"];
 
     #[test]
     fn ground_floor_has_the_planned_rooms() {
@@ -558,7 +561,7 @@ mod tests {
             "Korytarz wschodni",
             "Produkt / IT",
             "Mobile",
-            "DevOps (Mordor)",
+            "Mordor",
             "AI team",
             "Biznes",
             "Finanse",

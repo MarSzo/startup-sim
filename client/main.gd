@@ -116,6 +116,7 @@ func _ready() -> void:
 	day_layer.add_child(day_screen)
 	day_screen.choose_commute.connect(func(m: int): net.send(Protocol.encode_commute_choice(net.token, m)))
 	day_screen.skip_wait.connect(func(): net.send(Protocol.encode_skip_wait(net.token)))
+	day_screen.vote.connect(func(c: int): net.send(Protocol.encode_dialog_answer(net.token, Protocol.DIALOG_VOTE, c)))
 	portal.auto_offer = int(args.get("auto-recruit", "0"))
 	portal.auto_delay = float(args.get("auto-recruit-delay", "0"))
 	portal.apply.connect(func(offer, a): net.send(Protocol.encode_apply(net.token, offer, a.motivation, a.salary, a.form, a.student)))
@@ -269,6 +270,7 @@ func _on_connected(welcome: Dictionary) -> void:
 	game.setup(net, building, welcome, net.nick, args)
 	game.set_own_appearance(profile.appearance)
 	game.entered_world.connect(func(): portal.on_entered_world(); _sync_portal())
+	game.vote_dialog.connect(day_screen.on_vote)
 	_sync_portal()
 
 

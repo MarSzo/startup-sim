@@ -566,6 +566,7 @@ func _build() -> void:
 	_entry.add_theme_color_override("font_color", Color("#1c2430"))
 	_entry.add_theme_color_override("font_placeholder_color", Color("#8a93a3"))
 	_entry.add_theme_color_override("caret_color", Color("#1c2430"))
+	_entry.keep_editing_on_text_submit = true  # Enter sends, you keep typing
 	_entry.text_submitted.connect(func(_t): _send())
 	in_row.add_child(_entry)
 	_send_btn = _button("Wyślij", true)
@@ -1307,7 +1308,8 @@ func _render_sidebar() -> void:
 	header.call("KANAŁY")
 	var dm_header := false
 	for c in state.convs:
-		if c.conv & Protocol.CONV_DM and not dm_header:
+		var away: bool = c.conv == 0  # an employee who isn't here now
+		if (c.conv & Protocol.CONV_DM or away) and not dm_header:
 			dm_header = true
 			var gap := Control.new()
 			gap.custom_minimum_size = Vector2(0, 10)
@@ -1315,6 +1317,9 @@ func _render_sidebar() -> void:
 			header.call("WIADOMOŚCI PRYWATNE")
 		var b := Button.new()
 		b.text = c.title + ("   (%d)" % c.unread if c.unread > 0 and c.conv != current else "")
+		if away:
+			b.text = "%s (poza biurem)" % c.title
+			b.disabled = true
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		b.add_theme_font_size_override("font_size", 15)
 		var sb := StyleBoxFlat.new()
@@ -1329,7 +1334,10 @@ func _render_sidebar() -> void:
 		b.add_theme_stylebox_override("pressed", hover)
 		var bold: bool = c.unread > 0 and c.conv != current
 		var fc := Color.WHITE if bold or c.conv == current else Color(1, 1, 1, 0.72)
-		for k in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
+		if away:
+			fc = Color(1, 1, 1, 0.35)
+			b.add_theme_stylebox_override("disabled", sb)
+		for k in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color", "font_disabled_color"]:
 			b.add_theme_color_override(k, fc)
 		var conv: int = c.conv
 		b.pressed.connect(func(): _select(conv))

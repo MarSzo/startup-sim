@@ -602,13 +602,17 @@ impl Packet {
                 w.u16(*start);
                 w.u8(*topic);
             }
-            Packet::Dialog { id, npc, text, options } => {
+            Packet::Dialog { id, npc, text, options, items } => {
                 w.u8(*id);
                 w.u16(*npc);
                 w.str16(text, MAX_TEXT_BYTES);
                 w.u8(options.len().min(MAX_DIALOG_OPTIONS) as u8);
                 for o in options.iter().take(MAX_DIALOG_OPTIONS) {
                     w.str16(o, MAX_TEXT_BYTES);
+                }
+                w.u8(items.len().min(MAX_DIALOG_OPTIONS) as u8);
+                for &k in items.iter().take(MAX_DIALOG_OPTIONS) {
+                    w.u8(k);
                 }
             }
             Packet::DialogAnswer { token, id, choice } => {

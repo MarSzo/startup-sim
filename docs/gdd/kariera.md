@@ -160,5 +160,6 @@ Zastępuje prosty portal z 10.8. Po połączeniu gracz widzi pulpit komputera
   „Zamówił/a już Pan/Pani obiad?” — jeśli jeszcze nie.
 - **Pani Maria** (dawniej Pani Krysia) robi popołudniowy obchód (15–16) i
   bardzo dużo mówi: każdemu obok co około minutę opowiada coś z życia (Zbyszek,
-  wnuczek, działka) albo z miasta (ceny na rynku, tramwaje, dzik w parku). Paulina
-  dalej tylko siedzi w fotelu przy wejściu.
+  wnuczek, działka) albo z miasta (ceny na rynku, tramwaje, dzik w parku).
+  Poza obchodem jej nie widać (siedzi w strefie zamkniętej). Paulina dalej
+  tylko siedzi w fotelu w holu, przy wiatrołapie.

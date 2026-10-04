@@ -15,7 +15,7 @@ fn roundtrip_all_samples() {
 fn a_dialog_carries_all_its_answers() {
     // The TV: 5 channels + "off" (once cut to 4 - no way to switch it off).
     let options: Vec<String> = (1..=MAX_DIALOG_OPTIONS).map(|i| format!("opcja {i}")).collect();
-    let p = Packet::Dialog { id: 253, npc: 1, text: "Co oglądamy?".into(), options };
+    let p = Packet::Dialog { id: 253, npc: 1, text: "Co oglądamy?".into(), options, items: Vec::new() };
     assert_eq!(Packet::decode(&p.encode()), Ok(p));
 }
 

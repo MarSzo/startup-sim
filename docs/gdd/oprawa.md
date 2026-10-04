@@ -121,9 +121,52 @@ pełnym ekranie — zastąpiona stylem inspirowanym Don't Starve:
   spotkaniach).
 - **Toalety** mają na tabliczce sam znaczek: damska, męska, wózek (WC dla
   niepełnosprawnych, `accessible` w mapie) albo oba (toaleta przy portierni).
-  Gdy obok jest dwoje drzwi, czyta się te, w które się patrzy.
-- Tabliczek nie mają drzwi do korytarzy, holu, na zewnątrz, windy i brama
-  garażowa (drzwi na kartę — na klatkę schodową — mają) —
-  tam widać, gdzie się jest. Liczy to klient z mapy (`MapData.plaque_at`),
-  serwer nic o tym nie wie.
+  Gdy obok jest dwoje drzwi, czyta się te, w które się patrzy — także stojąc
+  już w progu. Kto wejdzie do WC dla niepełnosprawnych, rzuca żartem pod nosem
+  („Tylko na chwilkę… Nikt nie widział, prawda?” i podobne).
+- Tabliczki czyta się tylko z miejsc wspólnych (korytarz, hol, chill room,
+  na zewnątrz) — w środku łazienki kabiny ich nie mają. Nie mają ich też
+  rzeczy oczywiste: korytarze, hol, klatka schodowa, chill room, aneks
+  kuchenny, sklep, balkon, windy. Liczy to klient z mapy
+  (`MapData.plaque_at`), serwer nic o tym nie wie.
+- Klatka schodowa nie ma napisu na mapie — nad drzwiami do niej świeci
+  zielony znak **EXIT** (na obu piętrach; na półpiętrze strzałki „▸ Parter” /
+  „▸ Piętro 1” zostają).
+
+## 10.55 Poprawki piętra 1 i parteru (2026-10-04)
+
+- Wejście na klatkę schodową na piętrze 1 jest z prawej strony (z holu
+  windowego), tak jak na parterze; drzwi z zachodniego korytarza zniknęły.
+- **Łazienka damska** w wyspie: wejście z korytarza do części z umywalką,
+  dwie kabiny WC za nią (nie prosto z korytarza do kibla).
+- Drzwi kabin w ścianach poziomych rysują się poziomo.
+- Nazwy: „DevOps (Mordor)” → **Mordor**, „Pokój z biurkiem” → **Pokój do
+  wyjebywania**; „Kasa” → **Kasjer**.
+- Na parterze w fotelu w holu (tam, gdzie stała pani Maria) siedzi Paulina;
+  pani Maria pokazuje się dopiero na obchód (15–16).
+- Taca ze słodyczami stoi na blacie między sofami w chill roomie.
+
+## 10.56 Usprawnienia (2026-10-04)
+
+- **Terminal** (i komunikator, komentarze na tablicy) po Enterze pisze dalej
+  — wcześniej pole kończyło edycję i wyglądało na zawieszone.
+- **Komunikator**: kto się wylogował, zostaje na liście wiadomości
+  prywatnych jako „poza biurem” (wyszarzony, bez rozmowy).
+- **Krew**: dźgnięcie nożem — rozprysk kropli, na podłodze plama krwi
+  (sprzątaczka: „Krew?! Co tu się działo… Ja już nic nie widziałam.”;
+  inaczej znika o 22:00).
+- **Szafka, apteczka, magazynek, barek** pokazują zawartość jak ekwipunek:
+  sloty z obrazkami (klik albo klawisz numeru), „Zamknij” pod spodem.
+- **Tab — menu akcji**: lista tego, co da się zrobić tu i teraz, z
+  klawiszami (E przy rzeczy obok, F / Q z tym, co w rękach, kieszenie, G / X
+  przy osobie obok, L w kabinie, R, czat, dziennik); wybór numerem albo
+  kliknięciem.
+- **Pomiń czekanie = głosowanie** wszystkich grających (większość, 30 s):
+  przechodzi → wszyscy do domu z wypłatą i czas leci do rana. Rano zegar
+  zwalnia — każdy wybiera dojazd (wcześniej po pominięciu wyjście z domu
+  działo się od razu i nie dało się wybrać środka transportu).
+- **Noc w domu regeneruje**: rano przy wyjściu do pracy postać jest
+  wypoczęta, po śniadaniu i prysznicu, trzeźwa i zdrowa (potrzeby jak na
+  starcie; dojazd zmienia je jak dotąd). Wcześniej potrzeby w domu stały w
+  miejscu — kto wyszedł zmęczony i głodny, wracał rano taki sam.
 

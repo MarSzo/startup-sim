@@ -18,7 +18,7 @@ kubek w ręce przez 90 s, widoczny dla innych → „Kawa wypita.”
 - **Sklep na parterze** (przed bramkami, dostępny także dla gości):
   - **E przy półce** pokazuje towary z cenami; „Weź” (albo 1–9) wkłada towar do
     kieszeni / rąk jako **niezapłacony** (widać to w ekwipunku, z ceną);
-  - **kasa** (NPC „Kasa” za ladą): E = płacisz za wszystkie niezapłacone rzeczy;
+  - **kasa** (NPC „Kasjer” za ladą): E = płacisz za wszystkie niezapłacone rzeczy;
     za mało pieniędzy — trzeba coś odłożyć;
   - **wyjście z niezapłaconym towarem**: bramka piszczy, towar zostaje w
     sklepie, stres +10.
@@ -76,8 +76,8 @@ kubek w ręce przez 90 s, widoczny dla innych → „Kawa wypita.”
   - podstawić pod **ekspres** (E) — kawa leci do tego samego kubka.
 - Kubki leżą, dopóki ktoś ich nie podniesie albo nie przyjdzie sprzątaczka —
   zostają nawet po wyjściu gracza z gry.
-- **Pani Maria** (NPC, turkusowy fartuch i mop; do 10.49 — Pani Krysia) siedzi w zapleczu technicznym
-  na parterze. **Między 15:00 a 16:00** (o losowej porze, co dzień innej) zaczyna obchód: idzie do najbliższego kubka (najpierw
+- **Pani Maria** (NPC, turkusowy fartuch i mop; do 10.49 — Pani Krysia) siedzi w strefie zamkniętej
+  na parterze (drzwi obsługi z holu) i do obchodu jej nie widać. **Między 15:00 a 16:00** (o losowej porze, co dzień innej) zaczyna obchód: idzie do najbliższego kubka (najpierw
   na swoim piętrze), zbiera wszystkie w zasięgu, chwilę wyciera stół i idzie
   dalej — po całym budynku (ma klucze wszędzie; kubków w zamkniętej kabinie nie
   zbierze).
@@ -150,7 +150,8 @@ kubek w ręce przez 90 s, widoczny dla innych → „Kawa wypita.”
 
 ## 10.51 Telewizor i boombox w chill roomie
 
-- **Telewizor** na ścianie chill roomu (naprzeciw sof). Kanały rysowane w
+- **Telewizor** na szafce przy południowej ścianie chill roomu (naprzeciw sof;
+  do 2026-10-04 wisiał na ścianie i na nią zachodził, przed nim stał stół). Kanały rysowane w
   grze: *Kreskówki*, *Wiadomości* (pasek z newsami z biura), *Pogoda* (z
   pogody w grze), *Mecz* (gol co ~40 s) i *Przyroda* (akwarium).
 - **Pilot** leży przy stoliku: kto ma go w rękach w chill roomie, F — wybór

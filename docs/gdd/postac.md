@@ -99,8 +99,8 @@
 
 ## 10.48 Psoty, bójki i obsługa na parterze
 
-- **Kasjer** w zielonej koszulce i czapce; gdy ktoś podejdzie do lady z
-  towarem do zapłaty, pyta: „Jaka parówka jest, wariacie?” (raz, aż się
+- **Kasjer** (NPC „Kasjer”) w zielonej koszulce i czapce; gdy ktoś podejdzie
+  do lady z towarem do zapłaty, pyta: „Jaka parówka wariacie?” (raz, aż się
   odejdzie).
 - **Ochroniarz** nie stoi w miejscu: chodzi między półkami (kilka punktów, w
   każdym chwilę stoi). E przy półce działa, nawet gdy przechodzi obok.

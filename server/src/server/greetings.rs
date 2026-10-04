@@ -23,6 +23,13 @@ const LUNCH_ASK_UNTIL: u32 = 13 * 60;
 /// minute, and never two stories closer than 12 s.
 const MARIA_REACH: i32 = TILE_UNITS * 7 / 2;
 const MARIA_EACH_TICKS: u32 = 60 * 20;
+/// Coming into the toilet for the disabled.
+const ACCESSIBLE_REMARKS: [&str; 4] = [
+    "Tylko na chwilkę… Nikt nie widział, prawda?",
+    "Ale tu przestronnie! Można by tu zamieszkać.",
+    "Poręcze, lustro na wysokości… Luksus jak w hotelu.",
+    "Wózka nie mam, ale za to jaki komfort!",
+];
 const MARIA_GAP_TICKS: u32 = 12 * 20;
 
 impl Server {
@@ -53,7 +60,19 @@ impl Server {
         m.rooms.iter().find(|r| r.id == room).is_some_and(|r| r.outdoor || matches!(r.kind.as_str(), "entrance" | "parking"))
     }
 
-    /// The cashier: "Jaka parówka jest, wariacie?" to whoever comes up to the
+    /// Into the toilet for the disabled (without a wheelchair): a word to
+    /// yourself.
+    pub(super) fn remark_accessible(&mut self, entered: &[(u16, u8, u16, u16)]) {
+        for &(pid, f, _, to) in entered {
+            let accessible = self.building.floor(f).is_some_and(|m| m.rooms.iter().any(|r| r.id == to && r.accessible));
+            if accessible {
+                let line = ACCESSIBLE_REMARKS[self.rng.usize(0..ACCESSIBLE_REMARKS.len())];
+                self.says.push(Say::new(pid, line));
+            }
+        }
+    }
+
+    /// The cashier: "Jaka parówka wariacie?" to whoever comes up to the
     /// counter with goods to pay for (once, until they step away).
     pub(super) fn tick_cashier(&mut self) {
         let Some(c) = self.cashier.and_then(|id| self.npcs.iter().find(|n| n.id == id)) else { return };

@@ -50,7 +50,7 @@ impl Server {
         }
         let mut options: Vec<String> = media::CHANNELS.iter().map(|c| (*c).to_string()).collect();
         options.push(lines::OFF.into());
-        let packet = Packet::Dialog { id: media::TV_DIALOG, npc: pid, text: lines::TV_ASK.into(), options };
+        let packet = Packet::Dialog { id: media::TV_DIALOG, npc: pid, text: lines::TV_ASK.into(), options, items: Vec::new() };
         self.send(p.addr, &packet);
     }
 
@@ -59,7 +59,7 @@ impl Server {
         let Some(p) = self.players.get(&pid) else { return };
         let mut options: Vec<String> = media::TRACKS.iter().map(|t| (*t).to_string()).collect();
         options.push(lines::OFF.into());
-        let packet = Packet::Dialog { id: media::BOOMBOX_DIALOG, npc: pid, text: lines::MUSIC_ASK.into(), options };
+        let packet = Packet::Dialog { id: media::BOOMBOX_DIALOG, npc: pid, text: lines::MUSIC_ASK.into(), options, items: Vec::new() };
         self.send(p.addr, &packet);
     }
 
@@ -83,7 +83,7 @@ impl Server {
         }
         let Some(p) = self.players.get(&pid) else { return true };
         let (addr, held) = (p.addr, p.inventory.held_kind());
-        self.send(addr, &Packet::Dialog { id: 0, npc: pid, text: String::new(), options: Vec::new() });
+        self.send(addr, &Packet::Dialog { id: 0, npc: pid, text: String::new(), options: Vec::new(), items: Vec::new() });
         let pick = usize::from(choice);
         let tick = self.tick;
         if dialog == media::TV_DIALOG {

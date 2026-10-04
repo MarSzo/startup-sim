@@ -314,9 +314,9 @@ def floor0():
     f.walls(43, 40, 54, 57, ".", "Z")
     f.room("Z", 9, "Strefa zamknięta", "service", light="always")
     f.door(43, 45, 43, 45, "x", "Z")
-    f.door(43, 55, 43, 55, "x", "Z")
+    f.door(43, 55, 43, 55, "L", "Z")                     # the cleaner's way in and out
     f.plants([(28, 41), (28, 56), (42, 56)])
-    f.put(41, 54, 41, 54, "a")                           # Paulina's armchair
+    f.put(38, 56, 38, 56, "a")                           # Paulina's armchair
 
     # --- outside ---
     f.area(12, 9, 16, STREET_Y - 1, "=", "O")            # the drive to the garage
@@ -354,16 +354,17 @@ def floor0():
         # Pani Wiesia greets (and chats up) everybody coming in.
         {"kind": "porter", "name": "Pani Wiesia", "home": [37, 49], "escort_to": [1, 36, 36]},
         # Behind the till; customers pay from the other side of the counter.
-        {"kind": "cashier", "name": "Kasa", "home": [20, 55]},
+        {"kind": "cashier", "name": "Kasjer", "home": [20, 55]},
         # The guard walks between the shelves.
         {"kind": "guard", "name": "Ochrona", "home": [25, 55],
          "patrol": [[24, 47], [20, 48], [24, 50], [20, 52], [25, 55]]},
-        # 10: Pani Maria, the cleaner: her round in the afternoon (15-16), and
-        # she talks to everybody, all the time.
-        {"kind": "cleaner", "name": "Pani Maria", "home": [38, 56]},
-        # Paulina, also a cleaner, sits in her armchair by the entrance all
-        # day. That's it.
-        {"kind": "idler", "name": "Paulina", "home": [41, 54]},
+        # 10: Pani Maria, the cleaner: out of sight in the closed zone, she
+        # only comes out for her afternoon round (15-16) - and talks to
+        # everybody, all the time.
+        {"kind": "cleaner", "name": "Pani Maria", "home": [46, 55]},
+        # Paulina, also a cleaner, sits in her armchair in the hall all day.
+        # That's it.
+        {"kind": "idler", "name": "Paulina", "home": [38, 56]},
     ]
     return f
 
@@ -404,10 +405,10 @@ def floor1():
     f.put(20, 8, 22, 9, "T")                             # a small table
     f.put(31, 8, 33, 9, "Q")                             # sofas
     f.put(37, 8, 39, 9, "Q")
-    f.put(35, 11, 37, 11, "T")                           # the table (treats)
+    f.put(35, 7, 35, 7, "J")                             # a counter between the sofas (the treats' tray)
     f.put(41, 7, 41, 7, "O")                             # fruit bowl (free fruit)
     f.put(42, 7, 42, 7, "Y")                             # sanitizer by the food
-    f.places["tray"] = [36, 11]
+    f.places["tray"] = [35, 7]
     f.places["remote"] = [34, 12]                        # the TV remote, by the table
     f.places["boombox"] = [41, 12]
 
@@ -418,17 +419,15 @@ def floor1():
     # at 56) and a bin (57).
     f.area(35, 14, 39, 26, "#", "-")
     f.area(35, 28, 39, 32, "#", "-")                     # (a walkway between the two)
-    # 54: women's WC (a lockable room of its own, door to the corridor).
-    f.area(36, 15, 38, 16, ":", "a")
-    f.room("a", 30, "WC damskie", "stall", gender="female", light="always")
-    f.put(36, 16, 36, 16, "U")
-    f.door(39, 16, 39, 16, "k", "a")
-    # 53: women's bathroom (washbasin).
+    # 53/54: the women's bathroom: in from the corridor by the washbasin,
+    # two WC stalls behind it.
     f.area(36, 18, 38, 19, ":", "W")
     f.room("W", 8, "Łazienka damska", "bathroom", gender="female", light="always")
-    f.door(35, 18, 35, 18, "D", "W")
-    f.put(38, 18, 38, 18, "V")
-    f.put(38, 19, 38, 19, "Y")
+    f.door(35, 19, 35, 19, "D", "W")
+    f.put(38, 19, 38, 19, "V")
+    f.put(37, 19, 37, 19, "Y")
+    stall(f, "a", 30, "WC damskie 1", "W", "female", (36, 15), (36, 16), (36, 17), "Łazienka damska")
+    stall(f, "E", 43, "WC damskie 2", "W", "female", (38, 15), (38, 16), (38, 17), "Łazienka damska")
     # 52: men's WC, through 51 (men's bathroom, washbasin).
     f.area(36, 21, 38, 22, ":", "x")
     f.room("x", 33, "WC męskie", "stall", see=["M"], gender="male", lit_by="Łazienka męska")
@@ -525,6 +524,7 @@ def floor1():
     f.room("q", 23, "Szafa", "service", light="always")
     f.door(35, 39, 35, 39, "x", "q")                     # locked
     f.plants([(30, 39), (42, 48)])
+    f.door(29, 41, 29, 41, "D", "C")                     # the stairwell (to its right, like downstairs)
 
     # Lower left wing: 24 stairs (above), 20 mobile, 21 bathroom (22, 23
     # stalls), 17 corridor, 19 and 18 team rooms, 16 finance.
@@ -536,7 +536,7 @@ def floor1():
     f.walls(11, 43, 29, 49, ".", "D")
     f.room("D", 25, "Korytarz zachodni", "corridor", detector=True, light="always")
     f.door(13, 43, 14, 43, "D", "D")                     # mobile
-    f.door(22, 43, 23, 43, "D", "D")                     # stairwell
+
     f.door(29, 45, 29, 46, "D", "D")                     # hall 13
     f.walls(2, 43, 11, 49, ":", "w")
     f.room("w", 26, "Łazienka damska (zachód)", "bathroom", gender="female", light="switch", switch_door=(11, 46),
@@ -577,13 +577,13 @@ def floor1():
     f.door(43, 45, 43, 46, "D", "U")                     # hall 13 <-> 25
     f.door(48, 43, 48, 43, "M", "U")                     # storeroom 41 (the key: at the reception)
     f.walls(53, 37, 65, 49, ",", "V")
-    f.room("V", 31, "DevOps (Mordor)", "department", detector=True, light="switch", switch_door=(53, 45),
+    f.room("V", 31, "Mordor", "department", detector=True, light="switch", switch_door=(53, 45),
            windows=True, department=DEVOPS)
     f.desk_rows(56, 59, (40, 44))
     f.desk_rows(61, 63, (40, 44))
     f.door(53, 45, 53, 46, "D", "V")
     f.walls(43, 49, 47, 54, ",", "h")
-    f.room("h", 32, "Pokój z biurkiem", "department", detector=True, light="switch", switch_door=(47, 51))
+    f.room("h", 32, "Pokój do wyjebywania", "department", detector=True, light="switch", switch_door=(47, 51))
     f.put(44, 51, 44, 51, "W")
     f.door(47, 51, 47, 51, "D", "h")
     f.walls(43, 54, 53, 60, ",", "B")
@@ -619,9 +619,8 @@ def floor1():
     # key on its hook.
     f.put(39, 33, 39, 33, "j")
     f.put(35, 33, 35, 33, "y")
-    # The TV on the chill room's wall, facing the sofas (after the walls
-    # of the rooms below, which share it).
-    f.put(35, 14, 37, 14, "I")
+    # The TV on a stand by the chill room's south wall, facing the sofas.
+    f.put(35, 13, 37, 13, "I")
     return f
 
 

@@ -34,6 +34,7 @@ func _draw() -> void:
 			_tile_object(x, y)
 	_props()
 	_plaques()
+	_exit_signs()
 
 
 # ----------------------------------------------------------------- helpers
@@ -377,7 +378,7 @@ func _plaques() -> void:
 				var next := Vector2i(x, y) + (Vector2i(1, 0) if across else Vector2i(0, 1))
 				if map.is_plaque_door(next.x, next.y):
 					continue
-				if not sides.any(func(o): return o[0] != s[0] and map.has_plaque(o[0])):
+				if not sides.any(func(o): return map.plaque_between(s[0], o[0])):
 					continue
 				if not _is_wall(next.x, next.y):
 					continue
@@ -390,6 +391,29 @@ func _plaques() -> void:
 				_box(plate, Color("#d9c27a"), true, 0.4, 0.45)
 				var mid := plate.get_center()
 				draw_line(mid - Vector2(plate.size.x / 2 - 1.6, 0), mid + Vector2(plate.size.x / 2 - 1.6, 0), Color(INK, 0.7), 0.5)
+
+
+## A green EXIT sign over the stairwell's door (on the side you come from).
+func _exit_signs() -> void:
+	for y in map.height:
+		for x in map.width:
+			if not _is_door(x, y) or _is_door(x - 1, y) or _is_door(x, y - 1):
+				continue
+			var sides: Array = map.door_sides(x, y)
+			var stairs: Array = sides.filter(func(s): return map.room_types.get(s[0], "") == "stairs")
+			var other: Array = sides.filter(func(s): return map.room_types.get(s[0], "") != "stairs")
+			if stairs.is_empty() or other.is_empty():
+				continue
+			var d: Vector2i = other[0][1]
+			# On the wall next to the doorway: above it in a wall running
+			# up-down, to its left in one running left-right.
+			var at := Vector2i(x, y - 1) if d.x != 0 else Vector2i(x - 1, y)
+			if not _is_wall(at.x, at.y):
+				continue
+			var o := Vector2(at) * TP
+			var sign_r := Rect2(o + Vector2(2.5 + d.x * 3.0, 4.5 + (3.0 if d.y > 0 else 0.0)), Vector2(11, 6))
+			_box(sign_r, Color("#2f9e4f"), true, 0.4, 0.4)
+			draw_string(ThemeDB.fallback_font, sign_r.position + Vector2(1.6, 4.9), "EXIT", HORIZONTAL_ALIGNMENT_LEFT, -1, 4, Color("#f4f8ef"))
 
 
 # ------------------------------------------------------------ tile objects

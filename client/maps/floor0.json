@@ -55,6 +55,12 @@
    "access": "card",
    "free_dir": "right"
   },
+  "L": {
+   "type": "service_door",
+   "solid": false,
+   "color": "#6a3a2a",
+   "access": "service"
+  },
   "g": {
    "type": "garage_gate",
    "solid": false,
@@ -225,9 +231,9 @@
   "Fvvvvvvvvvvv=====v#..HHH...#_______K___#:::#..........#vvvvvvvvvvvvvvF",
   "Fvvvvvvvvvvv=====v#.......H#___________##k##..........#vvvvvvvvvvvvvvF",
   "Fvvvvvvvvvvv=====v#.......H####DD###_______#..........#vvvvvvvvvvvvvvF",
-  "Fvvvvvvvvvvv=====v#KKK.....#_______#_____a_#..........#vvvvvvvvvvvvvvF",
-  "Fvvvvvvvvvvv=====v#........#_______#_______x..........#vvvvvvvvvvvvvvF",
-  "Fvvvvvvvvvvv=====v#........#P______#______P#..........#vvvvvvvvvvvvvvF",
+  "Fvvvvvvvvvvv=====v#KKK.....#_______#_______#..........#vvvvvvvvvvvvvvF",
+  "Fvvvvvvvvvvv=====v#........#_______#_______L..........#vvvvvvvvvvvvvvF",
+  "Fvvvvvvvvvvv=====v#........#P______#__a___P#..........#vvvvvvvvvvvvvvF",
   "Fvvvvvvvvvvv=====v####GG######GGG######################vvvvvvvvvvvvvvF",
   "FpppppppppppppppppppppppApppppppppppbbbbpppppppppppppppppppppppppppppF",
   "FppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppF",
@@ -537,7 +543,7 @@
   },
   {
    "kind": "cashier",
-   "name": "Kasa",
+   "name": "Kasjer",
    "home": [
     20,
     55
@@ -577,16 +583,16 @@
    "kind": "cleaner",
    "name": "Pani Maria",
    "home": [
-    38,
-    56
+    46,
+    55
    ]
   },
   {
    "kind": "idler",
    "name": "Paulina",
    "home": [
-    41,
-    54
+    38,
+    56
    ]
   }
  ],

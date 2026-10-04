@@ -356,6 +356,7 @@ fn punches_knock_out_a_knife_calls_the_police_and_earns_a_reprimand() {
     let before = s.players[&2].needs.health_points();
     s.use_held(1);
     assert_eq!(s.players[&2].needs.health_points(), before - 35);
+    assert_eq!(s.puddles.last().map(|p| p.kind), Some(crate::protocol::puddle::BLOOD), "blood on the floor");
     assert!(s.police_calls.iter().any(|c| c.target == 1));
     assert_eq!(s.players[&1].reprimands, 1);
     assert_eq!(s.players[&1].assault, Some(true));
@@ -822,4 +823,93 @@ fn a_lost_passerby_asks_the_way_to_number_50() {
     }
     assert!(s.says.iter().any(|l| l.text == super::lost::lines::TRICKED), "tricked");
     assert!(s.passersby.now.is_none() && !s.npcs.iter().any(|n| n.id == id), "walked off");
+}
+
+#[test]
+fn skipping_the_wait_is_a_vote_and_ends_in_the_morning() {
+    let mut s = server();
+    for id in 1..=3 {
+        add_player(&mut s, id);
+        s.players.get_mut(&id).unwrap().contract = true;
+    }
+    s.clock.ds = 15 * 60 * crate::clock::DS_PER_MIN;
+    s.players.get_mut(&1).unwrap().stage = Stage::Home { arrive_at: None };
+    // At work you can't start it; from home - a vote, 1 of 3 isn't enough.
+    s.handle_skip_wait(2);
+    assert!(s.skip_vote.is_none(), "only from home");
+    s.handle_skip_wait(1);
+    assert!(s.skip_vote.is_some() && !s.clock.skip);
+    assert!(matches!(s.clock_packet(&s.players[&1]), Packet::Clock { skip: 1, .. }), "the vote is on");
+    // A no, then a yes: 2 of 3 - passed, everybody goes home, time flies.
+    assert!(s.answer_skip_vote(3, super::leave::VOTE_ID, 1));
+    assert!(s.skip_vote.is_some());
+    assert!(s.answer_skip_vote(2, super::leave::VOTE_ID, 0));
+    assert!(s.skip_vote.is_none() && s.clock.skip);
+    assert!(s.players.values().all(|p| matches!(p.stage, Stage::Home { .. })), "all at home");
+    // Morning: no more skipping - there's time to pick how to get to work.
+    while s.clock.minute() != crate::clock::OPEN_MIN {
+        s.tick_clock();
+    }
+    assert!(!s.clock.skip, "the morning stops it");
+    assert!(s.players.values().all(|p| p.depart_at.is_some()), "everybody still to leave");
+}
+
+#[test]
+fn a_skip_vote_fails_on_no_or_when_time_is_up() {
+    let mut s = server();
+    for id in 1..=2 {
+        add_player(&mut s, id);
+        s.players.get_mut(&id).unwrap().stage = Stage::Home { arrive_at: None };
+    }
+    s.handle_skip_wait(1);
+    s.answer_skip_vote(2, super::leave::VOTE_ID, 1);
+    assert!(s.skip_vote.is_none() && !s.clock.skip, "half against: no");
+    s.handle_skip_wait(2);
+    s.tick += 30 * 20;
+    s.tick_skip_vote();
+    assert!(s.skip_vote.is_none() && !s.clock.skip, "nobody else answered in time");
+    // Alone: your own yes is enough.
+    s.players.remove(&2);
+    s.handle_skip_wait(1);
+    assert!(s.clock.skip);
+}
+
+#[test]
+fn colleagues_who_left_stay_on_the_messenger_as_away() {
+    let mut s = server();
+    // Kuba was here (hired) and left; p1 is online (saved too: not twice).
+    for (id, nick) in [(2, "Kuba"), (1, "p1")] {
+        add_player(&mut s, id);
+        let p = s.players.get_mut(&id).unwrap();
+        p.contract = true;
+        p.nick = nick.into();
+        let p = s.players.remove(&id).unwrap();
+        let c = s.capture(&p);
+        s.offline.characters.insert(p.nick.clone(), c);
+        if id == 1 {
+            s.players.insert(id, p);
+        }
+    }
+    assert_eq!(s.offline_colleagues(), vec!["Kuba".to_string()]);
+}
+
+#[test]
+fn back_to_work_from_home_rested_and_fed() {
+    let mut s = server();
+    add_player(&mut s, 1);
+    let p = s.players.get_mut(&1).unwrap();
+    p.contract = true;
+    p.stage = Stage::Home { arrive_at: None };
+    // Went home worn out, hungry, drunk and beaten up.
+    p.needs.energy = 5 * crate::needs::SCALE;
+    p.needs.hunger = 95 * crate::needs::SCALE;
+    p.needs.hygiene = 10 * crate::needs::SCALE;
+    p.needs.alcohol = 80;
+    p.needs.health = 0;
+    s.clock.ds = 8 * 60 * crate::clock::DS_PER_MIN;
+    s.players.get_mut(&1).unwrap().depart_at = Some(s.clock.total_minutes());
+    s.tick_clock();
+    let n = &s.players[&1].needs;
+    assert!(matches!(s.players[&1].stage, Stage::Home { arrive_at: Some(_) }), "on the way");
+    assert_eq!(*n, crate::needs::Needs::default(), "a night at home: all fresh");
 }

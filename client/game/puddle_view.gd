@@ -1,7 +1,7 @@
 ## A puddle left by a toilet accident (entity kind PUDDLE): neon yellow -
 ## or, thrown up (held = 1), a lumpy greenish-beige one; or a brown pile
-## with flies (held = 2) - on the floor until the cleaner mops it up or the
-## office closes. The blob's shape comes from
+## with flies (held = 2); blood after a stab (held = 3) - on the floor until
+## the cleaner mops it up or the office closes. The blob's shape comes from
 ## the entity id, so every puddle looks a little different.
 extends Node2D
 
@@ -11,6 +11,8 @@ const SHINE := Color(1.0, 1.0, 0.85, 0.85)
 const VOMIT_GLOW := Color(0.6, 0.7, 0.2, 0.25)
 const VOMIT_FILL := Color("#b9b44e")
 const VOMIT_LUMP := Color("#8a7a3a")
+const BLOOD_GLOW := Color(0.45, 0.0, 0.0, 0.25)
+const BLOOD_FILL := Color("#8e1216")
 const POOP := Color("#6b4423")
 const POOP_DARK := Color("#4a2e17")
 const INK := Color("#1d1712")
@@ -18,6 +20,7 @@ const INK := Color("#1d1712")
 var last_seen_tick := 0
 var vomit := false
 var poop := false
+var blood := false
 var _blobs: Array = []  # [offset, radius]
 var _lumps: Array = []  # vomit: [offset, radius]
 
@@ -25,6 +28,7 @@ var _lumps: Array = []  # vomit: [offset, radius]
 func setup(id: int, kind := 0) -> void:
 	vomit = kind == 1
 	poop = kind == 2
+	blood = kind == 3
 	set_process(poop)  # the flies
 	var rng := RandomNumberGenerator.new()
 	rng.seed = id
@@ -48,14 +52,17 @@ func _draw() -> void:
 		return
 	# Flattened: a puddle lies on the floor.
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2(1.0, 0.55))
+	var glow := BLOOD_GLOW if blood else (VOMIT_GLOW if vomit else GLOW)
+	var fill := BLOOD_FILL if blood else (VOMIT_FILL if vomit else FILL)
+	var scale := 0.6 if blood else 1.0  # a stain, not a lake
 	for b in _blobs:
-		draw_circle(b[0], b[1] + 2.5, VOMIT_GLOW if vomit else GLOW)
+		draw_circle(b[0] * scale, b[1] * scale + 2.5, glow)
 	for b in _blobs:
-		draw_circle(b[0], b[1], VOMIT_FILL if vomit else FILL)
+		draw_circle(b[0] * scale, b[1] * scale, fill)
 	if vomit:
 		for l in _lumps:
 			draw_circle(l[0], l[1], VOMIT_LUMP)
-	draw_circle(Vector2(-2.5, -2.0), 1.6, Color(SHINE, 0.5) if vomit else SHINE)
+	draw_circle(Vector2(-2.5, -2.0) * scale, 1.6 * scale, Color(SHINE, 0.3 if blood else (0.5 if vomit else 1.0)))
 	draw_set_transform(Vector2.ZERO)
 
 

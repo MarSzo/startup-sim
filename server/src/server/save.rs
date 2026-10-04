@@ -127,7 +127,7 @@ impl Server {
         self.players.get(&id).map(|p| p.nick.clone()).unwrap_or_default()
     }
 
-    fn capture(&self, p: &Player) -> Character {
+    pub(super) fn capture(&self, p: &Player) -> Character {
         let nick_of = |id: u16| self.nick_of(id);
         let slot = |it: &Option<crate::inventory::Item>| it.as_ref().filter(|i| !i.unpaid).map(|i| SavedItem::from_item(i, nick_of));
         let mut inventory = vec![slot(&p.inventory.hands)];

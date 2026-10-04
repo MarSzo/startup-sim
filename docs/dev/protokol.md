@@ -110,7 +110,8 @@ aplikuje max 6 (średnio 3 = 60/20). Kolejka ponad 30 jest przycinana od najstar
 Encja (14 B): `id u16 | kind u8 | x i32 | y i32 | flags u8 | held u8 | activity u8`.
 - `kind`: 0 gracz, 1 NPC, 2 przedmiot na podłodze, 3 laptop na biurku,
   4 pojazd, 5 taca słodyczy, 6 kałuża po wpadce (`held` 0), wymiociny
-  (`held` 1) albo kupa (`held` 2); sprzątaczka ją ściera, inaczej znika o 22:00.
+  (`held` 1), kupa (`held` 2) albo krew po dźgnięciu (`held` 3); sprzątaczka
+  ją ściera, inaczej znika o 22:00.
   Id: gracze 1..0xDFFF, przedmioty na podłodze i laptopy na biurkach od
   `0xE000` (wspólna pula), NPC od `0xF000`. `PlayerInfo` laptopa niesie imię
   i dział jego właściciela.
@@ -334,7 +335,10 @@ spotkaniem od 10 min przed do 10 min po jego początku; drzwi zarządu (kafel
 ### 33 `Dialog` (S→C), 34 `DialogAnswer` (C→S)
 
 Rozmowa z NPC (spotkanie z zarządem): `id u8` (0 = zamknij okno), `npc u16`,
-`text` str16, n u8 (≤ 9, klawisze 1–9) × `option` str16; ponawiane co 1 s, dopóki trwa.
+`text` str16, n u8 (≤ 9, klawisze 1–9) × `option` str16, k u8 (≤ 9) × `item`
+u8 — przy szafce / apteczce / magazynku / barku rodzaj przedmiotu każdej
+opcji (0 = żaden; okno rysuje je jak ekwipunek), inaczej k = 0; ponawiane co
+1 s, dopóki trwa. Id 249: głosowanie „pomiń czekanie” (0 = tak, 1 = nie).
 `DialogAnswer`: token u32, id u8, choice u8 — odpowiedzi na nieaktualne `id`
 są ignorowane. Odpowiedzi NPC idą jako `Say`.
 
@@ -521,9 +525,12 @@ id 200–249 to pytanie o naganę po alkomacie, 252 — umowa w HR (kwota niższ
 
 ### 44 `SkipWait` (C→S)
 
-token u32. „Pomiń czekanie” — tylko w domu / w drodze. Gdy poprosili wszyscy
-gracze (i wszyscy są w domu lub w drodze), zegar pędzi aż do przyjazdu;
-stan w `Clock::skip` (0 nie, 1 czekam na innych, 2 czas pędzi).
+token u32. „Pomiń czekanie” — z domu / z drogi: głosowanie wszystkich
+grających (`Dialog` 249 do pozostałych, 30 s). Przechodzi, gdy za jest ponad
+połowa grających: kto jest w pracy, idzie do domu (z wypłatą), a zegar pędzi
+do rana (albo do czyjegoś przyjazdu do pracy); rano się zatrzymuje, żeby
+każdy wybrał dojazd. W trakcie głosowania `SkipWait` to głos za. Stan w
+`Clock::skip` (0 nie, 1 głosowanie trwa, 2 czas pędzi).
 
 ### 42 `Fridge` (S→C), 43 `FridgeAction` (C→S)
 
@@ -548,7 +555,7 @@ liczy klient: pora dnia (`Clock.minute`), pogoda, `windows`, `light`
 n × {`kind u8`, `price u32` (grosze), `name` str16}. `ShopTake`: token u32,
 shelf u8, kind u8 — weź jedną sztukę (serwer sprawdza zasięg półki); towar
 trafia do ekwipunku jako niezapłacony (etykieta w `Inventory` z dopiskiem i
-ceną). Płacenie: E przy NPC „Kasa” (odpowiedź jako `Say`). Wyjście ze sklepu
+ceną). Płacenie: E przy NPC „Kasjer” (odpowiedź jako `Say`). Wyjście ze sklepu
 z niezapłaconym towarem: `Say` z alarmem od kasy, towar znika.
 
 Rodzaje przedmiotów sklepowych (`held`, `Inventory.kind`): 10 kanapka z serem,

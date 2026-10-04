@@ -8,7 +8,7 @@ const INK := Color("#1d1712")
 const W := 44.0
 const H := 26.0
 const NEWS := ["PILNE: kałuża w holu", "Prezes: owocowe czwartki codziennie", "Tramwaj spóźniony (znowu)",
-	"Pani Wiesia pyta o ślub", "Kasa: jaka parówka jest?", "Dzik w parku miejskim"]
+	"Pani Wiesia pyta o ślub", "Kasjer: jaka parówka wariacie?", "Dzik w parku miejskim"]
 
 var channel := 0
 var started_at := 0.0   # seconds of game time since the channel came on (at the last update)

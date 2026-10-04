@@ -125,7 +125,7 @@ impl Server {
                 let addr = p.addr;
                 self.says.push(Say::addressed(id, lines::ASK, player));
                 let options = vec![lines::OTHER_END.into(), lines::HERE.into(), lines::DUNNO.into()];
-                self.send(addr, &Packet::Dialog { id: dialog, npc: id, text: lines::ASK.into(), options });
+                self.send(addr, &Packet::Dialog { id: dialog, npc: id, text: lines::ASK.into(), options, items: Vec::new() });
                 self.passersby.now = Some(Lost { npc: id, player, phase: Phase::Asking(dialog, self.tick + ANSWER_TICKS) });
             }
             Phase::ToTheDoor => {
@@ -148,7 +148,7 @@ impl Server {
             return false;
         }
         if let Some(addr) = self.players.get(&pid).map(|p| p.addr) {
-            self.send(addr, &Packet::Dialog { id: 0, npc, text: String::new(), options: Vec::new() });
+            self.send(addr, &Packet::Dialog { id: 0, npc, text: String::new(), options: Vec::new(), items: Vec::new() });
         }
         match choice {
             0 => {

@@ -256,6 +256,7 @@ pub fn golden_samples() -> Vec<(&'static str, Packet)> {
                 npc: 61444,
                 text: "Podwyżka? Proszę mnie przekonać.".into(),
                 options: vec!["Pracuję tu od początku.".into(), "Bo kawa podrożała.".into()],
+                items: vec![35, 0],
             },
         ),
         ("dialog_answer", Packet::DialogAnswer { token: 0x01020304, id: 3, choice: 1 }),

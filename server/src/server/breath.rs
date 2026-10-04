@@ -40,7 +40,7 @@ impl Server {
         if milli <= drunk::LIMIT_MILLI {
             return;
         }
-        let ask = ASK_ID_BASE + (self.tick % 50) as u8;
+        let ask = ASK_ID_BASE + (self.tick % 49) as u8; // 249: the skip vote
         let Some(me) = self.players.get_mut(&id) else { return };
         me.reprimand_ask = Some((ask, target));
         let addr = me.addr;
@@ -49,6 +49,7 @@ impl Server {
             npc: target,
             text: format!("{} ({nick})", lines::REPRIMAND_ASK),
             options: vec![lines::REPRIMAND_YES.into(), lines::REPRIMAND_NO.into()],
+            items: Vec::new(),
         };
         self.send(addr, &packet);
         self.send(addr, &packet); // a tiny packet: a duplicate makes loss unlikely
@@ -63,7 +64,7 @@ impl Server {
         }
         p.reprimand_ask = None;
         let addr = p.addr;
-        self.send(addr, &Packet::Dialog { id: 0, npc: target, text: String::new(), options: Vec::new() });
+        self.send(addr, &Packet::Dialog { id: 0, npc: target, text: String::new(), options: Vec::new(), items: Vec::new() });
         if choice != 0 {
             self.says.push(Say::new(pid, lines::SPARED));
             return true;

@@ -23,8 +23,10 @@ const DIR_NAMES := {"up": DIR_UP, "down": DIR_DOWN, "left": DIR_LEFT, "right": D
 ## Doors with a plaque by them (the name of the room behind): not the lifts,
 ## the card gates or the garage gate.
 const PLAQUE_DOORS := ["door", "glass_door", "card_door", "board_door", "service_door", "storeroom_door", "locked_door", "stall_door"]
-## Rooms whose doors get no plaque: you can see where you are.
-const NO_PLAQUE := ["corridor", "hall", "outside", "entrance", "parking", "smoking"]
+## Rooms whose doors get no plaque: it's obvious what they are.
+const NO_PLAQUE := ["corridor", "hall", "outside", "entrance", "parking", "smoking", "stairs", "common", "shop", "balcony"]
+## Plaques are read from the common spaces (not from inside a bathroom).
+const READ_FROM := ["corridor", "hall", "outside", "entrance", "parking", "common", "stairs"]
 const SIDES: Array[Vector2i] = [Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(1, 0)]
 
 var id: String
@@ -205,6 +207,11 @@ func has_plaque(rid: int) -> bool:
 	return room_names.has(rid) and room_types.get(rid, "") not in NO_PLAQUE
 
 
+## A plaque on the door from room `from` into room `to`?
+func plaque_between(from: int, to: int) -> bool:
+	return from != to and has_plaque(to) and room_types.get(from, "") in READ_FROM
+
+
 ## The rooms a door tile joins: [[room id, direction from the door], ...].
 func door_sides(tx: int, ty: int) -> Array:
 	var out := []
@@ -219,8 +226,14 @@ func door_sides(tx: int, ty: int) -> Array:
 
 
 ## The plaque you can read standing at (tx, ty) in room `here`: the room
-## behind a door right next to you (the one you face first); NO_ROOM = none.
+## behind a door right next to you (the one you face first) - or, standing
+## in a doorway, the one you face into; NO_ROOM = none.
 func plaque_at(tx: int, ty: int, here: int, facing := Vector2i.ZERO) -> int:
+	if is_plaque_door(tx, ty) and facing != Vector2i.ZERO:
+		var ahead := room_at_tile(tx + facing.x, ty + facing.y)
+		var behind := room_at_tile(tx - facing.x, ty - facing.y)
+		if plaque_between(behind, ahead):
+			return ahead
 	var around: Array[Vector2i] = []
 	if facing != Vector2i.ZERO:
 		around.append(facing)
@@ -235,7 +248,7 @@ func plaque_at(tx: int, ty: int, here: int, facing := Vector2i.ZERO) -> int:
 		if not sides.any(func(s): return s[0] == here):
 			continue
 		for s in sides:
-			if s[0] != here and has_plaque(s[0]):
+			if plaque_between(here, s[0]):
 				return s[0]
 	return NO_ROOM
 

@@ -268,6 +268,8 @@ pub mod puddle {
     pub const PEE: u8 = 0;
     pub const VOMIT: u8 = 1;
     pub const POOP: u8 = 2;
+    /// After a stab.
+    pub const BLOOD: u8 = 3;
 }
 
 /// Form of employment (`Apply::form`, the contract).
@@ -833,6 +835,9 @@ pub enum Packet {
         npc: u16,
         text: String,
         options: Vec<String>,
+        /// Per option: the item it is (`inventory::kind`, 0 = none) - a
+        /// cupboard / cabinet drawn like the inventory; empty = words only.
+        items: Vec<u8>,
     },
     DialogAnswer {
         token: u32,

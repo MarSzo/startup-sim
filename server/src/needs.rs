@@ -439,6 +439,12 @@ impl Needs {
         pts(self.energy) <= SLOW_ENERGY || pts(self.bladder) >= SLOW_BLADDER
     }
 
+    /// A night at home: slept, had breakfast, a shower, sober and well again
+    /// - the morning's state (the commute changes it a bit on the way).
+    pub fn rested_at_home(&mut self) {
+        *self = Needs::default();
+    }
+
     pub fn drink_coffee(&mut self) {
         self.energy += 25 * SCALE;
         self.bladder += 8 * SCALE;

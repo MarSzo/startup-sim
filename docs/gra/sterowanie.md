@@ -8,6 +8,7 @@
 |---|---|
 | **WASD** / strzałki | chodzenie |
 | **kółko myszy**, **+ / -** | przybliż / oddal kamerę |
+| **Tab** | menu akcji: co da się zrobić tu i teraz (wybór numerem) |
 | **Esc** | menu gry (ustawienia, wyjście do menu / z gry); przy komputerze — wstań |
 | **F3** | overlay debug (ping, FPS, pokój) |
 

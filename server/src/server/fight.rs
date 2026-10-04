@@ -6,6 +6,7 @@ use crate::inventory::kind as item_kind;
 use crate::mischief::{self, lines};
 use crate::npc;
 use crate::protocol as proto;
+use crate::sim::{Pos, TILE_UNITS};
 
 use super::{dist2, Say, Server};
 
@@ -45,6 +46,12 @@ impl Server {
             t.held_activity = proto::activity::KNOCKED_OUT;
         }
         self.sounds.push((if knife { proto::sound::STAB } else { proto::sound::PUNCH }, floor, pos));
+        if knife {
+            // Blood on the floor, a little off where they stand.
+            let off = |r: &mut fastrand::Rng| r.i32(-(TILE_UNITS / 3)..=TILE_UNITS / 3);
+            let at = Pos { x: pos.x + off(&mut self.rng), y: pos.y + off(&mut self.rng) };
+            self.leave_puddle(floor, at, proto::puddle::BLOOD);
+        }
         let line = if out {
             lines::KNOCKED_OUT
         } else if knife {

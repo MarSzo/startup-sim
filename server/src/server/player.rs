@@ -147,8 +147,6 @@ pub(super) struct Player {
     pub(super) deeds: Vec<super::actions::Deed>,
     /// The cupboard dialog shown: its options (item kinds, 0 = close).
     pub(super) cupboard: Vec<u8>,
-    /// At home: asked to skip the waiting (`SkipWait`).
-    pub(super) skip_wait: bool,
     /// Last applied TaskAction / MailAction nonces (retries are ignored).
     pub(super) task_nonce: u16,
     pub(super) mail_nonce: u16,
@@ -258,7 +256,6 @@ impl Player {
             assault: None,
             deeds: Vec::new(),
             cupboard: Vec::new(),
-            skip_wait: false,
             task_nonce: 0,
             mail_nonce: 0,
             voice_allowance: 200,

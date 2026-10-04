@@ -36,6 +36,8 @@ pub mod lines {
     pub const SPOTLESS: &str = "Czysto dziś, aż miło! Tak trzymać.";
     /// Mopping up an accident puddle.
     pub const PUDDLE: &str = "Co za cham tu naszczał!";
+    /// Mopping up blood after a stabbing.
+    pub const BLOOD: &str = "Krew?! Co tu się działo… Ja już nic nie widziałam.";
     pub fn room_mess(n: u32) -> String {
         format!("No nie… {} w jednym pokoju! To jakaś kolekcja?", mugs(n))
     }
