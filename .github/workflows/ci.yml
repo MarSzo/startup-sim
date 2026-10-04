@@ -171,6 +171,11 @@ jobs:
     name: Sekrety (gitleaks)
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # The action lists the PR's commits through the API: PRs from Dependabot
+    # get a token without it otherwise (403 "Resource not accessible").
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@v7
         with:
