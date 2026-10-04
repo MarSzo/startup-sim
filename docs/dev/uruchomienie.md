@@ -132,7 +132,7 @@ plik i licencja w `client/fonts/`.
 Serwer testowy działa na VPS-ie; SSH tylko z tailnetu (Tailscale):
 
 ```bash
-deploy/deploy.sh          # kod → VPS, build, restart (gra zapisuje się przy restarcie)
+deploy/deploy.sh          # kod → VPS, build, restart (gra zapisuje się przy restarcie); wpis na GitHubie: Deployments → serwer-testowy
 deploy/pull-backups.sh    # dzienne kopie bazy do vps-backups/
 deploy/pull-crashes.sh    # raporty awarii klientów do crash-reports/
 ```
