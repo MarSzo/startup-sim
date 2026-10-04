@@ -9,7 +9,9 @@ tools/build-macos.sh              # → build/StartupSim-<wersja>.dmg
 tools/build-macos.sh --app-only   # sama aplikacja, bez podpisu
 ```
 
-Aplikacja uniwersalna (Intel + Apple Silicon), podpisana Developer ID z
+Skrypt najpierw buduje przeglądarkę w grze (`tools/build_webview.sh`, godot_wry
+ze źródeł) — Godot wkłada ją do `Contents/Frameworks`, a skrypt podpisuje ją
+jako osobny framework przed aplikacją. Aplikacja uniwersalna (Intel + Apple Silicon), podpisana Developer ID z
 hardened runtime i uprawnieniem do mikrofonu, a z profilem `notarytool` także
 notaryzowana. Kto podpisuje: `IDENTITY` / `NOTARY_PROFILE` w środowisku albo w
 `tools/macos/signing.env` (poza repozytorium). `--app-only` — do własnego

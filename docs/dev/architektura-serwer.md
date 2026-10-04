@@ -379,9 +379,11 @@ od HR), `worked_a_day` w `go_home` (≥ 60 min), `morning` w porannym przejściu
 zegara: dzień urlopu = brak `depart_at` (zostaje w domu), wypłata 8 h na
 umowie o pracę, `Clock::leave`. Klient: `ui/office/hr_view.gd` (zakładki,
 odpytuje co 3 s, gdy okno otwarte), `terminal_view.gd` + `shell.gd` (fikcyjna
-powłoka, czysty tekst, testowana w `run_tests.gd`), `web_page.gd` (Plotek.pl,
-pogoda, memy z kontekstu `set_world`: dzień, pogoda, firma; onet.pl przez
-`OS.shell_open`, nigdy w trybie headless).
+powłoka, czysty tekst, testowana w `run_tests.gd`), `web_browser.gd`
+(prawdziwe strony: `WebView` z GDExtension godot_wry, jeśli jest — patrz
+[uruchomienie](uruchomienie.md#przeglądarka-w-grze); `computer_screen.gd`
+pokazuje go tylko, gdy okno przeglądarki jest na wierzchu, bo natywny widok
+leży nad całą grą; bez wtyczki — `OS.shell_open`, nigdy w trybie headless).
 
 **Telewizor i boombox** (`media.rs` + `server/media.rs`): ekrany z kafli
 „tv” (`find_screens`, pokój, na który patrzą), kanał i tick startu; boombox to

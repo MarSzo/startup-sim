@@ -96,10 +96,14 @@
   - **Dzień urlopu**: rano zostaje się w domu („Urlop 🌴”) do następnego dnia;
     na umowie o pracę płatny (8 h według stawki), na B2B i zleceniu bez
     wypłaty.
-- **Przeglądarka**: obok obiadów i tablicy zadań — *Plotek.pl* (wiadomości z
-  biura i z miasta, zmieniają się co dzień), *Pogoda* i *Memy*. Przycisk
-  „Otwórz onet.pl w prawdziwej przeglądarce” otwiera prawdziwą stronę w
-  przeglądarce gracza.
+- **Przeglądarka**: obok obiadów i tablicy zadań — **Internet**: prawdziwe
+  strony w oknie komputera (start: onet.pl), z paskiem adresu (adres albo
+  słowa — wyszukiwanie w DuckDuckGo), wstecz, odśwież i „↗” (otwórz w swojej
+  przeglądarce). Wymyślone strony (Plotek.pl, Pogoda, Memy) zniknęły
+  2026-10-05. Strona to natywny widok systemu (WebKit) nałożony na
+  grę: pokazuje się tylko, gdy okno przeglądarki jest na wierzchu. Bez
+  wtyczki (inne systemy, testy) zostaje tylko „otwórz w swojej
+  przeglądarce”.
 - **Terminal** (w stylu Ghostty: ciemny, czcionka o stałej szerokości,
   historia ↑/↓): fikcyjny system z plikami firmy — `ls`, `cd`, `cat`, `git`,
   `ssh prod`, `top`, `neofetch`, `cowsay`, `curl wttr.in` (pogoda z gry), `npm

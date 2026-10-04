@@ -1,5 +1,5 @@
 ## The office computer's apps (an employee, server --start-employed): the HR
-## app (the contract, leave for tomorrow), the terminal and the news page.
+## app (the contract, leave for tomorrow), the terminal and the Internet page.
 extends "res://tests/e2e/scenario.gd"
 
 const Item = preload("res://game/item_art.gd")
@@ -39,10 +39,11 @@ func run() -> void:
 	await pc("term:sudo rm -rf /")
 	check(screen.terminal._out.text.contains("Prezes"), "rm -rf / gets the CEO calling")
 
-	# Plotek.pl in the browser.
-	await pc("win:news")
-	check(screen.page == "news", "the news page")
-	var news = screen._pages["news"].get_child(0)
-	check(news.get_child_count() > 3, "headlines (%d)" % news.get_child_count())
+	# The Internet in the browser (headless: no WebView - the way out to
+	# the player's own browser instead).
+	await pc("win:web")
+	check(screen.page == "web" and screen.web.is_visible_in_tree(), "the Internet page")
+	check(screen.web.url == "https://www.onet.pl/", "starts at onet.pl: %s" % screen.web.url)
+	check(screen.web.to_url("wp.pl") == "https://wp.pl" and screen.web.to_url("kot w butach").begins_with(screen.web.SEARCH), "addresses and searches")
 	log_step("apps work")
 	await pc("close")

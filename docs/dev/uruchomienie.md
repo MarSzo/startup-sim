@@ -105,6 +105,22 @@ licencje zależności), gdlint i testy klienta w Godocie, ruff i zgodność map 
 generatorem, gitleaks. Scenariusze e2e — tylko w pull requestach zmieniających
 grę, w 3 równoległych częściach ([tests/README.md](../../tests/README.md)).
 
+## Przeglądarka w grze
+
+Prawdziwe strony w przeglądarce komputera w biurze to natywny WebView —
+GDExtension [godot_wry](https://github.com/doceazedo/godot_wry) (MIT),
+budowany ze źródeł z przypiętego commita (v1.0.2) i naszą łatką
+(`tools/webview/*.patch`: prostokąt widoku w pikselach okna, bo interfejs gry
+jest skalowany z 1280×720):
+
+```bash
+tools/build_webview.sh   # → client/addons/godot_wry/ (poza repozytorium), na razie macOS
+```
+
+Bez tego gra działa normalnie, a przeglądarka proponuje tylko otwarcie strony
+w przeglądarce gracza (tak jest w CI i w testach bez okna). `build-macos.sh`
+buduje wtyczkę sam.
+
 ## Dźwięki i czcionka
 
 Dźwięki generuje `python3 tools/sounds/gen_sounds.py`. Interfejs używa

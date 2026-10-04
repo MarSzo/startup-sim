@@ -1,0 +1,24 @@
+diff --git a/rust/src/lib.rs b/rust/src/lib.rs
+index 7e32f2b..1f1e035 100644
+--- a/rust/src/lib.rs
++++ b/rust/src/lib.rs
+@@ -494,11 +494,16 @@ impl WebView {
+                     size: PhysicalSize::new(viewport_size.x, viewport_size.y).into(),
+                 }
+             } else {
+-                let pos = self.base().get_screen_position();
++                // The control's rect in window pixels: through its canvas
++                // (layer) and the viewport's stretch (content scale).
++                let viewport = self.base().get_viewport().expect("Could not get viewport");
++                let xform = viewport.get_final_transform() * self.base().get_global_transform_with_canvas();
+                 let size = self.base().get_size();
++                let a = xform * Vector2::ZERO;
++                let b = xform * size;
+                 Rect {
+-                    position: PhysicalPosition::new(pos.x, pos.y).into(),
+-                    size: PhysicalSize::new(size.x, size.y).into(),
++                    position: PhysicalPosition::new(a.x.min(b.x), a.y.min(b.y)).into(),
++                    size: PhysicalSize::new((b.x - a.x).abs(), (b.y - a.y).abs()).into(),
+                 }
+             };
+             let _ = webview.set_bounds(rect);

@@ -35,7 +35,7 @@ GODOT=/ścieżka/do/godot python3 tests/e2e/run.py
 | `founder` | założyciel: firma z portalu, stanowisko w dziale Mobile, drugi gracz aplikuje, zatrudnienie |
 | `persistence` | laptop na biurku, restart serwera, ponowne logowanie: postać, karta i laptop na miejscu |
 | `resign` | jak onboarding, ale umowa w HR jest niższa niż na rozmowie — rezygnacja: z portierem do wyjścia, przepustka oddana, znów portal |
-| `office_apps` | komputer w biurze: Kadry (umowa, urlop na jutro), terminal, przeglądarka z wiadomościami |
+| `office_apps` | komputer w biurze: Kadry (umowa, urlop na jutro), terminal, Internet w przeglądarce (bez okna: wyjście do przeglądarki gracza) |
 | `chill` | dwóch graczy: pilot i mecz w telewizorze, boombox z disco polo — drugi widzi i słyszy to samo |
 | `storeroom` | apteczka na recepcji (witamina), klucz do magazynku — odmowa przy recepcjonistce, wzięty w jej przerwie obiadowej, cola z magazynku |
 | `chat` | dwóch graczy: powiadomienie o mailu, czat tekstowy do pokoju, szept i krzyk |

@@ -1,7 +1,7 @@
 ## The screen of a computer on a desk: a desktop like the one at home (icons,
 ## windows, a taskbar) with the company messenger, work mail (+ trash), the
-## browser (bookmarks: lunch ordering, the department's task board, news,
-## weather, memes), the calendar, the HR app, a terminal and — for the
+## browser (bookmarks: the real Internet, lunch ordering, the department's
+## task board), the calendar, the HR app, a terminal and — for the
 ## founder — the company panel; or the lock screen.
 ## Shown while the server says we sit at a computer (self_status bit); the
 ## computer is logged in as its owner, whoever sits at it.
@@ -17,7 +17,7 @@ const MailBox = preload("res://ui/office/mail_box.gd")
 const MailView = preload("res://ui/office/mail_view.gd")
 const HrView = preload("res://ui/office/hr_view.gd")
 const TerminalView = preload("res://ui/office/terminal_view.gd")
-const WebPage = preload("res://ui/office/web_page.gd")
+const WebBrowser = preload("res://ui/office/web_browser.gd")
 
 ## ComputerAction to send: action, conversation, argument, text.
 signal action(action: int, conv: int, arg: int, text: String)
@@ -96,9 +96,6 @@ var _co_drafts := {}            # text typed into the panel's fields, by key
 # The desktop: icons, windows, the taskbar; apps open in windows.
 const WINDOW_TITLES := {"chat": "Komunikator", "mail": "Poczta", "trash": "Kosz", "browser": "Przeglądarka",
 	"calendar": "Kalendarz zarządu", "company": "Panel firmy", "hr": "Kadry", "terminal": "Terminal"}
-## Browser pages beyond the work tools: name -> [url, title, bookmark].
-const WEB := {"news": ["https://plotek.pl", "Plotek.pl", "★ Plotek.pl"], "weather": ["https://pogoda.example", "Pogoda", "★ Pogoda"],
-	"memes": ["https://memy.example", "Memy", "★ Memy"]}
 ## The HR app asks again this often while open (a lost reply is no harm).
 const HR_POLL_MSEC := 3000
 var hr_view := HrView.new()
@@ -115,7 +112,9 @@ var _badges := {}               # name -> Label
 var _browser := VBoxContainer.new()
 var _url := Label.new()
 var _pages := {}                # page -> Control
-var page := "home"              # browser page: home / lunch / tasks
+var page := "home"              # browser page: home / lunch / tasks / web
+## The real Internet (a native WebView - see web_browser.gd).
+var web := WebBrowser.new()
 var kanban := KanbanView.new()
 var mailbox := MailBox.new()
 var _mail_view := MailView.new()
@@ -212,6 +211,7 @@ func _conv(conv: int) -> Dictionary:
 
 
 func _process(_d: float) -> void:
+	_place_web()
 	if not visible or state.is_empty() or state.locked:
 		return
 	mailbox.tick()
@@ -267,7 +267,7 @@ func _send() -> void:
 ## Dev (--goto): pc:say:<conv>:<text>, pc:open:<conv>, pc:lock, pc:unlock,
 ## pc:take, pc:close; <conv> = general / dept / dm:<nick>; pc:win:<app>
 ## (chat / mail / trash / browser / calendar / company / hr / terminal / lunch /
-## tasks / news / weather / memes), pc:term:<line> (type in the terminal),
+## tasks / web), pc:term:<line> (type in the terminal),
 ## pc:hr:<action>:<arg> (the HR app, Protocol.HR_*),
 ## pc:task:<title> (a new card), pc:mail:<nick>:<subject> (send a mail),
 ## pc:card:<n> (open the n-th card), pc:read:<n> (read the n-th mail),
@@ -438,9 +438,7 @@ func _build() -> void:
 	var marks := HBoxContainer.new()
 	marks.add_theme_constant_override("separation", 6)
 	marks.add_child(_mini_label("Ulubione:"))
-	var marks_list := [["home", "⌂ Start"], ["lunch", "★ Obiady do biura"], ["tasks", "★ Tablica zadań"]]
-	for w in WEB:
-		marks_list.append([w, WEB[w][2]])
+	var marks_list := [["home", "⌂ Start"], ["web", "🌐 Internet"], ["lunch", "★ Obiady do biura"], ["tasks", "★ Tablica zadań"]]
 	for bm in marks_list:
 		var mb := Ink.button(bm[1])
 		mb.add_theme_font_size_override("font_size", 14)
@@ -460,7 +458,7 @@ func _build() -> void:
 	tiles.add_theme_constant_override("separation", 14)
 	for bm in [["lunch", "Obiady do biura", "lunchbox.example — dostawa na recepcję", "company"],
 			["tasks", "Tablica zadań", "tasks.startup — zadania działu (kanban)", "tasks"],
-			["news", "Plotek.pl", "wiadomości z biura i z miasta", "browser"]]:
+			["web", "Internet", "prawdziwe strony (start: onet.pl)", "browser"]]:
 		var tb := Button.new()
 		tb.custom_minimum_size = Vector2(260, 130)
 		for st in ["normal", "hover", "pressed", "focus"]:
@@ -487,14 +485,7 @@ func _build() -> void:
 	home.add_child(tiles)
 	_pages["home"] = home
 	_pages["tasks"] = kanban
-	for w in WEB:
-		var wp := WebPage.new()
-		wp.setup(w)
-		var ws := ScrollContainer.new()
-		ws.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-		wp.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		ws.add_child(wp)
-		_pages[w] = ws
+	_pages["web"] = web
 	_views["hr"] = hr_view
 	hr_view.action.connect(func(a: int, arg: int): hr_action.emit(a, arg))
 	_views["terminal"] = terminal
@@ -780,19 +771,28 @@ func _close(name: String) -> void:
 		t.queue_free()
 
 
+## The real web page is a native view over everything: shown only while
+## its window is the front one (and the start menu is closed).
+func _place_web() -> void:
+	var front: Control = null
+	for w in _win_layer.get_children():
+		if w is Control and w.visible:
+			front = w
+	var on: bool = visible and page == "web" and _windows.has("browser") and front == _windows["browser"] \
+		and not _start.get_popup().visible and not (state.is_empty() or state.get("locked", false))
+	if on != web._shown:
+		web.set_shown(on)
+
+
 ## Browser: show a page (home / lunch / tasks).
 func _go(p: String) -> void:
 	page = p
 	for k in _pages:
 		_pages[k].visible = k == p
-	var urls := {"home": "start.os/ulubione", "lunch": "https://lunchbox.example/biuro", "tasks": "https://tasks.startup/tablica"}
-	var titles := {"home": "Start", "lunch": "Obiady do biura", "tasks": "Tablica zadań"}
-	for w in WEB:
-		urls[w] = WEB[w][0]
-		titles[w] = WEB[w][1]
-	if WEB.has(p):
-		_pages[p].get_child(0).refresh(world)
+	var urls := {"home": "start.os/ulubione", "lunch": "https://lunchbox.example/biuro", "tasks": "https://tasks.startup/tablica", "web": web.url}
+	var titles := {"home": "Start", "lunch": "Obiady do biura", "tasks": "Tablica zadań", "web": "Internet"}
 	_url.text = "  🔒  " + urls[p]
+	_url.get_parent().visible = p != "web"  # the Internet has its own address bar
 	if _windows.has("browser"):
 		_windows["browser"].set_title("Przeglądarka — %s" % titles[p])
 	_lunch_sig = ""
@@ -893,19 +893,17 @@ func on_hr(p: Dictionary) -> void:
 	hr_view.on_hr(p)
 
 
-## The world for the web pages and the terminal: {day, minute, weather,
+## The world for the terminal: {day, minute, weather,
 ## company, nick, department}.
 func set_world(w: Dictionary) -> void:
 	world = w
 	terminal.set_context(w.get("day", 1), w.get("minute", 0), w.get("weather", ""))
-	if WEB.has(page) and _windows.has("browser"):
-		_pages[page].get_child(0).refresh(world)
 
 
 func _set_tab(t: String) -> void:
 	tab = t
 	match t:
-		"lunch", "tasks", "news", "weather", "memes":
+		"lunch", "tasks", "web":
 			_open("browser")
 			_go(t)
 		_:

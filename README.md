@@ -128,4 +128,6 @@ Kod: [GNU AGPL-3.0-or-later](LICENSE) — możesz go używać, zmieniać i
 udostępniać, ale zmienioną wersję (także uruchomioną jako serwer w sieci)
 trzeba udostępnić na tej samej licencji. Czcionka
 [Patrick Hand](client/fonts/OFL-PatrickHand.txt) (© Patrick Wagesreiter): SIL
-OFL 1.1. Dźwięki, muzyka i grafika są generowane kodem z tego repozytorium.
+OFL 1.1. Przeglądarka w grze:
+[godot_wry](https://github.com/doceazedo/godot_wry) (MIT), budowana ze źródeł.
+Dźwięki, muzyka i grafika są generowane kodem z tego repozytorium.
