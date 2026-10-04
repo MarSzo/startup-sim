@@ -39,11 +39,21 @@ func _ready() -> void:
 	get_viewport().size_changed.connect(_place)
 
 
+## Above the inventory bar, by the panel's full height (all the answers -
+## new buttons only report their size a frame later).
 func _place() -> void:
 	var vs := get_viewport_rect().size
 	position = Vector2.ZERO
 	size = vs
-	_panel.position = Vector2((vs.x - _panel.size.x) / 2, vs.y - _panel.size.y - 120)
+	var want := _panel.get_combined_minimum_size()
+	if _panel.size != want:
+		_panel.size = want
+	_panel.position = Vector2((vs.x - want.x) / 2, maxf(8.0, vs.y - want.y - 120))
+
+
+func _process(_delta: float) -> void:
+	if visible and _panel.size != _panel.get_combined_minimum_size():
+		_place()
 
 
 func on_dialog(p: Dictionary) -> void:

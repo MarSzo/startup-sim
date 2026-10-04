@@ -1,4 +1,4 @@
-# Protokół sieciowy (wersja 45)
+# Protokół sieciowy (wersja 46)
 
 Własny binarny protokół na UDP. Implementacje:
 - serwer: `server/src/protocol/` (źródło prawdy),
@@ -334,7 +334,7 @@ spotkaniem od 10 min przed do 10 min po jego początku; drzwi zarządu (kafel
 ### 33 `Dialog` (S→C), 34 `DialogAnswer` (C→S)
 
 Rozmowa z NPC (spotkanie z zarządem): `id u8` (0 = zamknij okno), `npc u16`,
-`text` str16, n u8 (≤ 4) × `option` str16; ponawiane co 1 s, dopóki trwa.
+`text` str16, n u8 (≤ 9, klawisze 1–9) × `option` str16; ponawiane co 1 s, dopóki trwa.
 `DialogAnswer`: token u32, id u8, choice u8 — odpowiedzi na nieaktualne `id`
 są ignorowane. Odpowiedzi NPC idą jako `Say`.
 

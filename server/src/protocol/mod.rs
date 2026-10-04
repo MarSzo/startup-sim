@@ -23,7 +23,7 @@ pub use golden::{golden_samples, to_hex};
 pub use snapshot::{snapshot_fragments, SelfState};
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 45;
+pub const VERSION: u8 = 46;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
 /// A game packet at most (sealed, it grows by up to 48 B to `MAX_DATAGRAM`).
@@ -38,6 +38,9 @@ pub const MAX_SAY_BYTES: usize = MAX_TEXT_BYTES;
 pub const MAX_MAIL_BYTES: usize = 600;
 /// Max answer options of a recruitment question.
 pub const MAX_OPTIONS: usize = 4;
+/// Max answers in a `Dialog` window (keys 1-9): the TV's channels + off,
+/// the R menu, the first-aid cabinet...
+pub const MAX_DIALOG_OPTIONS: usize = 9;
 /// Messenger message text (a 200-char message of 2-byte letters fits whole).
 pub const MAX_CHAT_BYTES: usize = 400;
 /// Conversations in one `Computer` packet (2+1+2+24 B each -> < 1200 B).

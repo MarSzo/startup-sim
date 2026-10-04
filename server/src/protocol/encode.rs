@@ -209,8 +209,8 @@ impl Packet {
                 w.u8(*index);
                 w.u8(*total);
                 w.str16(text, MAX_TEXT_BYTES);
-                w.u8(options.len().min(MAX_OPTIONS) as u8);
-                for o in options.iter().take(MAX_OPTIONS) {
+                w.u8(options.len().min(MAX_DIALOG_OPTIONS) as u8);
+                for o in options.iter().take(MAX_DIALOG_OPTIONS) {
                     w.str16(o, MAX_TEXT_BYTES);
                 }
             }
@@ -606,8 +606,8 @@ impl Packet {
                 w.u8(*id);
                 w.u16(*npc);
                 w.str16(text, MAX_TEXT_BYTES);
-                w.u8(options.len().min(MAX_OPTIONS) as u8);
-                for o in options.iter().take(MAX_OPTIONS) {
+                w.u8(options.len().min(MAX_DIALOG_OPTIONS) as u8);
+                for o in options.iter().take(MAX_DIALOG_OPTIONS) {
                     w.str16(o, MAX_TEXT_BYTES);
                 }
             }

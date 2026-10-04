@@ -3,13 +3,14 @@
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 45
+const VERSION := 46
 const MAX_PACKET := 1152  # a game packet; sealed it grows to at most MAX_DATAGRAM
 const MAX_DATAGRAM := 1200
 const MAX_NICK_BYTES := 16
 const MAX_SAY_BYTES := 240
 const MAX_TEXT_BYTES := 240
 const MAX_OPTIONS := 4
+const MAX_DIALOG_OPTIONS := 9  # answers in a Dialog window (keys 1-9)
 const MAX_INPUTS_PER_PACKET := 8
 
 const T_CONNECT := 1
@@ -930,7 +931,7 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			p.npc = r.u16()
 			p.text = r.str16(MAX_TEXT_BYTES)
 			var n := r.u8()
-			if n > MAX_OPTIONS:
+			if n > MAX_DIALOG_OPTIONS:
 				return {}
 			var opts := []
 			for i in n:

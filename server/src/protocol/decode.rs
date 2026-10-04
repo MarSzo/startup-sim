@@ -532,7 +532,7 @@ impl Packet {
             ty::DIALOG => {
                 let (id, npc, text) = (r.u8()?, r.u16()?, r.str16(MAX_TEXT_BYTES)?);
                 let n = r.u8()? as usize;
-                if n > MAX_OPTIONS {
+                if n > MAX_DIALOG_OPTIONS {
                     return Err(DecodeError::Invalid("too many options"));
                 }
                 let mut options = Vec::with_capacity(n);

@@ -2,6 +2,7 @@
 
 *Zmiany formatu w kolejnych wersjach ([specyfikacja](protokol.md)). Nowa wersja = podbite `VERSION` w `server/src/protocol/` i wpis na górze tej listy.*
 
+- **46** — `Dialog`: do 9 odpowiedzi (było 4, jak w pytaniach rekrutacji) — menu telewizora, boomboxa, R i apteczka były ucinane, bez „Wyłącz” / „Nic”.
 - **45** — czat i powiadomienia: `ChatSay` (60, C→S), `Notice` (61, S→C); przedmioty 52–55 (barek); zagubiony przechodzień (NPC, pytanie jako zwykły `Dialog`).
 - **44** — skręty i zapasy: `Roll` (59, C→S), przedmioty 43–51, uprawnienie 16 (klucz do magazynku), `Dialog` 255 (apteczka / magazynek).
 - **43** — telewizor i boombox: `Media` (58, S→C), przedmioty 41 pilot, 42 boombox, `Dialog` 253 (kanały), 254 (utwory).
