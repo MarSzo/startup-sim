@@ -5,9 +5,10 @@
 set -eu
 S=${0:A:h}/shoot.sh
 $S s1_title "" "" 2 4.5
-# A rainy morning on the sidewalk.
+# A rainy morning: along the sidewalk, past the (closed) ramp to the
+# underground car park, up the drive to the smokers' bus-stop shelter.
 $S s2_rain "--skip-recruitment --start-with-card --start-time 8:30 --weather rain" \
-  "--nick=Mati --autoconnect --goto='wait:2;14,59;wait:2'" 2 5
+  "--nick=Mati --autoconnect --goto='wait:1;14,59;13,53;12,46;10,46;wait:6'" 5.5 5
 # In through the draught lobby: Pani Wiesia says hello (and asks about the wedding).
 $S s3_hall "--skip-recruitment --start-with-card --start-time 8:40 --weather sunny" \
   "--nick=Mati --autoconnect --goto='wait:1;31,58;31,55;31,51;33,50;wait:4'" 4.5 5

@@ -12,7 +12,7 @@
 ![Rust](https://img.shields.io/badge/serwer-Rust-orange?logo=rust)
 ![Godot 4](https://img.shields.io/badge/klient-Godot%204-478cbf?logo=godotengine&logoColor=white)
 
-<img src="docs/media/zwiastun.gif" alt="Zwiastun: dojazd w deszczu, portiernia, biuro, chill room, sklep" width="720">
+<img src="docs/media/zwiastun.gif" alt="Zwiastun: palarnia w deszczu, portiernia, biuro, chill room, sklep" width="720">
 
 [**Pobierz na macOS**](https://github.com/mateuszpalak/startup-sim/releases/latest) ·
 [Sterowanie](docs/gra/sterowanie.md) ·
@@ -43,24 +43,12 @@ i tekstowym.
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/media/portiernia.jpg" alt="Hol z portiernią"><br><sub>Pani Wiesia z portierni zawsze zagada</sub></td>
-    <td width="50%"><img src="docs/media/biuro.jpg" alt="Biuro"><br><sub>Biuro działu Biznes — inni gracze przy biurkach</sub></td>
+    <td width="50%"><img src="docs/media/portiernia.jpg" alt="Hol z portiernią"><br><sub>Pani Wiesia z portierni zawsze zagada (a Paulina siedzi w fotelu)</sub></td>
+    <td width="50%"><img src="docs/media/chill_room.jpg" alt="Chill room"><br><sub>Chill room: mecz w telewizorze, pilot w ręku</sub></td>
   </tr>
   <tr>
-    <td><img src="docs/media/chill_room.jpg" alt="Chill room"><br><sub>Chill room: mecz w telewizorze, pilot w ręku</sub></td>
-    <td><img src="docs/media/sklep.jpg" alt="Sklep"><br><sub>Sklep na parterze</sub></td>
-  </tr>
-  <tr>
-    <td><img src="docs/media/rekrutacja.jpg" alt="Formularz rekrutacyjny"><br><sub>Rekrutacja: portal z ofertami i formularz z widełkami</sub></td>
-    <td><img src="docs/media/umowa.jpg" alt="Umowa w HR"><br><sub>Umowa w HR — „drobna korekta, standard w branży”</sub></td>
-  </tr>
-  <tr>
-    <td><img src="docs/media/terminal.jpg" alt="Terminal"><br><sub>Firmowy komputer: terminal…</sub></td>
-    <td><img src="docs/media/przegladarka.jpg" alt="Przeglądarka"><br><sub>…i przeglądarka z wiadomościami z biura</sub></td>
-  </tr>
-  <tr>
-    <td><img src="docs/media/deszcz.jpg" alt="Dojazd w deszczu"><br><sub>Dojazd do pracy — pogoda zmienia się z dnia na dzień</sub></td>
-    <td><img src="docs/media/skret.jpg" alt="Skręcanie papierosa"><br><sub>Mini-gra: skręcanie papierosa</sub></td>
+    <td><img src="docs/media/palarnia.jpg" alt="Palarnia i zjazd do garażu"><br><sub>Palarnia jak przystanek (autobus nie przyjedzie) i zamknięty zjazd do garażu</sub></td>
+    <td><img src="docs/media/sklep.jpg" alt="Sklep"><br><sub>Sklep na parterze: „Jaka parówka wariacie?”</sub></td>
   </tr>
 </table>
 
@@ -82,10 +70,6 @@ i tekstowym.
   światło w oknach.
 - 🎙️ **Razem** — czat głosowy (do pokoju albo szeptem), czat tekstowy,
   dziennik dnia i powiadomienia.
-- 😈 **Psoty** — alkohol z barku i jego skutki, nagany od zarządu, bójki,
-  ochrona i policja, sprzątaczka pani Maria.
-- 🎨 **Oprawa „papier i tusz”** — ręcznie rysowany wygląd, dźwięki i muzyka
-  generowane kodem.
 
 ## Pobierz i graj
 

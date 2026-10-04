@@ -32,7 +32,7 @@ clip() {  # clip <name> <dir> <start frame> <frames> [caption] [gravity]
 }
 
 clip c1 s1_title 0 135
-clip c2 s2_rain 0 150 "Dojedź do pracy — nawet w deszczu"
+clip c2 s2_rain 0 150 "Palarnia jak przystanek — autobus nie przyjedzie"
 clip c3 s3_hall 0 150 "Pani Wiesia z portierni zawsze zagada"
 clip c4 s4_office 0 150 "Pracuj w startupie razem z innymi graczami"
 clip c5 s5_chill 0 150 "Mecz w telewizorze, disco polo z boomboxa"
