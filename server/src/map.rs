@@ -667,6 +667,22 @@ mod tests {
     }
 
     #[test]
+    fn the_garage_ramp_is_closed_and_the_smokers_shelter_is_open() {
+        use super::{access, dir, Tile};
+        let b = b();
+        let m = b.floor(0).unwrap();
+        let spawn = (0, m.spawns[0]);
+        let all = access::GUEST | access::CARD | access::SERVICE | access::BOARD | access::KEY;
+        // Not open yet: the barrier stops everyone, the ramp can't be reached.
+        assert!(m.blocks(6, 57, all, dir::UP), "the barrier (by the sidewalk) is down");
+        assert!(b.find_path(spawn, (0, Tile { x: 6, y: 53 }), all).is_none(), "no way down the ramp");
+        // The shelter by the drive: anybody can go and smoke there.
+        let shelter = m.room_by_name("Strefa palenia").unwrap().id;
+        assert_eq!(m.room_at_tile(10, 46), shelter);
+        assert!(b.find_path(spawn, (0, Tile { x: 10, y: 46 }), 0).is_some(), "open, no pass needed");
+    }
+
+    #[test]
     fn the_street_and_the_car_park_see_each_other() {
         let b = b();
         let m = b.floor(0).unwrap();

@@ -17,7 +17,13 @@ wewnętrzny (12, brama od północy,
 dojazd wzdłuż zachodniej ściany). Sklep (1) z wejściem od ulicy, strefa
 zamknięta (11) za zablokowanymi drzwiami, sprzątaczka siedzi w holu (10).
 Na zewnątrz: chodnik, ulica, parking zewnętrzny, postój taksówek, przystanek
-tramwaju, stojak na rowery, strefa palenia i popielniczka przy wejściu.
+tramwaju, stojak na rowery i popielniczka przy wejściu. Przy podjeździe do
+garażu (na zachód od sklepu): **palarnia** — wiata jak przystanek autobusowy
+(szkło z tyłu i po bokach, ławka, popielniczka, daszek, tabliczka
+„PALARNIA”; żaden autobus nie przyjeżdża), otwarta w stronę podjazdu; obok,
+bliżej ulicy, **zjazd do garażu podziemnego** — wjazd od chodnika, rampa
+w dół na północ, murki po bokach; na razie zamknięty: szlaban przy chodniku
+i opuszczona brama na dole rampy (podziemia jeszcze nie ma). Do 2026-10-05 strefa palenia była za ulicą, obok parkingu.
 
 ```
 FvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvF

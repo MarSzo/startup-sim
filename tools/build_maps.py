@@ -94,6 +94,15 @@ LEGEND = {
     "n": {"type": "balcony", "solid": False, "color": "#9a8a78"},
     "h": {"type": "railing", "solid": True, "color": "#3a3530"},
     "~": {"type": "void", "solid": True, "color": "#1c1c24"},
+    # The ramp down to the underground car park (not open yet: a closed
+    # barrier at the top, a shutter at the bottom), its parapets.
+    "/": {"type": "ramp", "solid": False, "color": "#4f5258"},
+    "[": {"type": "ramp_wall", "solid": True, "color": "#b5b2aa"},
+    "!": {"type": "boom_barrier", "solid": True, "color": "#d23b2e"},
+    "^": {"type": "garage_shutter", "solid": True, "color": "#3a3d42"},
+    # The smokers' shelter: looks like a bus stop (no bus ever comes).
+    "]": {"type": "shelter_glass", "solid": True, "color": "#a9cfdc"},
+    "{": {"type": "shelter_bench", "solid": True, "color": "#8a6a45"},
 }
 
 # Departments of the company (recruitment.json): rooms whose desks belong
@@ -331,10 +340,23 @@ def floor0():
     f.area(32, 69, 40, 69, "p", "O")                     # tram stop platform
     f.put(36, 58, 39, 58, "b")                           # bike rack by the entrance
     f.put(24, 58, 24, 58, "A")                           # ashtray by the entrance
-    f.area(42, 62, 54, 68, "z", "M")
+    # The smokers' shelter by the drive: a bus-stop-like shelter (glass at
+    # the back and the sides, a bench, an ashtray), open towards the drive.
+    f.area(8, 44, 11, 49, "z", "M")
     f.room("M", 10, "Strefa palenia", "smoking", outdoor=True)
-    f.put(44, 64, 46, 64, "N")                           # bench
-    f.put(50, 66, 50, 66, "A")                           # ashtray
+    f.put(8, 44, 8, 49, "]")                             # the back glass
+    f.put(9, 44, 9, 44, "]")                             # the side panes
+    f.put(9, 49, 9, 49, "]")
+    f.put(9, 45, 9, 48, "{")                             # the bench
+    f.put(11, 47, 11, 47, "A")                           # ashtray
+    # The ramp down to the underground car park, in from the sidewalk (going
+    # down northwards): closed for now - a barrier at the bottom, by the
+    # sidewalk, a shutter at the far end; parapets on both sides.
+    f.area(2, 50, 2, 57, "[")
+    f.area(11, 50, 11, 57, "[")
+    f.area(3, 50, 10, 50, "^")
+    f.area(3, 51, 10, 56, "/")
+    f.area(3, 57, 10, 57, "!")
 
     f.spawns = [[x, y] for y in (59, 60) for x in range(26, 36)]
     f.places.update({
