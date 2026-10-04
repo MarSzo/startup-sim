@@ -117,9 +117,11 @@ kubek w ręce przez 90 s, widoczny dla innych → „Kawa wypita.”
 
 ## 10.35 Aneks kuchenny, menu startowe i menu gry
 
-- **Aneks kuchenny** w chill roomie (wzdłuż północnej ściany): szafka z
-  kubkami, ekspres, blat, zlew, zmywarka, misa z owocami, lodówka, płyn do
-  dezynfekcji.
+- **Aneks kuchenny** obok chill roomu: sprzęty w lewym dolnym rogu — wzdłuż
+  zachodniej ściany ekspres, lodówka, zmywarka i zlew, przy południowej blat
+  i szafka z kubkami (i nożami); stół wyżej, przy oknach. Każdy sprzęt ma
+  przed sobą własny kafel (E bierze najbliższą rzecz). W chill roomie misa
+  z owocami i płyn do dezynfekcji.
 - **Kubki są policzone**: biuro ma 8 kubków. Kawa leci tylko do czystego kubka
   w rękach — najpierw E przy szafce. Wypita (albo wystygła) kawa = brudny
   kubek. Czysty kubek można odłożyć do szafki; brudny:

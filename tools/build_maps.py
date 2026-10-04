@@ -384,14 +384,16 @@ def floor1():
     f.area(19, 12, 22, 16, ":", "N")
     f.room("N", 14, "Aneks kuchenny", "common", light="switch", switch_door=(23, 6), windows=True)
     f.door(23, 6, 24, 6, "G", "N")                       # out to the balcony
-    f.put(19, 7, 19, 7, "f")                             # fridge
-    f.put(20, 7, 21, 7, "c")                             # cupboard (mugs)
-    f.put(22, 7, 22, 7, "J")
-    f.put(25, 7, 25, 7, "C")                             # coffee machine
-    f.put(26, 7, 26, 7, "J")
-    f.put(27, 7, 27, 7, "i")                             # sink
-    f.put(28, 7, 28, 7, "d")                             # dishwasher
-    f.put(20, 10, 22, 11, "T")                           # a small table
+    # The kitchen in the lower left corner: along the west wall, then the
+    # south one; the table up in the bright part by the windows.
+    # (Each one in front of its own tile: E takes the nearest.)
+    f.put(19, 12, 19, 12, "C")                           # coffee machine
+    f.put(19, 13, 19, 13, "f")                           # fridge
+    f.put(19, 14, 19, 14, "d")                           # dishwasher
+    f.put(19, 15, 19, 15, "i")                           # sink
+    f.put(19, 16, 20, 16, "J")
+    f.put(21, 16, 22, 16, "c")                           # cupboard (mugs, knives)
+    f.put(20, 8, 22, 9, "T")                             # a small table
     f.put(31, 8, 33, 9, "Q")                             # sofas
     f.put(37, 8, 39, 9, "Q")
     f.put(35, 11, 37, 11, "T")                           # the table (treats)

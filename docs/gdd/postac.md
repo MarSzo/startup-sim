@@ -144,6 +144,6 @@
 - **Magazynek** na piętrze: drzwi na klucz. **Klucz** wisi na haczyku przy
   recepcji i można go wziąć tylko pod nieobecność recepcjonistki (prowadzi
   kogoś do HR albo ma **przerwę obiadową 12:00–12:30** — idzie do aneksu
-  kuchennego); przy niej: „Klucz do magazynku? Nie ma mowy.” Klucz odkłada się
+  kuchennego, na wolny kafel przy lodówce); przy niej: „Klucz do magazynku? Nie ma mowy.” Klucz odkłada się
   na haczyk (E z kluczem w rękach); jeśli zginie, rano wraca. W magazynku na
   regałach: Coca-Cola (energia +15) i ciastka (głód −12), po 6 dziennie.

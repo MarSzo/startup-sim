@@ -35,13 +35,13 @@ fn building() -> Building {
 }
 
 /// Server on a random port, dual-stack. Returns (IPv4 loopback addr, building crc).
-// Where to stand in the kitchenette (floor 1, appliances along row 7) and at
+// Where to stand in the kitchenette (floor 1, its lower left corner) and at
 // the shop's till (floor 0).
-const CUPBOARD: Tile = Tile { x: 21, y: 8 };
-const COFFEE: Tile = Tile { x: 25, y: 8 };
-const SINK: Tile = Tile { x: 27, y: 8 };
-const DISHWASHER: Tile = Tile { x: 28, y: 8 };
-const FRIDGE: Tile = Tile { x: 19, y: 8 };
+const CUPBOARD: Tile = Tile { x: 21, y: 15 };
+const COFFEE: Tile = Tile { x: 20, y: 12 };
+const SINK: Tile = Tile { x: 20, y: 15 };
+const DISHWASHER: Tile = Tile { x: 20, y: 14 };
+const FRIDGE: Tile = Tile { x: 20, y: 13 };
 const TILL: Tile = Tile { x: 20, y: 53 };
 
 fn start_server() -> (SocketAddr, u32) {
@@ -877,7 +877,7 @@ fn coffee_machine_brews_one_cup_at_a_time() {
     let at_c = c.press_e(&b, at_c);
     cupboard_take(&c, 0);
     assert!(c.wait_for_line(&game::kitchen::lines::took_mug(6), Duration::from_millis(800)).is_some());
-    let at_c = c.walk_to(&b, at_c, (1, Tile { x: 24, y: 8 }), &[&a]);
+    let at_c = c.walk_to(&b, at_c, (1, Tile { x: 20, y: 11 }), &[&a]);
 
     // A presses E: brewing starts; A's own bubble says so.
     a.press_e(&b, at_a);

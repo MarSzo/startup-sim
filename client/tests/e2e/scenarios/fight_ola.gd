@@ -12,7 +12,7 @@ func run() -> void:
 		return
 	await until(func(): return holding(Item.LAPTOP), 5.0, "the laptop in hands")
 	await item(Protocol.ITEM_DROP)
-	if not await walk(1, 21, 8):  # in front of the kitchen cupboard
+	if not await walk(1, 21, 15):  # in front of the kitchen cupboard
 		return
 	await press_e()
 	var dialog = game().dialog

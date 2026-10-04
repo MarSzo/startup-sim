@@ -255,7 +255,15 @@ impl Server {
         if on == self.supplies.on_break {
             return;
         }
-        let kitchen = self.kitchen.as_ref().map(|k| (k.floor, Tile { x: k.fridge.x, y: k.fridge.y + 1 }));
+        // To the kitchenette: the first free tile next to the fridge.
+        let kitchen = self.kitchen.as_ref().and_then(|k| {
+            let m = self.building.floor(k.floor)?;
+            [(0, 1), (1, 0), (-1, 0), (0, -1)]
+                .into_iter()
+                .map(|(dx, dy)| Tile { x: k.fridge.x + dx, y: k.fridge.y + dy })
+                .find(|t| !m.is_blocked(t.x, t.y))
+                .map(|t| (k.floor, t))
+        });
         let Some(n) = self.npcs.iter_mut().find(|n| n.role == Role::Receptionist) else { return };
         if on {
             if !n.is_idle() {

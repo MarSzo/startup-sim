@@ -447,8 +447,17 @@ func _shadow(r: Rect2) -> void:
 	draw_rect(Rect2(r.position + Vector2(1.2, 1.6), r.size), Color(0, 0, 0, 0.2))
 
 
+const KITCHEN := ["coffee_machine", "kitchen_counter", "cupboard", "dishwasher", "kitchen_sink", "fridge"]
+
+
 func _prop(t: String, tr: Rect2i, index: int) -> void:
 	var r := Rect2(Vector2(tr.position) * TP, Vector2(tr.size) * TP)
+	var turn := _turn_from_wall(tr) if t in KITCHEN else 0.0
+	if turn != 0.0:
+		# Drawn as if against the north wall, then turned to face the room.
+		var size := r.size if is_equal_approx(absf(turn), PI) else Vector2(r.size.y, r.size.x)
+		draw_set_transform(r.get_center(), turn, Vector2.ONE)
+		r = Rect2(-size / 2, size)
 	match t:
 		"desk": _desks(tr, r, index)
 		"counter": _counter(r)
@@ -480,6 +489,25 @@ func _prop(t: String, tr: Rect2i, index: int) -> void:
 		"urinal": _urinal(tr, r)
 		"wardrobe": _wardrobe(r)
 		"bin": _bin(r)
+	if turn != 0.0:
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+## Kitchen units are drawn with their back to the north wall; this is the
+## turn for one standing by another wall (north first, then south, west, east).
+func _turn_from_wall(tr: Rect2i) -> float:
+	var sides := [[Vector2i(0, -1), 0.0], [Vector2i(0, 1), PI], [Vector2i(-1, 0), -PI / 2], [Vector2i(1, 0), PI / 2]]
+	for s in sides:
+		var d: Vector2i = s[0]
+		var all := true
+		for y in range(tr.position.y, tr.end.y):
+			for x in range(tr.position.x, tr.end.x):
+				var n := Vector2i(x, y) + d
+				if not tr.has_point(n) and not _is_wall(n.x, n.y):
+					all = false
+		if all:
+			return s[1]
+	return 0.0
 
 
 func _chair(c: Vector2, facing_up: bool) -> void:
@@ -724,8 +752,8 @@ func _kitchen_counter(r: Rect2) -> void:
 	for i in 3:
 		var mug: Color = [Color("#f1ece2"), Color("#4f7fb0"), Color("#d98a3e")][i]
 		_disc(top.position + Vector2(4.5 + i * 4, 5.5), 1.5, mug, true, 0.4)
-	if r.size.x >= 32:
-		_box(Rect2(top.position + Vector2(20, 1.5), Vector2(6, 7)), Color("#9aa3a8"), true, 1.5)
+	if r.size.x >= 32:  # a chopping board
+		_box(Rect2(top.position + Vector2(19, 2), Vector2(9, 6)), Color("#c79a62"), true, 1.0)
 
 
 func _fruit_bowl(r: Rect2) -> void:
