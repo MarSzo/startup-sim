@@ -93,8 +93,11 @@ nieobecny w snapshotach przez 5 ticków znika.
 
 **Render**: każde piętro to jeden sprite (widoczne tylko bieżące), postacie to
 `Node2D._draw()` z `Label`em (y-sort). Kamera `Camera2D` z zoomem 3×, bez
-wygładzania, z limitami mapy. Etykiety mają skalę `1/zoom` i rozmiar czcionki
-ekranowej, więc są ostre mimo zoomu.
+wygładzania, z limitami mapy. Etykiety (strzałki schodów) mają skalę `1/zoom` i rozmiar
+czcionki ekranowej, więc są ostre mimo zoomu. Nazw pokoi na mapie nie ma: są
+na tabliczkach przy drzwiach — `MapData.plaque_at` (drzwi obok, pokój po
+drugiej stronie), małe tabliczki rysuje `map_painter.gd`, dużą na środku
+ekranu `ui/door_plaque.gd` (E, gdy podpowiedź to „Przeczytaj tabliczkę”).
 
 **Podpowiedzi** na dole ekranu: „[E] Wezwij windę” / „Winda jedzie…” przy
 drzwiach windy, „[E] Jedź na: …” w kabinie,

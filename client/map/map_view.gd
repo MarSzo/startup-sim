@@ -1,5 +1,6 @@
 ## Renders the floor once into a texture (hand-drawn art, map_painter.gd,
-## drawn in a SubViewport at ART_SCALE x resolution) plus room-name labels.
+## drawn in a SubViewport at ART_SCALE x resolution) plus the stairs' labels
+## (room names are on the door plaques).
 extends Node2D
 
 const Ink = preload("res://ui/ink_ui.gd")
@@ -11,7 +12,7 @@ const ART_SCALE := 3
 
 
 ## `floor_names`: floor index -> name, for "where do these stairs go" labels.
-## Room names and stair signs; the game moves this node to a layer above
+## Stair signs; the game moves this node to a layer above
 ## the world's ink effect (and shows it with the floor).
 var labels := Node2D.new()
 
@@ -37,50 +38,6 @@ func build(map, zoom: float, floor_names := {}) -> void:
 	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	sprite.centered = false
 	add_child(sprite)
-	# Room labels at each room's centroid.
-	var sums := {}
-	for i in map.room.size():
-		var rid: int = map.room[i]
-		if rid == 0:
-			continue
-		if not sums.has(rid):
-			sums[rid] = [Vector2.ZERO, 0]
-		sums[rid][0] += Vector2(i % map.width, i / map.width)
-		sums[rid][1] += 1
-	for rid in sums:
-		if map.room_types.get(rid, "") in ["stall", "elevator"]:
-			continue  # tiny rooms (toilet stalls, the elevator car): no label
-		var c: Vector2 = sums[rid][0] / float(sums[rid][1])
-		# Non-convex areas (the outside wraps the building): use the room's
-		# tile nearest to the centroid.
-		if map.room_at_tile(int(c.x), int(c.y)) != rid:
-			var best := Vector2i.ZERO
-			var best_d := INF
-			for i in map.room.size():
-				if map.room[i] == rid:
-					var t := Vector2(i % map.width, i / map.width)
-					if t.distance_squared_to(c) < best_d:
-						best_d = t.distance_squared_to(c)
-						best = Vector2i(t)
-			c = Vector2(best)
-		var center: Vector2 = (c + Vector2(0.5, 0.5)) * tp
-		var l := Label.new()
-		l.text = map.room_name(rid)
-		var ls := LabelSettings.new()
-		ls.font = Ink.font()
-		ls.font_size = 28
-		ls.font_color = Color(Ink.PAPER_HI, 0.6)
-		ls.outline_size = 8
-		ls.outline_color = Color(Ink.INK, 0.55)
-		l.label_settings = ls
-		l.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		l.scale = Vector2.ONE / zoom
-		l.size = Vector2(400, 40)
-		l.position = center - Vector2(200, 20) / zoom
-		l.set_meta("anchor", center)
-		l.set_meta("half", Vector2(200, 20))
-		labels.add_child(l)
 	# Stairs: where they lead.
 	for link in map.links:
 		if link.kind != "stairs" or not floor_names.has(link.to_floor):

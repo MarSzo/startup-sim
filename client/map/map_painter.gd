@@ -33,6 +33,7 @@ func _draw() -> void:
 		for x in map.width:
 			_tile_object(x, y)
 	_props()
+	_plaques()
 
 
 # ----------------------------------------------------------------- helpers
@@ -360,6 +361,35 @@ func _wall_shadows() -> void:
 				draw_rect(Rect2(o + Vector2(0, 2.5), Vector2(TP, 2.0)), Color(0, 0, 0, 0.08))
 			if _is_wall(x - 1, y):
 				draw_rect(Rect2(o, Vector2(2.0, TP)), Color(0, 0, 0, 0.12))
+
+
+## A small plaque on the wall by each door, on the side it's read from (the
+## name of the room behind; E shows it big).
+func _plaques() -> void:
+	for y in map.height:
+		for x in map.width:
+			if not map.is_plaque_door(x, y):
+				continue
+			var sides: Array = map.door_sides(x, y)
+			for s in sides:
+				var across: bool = s[1].y != 0  # read from above / below
+				# One plaque per doorway: by its last tile (right / bottom).
+				var next := Vector2i(x, y) + (Vector2i(1, 0) if across else Vector2i(0, 1))
+				if map.is_plaque_door(next.x, next.y):
+					continue
+				if not sides.any(func(o): return o[0] != s[0] and map.has_plaque(o[0])):
+					continue
+				if not _is_wall(next.x, next.y):
+					continue
+				var o := Vector2(next) * TP
+				var plate: Rect2
+				if across:
+					plate = Rect2(o + Vector2(4, 9.5 if s[1].y > 0 else 2.5), Vector2(8, 4))
+				else:
+					plate = Rect2(o + Vector2(10.0 if s[1].x > 0 else 1.0, 2), Vector2(5, 7))
+				_box(plate, Color("#d9c27a"), true, 0.4, 0.45)
+				var mid := plate.get_center()
+				draw_line(mid - Vector2(plate.size.x / 2 - 1.6, 0), mid + Vector2(plate.size.x / 2 - 1.6, 0), Color(INK, 0.7), 0.5)
 
 
 # ------------------------------------------------------------ tile objects

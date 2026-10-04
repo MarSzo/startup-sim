@@ -110,6 +110,7 @@ Grafika „papier i atrament”, okna i światło, dźwięk.
 - **10.32** Wygląd „papier i atrament” (w duchu Don't Starve)
 - **10.34** Okna, światło, kamera i ręcznie rysowana mapa
 - **10.38** Dźwięk
+- **10.54** Tabliczki na drzwiach
 
 ## [Stan implementacji](stan.md)
 

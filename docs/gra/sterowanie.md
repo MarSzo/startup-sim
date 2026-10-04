@@ -29,6 +29,8 @@
 - **włącznik przy drzwiach** — zapal / zgaś światło;
 - **popielniczka** — zapal (**E** ponownie — wstań);
 - **przedmiot na podłodze** — podnieś;
+- **drzwi** — przeczytaj tabliczkę (nazwa pomieszczenia za drzwiami, na
+  środku ekranu; **E** albo **Esc** — schowaj);
 - **dwa razy** przy swoim aucie / rowerze, na zachodnim końcu chodnika, na
   przystanku tramwajowym lub postoju taksówek — powrót do domu przed końcem
   dnia (wypłata za przepracowany czas).

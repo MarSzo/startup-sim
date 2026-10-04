@@ -17,6 +17,7 @@ const ItemView = preload("res://game/item_view.gd")
 const TvView = preload("res://game/tv_view.gd")
 const Audio = preload("res://audio/audio.gd")
 const RollGame = preload("res://ui/roll_game.gd")
+const DoorPlaque = preload("res://ui/door_plaque.gd")
 const Notices = preload("res://ui/notices.gd")
 const LogHistory = preload("res://ui/log_history.gd")
 const ChatBox = preload("res://ui/chat_box.gd")
@@ -115,6 +116,9 @@ var smoke_layer := CanvasLayer.new()
 var weather_layer := CanvasLayer.new()
 var dialog := DialogWindow.new()
 var roll_game := RollGame.new()  # rolling a cigarette (F with tobacco)
+var door_plaque := DoorPlaque.new()  # a door plaque read up close (E by a door)
+## The room whose plaque E would read right now (0 = E does something else).
+var plaque_here := 0
 var notices := Notices.new()      # cards in the corner (Notice)
 var log_history := LogHistory.new()  # H: the day's log
 var chat_box := ChatBox.new()     # Enter: typed chat
@@ -370,6 +374,7 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 				net.send(Protocol.encode_calendar_book(net.token, start, topic)))
 	status_layer.add_child(dialog)
 	status_layer.add_child(roll_game)
+	status_layer.add_child(door_plaque)
 	status_layer.add_child(notices)
 	status_layer.add_child(log_history)
 	status_layer.add_child(chat_box)
@@ -518,6 +523,7 @@ func _goto_input(delta: float) -> int:
 		goto_legs.remove_at(0)
 		if leg == "E":
 			goto_delay = 0.3
+			_read_plaque()
 			return Movement.IN_INTERACT
 		if leg.begins_with("wait:"):
 			goto_delay = float(leg.substr(5))
@@ -1066,6 +1072,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			if not dialog.visible:
 				chat_box.open()
 				get_viewport().set_input_as_handled()
+		KEY_E:
+			_read_plaque()
 		KEY_H:
 			log_history.toggle()
 		KEY_1, KEY_2, KEY_3:
@@ -1088,6 +1096,15 @@ func _unhandled_input(event: InputEvent) -> void:
 		KEY_X:
 			if net.is_playing():
 				net.send(Protocol.encode_action(net.token, Protocol.ACTION_ATTACK))
+
+
+## E by a door with nothing else to do: read its plaque (E again: put away).
+func _read_plaque() -> void:
+	if door_plaque.visible:
+		door_plaque.close()
+	elif plaque_here != 0:
+		var m = building.get_floor(pred.floor)
+		door_plaque.open(plaque_here, m.room_name(plaque_here), m.plaque_icon(plaque_here))
 
 
 ## Pocket key: take it out, or put back what's in hands if that pocket is empty.
@@ -1113,6 +1130,7 @@ func _item_action(action: int, slot: int) -> void:
 ## gate that needs a pass.
 func _update_hint() -> void:
 	var text := ""
+	plaque_here = 0
 	if me.status == Protocol.ACT_HELD:
 		hint_label.text = "Zatrzymano cię — chwilę stoisz w miejscu…"
 		hint_label.visible = true
@@ -1247,6 +1265,7 @@ func _update_hint() -> void:
 			if kinds.get(id) == Protocol.KIND_PLAYER and remotes[id].position.distance_to(me_px3) <= 32.0:
 				text = "[G] Podaj %s: %s" % [ItemArt.item_name(me.held).to_lower(), nicks.get(id, "?")]
 				break
+	var e_free := text == ""  # nothing else for E: a door plaque, if one's here
 	if text == "" and map:
 		for dy in [-1, -2]:
 			for dx in [-1, 0, 1]:
@@ -1260,6 +1279,12 @@ func _update_hint() -> void:
 						text = "Bramka wymaga przepustki — porozmawiaj z portierem (portiernia)"
 					else:
 						text = "Wstęp tylko dla obsługi"
+	var facing: Vector2i = [Vector2i(0, 1), Vector2i(0, -1), Vector2i(-1, 0), Vector2i(1, 0)][me.facing]
+	plaque_here = map.plaque_at(t.x, t.y, room_id, facing) if e_free and map else 0
+	if plaque_here != 0:
+		text = "[E] Przeczytaj tabliczkę" if text == "" else text + "  ·  [E] tabliczka"
+	if door_plaque.visible and plaque_here != door_plaque.room:
+		door_plaque.close()  # walked off
 	if text == "" and voice.whisper_to >= 0:
 		text = "[V] mów · [B] szept: %s" % nicks.get(voice.whisper_to, "?")
 	hint_label.text = text

@@ -46,7 +46,7 @@ pełnym ekranie — zastąpiona stylem inspirowanym Don't Starve:
   rzeczy nad paskiem, skróty pod nim.
 - **Świat**: efekt na cały obraz gry — kontury tuszu tam, gdzie zmienia się
   kolor, ciepłe, lekko przygaszone barwy, faktura papieru i winieta. Napisy w
-  świecie (nicki, dymki, nazwy pomieszczeń) są nad efektem, więc zostają ostre.
+  świecie (nicki, dymki, strzałki schodów) są nad efektem, więc zostają ostre.
   (`--no-mood` wyłącza efekt.)
 - **Postacie** narysowane od nowa, w duchu Don't Starve: duża okrągła głowa z
   dużymi ciemnymi oczami (z błyskiem), uszy, mały tułów-trapez, cienkie kończyny
@@ -109,3 +109,20 @@ pełnym ekranie — zastąpiona stylem inspirowanym Don't Starve:
   domu (pulpit, noc, wybór dojazdu). W biurze tylko otoczenie.
 - **Ustawienia**: suwaki Efekty / Otoczenie / Muzyka (szyny SFX, Ambient,
   Music), zapisywane w `user://settings.cfg`.
+
+## 10.54 Tabliczki na drzwiach
+
+- Nazw pomieszczeń nie ma już na podłodze. Przy drzwiach wisi mała mosiężna
+  tabliczka (na ścianie obok, od strony, z której się ją czyta): nazwa
+  pomieszczenia **za** drzwiami.
+- **E** przy drzwiach (gdy E nie robi nic innego) pokazuje tabliczkę dużą, na
+  środku ekranu; znika po E / Esc albo gdy odejdziesz. Podpowiedź: „[E]
+  Przeczytaj tabliczkę” (przy drzwiach Zarządu dopisana do informacji o
+  spotkaniach).
+- **Toalety** mają na tabliczce sam znaczek: damska, męska, wózek (WC dla
+  niepełnosprawnych, `accessible` w mapie) albo oba (toaleta przy portierni).
+  Gdy obok jest dwoje drzwi, czyta się te, w które się patrzy.
+- Tabliczek nie mają drzwi do korytarzy, holu, na zewnątrz, windy i bramki —
+  tam widać, gdzie się jest. Liczy to klient z mapy (`MapData.plaque_at`),
+  serwer nic o tym nie wie.
+

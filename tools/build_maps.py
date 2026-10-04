@@ -108,7 +108,8 @@ class Floor:
         self.places = {}
 
     def room(self, key, rid, name, kind, see=None, gender=None, outdoor=False, detector=False,
-             light=None, switch_door=None, windows=False, lit_by=None, below=None, department=None):
+             light=None, switch_door=None, windows=False, lit_by=None, below=None, department=None,
+             accessible=False):
         d = {"id": rid, "name": name, "type": kind}
         if see:
             # Rooms whose people are visible from here (open door / window).
@@ -116,6 +117,9 @@ class Floor:
         if gender:
             # Bathrooms: "female" / "male" (only a sign; anyone may go in).
             d["gender"] = gender
+        if accessible:
+            # A toilet for the disabled (the wheelchair sign on its door).
+            d["accessible"] = True
         if outdoor:
             # Under the open sky: weather (rain, sun) applies here.
             d["outdoor"] = True
@@ -433,7 +437,7 @@ def floor1():
     f.put(38, 24, 38, 24, "Y")
     # 50: the disabled toilet (lockable, roomy).
     f.area(36, 29, 38, 31, ":", "y")
-    f.room("y", 35, "WC dla niepełnosprawnych", "stall", light="always")
+    f.room("y", 35, "WC dla niepełnosprawnych", "stall", light="always", accessible=True)
     f.door(37, 28, 37, 28, "k", "y")
     f.put(38, 31, 38, 31, "U")
     f.put(36, 29, 36, 29, "V")

@@ -453,6 +453,7 @@
    "id": 35,
    "name": "WC dla niepełnosprawnych",
    "type": "stall",
+   "accessible": true,
    "light": "always"
   },
   "Y": {
