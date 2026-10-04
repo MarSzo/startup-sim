@@ -34,7 +34,7 @@ pub enum Cup {
 }
 
 impl Cup {
-    /// For `Snapshot::self_status` / entity flags (see PROTOCOL.md).
+    /// For `Snapshot::self_status` / entity flags (see docs/dev/protokol.md).
     pub fn brewing(&self) -> bool {
         matches!(self, Cup::Brewing { .. })
     }

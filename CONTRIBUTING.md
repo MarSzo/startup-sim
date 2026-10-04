@@ -11,7 +11,7 @@ Dzięki, że chcesz coś dodać albo poprawić! Poniżej wszystko, co trzeba wie
   co się stało, czego oczekiwałeś, wersja klienta i system.
 - **Nowa funkcja** — najpierw opisz pomysł w Issues (szablon „Pomysł”), żeby
   ustalić, czy pasuje do gry, zanim włożysz w nią pracę. Opis gry i jej
-  założenia: [docs/GDD.md](docs/GDD.md).
+  założenia: [GDD](docs/gdd/README.md).
 - **Luka bezpieczeństwa** — nie w Issues, patrz [SECURITY.md](SECURITY.md).
 
 ## Uruchomienie u siebie
@@ -23,8 +23,8 @@ cd server && cargo run --release        # serwer: gra :7777 (UDP), logowanie :77
 godot --path client                     # klient: z edytora widać „Serwer lokalny (dev)”
 ```
 
-Więcej opcji (boty, szybszy czas, start od razu w biurze): [README](README.md).
-Jak to działa: [architektura](docs/ARCHITECTURE.md), [protokół](docs/PROTOCOL.md).
+Więcej opcji (boty, szybszy czas, start od razu w biurze): [uruchomienie](docs/dev/uruchomienie.md).
+Jak to działa: [architektura](docs/dev/architektura.md), [protokół](docs/dev/protokol.md).
 
 ## Zasady zmian
 
@@ -33,7 +33,7 @@ Jak to działa: [architektura](docs/ARCHITECTURE.md), [protokół](docs/PROTOCOL
   `client/sim/movement.gd`) i protokół muszą zgadzać się bit w bit — pilnują
   tego pliki golden w `server/tests/golden/`.
 - **Zmiana formatu pakietu** = podbicie `VERSION` (Rust i GDScript) i wpis w
-  „Historii wersji” w `docs/PROTOCOL.md`; po celowej zmianie:
+  [historii wersji](docs/dev/protokol-historia.md); po celowej zmianie:
   `cd server && UPDATE_GOLDEN=1 cargo test --test golden`.
 - **Mapy** zmieniaj w `tools/build_maps.py`, nie w JSON-ach
   (`python3 tools/build_maps.py`), potem odśwież wektory golden jak wyżej.
@@ -41,8 +41,8 @@ Jak to działa: [architektura](docs/ARCHITECTURE.md), [protokół](docs/PROTOCOL
   po polsku; nazwy i gęstość komentarzy jak obok.
 - Nowa mechanika = test (jednostkowy w module, e2e w `server/tests/`, parytet
   w `client/tests/run_tests.gd`, a większa rzecz w grze — scenariusz w
-  `client/tests/e2e/scenarios/`, patrz `tests/README.md`) i akapit w GDD /
-  ARCHITECTURE.
+  `client/tests/e2e/scenarios/`, patrz `tests/README.md`) i akapit w [GDD](docs/gdd/README.md) /
+  [architekturze](docs/dev/architektura.md).
 - **Nie commituj** adresów serwerów, certyfikatów, kluczy ani danych graczy:
   `client/net/servers.cfg`, `client/net/pins/*.pem` i
   `tools/macos/signing.env` są w `.gitignore` z powodu.

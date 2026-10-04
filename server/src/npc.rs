@@ -48,7 +48,7 @@ const PATROL_WAIT_TICKS: u32 = 120;
 const GUARD_GIVE_UP_TICKS: u32 = 400;
 const POLICE_GIVE_UP_TICKS: u32 = 3600;
 
-/// Appearance, sent in entity flags bits 3..5 (see PROTOCOL.md).
+/// Appearance, sent in entity flags bits 3..5 (see docs/dev/protokol.md).
 pub mod look {
     pub const PLAYER: u8 = 0;
     pub const PORTER: u8 = 1;

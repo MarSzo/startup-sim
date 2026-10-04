@@ -1,4 +1,4 @@
-## Binary UDP protocol - mirror of server/src/protocol.rs (see docs/PROTOCOL.md).
+## Binary UDP protocol - mirror of server/src/protocol.rs (see docs/dev/protokol.md).
 ## Little-endian. Header: magic u16 | version u8 | type u8.
 extends RefCounted
 

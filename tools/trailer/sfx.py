@@ -3,8 +3,9 @@ out on the trailer's timeline, to go under the music.
 
     python3 sfx.py out.wav seconds
 
-Times match the clips in build.sh (title 0-4.5, rain 4.5-9.5, office
-9.5-14.5, coffee 14.5-19.5, smoke 19.5-24.5, commute 24.5-28, end 28-32).
+Times match the clips in build.sh (title 0-4.5, rain 4.5-9.5, hall
+9.5-14.5, office 14.5-19.5, chill room 19.5-24.5, shop 24.5-29.5, end
+29.5-33.5).
 """
 import array
 import os
@@ -74,31 +75,31 @@ bed("rain_loop", 4.5, 9.5, -4)
 bed("street_loop", 4.5, 9.5, -8)
 steps("out", 4.7, 9.3, -6)
 put("thunder", 6.2, -3)
-# 3. The office: the hum, carpet steps, keyboards, somebody talking.
-bed("office_loop", 9.5, 14.5, -3)
-steps("carpet", 9.6, 14.3, 0)
-put("typing", 10.4, -10)
-put("typing", 12.9, -12)
-put("blip", 11.3, -12, 0.95)
-put("blip", 11.45, -12, 1.1)
-# 4. Coffee: corridor steps, the mug from the cupboard, the machine.
-bed("office_loop", 14.5, 19.5, -9)
-steps("floor", 14.6, 16.6, -5)
-put("cupboard", 16.75, -2)
-put("blip", 16.8, -10, 1.0)
-steps("floor", 17.1, 17.6, -6)
-put("coffee", 18.2, -1)
-put("blip", 18.25, -10, 1.0)
-# 5. Smoke in the bathroom: muffled office, a cough of the smoke detector.
-bed("office_loop", 19.5, 24.5, -14)
-put("lighter", 19.7, -6)
-for k in range(3):
-    put("detector_beep", 22.9 + k * 0.45, -8)
-# 6. Tomorrow: a paper swish, a click on "Tramwaj".
-put("ui_open", 24.7, -6)
-put("ui_click", 26.6, -4)
+# 3. The hall: tiles underfoot, the glass door, Pani Wiesia's hello.
+bed("office_loop", 9.5, 14.5, -12)
+steps("tiles", 9.6, 11.8, -4)
+put("blip", 12.0, -9, 0.85)
+put("blip", 12.2, -9, 0.9)
+put("blip", 12.45, -9, 0.85)
+# 4. The office: the hum, carpet steps, keyboards, somebody talking.
+bed("office_loop", 14.5, 19.5, -3)
+steps("carpet", 14.6, 16.6, 0)
+put("typing", 15.4, -10)
+put("typing", 17.9, -12)
+put("blip", 16.3, -12, 0.95)
+put("blip", 16.45, -12, 1.1)
+# 5. The chill room: the boombox's disco polo (the match on the TV).
+bed("boombox_1", 19.5, 24.5, -6)
+put("pickup", 19.7, -6)
+# 6. The shop: steps, a bottle off the shelf, the till.
+bed("street_loop", 24.5, 29.5, -16)
+steps("floor", 24.6, 26.4, -5)
+put("pickup", 26.5, -4)
+steps("floor", 26.8, 27.6, -6)
+put("blip", 28.0, -9, 1.15)
+put("blip", 28.2, -9, 1.2)
 # 7. End card: the elevator's ding.
-put("ding", 28.25, -4)
+put("ding", 29.75, -4)
 
 peak = max(abs(v) for v in buf) or 1.0
 scale = min(1.0, 0.9 / peak)

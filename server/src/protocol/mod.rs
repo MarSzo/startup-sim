@@ -1,4 +1,4 @@
-//! Binary UDP protocol. See `docs/PROTOCOL.md`.
+//! Binary UDP protocol. See `docs/dev/protokol.md`.
 //!
 //! Every packet: `magic u16 | version u8 | type u8 | payload`, little-endian.
 //! `client/net/protocol.gd` mirrors this module; parity is checked against
@@ -1007,7 +1007,7 @@ pub enum Packet {
         trashed: Vec<u16>,
     },
     /// Push-to-talk: one voice frame (opaque to the server: 16 kHz IMA
-    /// ADPCM, see PROTOCOL.md) to the room, or whispered to the nearest
+    /// ADPCM, see docs/dev/protokol.md) to the room, or whispered to the nearest
     /// person within reach (`whisper` = 1).
     Voice {
         token: u32,
