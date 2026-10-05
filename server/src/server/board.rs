@@ -165,7 +165,13 @@ impl Server {
         let m = &self.meetings[self.talk_meeting(pid, t)?];
         let board::State::Talking(step) = m.state else { return None };
         let s = board::steps(m.topic).get(step)?;
-        Some(Packet::Dialog { id: t.id, npc: t.npc, text: s.text.into(), options: s.options.iter().map(|o| o.to_string()).collect() })
+        Some(Packet::Dialog {
+            id: t.id,
+            npc: t.npc,
+            text: s.text.into(),
+            options: s.options.iter().map(|o| o.to_string()).collect(),
+            items: Vec::new(),
+        })
     }
 
     pub(super) fn send_dialog(&mut self, pid: u16) {
@@ -178,7 +184,17 @@ impl Server {
         if let Some(panel) = self.players.get(&pid).and_then(|p| p.lift_panel.clone()) {
             if panel.id == dialog {
                 self.press_lift_panel(pid, &panel, choice);
+                return;
             }
+        }
+        if self.answer_reprimand(pid, dialog, choice)
+            || self.answer_skip_vote(pid, dialog, choice)
+            || self.answer_mischief(pid, dialog, choice)
+            || self.answer_contract(pid, dialog, choice)
+            || self.answer_media(pid, dialog, choice)
+            || self.answer_supplies(pid, dialog, choice)
+            || self.answer_lost(pid, dialog, choice)
+        {
             return;
         }
         let Some(t) = self.players.get(&pid).and_then(|p| p.talk) else { return };
@@ -219,6 +235,12 @@ impl Server {
                 let days_worked = p.day.saturating_sub(1);
                 if chance_roll < board::raise_chance(days_worked, good > 0) {
                     p.pay_rate += board::RAISE_STEP;
+                    // An annex to the contract (the HR app shows it).
+                    p.salary = u32::try_from(p.pay_rate * crate::pay::HOURS_A_MONTH / 100).unwrap_or(u32::MAX);
+                    let n = p.hr.annexes.len().max(1);
+                    let rate = crate::shop::zl(p.pay_rate);
+                    let text = crate::hr::lines::raise(n, &rate, &crate::pay::zl(p.salary));
+                    p.hr.annex(p.day, text);
                     board::lines::RAISE_YES.into()
                 } else {
                     board::lines::RAISE_NO.into()
@@ -261,7 +283,7 @@ impl Server {
         if let Some(line) = last {
             self.says.push(Say::addressed(t.npc, line, pid));
         }
-        let close = Packet::Dialog { id: 0, npc: t.npc, text: String::new(), options: Vec::new() };
+        let close = Packet::Dialog { id: 0, npc: t.npc, text: String::new(), options: Vec::new(), items: Vec::new() };
         self.send_to(pid, &close);
         self.send_to(pid, &close); // tiny packet; a duplicate makes loss unlikely
     }

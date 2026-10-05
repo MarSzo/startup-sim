@@ -13,3 +13,6 @@
 /tools/macos/signing.env
 __pycache__/
 /crash-reports
+# The in-game WebView (tools/build_webview.sh builds it from source).
+/client/addons/godot_wry/
+/.cache

@@ -27,7 +27,7 @@ func load_path(path: String) -> void:
 		return
 	var dir := path.get_base_dir()
 	for f in data["floors"]:
-		var entry := {"name": f["name"], "locked": f.get("locked", false), "map": null}
+		var entry := {"name": f["name"], "locked": f.get("locked", false), "stairwell": f.get("stairwell", false), "map": null}
 		if f.get("file") != null:
 			var fb := FileAccess.get_file_as_bytes(dir.path_join(f["file"]))
 			if fb.is_empty():

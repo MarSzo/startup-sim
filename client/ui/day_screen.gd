@@ -14,8 +14,10 @@ const MODES := {1: ["Pieszo", 45, 0], 2: ["Rower", 25, 0], 3: ["Samochód", 20, 
 const MODE_NOTES := {1: "zmęczy, ale odpręży", 2: "szybko, ale spocisz się", 3: "+ korki do 20 min", 4: "wygodnie", 5: "tłok, stres"}
 
 signal choose_commute(mode: int)
-## "Pomiń czekanie" (SkipWait).
+## "Pomiń czekanie" (SkipWait): starts a vote of everybody playing.
 signal skip_wait
+## The answer to someone else's vote (0 = yes, 1 = no).
+signal vote(choice: int)
 
 var clock := {}           # last Clock packet
 var _day := 0             # personal day already announced
@@ -28,6 +30,9 @@ var _sky := Control.new()
 var _modes := HBoxContainer.new()
 var _mode_buttons := {}   # mode -> Button
 var _skip := Ink.button("Pomiń czekanie  »", true)
+var _vote := PanelContainer.new()
+var _vote_text := Label.new()
+var _vote_row := HBoxContainer.new()
 
 
 func _ready() -> void:
@@ -72,7 +77,41 @@ func _ready() -> void:
 	_skip.pressed.connect(func(): skip_wait.emit())
 	skip_row.add_child(_skip)
 	_skip.visible = false
+	# Someone else's "skip the waiting": a vote.
+	var vote_row := CenterContainer.new()
+	col.add_child(vote_row)
+	_vote.add_theme_stylebox_override("panel", Ink.box("paper"))
+	_vote.custom_minimum_size = Vector2(560, 0)
+	vote_row.add_child(_vote)
+	var vcol := VBoxContainer.new()
+	vcol.add_theme_constant_override("separation", 10)
+	_vote.add_child(vcol)
+	Ink.style_label(_vote_text, 18, Ink.TEXT_INK)
+	_vote_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_vote_text.custom_minimum_size = Vector2(520, 0)
+	vcol.add_child(_vote_text)
+	_vote_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	_vote_row.add_theme_constant_override("separation", 12)
+	vcol.add_child(_vote_row)
+	_vote.visible = false
 	_fit()
+
+
+## A vote from the server (Dialog 249), or 0: it's over / answered.
+func on_vote(p: Dictionary) -> void:
+	if p.id != Protocol.DIALOG_VOTE:
+		_vote.visible = false
+		return
+	_vote_text.text = p.text
+	for c in _vote_row.get_children():
+		c.queue_free()
+	for i in p.options.size():
+		var b := Ink.button(p.options[i], i == 0)
+		b.focus_mode = Control.FOCUS_NONE
+		var choice: int = i
+		b.pressed.connect(func(): vote.emit(choice); _vote.visible = false)
+		_vote_row.add_child(b)
+	_vote.visible = true
 
 
 func _fit() -> void:
@@ -138,7 +177,7 @@ func _render() -> void:
 	_skip.visible = clock.place in [Protocol.PLACE_HOME, Protocol.PLACE_COMMUTING]
 	var skip: int = clock.get("skip", 0)
 	_skip.disabled = skip != 0
-	_skip.text = ["Pomiń czekanie  »", "Czekam na pozostałych…", "Czas leci…  »»"][clampi(skip, 0, 2)]
+	_skip.text = ["Pomiń czekanie  »", "Głosowanie trwa…", "Czas leci…  »»"][clampi(skip, 0, 2)]
 	var place: int = clock.place
 	var now := Time.get_ticks_msec() / 1000.0
 	match place:
@@ -152,6 +191,11 @@ func _render() -> void:
 				_sub.text = "Biuro zamknięte do rana."
 			if clock.night:
 				_info.text = "Noc… Teraz %s — nowy dzień zaczyna się o 06:00." % hhmm(clock.minute)
+			elif clock.get("leave", false):
+				# A day off (the HR app): at home until tomorrow morning.
+				_title.text = "Urlop 🌴"
+				_sub.text = "Dzień wolny — odpoczywasz w domu (na umowie o pracę płatny)."
+				_info.text = "Teraz %s. Do biura jutro rano." % hhmm(clock.minute)
 			else:
 				# Home early: the day goes on for the others (fast if nobody works).
 				_title.text = "W domu"

@@ -22,7 +22,8 @@ pub(super) struct Steps {
     pub(super) presses: Vec<(u16, Body)>,
     /// Not in the building (portal, home, commuting).
     pub(super) offline: Vec<u16>,
-    coffee_ready: Vec<u16>,
+    /// Coffee ready: who, from which machine.
+    coffee_ready: Vec<(u16, usize)>,
     cold_cups: Vec<u16>,
     /// Smoking: (floor, room), who, where.
     puffs: Vec<((u8, u16), u16, Pos)>,
@@ -30,8 +31,12 @@ pub(super) struct Steps {
     unwashed_exits: Vec<(u16, u8, u16)>,
     /// Walked out of the shop with unpaid goods.
     shoplifters: Vec<u16>,
-    /// Didn't make it to the toilet: (floor, where they stood).
-    accidents: Vec<(u8, Pos)>,
+    /// Didn't make it to the toilet: (floor, where they stood, `puddle::*`).
+    accidents: Vec<(u8, Pos, u8)>,
+    /// Five cigarettes one after another: sick.
+    chain_smoked: Vec<u16>,
+    /// Came into the porter's hall from outside: (player, floor, room).
+    entered: Vec<(u16, u8, u16, u16)>,
 }
 
 impl Server {
@@ -67,6 +72,7 @@ impl Server {
             }
             p.room = self.building.room_at(p.body.floor, p.body.pos);
             if p.room != old_room {
+                steps.entered.push((p.id, p.body.floor, old_room, p.room));
                 if self.shop_rooms.contains(&(p.body.floor, old_room)) && p.inventory.items().any(|i| i.unpaid) {
                     steps.shoplifters.push(p.id);
                 }
@@ -74,22 +80,34 @@ impl Server {
                     steps.unwashed_exits.push((p.id, p.body.floor, old_room));
                 }
             }
-            if coffee::tick_cup(&mut p.cup, tick) {
-                steps.coffee_ready.push(p.id);
+            if let Some(machine) = coffee::tick_cup(&mut p.cup, tick) {
+                steps.coffee_ready.push((p.id, machine));
             }
             if !p.inventory.expire(tick).is_empty() {
                 refresh(p);
                 self.says.push(Say::new(p.id, coffee::lines::COLD));
                 steps.cold_cups.push(p.id);
             }
-            tick_needs(p, needs_speed, tick, &mut self.says, &mut self.sounds, &mut steps.accidents);
+            tick_needs(p, needs_speed, tick, &mut self.says, &mut self.sounds, &mut steps);
             if matches!(p.rest, Some((Rest::Smoking { .. }, _, _))) {
                 steps.puffs.push(((p.body.floor, p.room), p.id, p.body.pos));
             }
             let outdoors = self.outdoor_rooms.contains(&(p.body.floor, p.room));
             let umbrella_open = outdoor_weather(p, outdoors, weather_now, &mut self.says);
             p.body.slow = p.needs.slow();
-            p.flags = (p.flags & 0x37)
+            p.body.drunk = p.needs.stagger();
+            if p.passed_out && tick >= p.held_until {
+                p.passed_out = false;
+                p.needs.sleep_it_off();
+                self.says.push(Say::new(p.id, crate::drunk::lines::WAKE_UP));
+            }
+            if p.knocked_out && tick >= p.held_until {
+                p.knocked_out = false;
+                p.needs.come_round();
+                self.says.push(Say::new(p.id, crate::mischief::lines::COME_ROUND));
+            }
+            p.flags = (p.flags & 0x07)
+                | (p.needs.drunk_tier() << proto::FLAG_DRUNK_SHIFT)
                 | if umbrella_open { proto::FLAG_UMBRELLA } else { 0 }
                 | if p.body.slow { proto::FLAG_SLOW } else { 0 }
                 | if p.needs.smelly() { proto::FLAG_SMELLY } else { 0 };
@@ -106,10 +124,16 @@ impl Server {
         for (pid, floor, bath) in std::mem::take(&mut steps.unwashed_exits) {
             self.unwashed_hands_seen(pid, floor, bath);
         }
-        for pid in std::mem::take(&mut steps.coffee_ready) {
+        for (pid, machine) in std::mem::take(&mut steps.coffee_ready) {
             let free = self.players.get(&pid).is_some_and(|p| p.inventory.hands_free());
             self.says.push(Say::new(pid, if free { coffee::lines::READY } else { coffee::lines::WAITING }));
-            self.give_new(pid, item_kind::COFFEE); // no free hands: it waits on the floor
+            // Somebody peed in the machine: it doesn't show (until the first sip).
+            let tainted = self.machines.get_mut(machine).is_some_and(|m| {
+                let t = m.tainted > 0;
+                m.tainted = m.tainted.saturating_sub(1);
+                t
+            });
+            self.give_new_tainted(pid, item_kind::COFFEE, tainted); // no free hands: it waits on the floor
         }
         for pid in std::mem::take(&mut steps.cold_cups) {
             self.give_new(pid, item_kind::EMPTY_CUP);
@@ -117,9 +141,15 @@ impl Server {
         for (place, pid, pos) in std::mem::take(&mut steps.puffs) {
             self.smoke.puff(place, pid, pos);
         }
-        for (floor, pos) in std::mem::take(&mut steps.accidents) {
-            self.leave_puddle(floor, pos);
+        for (floor, pos, kind) in std::mem::take(&mut steps.accidents) {
+            self.leave_puddle(floor, pos, kind);
         }
+        for pid in std::mem::take(&mut steps.chain_smoked) {
+            self.throw_up(pid, crate::mischief::lines::CHAIN_SMOKE_SICK, "chain smoking");
+        }
+        let entered = std::mem::take(&mut steps.entered);
+        self.greet_entering(&entered);
+        self.remark_accessible(&entered);
     }
 
     /// Somebody in the bathroom saw it.
@@ -181,8 +211,8 @@ fn left_bathroom(building: &Building, floor: u8, from: u16, to: u16) -> bool {
 
 /// Needs: moving ends a rest; `speed` needs ticks at once (dev); the
 /// warnings they raise are said aloud, accidents go to `accidents`.
-fn tick_needs(p: &mut Player, speed: u32, tick: u32, says: &mut Vec<Say>, sounds: &mut Vec<(u8, u8, Pos)>, accidents: &mut Vec<(u8, Pos)>) {
-    let was_toilet = matches!(p.rest, Some((Rest::Toilet, _, _)));
+fn tick_needs(p: &mut Player, speed: u32, tick: u32, says: &mut Vec<Say>, sounds: &mut Vec<(u8, u8, Pos)>, steps: &mut Steps) {
+    let was_toilet = matches!(p.rest, Some((Rest::Toilet | Rest::Urinal, _, _)));
     if let Some((_, floor, pos)) = p.rest {
         if (floor, pos) != (p.body.floor, p.body.pos) {
             p.rest = None;
@@ -194,17 +224,36 @@ fn tick_needs(p: &mut Player, speed: u32, tick: u32, says: &mut Vec<Say>, sounds
         rest = r;
         for e in events {
             let line = match e {
+                needs::Event::RestDone(l) if l == needs::lines::SMOKE_DONE => {
+                    // One after another? Five in a row and it all comes back up.
+                    let gap = crate::mischief::CHAIN_GAP_TICKS + needs::SMOKE_TICKS;
+                    let chained = p.chain_smokes > 0 && tick <= p.last_smoke_end + gap;
+                    p.chain_smokes = if chained { p.chain_smokes + 1 } else { 1 };
+                    p.last_smoke_end = tick;
+                    if p.chain_smokes >= crate::mischief::CHAIN_SMOKES {
+                        p.chain_smokes = 0;
+                        steps.chain_smoked.push(p.id);
+                    }
+                    l
+                }
                 needs::Event::Warn(l) | needs::Event::RestDone(l) => l,
                 needs::Event::Accident => {
-                    accidents.push((p.body.floor, p.body.pos));
+                    steps.accidents.push((p.body.floor, p.body.pos, proto::puddle::PEE));
                     needs::lines::ACCIDENT
                 }
+                needs::Event::PoopAccident => {
+                    steps.accidents.push((p.body.floor, p.body.pos, proto::puddle::POOP));
+                    sounds.push((proto::sound::POOP, p.body.floor, p.body.pos));
+                    needs::lines::POOP_ACCIDENT
+                }
+                // Only from drinking (see `after_drink`).
+                needs::Event::Vomit | needs::Event::PassOut => continue,
             };
             says.push(Say::new(p.id, line));
         }
     }
     p.rest = rest.map(|r| (r, p.body.floor, p.body.pos));
-    if was_toilet && !matches!(p.rest, Some((Rest::Toilet, _, _))) {
+    if was_toilet && !matches!(p.rest, Some((Rest::Toilet | Rest::Urinal, _, _))) {
         sounds.push((proto::sound::FLUSH, p.body.floor, p.body.pos));
     }
 }

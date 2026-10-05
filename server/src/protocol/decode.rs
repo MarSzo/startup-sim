@@ -56,6 +56,7 @@ impl Packet {
                 let self_prev_input = r.u8()?;
                 let self_access = r.u8()?;
                 let self_slow = r.u8()?;
+                let self_drunk = r.u8()?;
                 let self_activity = r.u8()?;
                 let n = r.u8()? as usize;
                 let mut entities = Vec::with_capacity(n);
@@ -83,6 +84,7 @@ impl Packet {
                     self_prev_input,
                     self_access,
                     self_slow,
+                    self_drunk,
                     self_activity,
                     entities,
                 }
@@ -126,6 +128,8 @@ impl Packet {
                         department: r.u8()?,
                         applied: r.u8()? != 0,
                         vacancies: r.u8()?,
+                        salary_min: r.u32()?,
+                        salary_max: r.u32()?,
                         company: r.str16(MAX_TEXT_BYTES)?,
                         title: r.str16(MAX_TEXT_BYTES)?,
                         description: r.str16(MAX_TEXT_BYTES)?,
@@ -133,7 +137,14 @@ impl Packet {
                 }
                 Packet::JobOffers { offers }
             }
-            ty::APPLY => Packet::Apply { token: r.u32()?, offer: r.u8()?, motivation: r.str16(MAX_TEXT_BYTES)? },
+            ty::APPLY => Packet::Apply {
+                token: r.u32()?,
+                offer: r.u8()?,
+                motivation: r.str16(MAX_TEXT_BYTES)?,
+                salary: r.u32()?,
+                form: r.u8()?,
+                student: r.u8()? != 0,
+            },
             ty::QUESTION => {
                 let (attempt, index, total) = (r.u8()?, r.u8()?, r.u8()?);
                 let text = r.str16(MAX_TEXT_BYTES)?;
@@ -217,6 +228,9 @@ impl Packet {
                 stress: r.u8()?,
                 bladder: r.u8()?,
                 hygiene: r.u8()?,
+                alcohol: r.u8()?,
+                bowels: r.u8()?,
+                health: r.u8()?,
                 flags: r.u8()?,
                 money: r.u32()?,
             },
@@ -251,6 +265,7 @@ impl Packet {
                 founded: r.u8()? != 0,
                 alarm: r.u8()?,
                 skip: r.u8()?,
+                leave: r.u8()? != 0,
             },
             ty::FRIDGE => {
                 let n = r.u8()? as usize;
@@ -264,6 +279,7 @@ impl Packet {
                 Packet::Fridge { items, milk: r.u8()?, water: r.u8()?, juice: r.u8()? }
             }
             ty::SKIP_WAIT => Packet::SkipWait { token: r.u32()? },
+            ty::ACTION => Packet::Action { token: r.u32()?, action: r.u8()? },
             ty::TASK_ACTION => Packet::TaskAction {
                 token: r.u32()?,
                 nonce: r.u16()?,
@@ -345,6 +361,59 @@ impl Packet {
             ty::VOICE => {
                 let (token, seq, whisper) = (r.u32()?, r.u16()?, r.u8()?);
                 Packet::Voice { token, seq, whisper, data: r.voice()? }
+            }
+            ty::HR_ACTION => Packet::HrAction { token: r.u32()?, action: r.u8()?, arg: r.u16()? },
+            ty::HR_INFO => {
+                let mut h = HrInfo {
+                    title: r.str16(MAX_TEXT_BYTES)?,
+                    department: r.u8()?,
+                    form: r.u8()?,
+                    salary: r.u32()?,
+                    pay_rate: r.u32()?,
+                    start_day: r.u16()?,
+                    today: r.u16()?,
+                    reprimands: r.u8()?,
+                    leave_days: r.u8()?,
+                    worked: r.u8()?,
+                    ..HrInfo::default()
+                };
+                let n = r.u8()? as usize;
+                if n > MAX_HR_ROWS {
+                    return Err(DecodeError::Invalid("too many annexes"));
+                }
+                for _ in 0..n {
+                    h.annexes.push((r.u16()?, r.str16(MAX_TEXT_BYTES)?));
+                }
+                let n = r.u8()? as usize;
+                if n > MAX_HR_ROWS {
+                    return Err(DecodeError::Invalid("too many leave requests"));
+                }
+                for _ in 0..n {
+                    h.requests.push((r.u8()?, r.u16()?, r.u8()?));
+                }
+                Packet::HrInfo(Box::new(h))
+            }
+            ty::CHAT_SAY => Packet::ChatSay { token: r.u32()?, text: r.str16(MAX_SAY_BYTES)? },
+            ty::NOTICE => Packet::Notice { icon: r.u8()?, text: r.str16(MAX_TEXT_BYTES)? },
+            ty::ROLL => Packet::Roll { token: r.u32()?, quality: r.u8()? },
+            ty::MEDIA => {
+                let n = r.u8()? as usize;
+                if n > MAX_MEDIA {
+                    return Err(DecodeError::Invalid("too many screens"));
+                }
+                let mut screens = Vec::with_capacity(n);
+                for _ in 0..n {
+                    screens.push((r.u8()?, r.u8()?, r.u8()?, r.u8()?, r.u32()?));
+                }
+                let n = r.u8()? as usize;
+                if n > MAX_MEDIA {
+                    return Err(DecodeError::Invalid("too many boomboxes"));
+                }
+                let mut music = Vec::with_capacity(n);
+                for _ in 0..n {
+                    music.push((r.u8()?, r.u32()?, r.u8()?, r.i32()?, r.i32()?, r.u16()?));
+                }
+                Packet::Media { screens, music }
             }
             ty::DEPARTMENTS => {
                 let n = r.u8()? as usize;
@@ -439,7 +508,7 @@ impl Packet {
                 }
                 let mut staff = Vec::with_capacity(n);
                 for _ in 0..n {
-                    staff.push((r.u16()?, r.u8()?, r.u16()?, r.str16(MAX_NICK_BYTES)?));
+                    staff.push((r.u16()?, r.u8()?, r.u16()?, r.u8()?, r.str16(MAX_NICK_BYTES)?));
                 }
                 Packet::CompanyPeople { candidates, staff }
             }
@@ -463,14 +532,22 @@ impl Packet {
             ty::DIALOG => {
                 let (id, npc, text) = (r.u8()?, r.u16()?, r.str16(MAX_TEXT_BYTES)?);
                 let n = r.u8()? as usize;
-                if n > MAX_OPTIONS {
+                if n > MAX_DIALOG_OPTIONS {
                     return Err(DecodeError::Invalid("too many options"));
                 }
                 let mut options = Vec::with_capacity(n);
                 for _ in 0..n {
                     options.push(r.str16(MAX_TEXT_BYTES)?);
                 }
-                Packet::Dialog { id, npc, text, options }
+                let k = r.u8()? as usize;
+                if k > MAX_DIALOG_OPTIONS {
+                    return Err(DecodeError::Invalid("too many items"));
+                }
+                let mut items = Vec::with_capacity(k);
+                for _ in 0..k {
+                    items.push(r.u8()?);
+                }
+                Packet::Dialog { id, npc, text, options, items }
             }
             ty::DIALOG_ANSWER => Packet::DialogAnswer { token: r.u32()?, id: r.u8()?, choice: r.u8()? },
             ty::LUNCH_MENU => {

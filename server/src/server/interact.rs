@@ -27,7 +27,6 @@ impl Server {
     /// One E press: the first thing in reach, in priority order.
     fn interact(&mut self, pid: u16, body: &Body, events: &mut Vec<npc::Event>) {
         let Some(p) = self.players.get(&pid) else { return };
-        let dept = self.cfg.recruitment.department_name(p.department).map(str::to_string);
         let hands_free = p.inventory.hands_free();
         let holds_laptop = p.inventory.held_kind() == item_kind::LAPTOP;
         let lunch_waiting = self.lunch_orders.iter().any(|o| o.owner == pid && o.delivered);
@@ -39,13 +38,21 @@ impl Server {
             self.use_desk_and_say(pid, body);
             return;
         }
+        // The key hook / the cabinet right behind the reception desk win
+        // over talking to the receptionist; the storeroom's shelves too.
+        if self.use_supplies(pid, body) {
+            return;
+        }
         // NPCs at their post first (a porter still standing next to the
-        // guest he just brought mustn't shadow the receptionist).
+        // guest he just brought mustn't shadow the receptionist). At a shop
+        // shelf only somebody right next to you (the guard walks the aisles).
+        let shelf_here = crate::shop::shelf_in_reach(&self.shelves, body).is_some();
+        let close = |n: &npc::Npc| super::dist2(n.body.pos, body.pos) <= crate::needs::USE_RADIUS * crate::needs::USE_RADIUS;
         let nearest = self
             .npcs
             .iter()
             .enumerate()
-            .filter(|(_, n)| n.in_talk_range(body))
+            .filter(|(_, n)| n.in_talk_range(body) && (!shelf_here || close(n)))
             .min_by_key(|(_, n)| (!n.is_idle(), (n.body.pos.x - body.pos.x).abs() + (n.body.pos.y - body.pos.y).abs()))
             .map(|(i, _)| i);
         if let Some(i) = nearest {
@@ -56,7 +63,7 @@ impl Server {
                 let line = self.pick_up_lunch(pid);
                 self.says.push(Say::addressed(npc_id, line, pid));
             } else {
-                events.extend(n.interact(&self.building, pid, body.access, dept.as_deref(), hands_free));
+                events.extend(n.interact(&self.building, pid, body.access, hands_free));
             }
             return;
         }
@@ -81,6 +88,8 @@ impl Server {
             // Went home just now.
         } else if let Some(line) = self.try_pickup(pid, body) {
             self.says.push(Say::new(pid, line));
+        } else {
+            self.search_hideout(pid, body);
         }
     }
 
@@ -143,9 +152,11 @@ impl Server {
                         }
                     }
                 }
-                npc::Event::Say { npc, text, to } => self.says.push(Say { speaker: npc, text, to }),
+                npc::Event::Say { npc, text, to } => self.says.push(Say { speaker: npc, text, to, reach: super::Reach::Room }),
                 npc::Event::Caught { npc, player } => self.caught(npc, player),
-                npc::Event::Arrived { .. } => {} // the cleaner: see tick_cleaning
+                npc::Event::Arrived { npc } => {
+                    self.passerby_arrived(npc); // (the cleaner: see tick_cleaning)
+                }
                 npc::Event::Escaped { npc, player } => self.escaped(npc, player),
                 npc::Event::Meeting { npc, player } => {
                     if let Some(line) = self.start_meeting(npc, player) {
@@ -158,6 +169,8 @@ impl Server {
                     }
                 }
                 npc::Event::Contract { player } => self.sign_contract(player),
+                npc::Event::ShowContract { npc, player } => self.show_contract(npc, player),
+                npc::Event::SawOut { player, .. } => self.saw_out(player),
             }
         }
     }

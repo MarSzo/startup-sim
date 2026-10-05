@@ -6,6 +6,9 @@ extends "res://tests/e2e/scenario.gd"
 
 const Item = preload("res://game/item_art.gd")
 
+## The variant "resign": turn the contract down at HR (see resign.gd).
+var resign := false
+
 
 func run() -> void:
 	# Registration, the character, the portal and the interview go by
@@ -37,6 +40,15 @@ func run() -> void:
 	if not await hear("To dział HR", 30.0):
 		return
 	await press_e()
+	# The contract: a little less than agreed (of course). Signed anyway.
+	var dialog = game().dialog
+	if not await until(func(): return dialog.visible and dialog._title_text().begins_with("Umowa"), 5.0, "the contract"):
+		return
+	check(dialog._text.text.contains("brutto miesięcznie") and dialog._text.text.contains("korekta"), "the pay on paper: %s" % dialog._text.text)
+	if resign:
+		await turn_it_down(dialog)
+		return
+	dialog._choose(0)  # Podpisuję
 	if not await until(func(): return carrying(Item.EMPLOYEE_CARD) and holding(Item.LAPTOP), 10.0, "the card and the laptop from HR"):
 		return
 	await until(func(): return access() & MapData.ACCESS_CARD != 0, 5.0, "the card opening the gates")
@@ -50,3 +62,23 @@ func run() -> void:
 		return
 	await press_e()
 	await hear("Laptop na biurku")
+
+
+## "Rezygnuję": HR walks us down to the porter's desk, Pani Wiesia takes the
+## pass, and it's the job portal again (with a mail about it).
+func turn_it_down(dialog) -> void:
+	dialog._choose(1)
+	if not await hear("Szkoda. Odprowadzę na portiernię"):
+		return
+	if not await walk(0, 34, 49, 90.0):  # with HR, to the porter's desk
+		return
+	if not await hear("Przepustkę poproszę", 40.0):
+		return
+	await until(func(): return access() == 0, 5.0, "the pass taken back")
+	log_step("the pass given back")
+	var portal = main.portal
+	await until(func():
+		for m in portal.mails.values():
+			if str(m.subject) == "Rezygnacja z umowy":
+				return true
+		return false, 20.0, "back on the job portal")

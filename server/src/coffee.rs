@@ -34,7 +34,7 @@ pub enum Cup {
 }
 
 impl Cup {
-    /// For `Snapshot::self_status` / entity flags (see PROTOCOL.md).
+    /// For `Snapshot::self_status` / entity flags (see docs/dev/protokol.md).
     pub fn brewing(&self) -> bool {
         matches!(self, Cup::Brewing { .. })
     }
@@ -46,6 +46,9 @@ pub struct Machine {
     pub tile: Tile,
     /// Tick until which it's in use.
     pub busy_until: u32,
+    /// Somebody peed in it: this many more coffees come out "special"
+    /// (until the cleaner's round rinses it).
+    pub tainted: u8,
 }
 
 /// What happened, for the server to announce (self speech bubbles).
@@ -62,7 +65,7 @@ pub fn find_machines(b: &Building) -> Vec<Machine> {
         for y in 0..m.height {
             for x in 0..m.width {
                 if m.tile_type(x, y) == Some("coffee_machine") {
-                    out.push(Machine { floor: f, tile: Tile { x, y }, busy_until: 0 });
+                    out.push(Machine { floor: f, tile: Tile { x, y }, busy_until: 0, tainted: 0 });
                 }
             }
         }
@@ -94,13 +97,13 @@ pub fn use_machine(machines: &mut [Machine], i: usize, cup: &mut Cup, hands_free
 
 /// Advance a player's brewing; true when the coffee is ready (the server
 /// then creates the item).
-pub fn tick_cup(cup: &mut Cup, tick: u32) -> bool {
+pub fn tick_cup(cup: &mut Cup, tick: u32) -> Option<usize> {
     match *cup {
-        Cup::Brewing { until, .. } if tick >= until => {
+        Cup::Brewing { until, machine } if tick >= until => {
             *cup = Cup::None;
-            true
+            Some(machine)
         }
-        _ => false,
+        _ => None,
     }
 }
 
@@ -155,8 +158,8 @@ mod tests {
         assert!(a.brewing());
         assert_eq!(use_machine(&mut m, 0, &mut b, true, 110), Outcome::Busy, "one at a time");
         assert_eq!(use_machine(&mut m, 0, &mut a, true, 110), Outcome::HandsFull, "already brewing");
-        assert!(!tick_cup(&mut a, 100 + BREW_TICKS - 1));
-        assert!(tick_cup(&mut a, 100 + BREW_TICKS), "ready");
+        assert!(tick_cup(&mut a, 100 + BREW_TICKS - 1).is_none());
+        assert!(tick_cup(&mut a, 100 + BREW_TICKS).is_some(), "ready");
         assert_eq!(a, Cup::None);
         assert_eq!(use_machine(&mut m, 0, &mut b, true, 100 + BREW_TICKS), Outcome::Started, "free again");
     }

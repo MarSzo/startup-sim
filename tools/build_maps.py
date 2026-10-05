@@ -34,11 +34,16 @@ LEGEND = {
     # access: needs a pass/card ("card") or service access ("service");
     # free_dir: direction you may always pass in (exit through the gates).
     "B": {"type": "card_gate", "solid": False, "color": "#e0b040", "access": "card", "free_dir": "down"},
+    # Doors with a card reader (a guest pass works too); going out is free:
+    # into the hall from the car park (down) / from the stairwell (right).
+    "m": {"type": "card_door", "solid": False, "color": "#7a6a50", "access": "card", "free_dir": "down"},
+    "q": {"type": "card_door", "solid": False, "color": "#7a6a50", "access": "card", "free_dir": "right"},
     "L": {"type": "service_door", "solid": False, "color": "#6a3a2a", "access": "service"},
     "g": {"type": "garage_gate", "solid": False, "color": "#9a9a9a", "access": "card", "free_dir": "up"},
     # Locked for good (the closed zone, the server room, a locked wardrobe).
     "x": {"type": "locked_door", "solid": True, "color": "#7a2a2a"},
-    "E": {"type": "elevator_door", "solid": False, "color": "#b8c4cc"},
+    # In only with a card (or a guest pass); stepping out (down) is free.
+    "E": {"type": "elevator_door", "solid": False, "color": "#b8c4cc", "access": "card", "free_dir": "down"},
     "e": {"type": "elevator", "solid": False, "color": "#9aa8b0"},
     "S": {"type": "stairs", "solid": False, "color": "#b09070"},
     "s": {"type": "steps", "solid": False, "color": "#a58a6c"},
@@ -48,6 +53,13 @@ LEGEND = {
     "K": {"type": "counter", "solid": True, "color": "#c9a37a"},
     "H": {"type": "shelf", "solid": True, "color": "#7a7f8a"},
     "Q": {"type": "sofa", "solid": True, "color": "#5b7fbf"},
+    "a": {"type": "armchair", "solid": True, "color": "#8a4a5a"},
+    "I": {"type": "tv", "solid": True, "color": "#1e1f29"},
+    # The storeroom door: only with the key from the reception.
+    "M": {"type": "storeroom_door", "solid": False, "color": "#7a5a3a", "access": "key"},
+    "j": {"type": "medicine_cabinet", "solid": True, "color": "#e8eef2"},
+    "y": {"type": "key_hook", "solid": True, "color": "#8a6a45"},
+    "l": {"type": "liquor_cabinet", "solid": True, "color": "#5e2f22"},
     "P": {"type": "plant", "solid": True, "color": "#3f8a3a"},
     "R": {"type": "rack", "solid": True, "color": "#2a2d34"},
     "N": {"type": "bench", "solid": True, "color": "#8a6a45"},
@@ -84,6 +96,15 @@ LEGEND = {
     "n": {"type": "balcony", "solid": False, "color": "#9a8a78"},
     "h": {"type": "railing", "solid": True, "color": "#3a3530"},
     "~": {"type": "void", "solid": True, "color": "#1c1c24"},
+    # The ramp down to the underground car park (not open yet: a closed
+    # barrier at the top, a shutter at the bottom), its parapets.
+    "/": {"type": "ramp", "solid": False, "color": "#4f5258"},
+    "[": {"type": "ramp_wall", "solid": True, "color": "#b5b2aa"},
+    "!": {"type": "boom_barrier", "solid": True, "color": "#d23b2e"},
+    "^": {"type": "garage_shutter", "solid": True, "color": "#3a3d42"},
+    # The smokers' shelter: looks like a bus stop (no bus ever comes).
+    "]": {"type": "shelter_glass", "solid": True, "color": "#a9cfdc"},
+    "{": {"type": "shelter_bench", "solid": True, "color": "#8a6a45"},
 }
 
 # Departments of the company (recruitment.json): rooms whose desks belong
@@ -103,7 +124,8 @@ class Floor:
         self.places = {}
 
     def room(self, key, rid, name, kind, see=None, gender=None, outdoor=False, detector=False,
-             light=None, switch_door=None, windows=False, lit_by=None, below=None, department=None):
+             light=None, switch_door=None, windows=False, lit_by=None, below=None, department=None,
+             accessible=False):
         d = {"id": rid, "name": name, "type": kind}
         if see:
             # Rooms whose people are visible from here (open door / window).
@@ -111,6 +133,9 @@ class Floor:
         if gender:
             # Bathrooms: "female" / "male" (only a sign; anyone may go in).
             d["gender"] = gender
+        if accessible:
+            # A toilet for the disabled (the wheelchair sign on its door).
+            d["accessible"] = True
         if outdoor:
             # Under the open sky: weather (rain, sun) applies here.
             d["outdoor"] = True
@@ -281,16 +306,15 @@ def floor0():
         "4": [21, 51, 3, 1], "5": [19, 46, 1, 4], "6": [26, 52, 1, 2],
     }
 
-    # 3: the entrance hall. North part (lifts, stairs, the car park) behind
-    # the card gates; the porter's desk (5, the porter sits at 6) by them.
+    # 3: the entrance hall, open; the lifts, the stairwell and the car park
+    # only with a card (or the porter's guest pass) - out is free. The
+    # porter's desk (5, the porter sits at 6).
     f.walls(27, 40, 43, 57, "_", "H")
     f.room("H", 3, "Hol", "hall", detector=True, light="always", windows=True)
     elevators(f, "H")
-    f.door(27, 42, 27, 42, "D", "Q")                     # stairwell <-> hall
-    f.door(31, 40, 32, 40, "D", "H")                     # car park <-> hall
+    f.door(27, 42, 27, 42, "q", "Q")                     # stairwell <-> hall
+    f.door(31, 40, 32, 40, "m", "H")                     # car park <-> hall
     f.area(35, 46, 39, 46, "#", "-")                     # back of the porter's lodge
-    for x in range(28, 35):                              # card gates (out is free)
-        f.area(x, 46, x, 46, "B", "H")
     f.put(35, 47, 35, 51, "K")                           # 5: porter's desk
     # 7: the toilet by the lodge (one lockable stall).
     f.walls(39, 46, 43, 52, ":", "T")
@@ -307,8 +331,9 @@ def floor0():
     f.walls(43, 40, 54, 57, ".", "Z")
     f.room("Z", 9, "Strefa zamknięta", "service", light="always")
     f.door(43, 45, 43, 45, "x", "Z")
-    f.door(43, 55, 43, 55, "x", "Z")
+    f.door(43, 55, 43, 55, "L", "Z")                     # the cleaner's way in and out
     f.plants([(28, 41), (28, 56), (42, 56)])
+    f.put(38, 56, 38, 56, "a")                           # Paulina's armchair
 
     # --- outside ---
     f.area(12, 9, 16, STREET_Y - 1, "=", "O")            # the drive to the garage
@@ -323,10 +348,23 @@ def floor0():
     f.area(32, 69, 40, 69, "p", "O")                     # tram stop platform
     f.put(36, 58, 39, 58, "b")                           # bike rack by the entrance
     f.put(24, 58, 24, 58, "A")                           # ashtray by the entrance
-    f.area(42, 62, 54, 68, "z", "M")
+    # The smokers' shelter by the drive: a bus-stop-like shelter (glass at
+    # the back and the sides, a bench, an ashtray), open towards the drive.
+    f.area(8, 44, 11, 49, "z", "M")
     f.room("M", 10, "Strefa palenia", "smoking", outdoor=True)
-    f.put(44, 64, 46, 64, "N")                           # bench
-    f.put(50, 66, 50, 66, "A")                           # ashtray
+    f.put(8, 44, 8, 49, "]")                             # the back glass
+    f.put(9, 44, 9, 44, "]")                             # the side panes
+    f.put(9, 49, 9, 49, "]")
+    f.put(9, 45, 9, 48, "{")                             # the bench
+    f.put(11, 47, 11, 47, "A")                           # ashtray
+    # The ramp down to the underground car park, in from the sidewalk (going
+    # down northwards): closed for now - a barrier at the bottom, by the
+    # sidewalk, a shutter at the far end; parapets on both sides.
+    f.area(2, 50, 2, 57, "[")
+    f.area(11, 50, 11, 57, "[")
+    f.area(3, 50, 10, 50, "^")
+    f.area(3, 51, 10, 56, "/")
+    f.area(3, 57, 10, 57, "!")
 
     f.spawns = [[x, y] for y in (59, 60) for x in range(26, 36)]
     f.places.update({
@@ -343,12 +381,20 @@ def floor0():
     })
     f.npcs = [
         # The porter sits behind the desk; escorts newcomers to the reception.
-        {"kind": "porter", "name": "Portier", "home": [37, 49], "escort_to": [4, 36, 36]},
+        # Pani Wiesia greets (and chats up) everybody coming in.
+        {"kind": "porter", "name": "Pani Wiesia", "home": [37, 49], "escort_to": [4, 36, 36]},
         # Behind the till; customers pay from the other side of the counter.
-        {"kind": "cashier", "name": "Kasa", "home": [20, 55]},
-        {"kind": "guard", "name": "Ochrona", "home": [25, 55]},
-        # 10: the cleaner sits in the hall all day (her round in the afternoon).
-        {"kind": "cleaner", "name": "Pani Krysia", "home": [38, 56]},
+        {"kind": "cashier", "name": "Kasjer", "home": [20, 55]},
+        # The guard walks between the shelves.
+        {"kind": "guard", "name": "Ochrona", "home": [25, 55],
+         "patrol": [[24, 47], [20, 48], [24, 50], [20, 52], [25, 55]]},
+        # 10: Pani Maria, the cleaner: out of sight in the closed zone, she
+        # only comes out for her afternoon round (15-16) - and talks to
+        # everybody, all the time.
+        {"kind": "cleaner", "name": "Pani Maria", "home": [46, 55]},
+        # Paulina, also a cleaner, sits in her armchair in the hall all day.
+        # That's it.
+        {"kind": "idler", "name": "Paulina", "home": [38, 56]},
     ]
     return f
 
@@ -378,20 +424,24 @@ def floor4():
     f.area(19, 12, 22, 16, ":", "N")
     f.room("N", 14, "Aneks kuchenny", "common", light="switch", switch_door=(23, 6), windows=True)
     f.door(23, 6, 24, 6, "G", "N")                       # out to the balcony
-    f.put(19, 7, 19, 7, "f")                             # fridge
-    f.put(20, 7, 21, 7, "c")                             # cupboard (mugs)
-    f.put(22, 7, 22, 7, "J")
-    f.put(25, 7, 25, 7, "C")                             # coffee machine
-    f.put(26, 7, 26, 7, "J")
-    f.put(27, 7, 27, 7, "i")                             # sink
-    f.put(28, 7, 28, 7, "d")                             # dishwasher
-    f.put(20, 10, 22, 11, "T")                           # a small table
+    # The kitchen in the lower left corner: along the west wall, then the
+    # south one; the table up in the bright part by the windows.
+    # (Each one in front of its own tile: E takes the nearest.)
+    f.put(19, 12, 19, 12, "C")                           # coffee machine
+    f.put(19, 13, 19, 13, "f")                           # fridge
+    f.put(19, 14, 19, 14, "d")                           # dishwasher
+    f.put(19, 15, 19, 15, "i")                           # sink
+    f.put(19, 16, 20, 16, "J")
+    f.put(21, 16, 22, 16, "c")                           # cupboard (mugs, knives)
+    f.put(20, 8, 22, 9, "T")                             # a small table
     f.put(31, 8, 33, 9, "Q")                             # sofas
     f.put(37, 8, 39, 9, "Q")
-    f.put(35, 11, 37, 11, "T")                           # the table (treats)
+    f.put(35, 7, 35, 7, "J")                             # a counter between the sofas (the treats' tray)
     f.put(41, 7, 41, 7, "O")                             # fruit bowl (free fruit)
     f.put(42, 7, 42, 7, "Y")                             # sanitizer by the food
-    f.places["tray"] = [36, 11]
+    f.places["tray"] = [35, 7]
+    f.places["remote"] = [34, 12]                        # the TV remote, by the table
+    f.places["boombox"] = [41, 12]
 
     f.area(30, 14, 42, 37, ".", "K")
     f.room("K", 5, "Korytarz", "corridor", detector=True, light="always")
@@ -400,17 +450,15 @@ def floor4():
     # at 56) and a bin (57).
     f.area(35, 14, 39, 26, "#", "-")
     f.area(35, 28, 39, 32, "#", "-")                     # (a walkway between the two)
-    # 54: women's WC (a lockable room of its own, door to the corridor).
-    f.area(36, 15, 38, 16, ":", "a")
-    f.room("a", 30, "WC damskie", "stall", gender="female", light="always")
-    f.put(36, 16, 36, 16, "U")
-    f.door(39, 16, 39, 16, "k", "a")
-    # 53: women's bathroom (washbasin).
+    # 53/54: the women's bathroom: in from the corridor by the washbasin,
+    # two WC stalls behind it.
     f.area(36, 18, 38, 19, ":", "W")
     f.room("W", 8, "Łazienka damska", "bathroom", gender="female", light="always")
-    f.door(35, 18, 35, 18, "D", "W")
-    f.put(38, 18, 38, 18, "V")
-    f.put(38, 19, 38, 19, "Y")
+    f.door(35, 19, 35, 19, "D", "W")
+    f.put(38, 19, 38, 19, "V")
+    f.put(37, 19, 37, 19, "Y")
+    stall(f, "a", 30, "WC damskie 1", "W", "female", (36, 15), (36, 16), (36, 17), "Łazienka damska")
+    stall(f, "E", 43, "WC damskie 2", "W", "female", (38, 15), (38, 16), (38, 17), "Łazienka damska")
     # 52: men's WC, through 51 (men's bathroom, washbasin).
     f.area(36, 21, 38, 22, ":", "x")
     f.room("x", 33, "WC męskie", "stall", see=["M"], gender="male", lit_by="Łazienka męska")
@@ -423,7 +471,7 @@ def floor4():
     f.put(38, 24, 38, 24, "Y")
     # 50: the disabled toilet (lockable, roomy).
     f.area(36, 29, 38, 31, ":", "y")
-    f.room("y", 35, "WC dla niepełnosprawnych", "stall", light="always")
+    f.room("y", 35, "WC dla niepełnosprawnych", "stall", light="always", accessible=True)
     f.door(37, 28, 37, 28, "k", "y")
     f.put(38, 31, 38, 31, "U")
     f.put(36, 29, 36, 29, "V")
@@ -457,6 +505,7 @@ def floor4():
     f.walls(18, 34, 29, 38, ",", "n")
     f.room("n", 17, "Sala spotkań 2", "meeting", detector=True, light="switch", switch_door=(29, 36), windows=True)
     f.put(21, 36, 25, 36, "T")
+    f.put(19, 35, 19, 35, "l")                           # the liquor cabinet (the key is hidden somewhere)
     f.door(29, 36, 29, 36, "D", "K")
     f.walls(18, 38, 29, 43, ".", "Q")
     f.room("Q", 21, "Klatka schodowa", "stairs", light="always")
@@ -506,6 +555,7 @@ def floor4():
     f.room("q", 23, "Szafa", "service", light="always")
     f.door(35, 39, 35, 39, "x", "q")                     # locked
     f.plants([(30, 39), (42, 48)])
+    f.door(29, 41, 29, 41, "D", "C")                     # the stairwell (to its right, like downstairs)
 
     # Lower left wing: 24 stairs (above), 20 mobile, 21 bathroom (22, 23
     # stalls), 17 corridor, 19 and 18 team rooms, 16 finance.
@@ -517,7 +567,7 @@ def floor4():
     f.walls(11, 43, 29, 49, ".", "D")
     f.room("D", 25, "Korytarz zachodni", "corridor", detector=True, light="always")
     f.door(13, 43, 14, 43, "D", "D")                     # mobile
-    f.door(22, 43, 23, 43, "D", "D")                     # stairwell
+
     f.door(29, 45, 29, 46, "D", "D")                     # hall 13
     f.walls(2, 43, 11, 49, ":", "w")
     f.room("w", 26, "Łazienka damska (zachód)", "bathroom", gender="female", light="switch", switch_door=(11, 46),
@@ -556,15 +606,15 @@ def floor4():
     f.area(48, 49, 57, 53, ".", "U")
     f.room("U", 37, "Korytarz wschodni", "corridor", detector=True, light="always")
     f.door(43, 45, 43, 46, "D", "U")                     # hall 13 <-> 25
-    f.door(48, 43, 48, 43, "D", "U")                     # storeroom 41
+    f.door(48, 43, 48, 43, "M", "U")                     # storeroom 41 (the key: at the reception)
     f.walls(53, 37, 65, 49, ",", "V")
-    f.room("V", 31, "DevOps (Mordor)", "department", detector=True, light="switch", switch_door=(53, 45),
+    f.room("V", 31, "Mordor", "department", detector=True, light="switch", switch_door=(53, 45),
            windows=True, department=DEVOPS)
     f.desk_rows(56, 59, (40, 44))
     f.desk_rows(61, 63, (40, 44))
     f.door(53, 45, 53, 46, "D", "V")
     f.walls(43, 49, 47, 54, ",", "h")
-    f.room("h", 32, "Pokój z biurkiem", "department", detector=True, light="switch", switch_door=(47, 51))
+    f.room("h", 32, "Pokój do wyjebywania", "department", detector=True, light="switch", switch_door=(47, 51))
     f.put(44, 51, 44, 51, "W")
     f.door(47, 51, 47, 51, "D", "h")
     f.walls(43, 54, 53, 60, ",", "B")
@@ -591,11 +641,17 @@ def floor4():
         # 56: the receptionist behind the desk (guests come to its front,
         # row 36); takes newcomers to HR.
         {"kind": "receptionist", "name": "Recepcja", "home": [36, 34], "escort_to": [4, 47, 14]},
-        {"kind": "hr", "name": "HR", "home": [47, 12]},
+        {"kind": "hr", "name": "HR", "home": [47, 12], "escort_to": [0, 34, 49]},
         # The board: the CEO and the co-founder at the table in 37.
         {"kind": "ceo", "name": "Prezes", "home": [20, 19]},
         {"kind": "cofounder", "name": "Wspólniczka", "home": [27, 20]},
     ]
+    # Behind the reception desk: the first-aid cabinet and the storeroom
+    # key on its hook.
+    f.put(39, 33, 39, 33, "j")
+    f.put(35, 33, 35, 33, "y")
+    # The TV on a stand by the chill room's south wall, facing the sofas.
+    f.put(35, 13, 37, 13, "I")
     return f
 
 
@@ -644,10 +700,10 @@ def floor3():
     f.put(26, 16, 28, 16, "R")
     f.put(26, 19, 27, 19, "R")
     f.walls(29, 15, 33, 21, ":", "m")
-    f.room("m", 6, "Magazyn 1", "storage", light="switch", switch_door=(31, 21))
+    f.room("m", 6, "Magazyn 1", "service", light="switch", switch_door=(31, 21))
     f.put(30, 16, 32, 16, "H")
     f.walls(33, 15, 38, 21, ":", "n")
-    f.room("n", 7, "Magazyn 2", "storage", light="switch", switch_door=(35, 21))
+    f.room("n", 7, "Magazyn 2", "service", light="switch", switch_door=(35, 21))
     f.put(34, 16, 37, 16, "H")
     f.walls(38, 15, 43, 21, ":", "t")
     f.room("t", 8, "Toaleta", "stall", light="always")
@@ -698,8 +754,8 @@ def floor3():
     f.door(18, 21, 19, 21, "D", "1")                     # the passage from the lounge
     f.door(22, 21, 22, 21, "D", "1")                     # meeting room
     f.door(27, 21, 27, 21, "x", "Y")                     # server room: locked
-    f.door(31, 21, 31, 21, "D", "K")                     # storerooms
-    f.door(35, 21, 35, 21, "D", "K")
+    f.door(31, 21, 31, 21, "L", "K")                     # storerooms: staff only
+    f.door(35, 21, 35, 21, "L", "K")
     f.area(40, 21, 40, 21, "k", "t")                     # toilet
     f.door(48, 21, 49, 21, "D", "2")                     # kitchen
     for key, rid, name, x0, y0, door in (

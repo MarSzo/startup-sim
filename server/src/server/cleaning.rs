@@ -76,10 +76,12 @@ impl Server {
             !here
         });
         let puddles = self.puddles.len();
-        self.puddles.retain(|p| !(p.floor == floor && dist2(p.pos, pos) <= reach * reach));
+        let here = |p: &super::puddles::Puddle| p.floor == floor && dist2(p.pos, pos) <= reach * reach;
+        let blood = self.puddles.iter().any(|p| here(p) && p.kind == crate::protocol::puddle::BLOOD);
+        self.puddles.retain(|p| !here(p));
         if self.puddles.len() < puddles {
             round.mopped += u32::try_from(puddles - self.puddles.len()).unwrap_or(u32::MAX);
-            self.says.push(Say::new(cleaner, cleaning::lines::PUDDLE));
+            self.says.push(Say::new(cleaner, if blood { cleaning::lines::BLOOD } else { cleaning::lines::PUDDLE }));
         }
         if !picked.is_empty() || self.puddles.len() < puddles {
             round.busy_until = self.tick + cleaning::WIPE_TICKS;
@@ -118,6 +120,10 @@ impl Server {
         if !self.clock.is_night() && self.clock.minute() >= self.cleaning.start.1 && self.cleaning.last_day != day {
             self.cleaning.last_day = day;
             self.cleaning.round = Some(Round::default());
+            // She rinses the coffee machines first (whatever got in them).
+            for m in &mut self.machines {
+                m.tainted = 0;
+            }
             self.says.push(Say::new(cleaner, cleaning::lines::START));
             self.log("* cleaning round starts");
         }

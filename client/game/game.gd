@@ -14,6 +14,15 @@ const DebugOverlay = preload("res://ui/debug_overlay.gd")
 const MapData = preload("res://map/map_data.gd")
 const ItemArt = preload("res://game/item_art.gd")
 const ItemView = preload("res://game/item_view.gd")
+const TvView = preload("res://game/tv_view.gd")
+const Audio = preload("res://audio/audio.gd")
+const RollGame = preload("res://ui/roll_game.gd")
+const DoorPlaque = preload("res://ui/door_plaque.gd")
+const BloodSplash = preload("res://game/blood_splash.gd")
+const ActionMenu = preload("res://ui/action_menu.gd")
+const Notices = preload("res://ui/notices.gd")
+const LogHistory = preload("res://ui/log_history.gd")
+const ChatBox = preload("res://ui/chat_box.gd")
 const InventoryHud = preload("res://ui/inventory_hud.gd")
 const ComputerView = preload("res://game/computer_view.gd")
 const ComputerScreen = preload("res://ui/computer_screen.gd")
@@ -45,8 +54,8 @@ const ERROR_DECAY := 15.0
 const MAX_PENDING := 240
 ## Talk range to NPCs (same as npc::TALK_RADIUS on the server): 3.5 tiles.
 const TALK_RADIUS_PX := 56.0
-const LOG_LINES := 4
-const LOG_TTL_SEC := 12.0
+const LOG_LINES := 8
+const LOG_TTL_SEC := 30.0
 const Departments = preload("res://net/departments.gd")
 
 var net
@@ -69,6 +78,10 @@ var kinds := {}          # id -> entity kind (player / NPC)
 var floor_items := {}    # entity id -> ItemView (items lying on the floor)
 var puddles := {}        # entity id -> PuddleView (toilet accidents)
 var puddle_layer := Node2D.new()  # on the floor, under the people and items
+## The TVs ("floor:x:y" -> [TvView, floor]) and the boombox's music (Media).
+var tvs := {}
+var boombox := AudioStreamPlayer2D.new()
+var boombox_music := {}  # the Media entry playing (track, started, floor, x, y, holder)
 var inventory: Array = [] # hands + pockets (from the server)
 var hud := InventoryHud.new()
 var computers := {}      # entity id -> ComputerView (laptops on desks)
@@ -104,6 +117,18 @@ var label_layer := CanvasLayer.new()
 var smoke_layer := CanvasLayer.new()
 var weather_layer := CanvasLayer.new()
 var dialog := DialogWindow.new()
+var roll_game := RollGame.new()  # rolling a cigarette (F with tobacco)
+## A vote (or 0: close) - for the home screen, which covers the game.
+signal vote_dialog(p: Dictionary)
+
+var action_menu := ActionMenu.new()  # Tab: what can be done here
+var _queued_interact := false  # an E picked in the action menu (next input sample)
+var door_plaque := DoorPlaque.new()  # a door plaque read up close (E by a door)
+## The room whose plaque E would read right now (0 = E does something else).
+var plaque_here := 0
+var notices := Notices.new()      # cards in the corner (Notice)
+var log_history := LogHistory.new()  # H: the day's log
+var chat_box := ChatBox.new()     # Enter: typed chat
 var shelf_window := ShelfWindow.new()
 var _shelf_at := Vector2.ZERO     # where the shelf window was opened (walk away = close)
 var fridge_window := FridgeWindow.new()
@@ -177,7 +202,7 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 	voice.send.connect(func(s: int, w: bool, data: PackedByteArray):
 		if net.is_playing():
 			net.send(Protocol.encode_voice(net.token, s, w, data)))
-	var audio = preload("res://audio/audio.gd").inst
+	var audio = Audio.inst
 	if audio:
 		audio.world = world
 
@@ -187,9 +212,10 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 		if m == null:
 			continue
 		var view := MapView.new()
-		var names := {}
+		var names := {}  # where stairs lead (not "to the stairwell": the EXIT sign says it)
 		for g in building.floors.size():
-			names[g] = building.floor_name(g)
+			if not building.floors[g].stairwell:
+				names[g] = building.floor_name(g)
 		view.build(m, ZOOM, names)
 		view.visible = false
 		add_child(view)
@@ -201,6 +227,10 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 	add_child(puddle_layer)
 	add_child(ride_mask)  # between the map and the people
 	add_child(world)
+	boombox.bus = "Music"
+	boombox.max_distance = 320.0
+	boombox.attenuation = 1.6
+	world.add_child(boombox)
 	light_view.setup(building)
 	add_child(light_view)  # over the world (and inked with it)
 	# Smoke over the ink effect (drawn in its own style), under the weather.
@@ -229,6 +259,7 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 				if ttype == "stall_door":
 					var dv := StallDoorView.new()
 					dv.tile = Vector2i(x, y)
+					dv.across = m.is_blocked(x - 1, y) and m.is_blocked(x + 1, y)  # in a wall running left-right
 					dv.position = Movement.to_px(Movement.tile_center(x, y))
 					dv.visible = false
 					world.add_child(dv)
@@ -271,8 +302,8 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 	hint_label.visible = false
 	status_layer.add_child(hint_label)
 	log_label.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	log_label.position = Vector2(16, -140)
-	log_label.size = Vector2(430, 124)
+	log_label.position = Vector2(16, -236)
+	log_label.size = Vector2(470, 220)
 	log_label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 	log_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	log_label.add_theme_font_size_override("font_size", 16)
@@ -297,7 +328,7 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 	mat.shader = load("res://game/mood.gdshader")
 	mood.material = mat
 	Settings.load_once()
-	mood.visible = Settings.mood and not args.has("no-mood")
+	mood.visible = not args.has("no-mood")  # the ink and paper: always (off only for dev / perf runs)
 	mood_layer.add_child(mood)
 	alarm_tint.set_anchors_preset(Control.PRESET_FULL_RECT)
 	alarm_tint.color = Color(0.9, 0.05, 0.05, 0.0)
@@ -338,6 +369,9 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 	screen.mail_action.connect(func(n: int, act: int, id: int, to: String, subj: String, body: String):
 		if net.is_playing():
 			net.send(Protocol.encode_mail_action(net.token, n, act, id, to, subj, body)))
+	screen.hr_action.connect(func(act: int, arg: int):
+		if net.is_playing():
+			net.send(Protocol.encode_hr_action(net.token, act, arg)))
 	screen.company_action.connect(func(act: int, target: int, value: int, text: String):
 		if net.is_playing():
 			net.send(Protocol.encode_company_action(net.token, act, target, value, text)))
@@ -348,6 +382,18 @@ func setup(p_net, p_building, welcome: Dictionary, p_nick: String, args: Diction
 			if net.is_playing():
 				net.send(Protocol.encode_calendar_book(net.token, start, topic)))
 	status_layer.add_child(dialog)
+	status_layer.add_child(roll_game)
+	status_layer.add_child(door_plaque)
+	status_layer.add_child(action_menu)
+	status_layer.add_child(notices)
+	status_layer.add_child(log_history)
+	status_layer.add_child(chat_box)
+	chat_box.sent.connect(func(text: String):
+		if net.is_playing():
+			net.send(Protocol.encode_chat_say(net.token, text)))
+	roll_game.rolled.connect(func(q: int):
+		if net.is_playing():
+			net.send(Protocol.encode_roll(net.token, q)))
 	dialog.name_of = func(id: int) -> String: return nicks.get(id, "?")
 	dialog.answer.connect(func(id: int, choice: int):
 			if net.is_playing():
@@ -445,14 +491,14 @@ func _refresh_own_label() -> void:
 
 
 func _sample_input(delta: float) -> int:
-	if input_blocked or me.status in [Protocol.ACT_RIDING, Protocol.ACT_HELD]:
+	if input_blocked or me.status in Protocol.ACT_STUCK:
 		return 0
 	if script_driver != null:
 		return 0 if screen.visible or dialog.visible else script_driver.next_input(delta)
 	if not goto_legs.is_empty() or not _goto_path.is_empty():
 		var g := _goto_input(delta)  # dev script also drives the computer screen / dialogs
 		return 0 if screen.visible or dialog.visible else g
-	if dialog.visible:
+	if dialog.visible or roll_game.visible or chat_box.typing():
 		return 0
 	if screen.visible:
 		return 0
@@ -473,8 +519,9 @@ func _sample_input(delta: float) -> int:
 		b |= Movement.IN_LEFT
 	if Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT):
 		b |= Movement.IN_RIGHT
-	if Input.is_physical_key_pressed(KEY_E):
+	if Input.is_physical_key_pressed(KEY_E) or _queued_interact:
 		b |= Movement.IN_INTERACT
+	_queued_interact = false
 	return b
 
 
@@ -487,6 +534,7 @@ func _goto_input(delta: float) -> int:
 		goto_legs.remove_at(0)
 		if leg == "E":
 			goto_delay = 0.3
+			_read_plaque()
 			return Movement.IN_INTERACT
 		if leg.begins_with("wait:"):
 			goto_delay = float(leg.substr(5))
@@ -599,11 +647,67 @@ func _physics_process(delta: float) -> void:
 	net.send(Protocol.encode_input(net.token, latest_tick, seq, inputs))
 
 
+## Media: what the TVs show and where the boombox plays.
+func _on_media(p: Dictionary) -> void:
+	for s in p.screens:
+		var key := "%d:%d:%d" % [s.floor, s.x, s.y]
+		if not tvs.has(key):
+			var tv := TvView.new()
+			tv.position = Vector2(s.x * 16, s.y * 16)
+			world.add_child(tv)
+			tvs[key] = [tv, s.floor]
+		var view = tvs[key][0]
+		view.weather = Protocol.WEATHER_NAMES.get(weather, "")
+		view.show_channel(s.channel, (est_tick - s.started) / float(tick_hz))
+	boombox_music = p.music[0] if not p.music.is_empty() else {}
+	if boombox_music.is_empty():
+		boombox.stop()
+		return
+	if Audio.inst == null:
+		return
+	var stream = Audio.inst.stream("boombox_%d" % boombox_music.track, true)
+	if stream == null:
+		return
+	var length: float = stream.get_length()
+	var at := fposmod((est_tick - boombox_music.started) / float(tick_hz), length)
+	if boombox.stream != stream or not boombox.playing:
+		boombox.stream = stream
+		boombox.play(at)
+	elif absf(boombox.get_playback_position() - at) > 0.6 and absf(boombox.get_playback_position() - at) < length - 0.6:
+		boombox.seek(at)  # drifted: everybody hears the same bar
+
+
+## TVs only on our floor; the boombox follows whoever carries it.
+func _update_media() -> void:
+	for key in tvs:
+		tvs[key][0].visible = tvs[key][1] == floor_index
+	if boombox_music.is_empty():
+		return
+	var holder: int = boombox_music.holder
+	var pos := Vector2(boombox_music.x, boombox_music.y) / float(Movement.SUBPIXELS)
+	if holder == net.player_id:
+		pos = me.position
+	elif holder != 0 and remotes.has(holder):
+		pos = remotes[holder].position
+	boombox.position = pos
+	boombox.volume_db = -4.0 if boombox_music.floor == floor_index else -80.0
+
+
 func _process(delta: float) -> void:
+	_update_media()
 	# Fire alarm: the screen pulses red.
 	var pulse := 0.5 + 0.5 * sin(Time.get_ticks_msec() / 1000.0 * TAU * 1.5)
 	alarm_tint.color.a = 0.16 * pulse if fire_alarm else 0.0
 	alarm_label.modulate.a = 0.55 + 0.45 * pulse
+	# Drunk: the view sways a little (more the more drunk).
+	if ride_mask.visible:
+		pass  # the elevator shakes it (_update_ride)
+	elif me.drunk > 0 and me.status != Protocol.ACT_PASSED_OUT:
+		var t := Time.get_ticks_msec() / 1000.0
+		var amp := 1.5 * me.drunk
+		camera.offset = Vector2(sin(t * 0.9) * amp, sin(t * 1.3) * amp * 0.5)
+	else:
+		camera.offset = Vector2.ZERO
 	if have_state:
 		error_offset *= exp(-ERROR_DECAY * delta)
 		if error_offset.length_squared() < 0.0025:
@@ -694,11 +798,23 @@ func _on_packet(p: Dictionary) -> void:
 			weather = p.weather
 			clock_label.text = "Dzień %d · %02d:%02d · %s · %s" % [p.day, p.minute / 60, p.minute % 60, part, Protocol.WEATHER_NAMES.get(weather, "")]
 			_update_light()
+			screen.set_world({"day": p.day, "minute": p.minute, "weather": Protocol.WEATHER_NAMES.get(weather, ""),
+				"company": p.company, "nick": nick, "department": Departments.name_of(department, "")})
 		Protocol.T_STATS:
 			stats_hud.update_stats(p)
 			me.set_smelly(p.hygiene < 25)
+			me.set_drunk(Protocol.drunk_tier(p.alcohol))
 		Protocol.T_COMPUTER:
 			screen.on_computer(p)
+		Protocol.T_NOTICE:
+			notices.push(p.icon, p.text)
+			log_history.add("[%02d:%02d] %s %s" % [game_minute / 60, game_minute % 60, Notices.ICONS.get(p.icon, "•"), p.text])
+			if Audio.inst:
+				Audio.inst.play("notify", -8.0)
+		Protocol.T_MEDIA:
+			_on_media(p)
+		Protocol.T_HR_INFO:
+			screen.on_hr(p)
 		Protocol.T_CALENDAR:
 			screen.on_calendar(p)
 		Protocol.T_LUNCH_MENU:
@@ -707,6 +823,8 @@ func _on_packet(p: Dictionary) -> void:
 			screen.on_company(p)
 		Protocol.T_DIALOG:
 			dialog.on_dialog(p)
+			if p.id in [0, Protocol.DIALOG_VOTE]:
+				vote_dialog.emit(p)  # the home screen shows the vote too
 		Protocol.T_CHAT:
 			screen.on_chat(p)
 		Protocol.T_TASK_BOARD:
@@ -719,6 +837,11 @@ func _on_packet(p: Dictionary) -> void:
 			screen.on_mail_state(p)
 		Protocol.T_SOUND:
 			sounds.on_sound(p)
+			for s in p.sounds:
+				if s[0] == Protocol.SOUND_STAB:
+					var splash := BloodSplash.new()
+					splash.position = Vector2(s[1], s[2]) / float(Movement.SUBPIXELS)
+					world.add_child(splash)
 		Protocol.T_VOICE_FROM:
 			voice.on_voice(p)
 		Protocol.T_SAY:
@@ -732,6 +855,7 @@ func _on_packet(p: Dictionary) -> void:
 			else:
 				_pending_say[p.id] = [Time.get_ticks_msec(), p.text]
 			_log.append([Time.get_ticks_msec(), "%s: %s" % [who, p.text]])
+			log_history.add("[%02d:%02d] %s: %s" % [game_minute / 60, game_minute % 60, who, p.text])
 			if _log.size() > LOG_LINES:
 				_log.pop_front()
 			_refresh_log()
@@ -790,7 +914,7 @@ func _on_snapshot(p: Dictionary) -> void:
 			have_time = true
 		else:
 			est_tick += (tick - est_tick) * 0.1
-		_reconcile(Movement.body(p.floor, Vector2i(p.self_x, p.self_y), p.self_prev_input, p.self_lock, p.self_access, p.self_slow != 0), p.last_input_seq)
+		_reconcile(Movement.body(p.floor, Vector2i(p.self_x, p.self_y), p.self_prev_input, p.self_lock, p.self_access, p.self_slow != 0, p.self_drunk), p.last_input_seq)
 		me.set_status(p.self_activity, p.self_slow != 0)
 		me.visible = p.self_activity != Protocol.ACT_RIDING  # inside the vehicle
 		screen.set_seated(p.self_activity == Protocol.ACT_COMPUTER)
@@ -812,7 +936,7 @@ func _on_snapshot(p: Dictionary) -> void:
 			var pv = puddles.get(e.id)
 			if pv == null:
 				pv = PuddleView.new()
-				pv.setup(e.id)
+				pv.setup(e.id, e.held)
 				puddle_layer.add_child(pv)
 				puddles[e.id] = pv
 			pv.position = Vector2(e.x, e.y) / float(Movement.SUBPIXELS)
@@ -870,6 +994,9 @@ func _on_snapshot(p: Dictionary) -> void:
 		r.set_status(e.activity, (e.flags & Protocol.FLAG_SLOW) != 0)
 		r.set_smelly((e.flags & Protocol.FLAG_SMELLY) != 0)
 		r.set_umbrella(e.kind == Protocol.KIND_PLAYER and (e.flags & Protocol.FLAG_UMBRELLA) != 0)
+		if e.kind == Protocol.KIND_PLAYER:
+			r.set_drunk((e.flags & Protocol.FLAG_DRUNK_MASK) >> Protocol.FLAG_DRUNK_SHIFT)
+			voice.set_drunk(e.id, (e.flags & Protocol.FLAG_DRUNK_MASK) >> Protocol.FLAG_DRUNK_SHIFT)
 		r.set_held(e.held)
 		kinds[e.id] = e.kind
 		if not nicks.has(e.id) and now - info_requested.get(e.id, -100000) > 500:
@@ -918,12 +1045,12 @@ func _reconcile(server_body: Dictionary, ack: int) -> void:
 
 ## Something in the game takes Esc itself (a window is open).
 func window_open() -> bool:
-	return screen.visible or shelf_window.visible or fridge_window.visible or dialog.visible
+	return screen.visible or shelf_window.visible or fridge_window.visible or dialog.visible or roll_game.visible \
+		or chat_box.visible or log_history.visible
 
 
 ## Settings changed in the Esc menu.
 func apply_settings() -> void:
-	mood.visible = Settings.mood
 	set_zoom_level(Settings.zoom)
 
 
@@ -959,6 +1086,17 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventKey and event.pressed and not event.echo) or input_blocked or screen.visible or not have_state:
 		return
 	match event.physical_keycode:
+		KEY_ENTER, KEY_KP_ENTER:
+			if not dialog.visible:
+				chat_box.open()
+				get_viewport().set_input_as_handled()
+		KEY_E:
+			_read_plaque()
+		KEY_TAB:
+			action_menu.open(_actions_here())
+			get_viewport().set_input_as_handled()
+		KEY_H:
+			log_history.toggle()
 		KEY_1, KEY_2, KEY_3:
 			_pocket_key(event.physical_keycode - KEY_1)
 		KEY_Q:
@@ -966,10 +1104,91 @@ func _unhandled_input(event: InputEvent) -> void:
 		KEY_G:
 			_item_action(Protocol.ITEM_GIVE, 0)
 		KEY_F:
-			_item_action(Protocol.ITEM_USE, 0)
+			if me.held == ItemArt.TOBACCO:
+				roll_game.start()  # roll one first (the server checks it's paid for)
+			else:
+				_item_action(Protocol.ITEM_USE, 0)
 		KEY_L:
 			if net.is_playing():
 				net.send(Protocol.encode_door_action(net.token))
+		KEY_R:
+			if net.is_playing():
+				net.send(Protocol.encode_action(net.token, Protocol.ACTION_MENU))
+		KEY_X:
+			if net.is_playing():
+				net.send(Protocol.encode_action(net.token, Protocol.ACTION_ATTACK))
+
+
+## Tab: the actions that make sense here and now, with their keys.
+func _actions_here() -> Array:
+	var out := []
+	var add := func(key: String, text: String, run: Callable) -> void: out.append({"key": key, "text": text, "run": run})
+	var hint: String = hint_label.text if hint_label.visible else ""
+	if hint.begins_with("[E] "):
+		var what := hint.substr(4).get_slice("  ·  ", 0)
+		add.call("E", what, _menu_interact)
+	var held: int = me.held
+	if held != 0:
+		var name := ItemArt.item_name(held).to_lower()
+		if held == ItemArt.TOBACCO:
+			add.call("F", "Skręć papierosa", func(): roll_game.start())
+		else:
+			add.call("F", "Użyj: %s" % name, func(): _item_action(Protocol.ITEM_USE, 0))
+		add.call("Q", "Upuść: %s" % name, func(): _item_action(Protocol.ITEM_DROP, 0))
+	for i in range(1, mini(inventory.size(), 4)):
+		var k: int = inventory[i].kind
+		if k != 0:
+			var pocket := i - 1
+			add.call(str(i), "Wyjmij z kieszeni: %s" % ItemArt.item_name(k).to_lower(), func(): _pocket_key(pocket))
+	if held in ItemArt.SMALL:
+		add.call("1–3", "Schowaj do kieszeni", func(): _item_action(Protocol.ITEM_PUT_AWAY, 0))
+	# Someone right next to you: give, hit.
+	var me_px := Movement.to_px(pred.pos)
+	var near := ""
+	for id in remotes:
+		if kinds.get(id) == Protocol.KIND_PLAYER and remotes[id].position.distance_to(me_px) <= 32.0:
+			near = nicks.get(id, "?")
+			break
+	if near != "":
+		if held != 0:
+			add.call("G", "Podaj: %s" % near, func(): _item_action(Protocol.ITEM_GIVE, 0))
+		var knife: bool = held == ItemArt.KNIFE
+		add.call("X", ("Dźgnij: %s" if knife else "Uderz: %s") % near, _send_action.bind(Protocol.ACTION_ATTACK))
+	var m = building.get_floor(pred.floor)
+	if m and m.room_types.get(room_id, "") == "stall":
+		add.call("L", "Zamknij / otwórz kabinę", _send_door_action)
+	if room_id != 0:
+		add.call("R", "Psoty…", _send_action.bind(Protocol.ACTION_MENU))
+	add.call("Enter", "Napisz na czacie", func(): chat_box.open())
+	add.call("H", "Dziennik dnia", func(): log_history.toggle())
+	return out
+
+
+## The menu's E: a plaque is read here; anything else goes to the server.
+func _menu_interact() -> void:
+	if plaque_here != 0:
+		_read_plaque()
+	else:
+		_queued_interact = true
+
+
+func _send_action(action: int) -> void:
+	if net.is_playing():
+		net.send(Protocol.encode_action(net.token, action))
+
+
+func _send_door_action() -> void:
+	if net.is_playing():
+		net.send(Protocol.encode_door_action(net.token))
+
+
+## E by a door with nothing else to do: read its plaque (E again: put away).
+func _read_plaque() -> void:
+	if door_plaque.visible:
+		door_plaque.close()
+	elif plaque_here != 0:
+		var m = building.get_floor(pred.floor)
+		door_plaque.open(plaque_here, m.room_name(plaque_here), m.plaque_icon(plaque_here))
 
 
 ## Pocket key: take it out, or put back what's in hands if that pocket is empty.
@@ -995,8 +1214,13 @@ func _item_action(action: int, slot: int) -> void:
 ## gate that needs a pass.
 func _update_hint() -> void:
 	var text := ""
+	plaque_here = 0
 	if me.status == Protocol.ACT_HELD:
 		hint_label.text = "Zatrzymano cię — chwilę stoisz w miejscu…"
+		hint_label.visible = true
+		return
+	if STUCK_HINTS.has(me.status):
+		hint_label.text = STUCK_HINTS[me.status]
 		hint_label.visible = true
 		return
 	if voice.talking != 0:
@@ -1037,10 +1261,10 @@ func _update_hint() -> void:
 					best_id = id
 		if best_id >= 0:
 			var who: String = nicks.get(best_id, "?")
-			text = "[E] Kasa — zapłać za zakupy" if who == "Kasa" else "[E] Porozmawiaj: %s" % who
+			text = "[E] Kasjer — zapłać za zakupy" if who == "Kasjer" else "[E] Porozmawiaj: %s" % who
 	if text == "" and map:
 		# Kitchenette things (the nearest within 1.5 tiles).
-		var kitchen_names := {"cupboard": "[E] Szafka z kubkami", "dishwasher": "[E] Zmywarka", "fridge": "[E] Lodówka", "kitchen_sink": "[E] Zlew"}
+		var kitchen_names := {"cupboard": "[E] Zajrzyj do szafki", "dishwasher": "[E] Zmywarka", "fridge": "[E] Lodówka", "kitchen_sink": "[E] Zlew"}
 		var best_d := INF
 		for dy in range(-2, 3):
 			for dx in range(-2, 3):
@@ -1124,17 +1348,26 @@ func _update_hint() -> void:
 			if kinds.get(id) == Protocol.KIND_PLAYER and remotes[id].position.distance_to(me_px3) <= 32.0:
 				text = "[G] Podaj %s: %s" % [ItemArt.item_name(me.held).to_lower(), nicks.get(id, "?")]
 				break
+	var e_free := text == ""  # nothing else for E: a door plaque, if one's here
 	if text == "" and map:
-		for dy in [-1, -2]:
+		for dy in [-1, -2, 0, 1]:
 			for dx in [-1, 0, 1]:
 				var need: int = map.need_at(t.x + dx, t.y + dy)
 				if need != 0 and (pred.access & need) == 0:
 					if need & MapData.ACCESS_BOARD:
 						text = "Zarząd — wstęp tylko na umówione spotkanie (kalendarz na komputerze)"
+					elif need & MapData.ACCESS_KEY:
+						text = "Magazynek zamknięty — klucz wisi przy recepcji (gdy nikogo tam nie ma…)"
 					elif need & MapData.ACCESS_GUEST:
-						text = "Bramka wymaga przepustki — porozmawiaj z portierem (portiernia)"
+						text = "Tylko z kartą (windy, schody, parking) — przepustkę da portier w portierni"
 					else:
 						text = "Wstęp tylko dla obsługi"
+	var facing: Vector2i = [Vector2i(0, 1), Vector2i(0, -1), Vector2i(-1, 0), Vector2i(1, 0)][me.facing]
+	plaque_here = map.plaque_at(t.x, t.y, room_id, facing) if e_free and map else 0
+	if plaque_here != 0:
+		text = "[E] Przeczytaj tabliczkę" if text == "" else text + "  ·  [E] tabliczka"
+	if door_plaque.visible and plaque_here != door_plaque.room:
+		door_plaque.close()  # walked off
 	if text == "" and voice.whisper_to >= 0:
 		text = "[V] mów · [B] szept: %s" % nicks.get(voice.whisper_to, "?")
 	hint_label.text = text
@@ -1280,7 +1513,13 @@ func _stall_hint(map, t: Vector2i, text: String) -> String:
 	return text
 
 
-const SPOT_HINTS := {"shelf": "[E] Zobacz półkę", "sofa": "[E] Usiądź na sofie", "toilet": "[E] Skorzystaj z toalety", "ashtray": "[E] Zapal", "fruit_bowl": "[E] Weź owoc", "sink": "[E] Umyj ręce", "sanitizer": "[E] Zdezynfekuj ręce"}
+## What you can't walk away from, and the hint meanwhile.
+const STUCK_HINTS := {Protocol.ACT_VOMITING: "Wymiotujesz…", Protocol.ACT_PASSED_OUT: "Odsypiasz… (chwilę potrwa)",
+	Protocol.ACT_KNOCKED_OUT: "Znokautowany… gwiazdki krążą (chwilę potrwa)", Protocol.ACT_PEEING: "Sikasz…",
+	Protocol.ACT_POOPING: "Kucasz… (natura wzywa)"}
+const SPOT_HINTS := {"shelf": "[E] Zobacz półkę", "medicine_cabinet": "[E] Apteczka", "key_hook": "[E] Klucz do magazynku",
+	"liquor_cabinet": "[E] Barek", "plant": "[E] Przeszukaj doniczkę", "bin": "[E] Przeszukaj kosz", "sofa": "[E] Usiądź na sofie", "toilet": "[E] Skorzystaj z toalety", "urinal": "[E] Pisuar",
+	"ashtray": "[E] Zapal", "fruit_bowl": "[E] Weź owoc", "sink": "[E] Umyj ręce", "sanitizer": "[E] Zdezynfekuj ręce"}
 
 
 ## Next to the elevator doors (outside the cabin): call it / wait / step in.
@@ -1294,6 +1533,9 @@ func _elevator_call_hint(map) -> String:
 			best = ev
 	if best == null:
 		return ""
+	var need: int = map.need_at(best.tile.x, best.tile.y)
+	if need != 0 and (pred.access & need) == 0:
+		return "Winda tylko z kartą — przepustkę da portier w portierni"
 	if not map.is_closed(best.tile.x, best.tile.y):
 		return "Winda otwarta — wejdź"
 	var l := _lift(best.lift)

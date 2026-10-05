@@ -32,15 +32,15 @@ clip() {  # clip <name> <dir> <start frame> <frames> [caption] [gravity]
 }
 
 clip c1 s1_title 0 135
-clip c2 s5_rain 0 150 "Dojedź do pracy — nawet w deszczu"
-clip c3 s2_office 0 150 "Pracuj w startupie razem z innymi graczami"
-clip c4 s3_coffee 30 150 "Kawa z ekspresu… jeśli znajdziesz czysty kubek"
-clip c5 s4_smoke 0 150 "Jeden szybki papieros w łazience? Co może pójść nie tak…"
-clip c6 s6_commute 0 105 "A jutro? Pieszo, rowerem, autem, taksówką czy tramwajem?" south
+clip c2 s2_rain 0 150 "Palarnia jak przystanek — autobus nie przyjedzie"
+clip c3 s3_hall 0 150 "Pani Wiesia z portierni zawsze zagada"
+clip c4 s4_office 0 150 "Pracuj w startupie razem z innymi graczami"
+clip c5 s5_chill 0 150 "Mecz w telewizorze, disco polo z boomboxa"
+clip c6 s6_shop 0 150 "„Jaka parówka wariacie?”" south
 
 # End card: the splash (logo + name), tagline, "wkrótce".
 magick $R/client/icons/splash.png -resize 1920x1080 \
-  -font $FONT -fill '#c2af8a' -pointsize 54 -gravity center -annotate +0+400 'Symulator pracy w startupie IT  ·  wkrótce' build/end.png
+  -font $FONT -fill '#c2af8a' -pointsize 54 -gravity center -annotate +0+400 'Symulator pracy w startupie IT  ·  github.com/mateuszpalak/startup-sim' build/end.png
 ffmpeg -loglevel error -y -loop 1 -framerate 30 -i build/end.png -vf "fade=t=in:st=0:d=0.5,fade=t=out:st=3.5:d=0.5,format=yuv420p" \
   -frames:v 120 -c:v libx264 -crf 17 build/c7.mp4
 echo build/c7.mp4 >> build/list.txt.tmp
@@ -50,8 +50,8 @@ ffmpeg -loglevel error -y -f concat -safe 0 -i build/list.txt -c copy build/vide
 DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 build/video.mp4)
 python3 $T/music.py build/music.wav $DUR
 python3 $T/sfx.py build/sfx.wav $DUR
-# Music ducked under the gameplay clips (4.5-24.5 s), the game's sounds on top.
-DUCK="1-0.62*clip((t-4.1)/0.4,0,1)*clip((24.9-t)/0.4,0,1)"
+# Music ducked under the gameplay clips (4.5-29.5 s), the game's sounds on top.
+DUCK="1-0.62*clip((t-4.1)/0.4,0,1)*clip((29.9-t)/0.4,0,1)"
 ffmpeg -loglevel error -y -i build/video.mp4 -i build/music.wav -i build/sfx.wav \
   -filter_complex "[1:a]aresample=44100,volume='$DUCK':eval=frame[m];[2:a]aresample=44100,volume=1.1[s];[m][s]amix=inputs=2:normalize=0:duration=first,alimiter=limit=0.95[a]" \
   -map 0:v -map "[a]" -c:v copy -c:a aac -b:a 192k -shortest -movflags +faststart startup_sim_zwiastun.mp4

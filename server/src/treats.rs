@@ -22,7 +22,7 @@ pub const REACH: i32 = TILE_UNITS * 3 / 2;
 /// Chance that fruit from the bowl is stale.
 pub const STALE_FRUIT_PERCENT: u32 = 15;
 
-/// Where the tray stands: on the chill-room table (the map's "tray" place).
+/// Where the tray stands: on the chill room's counter (the map's "tray" place).
 pub fn tray_pos(b: &Building) -> Option<(u8, Pos)> {
     b.tray.map(|(f, t)| (f, Pos::tile_center(t.x, t.y)))
 }
@@ -62,12 +62,12 @@ mod tests {
     use crate::building::{default_building_path, Building};
 
     #[test]
-    fn the_tray_stands_on_the_chill_room_table_and_can_be_reached() {
+    fn the_tray_stands_on_the_chill_room_counter_and_can_be_reached() {
         let b = Building::load(&default_building_path()).unwrap();
         let (f, p) = tray_pos(&b).unwrap();
         let m = b.floor(f).unwrap();
         let (tx, ty) = p.tile();
-        assert_eq!(m.tile_type(tx, ty), Some("table"));
+        assert_eq!(m.tile_type(tx, ty), Some("kitchen_counter"));
         assert_eq!(m.room_name(m.room_at(p.x, p.y)), "Chill room");
         // From the free tile below the table.
         assert!(in_reach(&b, &Body::at(f, Pos::tile_center(tx, ty + 1))));

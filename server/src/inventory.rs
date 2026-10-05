@@ -52,6 +52,32 @@ pub mod kind {
     pub const LATTE: u8 = 37;
     /// A 100 ml "małpka" of vodka (shop).
     pub const MALPKA: u8 = 38;
+    /// The board's breathalyser (F: test the person next to you).
+    pub const BREATHALYSER: u8 = 39;
+    /// A kitchen knife from the cupboard (for bread… or a fight).
+    pub const KNIFE: u8 = 40;
+    /// The chill room's TV remote; the boombox (hands only).
+    pub const REMOTE: u8 = 41;
+    pub const BOOMBOX: u8 = 42;
+    /// Rolling tobacco (shop, 10 rolls) and a rolled cigarette (the minigame).
+    pub const TOBACCO: u8 = 43;
+    pub const ROLLED: u8 = 44;
+    /// The storeroom key (the hook at the reception).
+    pub const STORE_KEY: u8 = 45;
+    /// From the storeroom: cola and cookies.
+    pub const COLA: u8 = 46;
+    pub const STORE_COOKIES: u8 = 47;
+    /// From the first-aid cabinet at the reception.
+    pub const PAINKILLER: u8 = 48;
+    pub const CHARCOAL: u8 = 49;
+    pub const VITAMIN: u8 = 50;
+    pub const PLASTER: u8 = 51;
+    /// The liquor cabinet's key (hidden somewhere in the office every day)
+    /// and what's in the cabinet.
+    pub const BAR_KEY: u8 = 52;
+    pub const WHISKY: u8 = 53;
+    pub const COGNAC: u8 = 54;
+    pub const VODKA: u8 = 55;
 }
 
 pub const POCKETS: usize = 3;
@@ -62,7 +88,8 @@ pub fn is_small(k: u8) -> bool {
         // Shop goods fit in a pocket, except the bulky ones.
         kind::BURGER | kind::FRIES | kind::WINE => false,
         10..=27 => true,
-        kind::MILK | kind::MALPKA => true,
+        kind::MILK | kind::MALPKA | kind::BREATHALYSER | kind::KNIFE | kind::REMOTE => true,
+        kind::TOBACCO..=kind::VODKA => true,
         28..=33 => false, // lunch boxes: both hands
         _ => false,
     }
@@ -78,6 +105,22 @@ pub fn display_name(k: u8) -> &'static str {
         kind::CUP => "Kubek",
         kind::LATTE => "Kawa z mlekiem",
         kind::FRUIT => "Owoc",
+        kind::BREATHALYSER => "Alkomat",
+        kind::KNIFE => "Nóż kuchenny",
+        kind::REMOTE => "Pilot do telewizora",
+        kind::BOOMBOX => "Boombox",
+        kind::ROLLED => "Skręt",
+        kind::STORE_KEY => "Klucz do magazynku",
+        kind::COLA => "Coca-Cola",
+        kind::STORE_COOKIES => "Ciastka z magazynu",
+        kind::PAINKILLER => "Apap",
+        kind::CHARCOAL => "Węgiel aktywny",
+        kind::VITAMIN => "Witamina C",
+        kind::PLASTER => "Plaster",
+        kind::BAR_KEY => "Mały kluczyk",
+        kind::WHISKY => "Whisky",
+        kind::COGNAC => "Koniak",
+        kind::VODKA => "Wódka",
         k => crate::shop::product(k).map_or("?", |p| p.name),
     }
 }
@@ -99,6 +142,10 @@ pub struct Item {
     pub unpaid: bool,
     /// Food past its best (fruit): upsets the stomach.
     pub stale: bool,
+    /// Somebody peed in it (a drink): disgusting, maybe sick. Not saved.
+    pub tainted: bool,
+    /// A rolled cigarette: how well (0..100). Not saved.
+    pub quality: u8,
 }
 
 /// Use up one piece of a pack in `slot` (a cigarette); the empty pack goes.
@@ -143,6 +190,7 @@ impl Inventory {
             a | match it.kind {
                 kind::GUEST_PASS => access::GUEST,
                 kind::EMPLOYEE_CARD => access::CARD,
+                kind::STORE_KEY => access::KEY,
                 _ => 0,
             }
         })
@@ -272,7 +320,18 @@ mod tests {
     use super::*;
 
     fn item(id: u32, k: u8) -> Item {
-        Item { id, kind: k, label: String::new(), expires: None, owner: 0, count: 1, unpaid: false, stale: false }
+        Item {
+            id,
+            kind: k,
+            label: String::new(),
+            expires: None,
+            owner: 0,
+            count: 1,
+            unpaid: false,
+            stale: false,
+            tainted: false,
+            quality: 0,
+        }
     }
 
     #[test]
@@ -336,6 +395,8 @@ mod tests {
             count: 1,
             unpaid: false,
             stale: false,
+            tainted: false,
+            quality: 0,
         })
         .unwrap();
         assert!(inv.expire(99).is_empty());

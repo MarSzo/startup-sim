@@ -19,6 +19,9 @@ pub const SPEED_DIAG: i32 = 17;
 /// Exhausted or desperate for the toilet (`Body::slow`): 14 units -> 52 px/s.
 pub const SPEED_SLOW: i32 = 14;
 pub const SPEED_SLOW_DIAG: i32 = 10;
+/// Staggering (`Body::drunk` 1, 2): sideways units per step while walking
+/// straight - a zigzag that turns every 2 tiles (512 units) of the way.
+pub const DRIFT: [i32; 3] = [0, 3, 6];
 
 /// Collision box half extents (box is 10 x 8 px, centered on the position).
 pub const HALF_W: i32 = 5 * SUBPIXELS;
@@ -72,15 +75,17 @@ pub fn input_dir(input: u8) -> (i32, i32) {
 /// `access`. Movement is resolved per axis (X, then Y) so the player slides
 /// along walls.
 pub fn move_on(map: &Map, pos: Pos, input: u8, access: u8) -> Pos {
-    move_at(map, pos, input, access, false)
+    move_at(map, pos, input, access, false, 0)
 }
 
-/// `move_on` at normal or slow (`Body::slow`) speed.
-pub fn move_at(map: &Map, pos: Pos, input: u8, access: u8, slow: bool) -> Pos {
+/// `move_on` at normal or slow (`Body::slow`) speed, staggering when drunk
+/// (`Body::drunk`: 1 a little, 2 more and slowly).
+pub fn move_at(map: &Map, pos: Pos, input: u8, access: u8, slow: bool, drunk: u8) -> Pos {
     let (dx, dy) = input_dir(input);
     if dx == 0 && dy == 0 {
         return pos;
     }
+    let slow = slow || drunk >= 2;
     let speed = match (dx != 0 && dy != 0, slow) {
         (true, false) => SPEED_DIAG,
         (false, false) => SPEED,
@@ -93,6 +98,18 @@ pub fn move_at(map: &Map, pos: Pos, input: u8, access: u8, slow: bool) -> Pos {
     }
     if dy != 0 {
         p.y = move_y(map, p, dy * speed, access);
+    }
+    // Drunk, walking straight: drifting to one side, then the other (walls
+    // still stop it; walking diagonally stays straight - never out of control).
+    let drift = DRIFT[drunk.min(2) as usize];
+    if drift > 0 && (dx == 0) != (dy == 0) {
+        if dx != 0 {
+            let side = if (p.x >> 9) & 1 == 0 { 1 } else { -1 };
+            p.y = move_y(map, p, side * drift, access);
+        } else {
+            let side = if (p.y >> 9) & 1 == 0 { 1 } else { -1 };
+            p.x = move_x(map, p, side * drift, access);
+        }
     }
     p
 }
@@ -163,11 +180,14 @@ pub struct Body {
     /// Walks slowly (exhausted / needs the toilet badly). Set by the server
     /// from the character's needs; the client learns it from snapshots.
     pub slow: bool,
+    /// Staggers (0 sober, 1 from 50 % alcohol, 2 from 75 %: also slow).
+    /// Set by the server from the character's needs, like `slow`.
+    pub drunk: u8,
 }
 
 impl Body {
     pub fn at(floor: u8, pos: Pos) -> Body {
-        Body { floor, pos, prev_input: 0, lock: LOCK_NONE, access: 0, slow: false }
+        Body { floor, pos, prev_input: 0, lock: LOCK_NONE, access: 0, slow: false, drunk: 0 }
     }
 }
 
@@ -182,7 +202,7 @@ impl Body {
 pub fn step(b: &Building, body: Body, input: u8) -> Body {
     let Some(map) = b.floor(body.floor) else { return body };
     let mut n = body;
-    n.pos = move_at(map, body.pos, input, body.access, body.slow);
+    n.pos = move_at(map, body.pos, input, body.access, body.slow, body.drunk);
     if n.lock == LOCK_HELD && (input & IN_MOVE_MASK) != (body.prev_input & IN_MOVE_MASK) {
         n.lock = LOCK_RELEASED;
     }
@@ -254,33 +274,42 @@ mod tests {
     fn stops_flush_against_wall() {
         let b = building();
         let m = b.floor(0).unwrap();
-        // The hall by the gates: the porter's desk (x=35) on the right.
+        // The hall: the porter's desk (x=35) on the right.
         let p = run(m, Pos::tile_center(31, 49), IN_RIGHT, 200);
         assert_eq!(p.x, 35 * TILE_UNITS - HALF_W);
-        // The gates (row 46) stop you without a pass.
+        // The car park's card door (row 40) stops you without a pass.
         let p = run(m, Pos::tile_center(31, 49), IN_UP, 200);
-        assert_eq!(p.y, 47 * TILE_UNITS + HALF_H);
+        assert_eq!(p.y, 41 * TILE_UNITS + HALF_H);
         assert!(box_is_free(m, p));
     }
 
     #[test]
-    fn gates_need_a_pass_to_enter_but_not_to_leave() {
+    fn card_doors_need_a_pass_to_enter_but_not_to_leave() {
         use crate::map::access;
         let b = building();
         let room = |body: &Body| {
             let m = b.floor(body.floor).unwrap();
             m.room_name(m.room_at(body.pos.x, body.pos.y)).to_string()
         };
-        let lobby = Body::at(0, Pos::tile_center(31, 48)); // below the gates (row 46)
+        // The hall is open; the car park's door (row 40) needs a card.
+        let lobby = Body::at(0, Pos::tile_center(31, 48));
         let stuck = walk(&b, lobby, IN_UP, 100);
-        assert_eq!(stuck.pos.y, 47 * TILE_UNITS + HALF_H, "no pass: stopped at the gate");
+        assert_eq!(stuck.pos.y, 41 * TILE_UNITS + HALF_H, "no pass: stopped at the car park's door");
         let guest = walk(&b, Body { access: access::GUEST, ..lobby }, IN_UP, 100);
-        assert!(guest.pos.y < 46 * TILE_UNITS, "guest pass opens the gate");
+        assert!(guest.pos.y < 40 * TILE_UNITS, "guest pass opens the door");
         let employee = walk(&b, Body { access: access::CARD, ..lobby }, IN_UP, 100);
-        assert!(employee.pos.y < 46 * TILE_UNITS, "employee card opens the gate");
-        // Leaving: from the lifts, without any pass, down through the gate.
-        let out = walk(&b, Body::at(0, Pos::tile_center(31, 44)), IN_DOWN, 100);
-        assert!(out.pos.y > 47 * TILE_UNITS, "exit is free");
+        assert!(employee.pos.y < 40 * TILE_UNITS, "employee card opens the door");
+        // Leaving: from the car park, without any pass, down into the hall.
+        let out = walk(&b, Body::at(0, Pos::tile_center(31, 38)), IN_DOWN, 100);
+        assert!(out.pos.y > 41 * TILE_UNITS, "exit is free");
+        // The stairwell's door (to the west): in with a card, out for free.
+        let hall = Body::at(0, Pos::tile_center(29, 42));
+        assert_eq!(room(&walk(&b, hall, IN_LEFT, 60)), "Hol", "no pass: no stairs");
+        assert_eq!(room(&walk(&b, Body { access: access::CARD, ..hall }, IN_LEFT, 60)), "Klatka schodowa");
+        assert_eq!(room(&walk(&b, Body::at(0, Pos::tile_center(25, 42)), IN_RIGHT, 60)), "Hol", "out of the stairwell");
+        // The lifts: in only with a card.
+        let at_lift = Body::at(0, Pos::tile_center(37, 45));
+        assert_eq!(walk(&b, at_lift, IN_UP, 60).pos.y, 44 * TILE_UNITS + HALF_H, "no pass: not into the lift");
         // Garage gate (row 13, from the drive to the north): same rules.
         let garage = walk(&b, Body::at(0, Pos::tile_center(35, 11)), IN_DOWN, 100);
         assert_eq!(room(&garage), "Na zewnątrz", "no pass: can't drive in");
@@ -318,6 +347,41 @@ mod tests {
         assert_eq!(p.x, 43 * TILE_UNITS - HALF_W);
     }
 
+    #[test]
+    fn drunk_walking_zigzags_and_never_goes_through_walls() {
+        let b = building();
+        let m = b.floor(4).unwrap();
+        // The corridor upstairs, walking down (south) a long way.
+        let start = Pos::tile_center(31, 15);
+        let walk = |drunk: u8, input: u8, n: usize| {
+            let mut p = start;
+            let mut xs = Vec::new();
+            for _ in 0..n {
+                p = move_at(m, p, input, 0, false, drunk);
+                xs.push(p.x);
+                assert!(box_is_free(m, p));
+            }
+            (p, xs)
+        };
+        let (sober, xs) = walk(0, IN_DOWN, 100);
+        assert!(xs.iter().all(|&x| x == start.x), "sober: straight");
+        let (tipsy, xs) = walk(1, IN_DOWN, 100);
+        assert!(xs.iter().any(|&x| x > start.x) && xs.iter().any(|&x| x < start.x), "tipsy: zigzag");
+        assert_eq!(tipsy.y, sober.y, "tipsy: same speed");
+        let (drunk, _) = walk(2, IN_DOWN, 100);
+        assert!(drunk.y < sober.y, "drunk: slower");
+        // Diagonally: no drift (never out of control).
+        let (diag_sober, _) = walk(0, IN_DOWN | IN_RIGHT, 40);
+        let (diag_tipsy, _) = walk(1, IN_DOWN | IN_RIGHT, 40);
+        assert_eq!(diag_sober, diag_tipsy);
+        // Along a wall the drift is stopped by it.
+        let mut p = Pos::tile_center(30, 20);
+        for _ in 0..300 {
+            p = move_at(m, p, IN_DOWN, 0, false, 2);
+            assert!(box_is_free(m, p));
+        }
+    }
+
     /// Stairwell map (between the ground floor and floor 3).
     const MID: u8 = 5;
 
@@ -325,7 +389,8 @@ mod tests {
     fn stairs_go_through_the_stairwell_and_landing() {
         let b = building();
         // From the hall through the stairwell door (27,42), left onto the flight.
-        let body = until_floor_change(&b, Body::at(0, Pos::tile_center(29, 42)), IN_LEFT, 300);
+        let card = |body: Body| Body { access: crate::map::access::CARD, ..body };
+        let body = until_floor_change(&b, card(Body::at(0, Pos::tile_center(29, 42))), IN_LEFT, 300);
         assert_eq!(body.floor, MID, "into the stairwell");
         assert_eq!(body.pos, Pos::tile_center(32, 13), "bottom of the first flight");
         assert_eq!(body.lock, LOCK_HELD);
@@ -355,7 +420,8 @@ mod tests {
     #[test]
     fn interact_in_the_elevator_cabin_changes_nothing_in_the_simulation() {
         let b = building();
-        let body = walk(&b, Body::at(0, Pos::tile_center(37, 45)), IN_UP, 60); // into the cabin
+        let at_doors = Body { access: crate::map::access::CARD, ..Body::at(0, Pos::tile_center(37, 45)) };
+        let body = walk(&b, at_doors, IN_UP, 60); // into the cabin
         assert_eq!(b.floor(0).unwrap().tile_type(body.pos.tile().0, body.pos.tile().1), Some("elevator"));
         let after = step(&b, step(&b, body, 0), IN_INTERACT);
         assert_eq!(after.floor, 0, "the server moves the cabin, not the simulation");

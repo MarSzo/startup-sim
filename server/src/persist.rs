@@ -65,6 +65,8 @@ impl SavedItem {
             count: self.count.max(1),
             unpaid: self.unpaid,
             stale: self.stale,
+            tainted: false,
+            quality: if self.kind == crate::inventory::kind::ROLLED { 60 } else { 0 },
         }
     }
 }
@@ -126,6 +128,20 @@ pub struct Character {
     /// Interview questions already asked (question set -> question ids).
     #[serde(default)]
     pub seen_questions: HashMap<String, Vec<u32>>,
+    /// Reprimands from the board (alcohol at work).
+    #[serde(default)]
+    pub reprimands: u8,
+    /// The contract: zł a month gross and its form (0 = before the pay ranges).
+    #[serde(default)]
+    pub salary: u32,
+    #[serde(default)]
+    pub employment: u8,
+    /// Hired, not signed yet: what was agreed (and offered).
+    #[serde(default)]
+    pub terms: Option<crate::pay::Terms>,
+    /// Annexes, leave days and requests (the HR app).
+    #[serde(default)]
+    pub hr: crate::hr::HrFile,
 }
 
 /// A laptop standing on a desk.
@@ -392,6 +408,11 @@ mod tests {
                 None,
             ],
             seen_questions: HashMap::from([("programming".to_string(), vec![11, 22])]),
+            reprimands: 0,
+            salary: 0,
+            employment: 0,
+            terms: None,
+            hr: Default::default(),
         }
     }
 
@@ -431,6 +452,8 @@ mod tests {
             count: 1,
             unpaid: false,
             stale: false,
+            tainted: false,
+            quality: 0,
         };
         let s = SavedItem::from_item(&item, |_| "Ola".into());
         assert_eq!((s.kind, s.owner.as_str()), (item_kind::EMPTY_CUP, "Ola"));

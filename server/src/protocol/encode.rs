@@ -48,6 +48,13 @@ impl Packet {
             Packet::Fridge { .. } => ty::FRIDGE,
             Packet::FridgeAction { .. } => ty::FRIDGE_ACTION,
             Packet::SkipWait { .. } => ty::SKIP_WAIT,
+            Packet::Action { .. } => ty::ACTION,
+            Packet::HrAction { .. } => ty::HR_ACTION,
+            Packet::HrInfo(_) => ty::HR_INFO,
+            Packet::Media { .. } => ty::MEDIA,
+            Packet::Roll { .. } => ty::ROLL,
+            Packet::ChatSay { .. } => ty::CHAT_SAY,
+            Packet::Notice { .. } => ty::NOTICE,
             Packet::Sound { .. } => ty::SOUND,
             Packet::TaskAction { .. } => ty::TASK_ACTION,
             Packet::TaskBoard { .. } => ty::TASK_BOARD,
@@ -112,6 +119,7 @@ impl Packet {
                 self_prev_input,
                 self_access,
                 self_slow,
+                self_drunk,
                 self_activity,
                 entities,
             } => {
@@ -127,6 +135,7 @@ impl Packet {
                 w.u8(*self_prev_input);
                 w.u8(*self_access);
                 w.u8(*self_slow);
+                w.u8(*self_drunk);
                 w.u8(*self_activity);
                 let n = entities.len().min(MAX_ENTITIES_PER_SNAPSHOT);
                 w.u8(n as u8);
@@ -180,23 +189,28 @@ impl Packet {
                     w.u8(o.department);
                     w.u8(o.applied as u8);
                     w.u8(o.vacancies);
+                    w.u32(o.salary_min);
+                    w.u32(o.salary_max);
                     w.str16(&o.company, MAX_TEXT_BYTES);
                     w.str16(&o.title, MAX_TEXT_BYTES);
                     w.str16(&o.description, MAX_TEXT_BYTES);
                 }
             }
-            Packet::Apply { token, offer, motivation } => {
+            Packet::Apply { token, offer, motivation, salary, form, student } => {
                 w.u32(*token);
                 w.u8(*offer);
                 w.str16(motivation, MAX_TEXT_BYTES);
+                w.u32(*salary);
+                w.u8(*form);
+                w.u8(*student as u8);
             }
             Packet::Question { attempt, index, total, text, options } => {
                 w.u8(*attempt);
                 w.u8(*index);
                 w.u8(*total);
                 w.str16(text, MAX_TEXT_BYTES);
-                w.u8(options.len().min(MAX_OPTIONS) as u8);
-                for o in options.iter().take(MAX_OPTIONS) {
+                w.u8(options.len().min(MAX_DIALOG_OPTIONS) as u8);
+                for o in options.iter().take(MAX_DIALOG_OPTIONS) {
                     w.str16(o, MAX_TEXT_BYTES);
                 }
             }
@@ -272,12 +286,15 @@ impl Packet {
                 }
             }
             Packet::DoorAction { token } => w.u32(*token),
-            Packet::Stats { hunger, energy, stress, bladder, hygiene, flags, money } => {
+            Packet::Stats { hunger, energy, stress, bladder, hygiene, alcohol, bowels, health, flags, money } => {
                 w.u8(*hunger);
                 w.u8(*energy);
                 w.u8(*stress);
                 w.u8(*bladder);
                 w.u8(*hygiene);
+                w.u8(*alcohol);
+                w.u8(*bowels);
+                w.u8(*health);
                 w.u8(*flags);
                 w.u32(*money);
             }
@@ -313,6 +330,7 @@ impl Packet {
                 founded,
                 alarm,
                 skip,
+                leave,
             } => {
                 w.u16(*day);
                 w.u16(*minute);
@@ -330,6 +348,7 @@ impl Packet {
                 w.u8(*founded as u8);
                 w.u8(*alarm);
                 w.u8(*skip);
+                w.u8(*leave as u8);
             }
             Packet::Fridge { items, milk, water, juice } => {
                 w.u8(items.len().min(16) as u8);
@@ -342,6 +361,10 @@ impl Packet {
                 w.u8(*juice);
             }
             Packet::SkipWait { token } => w.u32(*token),
+            Packet::Action { token, action } => {
+                w.u32(*token);
+                w.u8(*action);
+            }
             Packet::TaskAction { token, nonce, action, task, arg, text } => {
                 w.u32(*token);
                 w.u16(*nonce);
@@ -413,6 +436,65 @@ impl Packet {
                 let n = data.len().min(MAX_VOICE_BYTES);
                 w.u16(n as u16);
                 w.0.extend_from_slice(&data[..n]);
+            }
+            Packet::HrAction { token, action, arg } => {
+                w.u32(*token);
+                w.u8(*action);
+                w.u16(*arg);
+            }
+            Packet::HrInfo(h) => {
+                w.str16(&h.title, MAX_TEXT_BYTES);
+                w.u8(h.department);
+                w.u8(h.form);
+                w.u32(h.salary);
+                w.u32(h.pay_rate);
+                w.u16(h.start_day);
+                w.u16(h.today);
+                w.u8(h.reprimands);
+                w.u8(h.leave_days);
+                w.u8(h.worked);
+                w.u8(h.annexes.len().min(MAX_HR_ROWS) as u8);
+                for (day, text) in h.annexes.iter().take(MAX_HR_ROWS) {
+                    w.u16(*day);
+                    w.str16(text, MAX_TEXT_BYTES);
+                }
+                w.u8(h.requests.len().min(MAX_HR_ROWS) as u8);
+                for (id, day, status) in h.requests.iter().take(MAX_HR_ROWS) {
+                    w.u8(*id);
+                    w.u16(*day);
+                    w.u8(*status);
+                }
+            }
+            Packet::ChatSay { token, text } => {
+                w.u32(*token);
+                w.str16(text, MAX_SAY_BYTES);
+            }
+            Packet::Notice { icon, text } => {
+                w.u8(*icon);
+                w.str16(text, MAX_TEXT_BYTES);
+            }
+            Packet::Roll { token, quality } => {
+                w.u32(*token);
+                w.u8(*quality);
+            }
+            Packet::Media { screens, music } => {
+                w.u8(screens.len().min(MAX_MEDIA) as u8);
+                for &(floor, x, y, channel, started) in screens.iter().take(MAX_MEDIA) {
+                    w.u8(floor);
+                    w.u8(x);
+                    w.u8(y);
+                    w.u8(channel);
+                    w.u32(started);
+                }
+                w.u8(music.len().min(MAX_MEDIA) as u8);
+                for &(track, started, floor, x, y, holder) in music.iter().take(MAX_MEDIA) {
+                    w.u8(track);
+                    w.u32(started);
+                    w.u8(floor);
+                    w.i32(x);
+                    w.i32(y);
+                    w.u16(holder);
+                }
             }
             Packet::Departments { list } => {
                 w.u8(list.len().min(MAX_DEPARTMENTS) as u8);
@@ -487,10 +569,11 @@ impl Packet {
                     w.str16(nick, MAX_NICK_BYTES);
                 }
                 w.u8(staff.len().min(30) as u8);
-                for (pid, dept, day, nick) in staff.iter().take(30) {
+                for (pid, dept, day, reprimands, nick) in staff.iter().take(30) {
                     w.u16(*pid);
                     w.u8(*dept);
                     w.u16(*day);
+                    w.u8(*reprimands);
                     w.str16(nick, MAX_NICK_BYTES);
                 }
             }
@@ -519,13 +602,17 @@ impl Packet {
                 w.u16(*start);
                 w.u8(*topic);
             }
-            Packet::Dialog { id, npc, text, options } => {
+            Packet::Dialog { id, npc, text, options, items } => {
                 w.u8(*id);
                 w.u16(*npc);
                 w.str16(text, MAX_TEXT_BYTES);
-                w.u8(options.len().min(MAX_OPTIONS) as u8);
-                for o in options.iter().take(MAX_OPTIONS) {
+                w.u8(options.len().min(MAX_DIALOG_OPTIONS) as u8);
+                for o in options.iter().take(MAX_DIALOG_OPTIONS) {
                     w.str16(o, MAX_TEXT_BYTES);
+                }
+                w.u8(items.len().min(MAX_DIALOG_OPTIONS) as u8);
+                for &k in items.iter().take(MAX_DIALOG_OPTIONS) {
+                    w.u8(k);
                 }
             }
             Packet::DialogAnswer { token, id, choice } => {

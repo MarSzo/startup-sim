@@ -40,6 +40,8 @@ pub(super) struct Desk {
     pub(super) hired: Option<u8>,
     /// Passed an interview, waiting for the founder's decision (offer).
     pub(super) awaiting: Option<u8>,
+    /// What the application said: (offer, expected zł a month, form).
+    pub(super) terms: Vec<(u8, u32, u8)>,
     pub(super) inbox: Vec<MailMsg>,
     pub(super) next_mail: u8,
 }
@@ -134,8 +136,28 @@ pub(super) struct Player {
     pub(super) home_ask_until: u32,
     /// Stopped by the guard / the police until this tick (no walking).
     pub(super) held_until: u32,
-    /// At home: asked to skip the waiting (`SkipWait`).
-    pub(super) skip_wait: bool,
+    /// What others see meanwhile (`activity::HELD`, `VOMITING`, `PASSED_OUT`).
+    pub(super) held_activity: u8,
+    /// Passed out drunk: wakes up when `held_until` comes.
+    pub(super) passed_out: bool,
+    /// Reprimands from the board (3 = fired).
+    pub(super) reprimands: u8,
+    /// A board member asked "reprimand?": (dialog id, the tested player).
+    pub(super) reprimand_ask: Option<(u8, u16)>,
+    /// Knocked out in a fight: comes round when `held_until` comes.
+    pub(super) knocked_out: bool,
+    /// Cigarettes one after another, and when the last one went out.
+    pub(super) chain_smokes: u8,
+    pub(super) last_smoke_end: u32,
+    /// The next punch / stab not before this tick; the swing shows until.
+    pub(super) next_attack: u32,
+    pub(super) swing_until: u32,
+    /// Hit somebody: the guard (police) is after them; true = with a knife.
+    pub(super) assault: Option<bool>,
+    /// The R menu shown: what each option does.
+    pub(super) deeds: Vec<super::actions::Deed>,
+    /// The cupboard dialog shown: its options (item kinds, 0 = close).
+    pub(super) cupboard: Vec<u8>,
     /// Last applied TaskAction / MailAction nonces (retries are ignored).
     pub(super) task_nonce: u16,
     pub(super) mail_nonce: u16,
@@ -151,6 +173,22 @@ pub(super) struct Player {
     pub(super) crypto: Option<crate::crypto::Session>,
     /// Salary, grosze per game hour (raises from the CEO).
     pub(super) pay_rate: i64,
+    /// Hired, not signed yet: what was agreed (and what HR offers).
+    pub(super) terms: Option<crate::pay::Terms>,
+    /// Signed: zł a month gross and the form (`protocol::employment`).
+    pub(super) salary: u32,
+    pub(super) employment: u8,
+    /// HR showed the contract (the dialog is open): HR's NPC id.
+    pub(super) contract_shown: Option<u16>,
+    /// Gave the pass back after turning the contract down: back to the job
+    /// portal at this tick.
+    pub(super) to_portal_at: Option<u32>,
+    /// The HR file: annexes, leave days and requests.
+    pub(super) hr: crate::hr::HrFile,
+    /// A cabinet / the storeroom shelves dialog shown: its options (kinds, 0 = close).
+    pub(super) supply_menu: Vec<u8>,
+    /// Typed chat: not before this tick (flood guard).
+    pub(super) next_chat: u32,
     /// World day of the last raise request (cooldown).
     pub(super) last_raise_day: Option<u32>,
     /// Talking to a board member: meeting index, NPC, dialog id, good answers.
@@ -219,7 +257,18 @@ impl Player {
             alarm_nag: 0,
             home_ask_until: 0,
             held_until: 0,
-            skip_wait: false,
+            held_activity: proto::activity::HELD,
+            passed_out: false,
+            reprimands: 0,
+            reprimand_ask: None,
+            knocked_out: false,
+            chain_smokes: 0,
+            last_smoke_end: 0,
+            next_attack: 0,
+            swing_until: 0,
+            assault: None,
+            deeds: Vec::new(),
+            cupboard: Vec::new(),
             task_nonce: 0,
             mail_nonce: 0,
             voice_allowance: 200,
@@ -228,6 +277,14 @@ impl Player {
             guest: true,
             crypto: None,
             pay_rate: clock::PAY_PER_MIN * 60,
+            terms: None,
+            salary: 0,
+            employment: 0,
+            contract_shown: None,
+            to_portal_at: None,
+            hr: crate::hr::HrFile::default(),
+            supply_menu: Vec::new(),
+            next_chat: 0,
             last_raise_day: None,
             talk: None,
             lift_panel: None,
@@ -269,11 +326,15 @@ pub(super) fn activity(p: &Player, tick: u32) -> u8 {
         return a::RIDING;
     }
     if tick < p.held_until {
-        return a::HELD;
+        return p.held_activity;
+    }
+    if tick < p.swing_until {
+        return a::ATTACKING;
     }
     match (p.at_computer, p.rest.map(|r| r.0)) {
         (Some(_), _) => a::COMPUTER,
         (_, Some(Rest::Toilet)) => a::TOILET,
+        (_, Some(Rest::Urinal)) => a::PEEING,
         (_, Some(Rest::Sofa)) => a::SOFA,
         (_, Some(Rest::Smoking { .. })) => a::SMOKING,
         (_, Some(Rest::Washing { .. })) => a::WASHING,

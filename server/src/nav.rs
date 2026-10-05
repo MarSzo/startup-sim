@@ -88,8 +88,9 @@ mod tests {
                 .collect();
             let goal = tiles[tiles.len() / 2];
             let mut body = Body::at(spawn.0, Pos::tile_center(spawn.1.x, spawn.1.y));
-            // A guest; the board room needs a meeting (BOARD) on top.
-            body.access = crate::map::access::GUEST | crate::map::access::BOARD;
+            // A guest; the board room needs a meeting (BOARD), the storeroom
+            // the key (KEY) on top.
+            body.access = crate::map::access::GUEST | crate::map::access::BOARD | crate::map::access::KEY;
             let mut w = Walker::to(&b, &body, (4, goal)).unwrap_or_else(|| panic!("no path to {}", room.name));
             let mut steps = 0;
             while !w.done() && steps < 20_000 {

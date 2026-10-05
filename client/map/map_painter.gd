@@ -33,6 +33,9 @@ func _draw() -> void:
 		for x in map.width:
 			_tile_object(x, y)
 	_props()
+	_plaques()
+	_exit_signs()
+	_shelters()
 
 
 # ----------------------------------------------------------------- helpers
@@ -116,13 +119,20 @@ func _tile_rect(x: int, y: int) -> Rect2:
 
 # ------------------------------------------------------------------ ground
 
+const DOOR_TYPES := ["door", "glass_door", "card_gate", "card_door", "garage_gate", "elevator_door", "board_door", "stall_door", "service_door", "locked_door", "storeroom_door"]
+
+
+func _is_door(x: int, y: int) -> bool:
+	return _type(x, y) in DOOR_TYPES
+
+
 ## Floor under a solid object / a door: the most common walkable neighbour.
+## A door takes its own room's floor, so a wide doorway is all one floor.
 func _floor_under(x: int, y: int) -> String:
-	var counts := {}
-	for d in [Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 0), Vector2i(-1, 0), Vector2i(1, 1), Vector2i(-1, -1)]:
-		var c := _ch(x + d.x, y + d.y)
-		if map.legend.has(c) and not _solid(c) and _type_of(c) not in ["door", "glass_door", "card_gate", "garage_gate", "elevator_door", "stairs", "board_door", "stall_door"]:
-			counts[c] = counts.get(c, 0) + 1
+	var own: int = map.room_at_tile(x, y) if _is_door(x, y) else -1
+	var counts := _floor_counts(x, y, own)
+	if counts.is_empty() and own != -1:
+		counts = _floor_counts(x, y, -1)
 	var best := "."
 	var best_n := 0
 	for c in counts:
@@ -130,6 +140,20 @@ func _floor_under(x: int, y: int) -> String:
 			best_n = counts[c]
 			best = c
 	return best
+
+
+## Walkable floors around a tile (`room` != -1: only that room's).
+func _floor_counts(x: int, y: int, room: int) -> Dictionary:
+	var counts := {}
+	var around := [Vector2i(0, 1), Vector2i(0, -1), Vector2i(1, 0), Vector2i(-1, 0), Vector2i(1, 1), Vector2i(-1, -1)]
+	if room != -1:
+		around += [Vector2i(1, -1), Vector2i(-1, 1)]
+	for d in around:
+		var c := _ch(x + d.x, y + d.y)
+		if map.legend.has(c) and not _solid(c) and _type_of(c) not in DOOR_TYPES + ["stairs"]:
+			if room == -1 or map.room_at_tile(x + d.x, y + d.y) == room:
+				counts[c] = counts.get(c, 0) + 1
+	return counts
 
 
 func _ground(x: int, y: int) -> void:
@@ -142,7 +166,7 @@ func _ground(x: int, y: int) -> void:
 	if t == "fence":
 		_floor(x, y, "grass")
 		return
-	if _solid(c) or t in ["door", "glass_door", "card_gate", "garage_gate", "board_door", "stall_door", "service_door", "locked_door"]:
+	if _solid(c) or t in ["door", "glass_door", "card_gate", "card_door", "garage_gate", "board_door", "stall_door", "service_door", "locked_door", "storeroom_door"]:
 		t = _type_of(_floor_under(x, y))
 	_floor(x, y, t)
 
@@ -182,6 +206,25 @@ func _floor(x: int, y: int, t: String) -> void:
 			draw_rect(r, Color("#5b5954"))
 			for i in 5:
 				draw_circle(o + Vector2(_rf(x, y, i) * TP, _rf(y, x, i) * TP), 0.4, Color("#66645e") if i % 2 else Color("#4f4d49"))
+		"ramp":  # down to the shutter: darker and darker, arrows on the asphalt
+			var down := Vector2i(0, -1)  # towards the shutter
+			var to_shutter := 6
+			for d in [Vector2i(0, -1), Vector2i(0, 1), Vector2i(-1, 0), Vector2i(1, 0)]:
+				var k := 1
+				while _type(x + d.x * k, y + d.y * k) == "ramp":
+					k += 1
+				if _type(x + d.x * k, y + d.y * k) == "garage_shutter":
+					down = d
+					to_shutter = k
+			var depth := clampf(1.0 - (to_shutter - 1) / 6.0, 0.0, 1.0)  # deeper by the shutter
+			draw_rect(r, Color("#55575c").darkened(0.45 * depth))
+			var mid := (x == 6 or x == 7) if down.y != 0 else (y == 53 or y == 54)
+			if mid:
+				var c := o + Vector2(8, 8)
+				var ink := Color("#e8e2c8", 0.8 - 0.5 * depth)
+				var side := Vector2(down.y, down.x) * 2.5
+				draw_line(c - Vector2(down) * 2.5 + side, c + Vector2(down) * 2.0, ink, 1.0)
+				draw_line(c - Vector2(down) * 2.5 - side, c + Vector2(down) * 2.0, ink, 1.0)
 		"street":
 			draw_rect(r, Color("#4c4a46"))
 			draw_line(o + Vector2(0, 0.4), o + Vector2(TP, 0.4), Color("#7c7870"), 0.8)
@@ -240,7 +283,7 @@ func _floor(x: int, y: int, t: String) -> void:
 
 func _is_floorish(x: int, y: int) -> bool:
 	var c := _ch(x, y)
-	return c != "#" and _type_of(c) not in ["void", "fence", "service_door", "locked_door"] and map.legend.has(c)
+	return c != "#" and _type_of(c) not in ["void", "fence", "service_door", "locked_door", "storeroom_door"] and map.legend.has(c)
 
 
 ## Outside: beyond the map, open air, a hedge, or an outdoor room.
@@ -341,6 +384,101 @@ func _wall_shadows() -> void:
 				draw_rect(Rect2(o, Vector2(2.0, TP)), Color(0, 0, 0, 0.12))
 
 
+## A small plaque on the wall by each door, on the side it's read from (the
+## name of the room behind; E shows it big).
+func _plaques() -> void:
+	for y in map.height:
+		for x in map.width:
+			if not map.is_plaque_door(x, y):
+				continue
+			var sides: Array = map.door_sides(x, y)
+			for s in sides:
+				var across: bool = s[1].y != 0  # read from above / below
+				# One plaque per doorway: by its last tile (right / bottom).
+				var next := Vector2i(x, y) + (Vector2i(1, 0) if across else Vector2i(0, 1))
+				if map.is_plaque_door(next.x, next.y):
+					continue
+				if not sides.any(func(o): return map.plaque_between(s[0], o[0])):
+					continue
+				if not _is_wall(next.x, next.y):
+					continue
+				var o := Vector2(next) * TP
+				var plate: Rect2
+				if across:
+					plate = Rect2(o + Vector2(4, 9.5 if s[1].y > 0 else 2.5), Vector2(8, 4))
+				else:
+					plate = Rect2(o + Vector2(10.0 if s[1].x > 0 else 1.0, 2), Vector2(5, 7))
+				_box(plate, Color("#d9c27a"), true, 0.4, 0.45)
+				var mid := plate.get_center()
+				draw_line(mid - Vector2(plate.size.x / 2 - 1.6, 0), mid + Vector2(plate.size.x / 2 - 1.6, 0), Color(INK, 0.7), 0.5)
+
+
+## The smokers' shelter, like a bus stop: glass at the back and the sides,
+## a bench, a roof (its shade on the paving) and a sign.
+func _shelters() -> void:
+	var glass := Rect2i()
+	var found := false
+	for y in map.height:
+		for x in map.width:
+			if _type(x, y) in ["shelter_glass", "shelter_bench"]:
+				glass = Rect2i(x, y, 1, 1) if not found else glass.merge(Rect2i(x, y, 1, 1))
+				found = true
+	if not found:
+		return
+	var room: int = map.room_at_tile(glass.position.x + glass.size.x, glass.position.y + 1)
+	# The roof: over the whole shelter (its tiles in that room).
+	var roof := Rect2(Vector2(glass.position) * TP, Vector2(glass.size) * TP)
+	for y in range(glass.position.y, glass.end.y):
+		for x in range(glass.position.x, map.width):
+			if map.room_at_tile(x, y) != room:
+				break
+			roof = roof.merge(Rect2(Vector2(x, y) * TP, Vector2(TP, TP)))
+	draw_rect(roof, Color(0, 0, 0, 0.16))
+	for y in map.height:
+		for x in map.width:
+			var o := Vector2(x, y) * TP
+			match _type(x, y):
+				"shelter_glass":
+					var g := Rect2(o + Vector2(3, 0.5), Vector2(10, TP - 1))
+					draw_rect(g, Color("#a9cfdc", 0.55))
+					draw_line(g.position + Vector2(2, 2), g.position + Vector2(5, 6), Color(1, 1, 1, 0.5), 0.7)
+					draw_rect(g, Color("#6e7c84"), false, 0.8)
+				"shelter_bench":
+					_box(Rect2(o + Vector2(2, 0.5), Vector2(9, TP - 1)), Color("#9a7550"), true, 0.5, 0.45)
+					for i in 3:
+						draw_line(o + Vector2(4 + i * 3, 1), o + Vector2(4 + i * 3, TP - 1), Color("#7a5a3a"), 0.5)
+	# The roof's front edge, with its posts, and the sign on top.
+	var edge := Rect2(Vector2(roof.position.x, roof.position.y - 2), Vector2(roof.size.x, 3))
+	_box(edge, Color("#5d666d"), true, 0.6)
+	_box(Rect2(Vector2(roof.end.x - 2.5, roof.position.y), Vector2(2.5, roof.size.y)), Color("#5d666d"), true, 0.5)
+	var sign_r := Rect2(Vector2(roof.end.x - 30, roof.position.y - 10), Vector2(28, 9))
+	_box(sign_r, Color("#2f6fb0"), true, 0.5, 0.4)
+	draw_string(ThemeDB.fallback_font, sign_r.position + Vector2(2, 6.6), "PALARNIA", HORIZONTAL_ALIGNMENT_LEFT, -1, 5, Color.WHITE)
+
+
+## A green EXIT sign over the stairwell's door (on the side you come from).
+func _exit_signs() -> void:
+	for y in map.height:
+		for x in map.width:
+			if not _is_door(x, y) or _is_door(x - 1, y) or _is_door(x, y - 1):
+				continue
+			var sides: Array = map.door_sides(x, y)
+			var stairs: Array = sides.filter(func(s): return map.room_types.get(s[0], "") == "stairs")
+			var other: Array = sides.filter(func(s): return map.room_types.get(s[0], "") != "stairs")
+			if stairs.is_empty() or other.is_empty():
+				continue
+			var d: Vector2i = other[0][1]
+			# On the wall next to the doorway: above it in a wall running
+			# up-down, to its left in one running left-right.
+			var at := Vector2i(x, y - 1) if d.x != 0 else Vector2i(x - 1, y)
+			if not _is_wall(at.x, at.y):
+				continue
+			var o := Vector2(at) * TP
+			var sign_r := Rect2(o + Vector2(2.5 + d.x * 3.0, 4.5 + (3.0 if d.y > 0 else 0.0)), Vector2(11, 6))
+			_box(sign_r, Color("#2f9e4f"), true, 0.4, 0.4)
+			draw_string(ThemeDB.fallback_font, sign_r.position + Vector2(1.6, 4.9), "EXIT", HORIZONTAL_ALIGNMENT_LEFT, -1, 4, Color("#f4f8ef"))
+
+
 # ------------------------------------------------------------ tile objects
 
 ## Doors, gates, hedges, railings: things drawn per tile.
@@ -349,9 +487,9 @@ func _tile_object(x: int, y: int) -> void:
 	var r := _tile_rect(x, y)
 	var o := r.position
 	match t:
-		"door", "board_door":
+		"door", "board_door", "card_door":
 			var across := _is_wall(x - 1, y) or _is_wall(x + 1, y) or _type(x - 1, y) == t or _type(x + 1, y) == t
-			var wood := Color("#8a5a36") if t == "door" else Color("#5e2f22")
+			var wood: Color = {"door": Color("#8a5a36"), "board_door": Color("#5e2f22"), "card_door": Color("#6b6f75")}[t]
 			if across:
 				_box(Rect2(o + Vector2(0, 6), Vector2(TP, 4)), Color("#a6764c"), true, 0.3, 0.45)
 				if _is_wall(x - 1, y):
@@ -364,6 +502,10 @@ func _tile_object(x: int, y: int) -> void:
 					_box(Rect2(o, Vector2(TP, 2.2)), wood, true, 0.3, 0.45)
 				if _is_wall(x, y + 1):
 					_box(Rect2(o + Vector2(0, TP - 2.2), Vector2(TP, 2.2)), wood, true, 0.3, 0.45)
+			if t == "card_door" and _type(x + 1, y) != t and _type(x, y + 1) != t:
+				# The card reader by the door: a little box with a green light.
+				_box(Rect2(o + Vector2(TP - 5, 1), Vector2(4, 5)), Color("#3a3d42"), true, 0.3, 0.45)
+				draw_circle(o + Vector2(TP - 3, 2.6), 0.7, Color("#6fd06b"))
 		"glass_door":
 			var g := Rect2(o + Vector2(0, 5), Vector2(TP, 6))
 			draw_rect(g, Color("#a9d4e0", 0.85))
@@ -375,6 +517,32 @@ func _tile_object(x: int, y: int) -> void:
 			_box(Rect2(o + Vector2(TP - 3, 2), Vector2(3, 12)), Color("#6f7278"))
 			_box(Rect2(o + Vector2(3, 7), Vector2(7, 2)), Color("#d4a94a"), true, 0.3, 0.45)
 			draw_circle(o + Vector2(1.5, 4), 0.6, Color("#6fd06b"))
+		"ramp_wall":  # a concrete parapet along the ramp
+			if _type(x, y - 1) == t or _type(x, y + 1) == t:  # running up-down
+				_box(Rect2(o + Vector2(4, 0), Vector2(8, TP)), Color("#b5b2aa"), true, 0.5, 0.3)
+				draw_line(o + Vector2(6, 0), o + Vector2(6, TP), Color("#d2cfc6"), 0.6)
+			else:
+				_box(Rect2(o + Vector2(0, 4), Vector2(TP, 8)), Color("#b5b2aa"), true, 0.5, 0.3)
+				draw_line(o + Vector2(0, 6), o + Vector2(TP, 6), Color("#d2cfc6"), 0.6)
+		"garage_shutter":  # the underground car park's shutter, down
+			draw_rect(r, Color("#2f3236"))
+			var along_x := _type(x - 1, y) == t or _type(x + 1, y) == t
+			for i in range(1, 8):
+				if along_x:
+					draw_line(o + Vector2(0, 2 + i * 1.6), o + Vector2(TP, 2 + i * 1.6), Color("#4b4f55"), 0.5)
+				else:
+					draw_line(o + Vector2(2 + i * 1.6, 0), o + Vector2(2 + i * 1.6, TP), Color("#4b4f55"), 0.5)
+			draw_rect(r, INK, false, 0.5)
+		"boom_barrier":  # red and white, across the way in; the post at one end
+			var across := _type(x - 1, y) == t or _type(x + 1, y) == t
+			var first := _type(x - 1, y) != t if across else _type(x, y - 1) != t
+			for i in 4:
+				var stripe := Color("#d23b2e") if ((x if across else y) * 4 + i) % 2 == 0 else Color("#f2efe6")
+				draw_rect(Rect2(o + (Vector2(i * 4, 6.5) if across else Vector2(6.5, i * 4)), Vector2(4, 3) if across else Vector2(3, 4)), stripe)
+			draw_rect(Rect2(o + (Vector2(0, 6.5) if across else Vector2(6.5, 0)), Vector2(TP, 3) if across else Vector2(3, TP)), INK, false, 0.4)
+			if first:
+				_box(Rect2(o + Vector2(1, 4.5) if across else o + Vector2(4.5, 1), Vector2(7, 7)), Color("#e6b23a"), true, 0.8)
+				draw_circle(o + (Vector2(4.5, 8) if across else Vector2(8, 4.5)), 1.0, Color("#c9463a"))
 		"garage_gate":
 			for i in 5:
 				draw_rect(Rect2(o + Vector2(i * 3.2, 0), Vector2(3.2, 3)), Color("#d4a94a") if i % 2 == 0 else Color("#2b2522"))
@@ -383,6 +551,11 @@ func _tile_object(x: int, y: int) -> void:
 			_box(r.grow(-0.3), Color("#6b4128"))
 			_box(Rect2(o + Vector2(4, 4), Vector2(8, 3)), Color("#a8402f"), true, 0.3, 0.45)
 			draw_circle(o + Vector2(11, 9), 0.8, Color("#d4b870"))
+		"storeroom_door":  # the storeroom: a door with a keyhole (the key is at the reception)
+			_box(r.grow(-0.3), Color("#7a5a3a"))
+			_box(Rect2(o + Vector2(3, 3), Vector2(10, 10)), Color("#8f6c48"), true, 0.3, 0.45)
+			draw_circle(o + Vector2(8, 7.5), 1.3, INK)
+			draw_rect(Rect2(o + Vector2(7.5, 7.5), Vector2(1, 2.6)), INK)
 		"locked_door":  # shut for good: dark door, red band, a padlock
 			_box(r.grow(-0.3), Color("#4a2f24"))
 			_box(Rect2(o + Vector2(2, 6.5), Vector2(12, 3)), Color("#b0382c"), true, 0.3, 0.45)
@@ -408,7 +581,7 @@ func _tile_object(x: int, y: int) -> void:
 
 const PROP_TYPES := ["desk", "counter", "shelf", "sofa", "table", "plant", "rack", "bench", "ashtray", "toilet", "sink",
 	"car", "coffee_machine", "kitchen_counter", "fruit_bowl", "partition", "sanitizer", "bike_rack",
-	"cupboard", "dishwasher", "kitchen_sink", "fridge", "urinal", "wardrobe", "bin"]
+	"cupboard", "dishwasher", "kitchen_sink", "fridge", "urinal", "wardrobe", "bin", "armchair", "tv", "medicine_cabinet", "key_hook", "liquor_cabinet"]
 
 
 ## Connected tiles of the same furniture char = one object.
@@ -442,13 +615,27 @@ func _shadow(r: Rect2) -> void:
 	draw_rect(Rect2(r.position + Vector2(1.2, 1.6), r.size), Color(0, 0, 0, 0.2))
 
 
+const KITCHEN := ["coffee_machine", "kitchen_counter", "cupboard", "dishwasher", "kitchen_sink", "fridge"]
+
+
 func _prop(t: String, tr: Rect2i, index: int) -> void:
 	var r := Rect2(Vector2(tr.position) * TP, Vector2(tr.size) * TP)
+	var turn := _turn_from_wall(tr) if t in KITCHEN else 0.0
+	if turn != 0.0:
+		# Drawn as if against the north wall, then turned to face the room.
+		var size := r.size if is_equal_approx(absf(turn), PI) else Vector2(r.size.y, r.size.x)
+		draw_set_transform(r.get_center(), turn, Vector2.ONE)
+		r = Rect2(-size / 2, size)
 	match t:
 		"desk": _desks(tr, r, index)
 		"counter": _counter(r)
 		"shelf": _shelf(r, index)
 		"sofa": _sofa(r)
+		"armchair": _armchair(r)
+		"tv": _tv(r)
+		"medicine_cabinet": _medicine_cabinet(r)
+		"key_hook": _key_hook(r)
+		"liquor_cabinet": _liquor_cabinet(r)
 		"table": _table(tr, r)
 		"plant": _plant(r, index)
 		"rack": _racks(r, index)
@@ -470,6 +657,25 @@ func _prop(t: String, tr: Rect2i, index: int) -> void:
 		"urinal": _urinal(tr, r)
 		"wardrobe": _wardrobe(r)
 		"bin": _bin(r)
+	if turn != 0.0:
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+## Kitchen units are drawn with their back to the north wall; this is the
+## turn for one standing by another wall (north first, then south, west, east).
+func _turn_from_wall(tr: Rect2i) -> float:
+	var sides := [[Vector2i(0, -1), 0.0], [Vector2i(0, 1), PI], [Vector2i(-1, 0), -PI / 2], [Vector2i(1, 0), PI / 2]]
+	for s in sides:
+		var d: Vector2i = s[0]
+		var all := true
+		for y in range(tr.position.y, tr.end.y):
+			for x in range(tr.position.x, tr.end.x):
+				var n := Vector2i(x, y) + d
+				if not tr.has_point(n) and not _is_wall(n.x, n.y):
+					all = false
+		if all:
+			return s[1]
+	return 0.0
 
 
 func _chair(c: Vector2, facing_up: bool) -> void:
@@ -536,6 +742,53 @@ func _sofa(r: Rect2) -> void:
 	var n := int(r.size.x / TP)
 	for i in range(1, n):
 		draw_line(Vector2(r.position.x + i * TP, r.position.y + 7), Vector2(r.position.x + i * TP, r.end.y - 4), c.darkened(0.2), 0.5)
+
+
+## A deep old armchair (Paulina's): a high back, two armrests, a cushion.
+func _armchair(r: Rect2) -> void:
+	var c := Color("#8a4a5a")
+	_shadow(r)
+	_box(Rect2(r.position + Vector2(1, 0), Vector2(r.size.x - 2, 6)), c.darkened(0.25), true, 2.0)
+	_box(Rect2(r.position + Vector2(0, 3), Vector2(3.5, r.size.y - 4)), c.darkened(0.15), true, 1.2)
+	_box(Rect2(Vector2(r.end.x - 3.5, r.position.y + 3), Vector2(3.5, r.size.y - 4)), c.darkened(0.15), true, 1.2)
+	_box(Rect2(r.position + Vector2(3.5, 5), Vector2(r.size.x - 7, r.size.y - 7)), c, true, 1.2)
+
+
+## The first-aid cabinet: a white box with a red cross.
+func _medicine_cabinet(r: Rect2) -> void:
+	var b := r.grow(-1.5)
+	_shadow(b)
+	_box(b, Color("#f4f6f8"), true, 1.0)
+	var c := b.get_center()
+	draw_rect(Rect2(c - Vector2(1.2, 3.6), Vector2(2.4, 7.2)), Color("#d9443a"))
+	draw_rect(Rect2(c - Vector2(3.6, 1.2), Vector2(7.2, 2.4)), Color("#d9443a"))
+
+
+## The liquor cabinet: dark wood, glass doors, bottles behind them, a keyhole.
+func _liquor_cabinet(r: Rect2) -> void:
+	var b := r.grow(-1.0)
+	_shadow(b)
+	_box(b, Color("#5e2f22"), true, 1.0)
+	var g := Rect2(b.position + Vector2(1.5, 1.5), b.size - Vector2(3, 5))
+	draw_rect(g, Color("#a9d4e0", 0.5))
+	for i in 3:
+		draw_rect(Rect2(g.position + Vector2(1.5 + i * 3.5, 2.5), Vector2(2, 5)), [Color("#b8742a"), Color("#dfe8ee"), Color("#7a3a1a")][i])
+	draw_circle(Vector2(b.get_center().x, b.end.y - 1.8), 0.6, Color("#d4b870"))
+
+
+## The key hook: a little board, and the key on it (the server knows if it's there).
+func _key_hook(r: Rect2) -> void:
+	var b := Rect2(r.position + Vector2(3, 3), Vector2(10, 7))
+	_box(b, Color("#8a6a45"), true, 0.6)
+	draw_circle(b.position + Vector2(5, 2.5), 0.7, Color("#d4b870"))
+	draw_line(b.position + Vector2(5, 3), b.position + Vector2(5, 7.5), Color("#d4b870"), 1.0)
+	draw_line(b.position + Vector2(5, 6.5), b.position + Vector2(6.5, 6.5), Color("#d4b870"), 0.8)
+
+
+## The TV's wall bracket; the set itself (and what's on) is game/tv_view.gd.
+func _tv(r: Rect2) -> void:
+	draw_rect(r, Color("#3b3b4f"))
+	draw_rect(Rect2(r.get_center() - Vector2(4, 2), Vector2(8, 4)), Color("#2b2b33"))
 
 
 func _table(tr: Rect2i, r: Rect2) -> void:
@@ -667,8 +920,8 @@ func _kitchen_counter(r: Rect2) -> void:
 	for i in 3:
 		var mug: Color = [Color("#f1ece2"), Color("#4f7fb0"), Color("#d98a3e")][i]
 		_disc(top.position + Vector2(4.5 + i * 4, 5.5), 1.5, mug, true, 0.4)
-	if r.size.x >= 32:
-		_box(Rect2(top.position + Vector2(20, 1.5), Vector2(6, 7)), Color("#9aa3a8"), true, 1.5)
+	if r.size.x >= 32:  # a chopping board
+		_box(Rect2(top.position + Vector2(19, 2), Vector2(9, 6)), Color("#c79a62"), true, 1.0)
 
 
 func _fruit_bowl(r: Rect2) -> void:

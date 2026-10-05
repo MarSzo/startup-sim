@@ -5,6 +5,7 @@
     python3 tests/e2e/run.py                 # every scenario
     python3 tests/e2e/run.py workday founder # some of them
     python3 tests/e2e/run.py --list
+    python3 tests/e2e/run.py --shard 2/3     # a third of them (CI runs 3 in parallel)
 
 Each scenario gets its own server (own port, temporary save directory) and
 one or more clients; a phase may restart the server in between. A client
@@ -40,6 +41,37 @@ SCENARIOS = {
         {"server": ["--save", "{tmp}/world.db"],
          "clients": [["onboarding", ["--login=Nowa:haslo-nowej-1", "--register", "--autocreate", "--auto-recruit=1"]]]},
     ],
+    "resign": [
+        {"server": ["--save", "{tmp}/world.db"],
+         "clients": [["resign", ["--login=Wybredna:haslo-wybrednej-1", "--register", "--autocreate", "--auto-recruit=1"]]]},
+    ],
+    "drinking": [
+        {"server": EMPLOYED + ["--start-time", "10:00"],
+         "clients": [["drinking", ["--nick=Kuba", "--autoconnect"]]]},
+    ],
+    "fight": [
+        {"server": EMPLOYED + ["--start-time", "10:00"],
+         "clients": [["fight_ola", ["--nick=Ola", "--autoconnect"]],
+                     ["fight_kuba", ["--nick=Kuba", "--autoconnect"], 1.5]]},
+    ],
+    "office_apps": [
+        {"server": EMPLOYED + ["--start-time", "10:00"],
+         "clients": [["office_apps", ["--nick=Ola", "--autoconnect"]]]},
+    ],
+    "chill": [
+        {"server": EMPLOYED + ["--start-time", "10:00"],
+         "clients": [["chill_ola", ["--nick=Ola", "--autoconnect"]],
+                     ["chill_kuba", ["--nick=Kuba", "--autoconnect"], 1.5]]},
+    ],
+    "storeroom": [
+        {"server": EMPLOYED + ["--start-time", "11:58"],
+         "clients": [["storeroom", ["--nick=Ola", "--autoconnect"]]]},
+    ],
+    "chat": [
+        {"server": EMPLOYED + ["--start-time", "10:00"],
+         "clients": [["chat_ola", ["--nick=Ola", "--autoconnect"]],
+                     ["chat_kuba", ["--nick=Kuba", "--autoconnect"], 1.5]]},
+    ],
     "together": [
         {"server": EMPLOYED + ["--start-time", "10:00"],
          "clients": [["together_ola", ["--nick=Ola", "--autoconnect"]],
@@ -57,6 +89,23 @@ SCENARIOS = {
          "clients": [["persist_day2", ["--login=Trwala:haslo-trwalej-1"]]]},
     ],
 }
+
+
+# Rough run times (s), to split the scenarios evenly into shards.
+DURATION = {"resign": 90, "onboarding": 60, "workday": 41, "together": 33, "fight": 33, "drinking": 31,
+            "persistence": 23, "chat": 23, "storeroom": 19, "chill": 18, "founder": 15, "office_apps": 6}
+
+
+def shard(names, k, n):
+    """Part k (1..n) of the scenarios: the longest first, each to the
+    shard with the least work so far."""
+    load = [0.0] * n
+    parts = [[] for _ in range(n)]
+    for name in sorted(names, key=lambda x: -DURATION.get(x, 30)):
+        i = load.index(min(load))
+        parts[i].append(name)
+        load[i] += DURATION.get(name, 30)
+    return parts[k - 1]
 
 
 class Server:
@@ -140,11 +189,18 @@ def main():
     ap.add_argument("--list", action="store_true")
     ap.add_argument("--logs", default=None)
     ap.add_argument("--port", type=int, default=7900)
+    ap.add_argument("--shard", default=None, help="k/n: only part k of n (CI runs the parts in parallel)")
     a = ap.parse_args()
     if a.list:
         print("\n".join(SCENARIOS))
         return 0
     names = a.names or list(SCENARIOS)
+    if a.shard:
+        k, n = (int(x) for x in a.shard.split("/"))
+        if not 1 <= k <= n:
+            sys.exit("--shard k/n: 1 <= k <= n")
+        names = shard(names, k, n)
+        print("shard %d/%d: %s" % (k, n, ", ".join(names)), flush=True)
     unknown = [n for n in names if n not in SCENARIOS]
     if unknown:
         sys.exit("unknown scenario(s): %s" % ", ".join(unknown))

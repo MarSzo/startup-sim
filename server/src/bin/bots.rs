@@ -243,7 +243,14 @@ impl Bot {
                 let ours: Vec<_> = offers.iter().filter(|o| o.department != 0).collect();
                 if !ours.is_empty() && !ours.iter().any(|o| o.applied) {
                     let o = ours[fastrand::usize(..ours.len())];
-                    let apply = Packet::Apply { token: self.token, offer: o.id, motivation: "Jestem botem, ale pracowitym.".into() };
+                    let apply = Packet::Apply {
+                        token: self.token,
+                        offer: o.id,
+                        motivation: "Jestem botem, ale pracowitym.".into(),
+                        salary: o.salary_min.max(game::pay::SALARY_MIN),
+                        form: game::protocol::employment::EMPLOYMENT,
+                        student: false,
+                    };
                     let _ = self.sock.send(&apply.encode());
                 }
             }
@@ -267,6 +274,7 @@ impl Bot {
                 self_prev_input,
                 self_access,
                 self_slow,
+                self_drunk,
                 entities,
                 ..
             } => {
@@ -295,6 +303,7 @@ impl Bot {
                     lock: self_lock,
                     access: self_access,
                     slow: self_slow != 0,
+                    drunk: self_drunk,
                 };
                 for &(_, bits) in &self.pending {
                     body = sim::step(building, body, bits);

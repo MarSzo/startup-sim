@@ -23,6 +23,8 @@ pub mod access {
     pub const SERVICE: u8 = 4;
     /// Board room: only during your meeting (calendar).
     pub const BOARD: u8 = 8;
+    /// The storeroom key (from the hook at the reception).
+    pub const KEY: u8 = 16;
 
     /// Rights that satisfy a tile's `access` requirement from the legend.
     pub fn required(name: &str) -> Option<u8> {
@@ -30,6 +32,7 @@ pub mod access {
             "card" => Some(GUEST | CARD),
             "service" => Some(SERVICE),
             "board" => Some(BOARD),
+            "key" => Some(KEY),
             _ => None,
         }
     }
@@ -74,6 +77,8 @@ struct NpcFile {
     home: [i32; 2],
     #[serde(default)]
     escort_to: Option<[i32; 3]>,
+    #[serde(default)]
+    patrol: Vec<[i32; 2]>,
 }
 
 /// NPC placed on this floor (server-side characters).
@@ -84,6 +89,8 @@ pub struct NpcDef {
     pub home: Tile,
     /// Where the porter escorts newcomers: (floor, tile).
     pub escort_to: Option<(u8, Tile)>,
+    /// Points the guard walks between (same floor) when nothing happens.
+    pub patrol: Vec<Tile>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -99,6 +106,9 @@ pub struct RoomDef {
     /// Bathrooms: "female" / "male".
     #[serde(default)]
     pub gender: Option<String>,
+    /// A toilet for the disabled (the wheelchair sign; a remark on coming in).
+    #[serde(default)]
+    pub accessible: bool,
     /// Under the open sky (weather applies).
     #[serde(default)]
     pub outdoor: bool,
@@ -154,6 +164,11 @@ pub struct Places {
     /// The chill-room table where the treats tray stands.
     #[serde(default)]
     pub tray: Option<[i32; 2]>,
+    /// Where the TV remote and the boombox lie (and come back every morning).
+    #[serde(default)]
+    pub remote: Option<[i32; 2]>,
+    #[serde(default)]
+    pub boombox: Option<[i32; 2]>,
     /// Where a new founder appears (by the board table).
     #[serde(default)]
     pub founder: Option<[i32; 2]>,
@@ -349,6 +364,7 @@ impl Map {
                     name: n.name.clone(),
                     home: Tile { x: n.home[0], y: n.home[1] },
                     escort_to: n.escort_to.map(|e| (e[0] as u8, Tile { x: e[1], y: e[2] })),
+                    patrol: n.patrol.iter().map(|p| Tile { x: p[0], y: p[1] }).collect(),
                 })
                 .collect(),
             places: file.places,
@@ -505,7 +521,7 @@ mod tests {
     }
 
     /// Rooms behind locked doors (or walled up): nobody gets in.
-    const SEALED: [&str; 4] = ["Strefa zamknięta", "Serwerownia", "Szafa", "Pomieszczenie użytkowe"];
+    const SEALED: [&str; 3] = ["Serwerownia", "Szafa", "Pomieszczenie użytkowe"];
 
     #[test]
     fn ground_floor_has_the_planned_rooms() {
@@ -545,7 +561,7 @@ mod tests {
             "Korytarz wschodni",
             "Produkt / IT",
             "Mobile",
-            "DevOps (Mordor)",
+            "Mordor",
             "AI team",
             "Biznes",
             "Finanse",
@@ -591,15 +607,18 @@ mod tests {
     }
 
     #[test]
-    fn gates_need_a_pass_except_on_the_way_out() {
+    fn card_doors_need_a_pass_except_on_the_way_out() {
         use super::{access, dir};
         let b = b();
         let m = b.floor(0).unwrap();
-        assert_eq!(m.tile_char(28, 46), Some('B'));
-        assert!(m.blocks(28, 46, 0, dir::UP), "no pass: can't enter");
-        assert!(!m.blocks(28, 46, 0, dir::DOWN), "no pass: can always leave");
-        assert!(!m.blocks(28, 46, access::GUEST, dir::UP), "guest pass opens");
-        assert!(!m.blocks(28, 46, access::CARD, dir::UP), "employee card opens");
+        // The lifts, the car park (north) and the stairwell (west) off the hall.
+        for (x, y, into, out) in [(37, 43, dir::UP, dir::DOWN), (31, 40, dir::UP, dir::DOWN), (27, 42, dir::LEFT, dir::RIGHT)] {
+            assert!(m.blocks(x, y, 0, into), "no pass: can't enter ({x},{y})");
+            assert!(!m.blocks(x, y, 0, out), "no pass: can always leave ({x},{y})");
+            assert!(!m.blocks(x, y, access::GUEST, into), "guest pass opens ({x},{y})");
+            assert!(!m.blocks(x, y, access::CARD, into), "employee card opens ({x},{y})");
+        }
+        assert!(!(0..m.height).any(|y| (0..m.width).any(|x| m.tile_char(x, y) == Some('B'))), "no gates left");
         assert_eq!(m.tile_char(43, 45), Some('x'));
         assert!(m.blocks(43, 45, 0xff, dir::RIGHT), "the locked door stays locked");
         let m1 = b.floor(4).unwrap();
@@ -614,7 +633,7 @@ mod tests {
         use super::access;
         let b = b();
         let spawn = (0, b.floor(0).unwrap().spawns[0]);
-        let public = ["outside", "parking", "entrance", "shop", "smoking", "stall"];
+        let public = ["outside", "parking", "entrance", "shop", "smoking", "stall", "hall"];
         for f in [0u8, 3, 4] {
             let m = b.floor(f).unwrap();
             // (The lift cabins are reached by riding, not walking.)
@@ -627,18 +646,40 @@ mod tests {
                 let target = (f, tile);
                 let guest = b.find_path(spawn, target, access::GUEST).is_some();
                 let nobody = b.find_path(spawn, target, 0).is_some();
-                let staff = b.find_path(spawn, target, access::CARD | access::SERVICE | access::BOARD).is_some();
+                let staff = b.find_path(spawn, target, access::CARD | access::SERVICE | access::BOARD | access::KEY).is_some();
                 if SEALED.contains(&r.name.as_str()) {
                     assert!(!staff, "floor {f} {} should be locked for everyone", r.name);
                     continue;
                 }
                 assert!(staff, "floor {f} {} unreachable even for staff", r.name);
-                // Board room: only with a meeting (BOARD), service rooms: staff.
-                assert_eq!(guest, !matches!(r.kind.as_str(), "service" | "management"), "floor {f} {} with a guest pass", r.name);
+                // Board room: only with a meeting (BOARD), service rooms: staff,
+                // the storeroom: the key from the reception.
+                assert_eq!(
+                    guest,
+                    !matches!(r.kind.as_str(), "service" | "management" | "storage"),
+                    "floor {f} {} with a guest pass",
+                    r.name
+                );
                 let is_public = f == 0 && public.contains(&r.kind.as_str()) && r.name != "Parking wewnętrzny";
                 assert_eq!(nobody, is_public, "floor {f} {} without any pass", r.name);
             }
         }
+    }
+
+    #[test]
+    fn the_garage_ramp_is_closed_and_the_smokers_shelter_is_open() {
+        use super::{access, dir, Tile};
+        let b = b();
+        let m = b.floor(0).unwrap();
+        let spawn = (0, m.spawns[0]);
+        let all = access::GUEST | access::CARD | access::SERVICE | access::BOARD | access::KEY;
+        // Not open yet: the barrier stops everyone, the ramp can't be reached.
+        assert!(m.blocks(6, 57, all, dir::UP), "the barrier (by the sidewalk) is down");
+        assert!(b.find_path(spawn, (0, Tile { x: 6, y: 53 }), all).is_none(), "no way down the ramp");
+        // The shelter by the drive: anybody can go and smoke there.
+        let shelter = m.room_by_name("Strefa palenia").unwrap().id;
+        assert_eq!(m.room_at_tile(10, 46), shelter);
+        assert!(b.find_path(spawn, (0, Tile { x: 10, y: 46 }), 0).is_some(), "open, no pass needed");
     }
 
     #[test]
@@ -656,9 +697,16 @@ mod tests {
     fn porter_sits_in_the_hall_and_takes_guests_up() {
         let b = b();
         let m = b.floor(0).unwrap();
-        assert_eq!(m.npcs.len(), 4, "porter + shop cashier + shop guard + cleaner");
+        assert_eq!(m.npcs.len(), 5, "porter + shop cashier + shop guard + two cleaners");
         let p = &m.npcs[0];
-        assert_eq!((p.kind.as_str(), p.name.as_str()), ("porter", "Portier"));
+        assert_eq!((p.kind.as_str(), p.name.as_str()), ("porter", "Pani Wiesia"));
+        let guard = &m.npcs[2];
+        assert!(guard.patrol.len() >= 3, "the guard walks between the shelves");
+        for t in &guard.patrol {
+            assert!(!m.is_blocked(t.x, t.y) && m.room_name(m.room_at_tile(t.x, t.y)) == "Sklep");
+        }
+        let paulina = &m.npcs[4];
+        assert_eq!(m.tile_type(paulina.home.x, paulina.home.y), Some("armchair"), "Paulina in her armchair");
         assert_eq!(m.room_name(m.room_at_tile(p.home.x, p.home.y)), "Hol");
         let (f, t) = p.escort_to.unwrap();
         let m1 = b.floor(f).unwrap();

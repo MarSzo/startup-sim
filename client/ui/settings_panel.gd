@@ -1,6 +1,7 @@
-## The settings (title screen and the Esc menu): full screen, the ink
-## effect over the world, battery saving, the camera zoom, sound volumes. Changes apply and
-## save at once.
+## The settings (title screen and the Esc menu): full screen, battery
+## saving, crash reports, the camera zoom, sound volumes, the microphone.
+## Changes apply and save at once. The options scroll when the window is
+## short; "Wróć" stays visible under them.
 extends VBoxContainer
 
 const Ink = preload("res://ui/ink_ui.gd")
@@ -10,19 +11,24 @@ signal changed
 signal back
 
 var _full := CheckButton.new()
-var _mood := CheckButton.new()
 var _battery := CheckButton.new()
 var _crashes := CheckButton.new()
 var _zoom := HSlider.new()
 var _zoom_label := Label.new()
+var _scroll := ScrollContainer.new()
+var _content := VBoxContainer.new()
 
 
 func _ready() -> void:
 	Settings.load_once()
 	add_theme_constant_override("separation", 10)
 	add_child(Ink.label("Ustawienia", 28, Ink.TEXT_INK))
-	for pair in [[_full, "Pełny ekran"], [_mood, "Efekt „tuszu i papieru” na świecie"],
-			[_battery, "Oszczędzanie baterii (30 klatek/s)"],
+	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	add_child(_scroll)
+	_content.add_theme_constant_override("separation", 10)
+	_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_scroll.add_child(_content)
+	for pair in [[_full, "Pełny ekran"], [_battery, "Oszczędzanie baterii (30 klatek/s)"],
 			[_crashes, "Wysyłaj raporty awarii bez pytania"]]:
 		var cb: CheckButton = pair[0]
 		cb.text = pair[1]
@@ -30,9 +36,8 @@ func _ready() -> void:
 		cb.add_theme_font_size_override("font_size", 20)
 		for k in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color", "font_hover_pressed_color"]:
 			cb.add_theme_color_override(k, Ink.TEXT_INK)
-		add_child(cb)
+		_content.add_child(cb)
 	_full.button_pressed = Settings.fullscreen
-	_mood.button_pressed = Settings.mood
 	_battery.button_pressed = Settings.battery
 	_crashes.button_pressed = Settings.crash_reports_always
 	_crashes.toggled.connect(func(on: bool):
@@ -45,9 +50,6 @@ func _ready() -> void:
 	_full.toggled.connect(func(on: bool):
 		Settings.fullscreen = on
 		Settings.apply_window()
-		_save())
-	_mood.toggled.connect(func(on: bool):
-		Settings.mood = on
 		_save())
 	var zr := HBoxContainer.new()
 	zr.add_theme_constant_override("separation", 12)
@@ -65,9 +67,9 @@ func _ready() -> void:
 		_update_zoom_label()
 		_save())
 	zr.add_child(_zoom)
-	add_child(zr)
+	_content.add_child(zr)
 	_update_zoom_label()
-	add_child(Ink.label("W grze: kółko myszy albo + / - zmienia przybliżenie na chwilę.", 16, Ink.TEXT_MUTED))
+	_content.add_child(Ink.label("W grze: kółko myszy albo + / - zmienia przybliżenie na chwilę.", 16, Ink.TEXT_MUTED))
 	_volume("Efekty", Settings.vol_sfx, func(v: float): Settings.vol_sfx = v)
 	_volume("Otoczenie", Settings.vol_ambient, func(v: float): Settings.vol_ambient = v)
 	_volume("Muzyka", Settings.vol_music, func(v: float): Settings.vol_music = v)
@@ -90,11 +92,28 @@ func _ready() -> void:
 		Settings.apply_audio()
 		_save())
 	mr.add_child(mic)
-	add_child(mr)
-	add_child(Ink.label("Czat głosowy: trzymaj V — mówisz do pomieszczenia, B — szept do osoby obok.", 16, Ink.TEXT_MUTED))
+	_content.add_child(mr)
+	_content.add_child(Ink.label("Czat głosowy: trzymaj V — mówisz do pomieszczenia, B — szept do osoby obok.", 16, Ink.TEXT_MUTED))
 	var b := Ink.button("Wróć")
 	b.pressed.connect(func(): back.emit())
 	add_child(b)
+	get_viewport().size_changed.connect(_fit_height)
+	visibility_changed.connect(_fit_height)
+	_fit_height.call_deferred()
+
+
+## The options as tall as they are - or as fits the window (then they
+## scroll); the title above and "Wróć" below always show.
+func _fit_height() -> void:
+	var want := _content.get_combined_minimum_size()
+	var room := get_viewport_rect().size.y - FIXED_HEIGHT
+	_scroll.custom_minimum_size = Vector2(want.x, clampf(want.y, 120.0, maxf(room, 120.0)))
+	reset_size()
+
+
+## Height around the options: the title screen's logo, the card's margins,
+## "Ustawienia" and "Wróć".
+const FIXED_HEIGHT := 400.0
 
 
 ## A volume slider row (0..100 %).
@@ -119,7 +138,7 @@ func _volume(title: String, value: float, set_value: Callable) -> void:
 		Settings.apply_audio()
 		_save())
 	row.add_child(s)
-	add_child(row)
+	_content.add_child(row)
 
 
 func _update_zoom_label() -> void:

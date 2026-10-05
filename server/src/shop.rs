@@ -101,6 +101,7 @@ pub const PRODUCTS: &[Product] = &[
         line: "Na odwagę przed review.",
     },
     Product { kind: kind::CIGARETTES, name: "Papierosy", price: 18_00, effect: e(0, 0, 0, 0), count: 20, line: "" },
+    Product { kind: kind::TOBACCO, name: "Tytoń do skręcania", price: 22_00, effect: e(0, 0, 0, 0), count: 10, line: "" },
     Product { kind: kind::UMBRELLA, name: "Parasol", price: 25_00, effect: e(0, 0, 0, 0), count: 1, line: "" },
     // Chill-room sweets (free, not on the shelves - see `treats`).
     Product { kind: kind::DONUT, name: "Pączek", price: 0, effect: e(-12, 6, -5, 0), count: 1, line: "Pączek z różą. Niebo." },
@@ -165,7 +166,7 @@ const SHELF_GOODS: [(u8, &str, &[u8]); 6] = {
         (2, "Fast food", &[BURGER, FRIES]),
         (3, "Przekąski", &[BUN, BAR, CHIPS]),
         (4, "Napoje", &[WATER, ENERGY_DRINK, JUICE, MILK]),
-        (5, "Alkohol i papierosy", &[BEER, WINE, MALPKA, CIGARETTES]),
+        (5, "Alkohol i papierosy", &[BEER, WINE, MALPKA, CIGARETTES, TOBACCO]),
         (6, "Parasole", &[UMBRELLA]),
     ]
 };

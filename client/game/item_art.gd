@@ -40,6 +40,23 @@ const CUP := 35
 const MILK := 36
 const LATTE := 37
 const MALPKA := 38
+const BREATHALYSER := 39
+const KNIFE := 40
+const REMOTE := 41
+const BOOMBOX := 42
+const TOBACCO := 43
+const ROLLED := 44
+const STORE_KEY := 45
+const COLA := 46
+const STORE_COOKIES := 47
+const PAINKILLER := 48
+const CHARCOAL := 49
+const VITAMIN := 50
+const PLASTER := 51
+const BAR_KEY := 52
+const WHISKY := 53
+const COGNAC := 54
+const VODKA := 55
 
 const NAMES := {GUEST_PASS: "Przepustka gościa", EMPLOYEE_CARD: "Karta pracownika", LAPTOP: "Laptop", COFFEE: "Kawa", FRUIT: "Owoc",
 	SANDWICH_CHEESE: "Kanapka z serem", SANDWICH_HAM: "Kanapka z szynką", WRAP: "Wrap wege", BURGER: "Hamburger",
@@ -48,9 +65,12 @@ const NAMES := {GUEST_PASS: "Przepustka gościa", EMPLOYEE_CARD: "Karta pracowni
 	DONUT: "Pączek", COOKIE: "Ciastko", CHEESECAKE: "Kawałek sernika",
 	PIEROGI: "Pierogi ruskie", PIZZA: "Pizza margherita", SUSHI: "Zestaw sushi", SCHNITZEL: "Schabowy z ziemniakami",
 	SALAD: "Sałatka z kurczakiem", KEBAB: "Kebab", EMPTY_CUP: "Brudny kubek", CUP: "Kubek", MILK: "Mleko (karton)",
-	LATTE: "Kawa z mlekiem", MALPKA: "Małpka"}
+	LATTE: "Kawa z mlekiem", MALPKA: "Małpka", BREATHALYSER: "Alkomat", KNIFE: "Nóż kuchenny", REMOTE: "Pilot do telewizora", BOOMBOX: "Boombox", TOBACCO: "Tytoń do skręcania", ROLLED: "Skręt", STORE_KEY: "Klucz do magazynku",
+	COLA: "Coca-Cola", STORE_COOKIES: "Ciastka z magazynu", PAINKILLER: "Apap", CHARCOAL: "Węgiel aktywny", VITAMIN: "Witamina C",
+	PLASTER: "Plaster", BAR_KEY: "Mały kluczyk", WHISKY: "Whisky", COGNAC: "Koniak", VODKA: "Wódka"}
 const SMALL := [GUEST_PASS, EMPLOYEE_CARD, FRUIT, SANDWICH_CHEESE, SANDWICH_HAM, WRAP, BUN, BAR, CHIPS, WATER,
-	ENERGY_DRINK, JUICE, BEER, CIGARETTES, UMBRELLA, DONUT, COOKIE, CHEESECAKE, MILK, MALPKA]
+	ENERGY_DRINK, JUICE, BEER, CIGARETTES, UMBRELLA, DONUT, COOKIE, CHEESECAKE, MILK, MALPKA, BREATHALYSER, KNIFE, REMOTE, TOBACCO, ROLLED, STORE_KEY,
+	COLA, STORE_COOKIES, PAINKILLER, CHARCOAL, VITAMIN, PLASTER, BAR_KEY, WHISKY, COGNAC, VODKA]
 
 
 static func item_name(kind: int) -> String:
@@ -195,6 +215,72 @@ static func draw(c: CanvasItem, kind: int, o: Vector2, s: float) -> void:
 			ln.call(5.3, 8.4, 6.3, 7.8, Color(1, 1, 1, 0.55), 0.6)
 			rr.call(6.5, 2.6, 3, 2.4, Color("#d4b04a"), 0.4)
 			ln.call(6.9, 3.5, 9.1, 3.5, Color("#9c7f2e"), 0.4)
+		BREATHALYSER:
+			# A handheld tester: grey body, green display, a white mouthpiece.
+			rr.call(6.6, 0.8, 2.8, 3.6, Color("#f4efe4"), 0.6)
+			rr.call(4.2, 4, 7.6, 11, Color("#5c6670"), 1.6)
+			rr.call(5.2, 5.2, 5.6, 3.2, Color("#9fd46a"), 0.4)
+			ln.call(6, 6.8, 7.6, 6.8, Color("#2c4a22"), 0.6)
+			ln.call(8.4, 6.8, 10, 6.8, Color("#2c4a22"), 0.6)
+			dot.call(8, 11.4, 1.1, Color("#d9443a"))
+		BAR_KEY:  # a small brass key
+			circ.call(6, 6.5, 2.4, Color("#c9a24a"))
+			dot.call(6, 6.5, 0.9, Color("#8a6a45"))
+			ln.call(7.8, 8, 12.6, 12.8, Color("#c9a24a"), 1.2)
+			ln.call(11, 11.2, 12.2, 10, Color("#c9a24a"), 1.0)
+		WHISKY:
+			bottle.call(Color("#b8742a"), Color("#efe0b0"), Color("#2d3036"))
+		COGNAC:
+			bottle.call(Color("#7a3a1a"), Color("#e8c46a"), Color("#c9a24a"))
+		VODKA:
+			bottle.call(Color("#dfe8ee"), Color("#f4f6f8"), Color("#c0392b"))
+		TOBACCO:  # a pouch with a leaf
+			rr.call(2.2, 4, 11.6, 9.6, Color("#3f6b3a"), 1.6)
+			ln.call(2.6, 7, 13.4, 7, Color("#2c4a28"), 0.6)
+			poly.call([Vector2(8, 8.6), Vector2(11, 10.4), Vector2(8, 12.4), Vector2(5, 10.4)], Color("#c9a24a"))
+		ROLLED:
+			ln.call(3, 12, 12.4, 4.6, INK, 2.8)
+			ln.call(3, 12, 12.4, 4.6, Color("#f4ead0"), 1.8)
+			ln.call(3, 12, 5, 10.4, Color("#b88a4e"), 1.8)
+		STORE_KEY:
+			circ.call(5, 6, 3, Color("#d4b870"))
+			dot.call(5, 6, 1.2, Color("#8a6a45"))
+			ln.call(7.4, 7.6, 13.4, 13.4, Color("#d4b870"), 1.6)
+			ln.call(11, 11, 12.6, 9.6, Color("#d4b870"), 1.4)
+		COLA:
+			bottle.call(Color("#3a1f14"), Color("#d9443a"), Color("#c0392b"))
+		STORE_COOKIES:
+			rr.call(2, 5, 12, 8, Color("#e8c46a"), 1.2)
+			for q in [Vector2(5, 8), Vector2(9, 7.5), Vector2(11, 10), Vector2(6.5, 10.5)]:
+				dot.call(q.x, q.y, 0.7, Color("#4a2e1e"))
+		PAINKILLER, CHARCOAL, VITAMIN:
+			var col: Color = {PAINKILLER: Color("#f4f6f8"), CHARCOAL: Color("#2d3036"), VITAMIN: Color("#f39c12")}[kind]
+			rr.call(3, 4.5, 10, 7, Color("#dfe6ea"), 1.2)
+			for q in [Vector2(6, 8), Vector2(10, 8)]:
+				circ.call(q.x, q.y, 1.8, col)
+		PLASTER:
+			poly.call([Vector2(2, 9), Vector2(10, 2), Vector2(14, 6), Vector2(6, 13)], Color("#e8c09a"))
+			rr.call(6.4, 5.6, 3.4, 3.4, Color("#f4ead0"), 0.6)
+		REMOTE:
+			rr.call(5.2, 1.6, 5.6, 13.2, Color("#2d3036"), 1.6)
+			dot.call(8, 3.8, 0.9, Color("#e74c3c"))
+			for k in 6:
+				dot.call(6.8 + (k % 2) * 2.4, 6.6 + (k / 2) * 2.2, 0.55, Color("#c9c9c9"))
+		BOOMBOX:
+			rr.call(1.2, 5, 13.6, 9, Color("#b8bec4"), 1.2)
+			ln.call(3, 5, 4.5, 2, INK, 0.8)
+			ln.call(13, 5, 11.5, 2, INK, 0.8)
+			ln.call(4.5, 2, 11.5, 2, INK, 0.8)
+			for x in [4.8, 11.2]:
+				circ.call(x, 9.6, 2.6, Color("#2d3036"))
+				dot.call(x, 9.6, 1.0, Color("#6b6f75"))
+			rr.call(6.6, 6.4, 2.8, 2.2, Color("#9fd46a"), 0.3)
+		KNIFE:
+			# A kitchen knife, diagonally: a black handle, a steel blade.
+			poly.call([Vector2(2, 14.5), Vector2(6.4, 10.1), Vector2(7.6, 11.3), Vector2(3.2, 15.7)], Color("#2a2a2e"))
+			dot.call(4, 13.6, 0.35, Color("#c9c9c9"))
+			poly.call([Vector2(6.6, 9.4), Vector2(14.6, 1.4), Vector2(13.4, 5.2), Vector2(8.4, 11.2)], Color("#d8dde2"))
+			ln.call(7.6, 9.6, 13.8, 2.6, Color(1, 1, 1, 0.8), 0.4)
 		DONUT:
 			circ.call(8, 8.5, 6.2, Color("#d9a15a"))
 			c.draw_arc(pt.call(8, 8.5), 3.8 * s, 0, TAU, 24, Color("#e889a8"), 3.6 * s, true)

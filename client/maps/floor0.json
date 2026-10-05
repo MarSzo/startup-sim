@@ -41,12 +41,25 @@
    "solid": false,
    "color": "#8fd3e8"
   },
-  "B": {
-   "type": "card_gate",
+  "m": {
+   "type": "card_door",
    "solid": false,
-   "color": "#e0b040",
+   "color": "#7a6a50",
    "access": "card",
    "free_dir": "down"
+  },
+  "q": {
+   "type": "card_door",
+   "solid": false,
+   "color": "#7a6a50",
+   "access": "card",
+   "free_dir": "right"
+  },
+  "L": {
+   "type": "service_door",
+   "solid": false,
+   "color": "#6a3a2a",
+   "access": "service"
   },
   "g": {
    "type": "garage_gate",
@@ -63,7 +76,9 @@
   "E": {
    "type": "elevator_door",
    "solid": false,
-   "color": "#b8c4cc"
+   "color": "#b8c4cc",
+   "access": "card",
+   "free_dir": "down"
   },
   "e": {
    "type": "elevator",
@@ -85,15 +100,15 @@
    "solid": true,
    "color": "#7a7f8a"
   },
+  "a": {
+   "type": "armchair",
+   "solid": true,
+   "color": "#8a4a5a"
+  },
   "P": {
    "type": "plant",
    "solid": true,
    "color": "#3f8a3a"
-  },
-  "N": {
-   "type": "bench",
-   "solid": true,
-   "color": "#8a6a45"
   },
   "A": {
    "type": "ashtray",
@@ -154,6 +169,36 @@
    "type": "fence",
    "solid": true,
    "color": "#4a3a2a"
+  },
+  "/": {
+   "type": "ramp",
+   "solid": false,
+   "color": "#4f5258"
+  },
+  "[": {
+   "type": "ramp_wall",
+   "solid": true,
+   "color": "#b5b2aa"
+  },
+  "!": {
+   "type": "boom_barrier",
+   "solid": true,
+   "color": "#d23b2e"
+  },
+  "^": {
+   "type": "garage_shutter",
+   "solid": true,
+   "color": "#3a3d42"
+  },
+  "]": {
+   "type": "shelter_glass",
+   "solid": true,
+   "color": "#a9cfdc"
+  },
+  "{": {
+   "type": "shelter_bench",
+   "solid": true,
+   "color": "#8a6a45"
   }
  },
  "tiles": [
@@ -197,35 +242,35 @@
   "Fvvvvvvvvvvv=====v#===================================#vvvvvvvvvvvvvvF",
   "Fvvvvvvvvvvv=====v#===================================#vvvvvvvvvvvvvvF",
   "Fvvvvvvvvvvv=====v#===================================#vvvvvvvvvvvvvvF",
-  "Fvvvvvvvvvvv=====v#############DD######################vvvvvvvvvvvvvvF",
+  "Fvvvvvvvvvvv=====v#############mm######################vvvvvvvvvvvvvvF",
   "Fvvvvvvvvvvv=====v#SSS.....#P______#eee#eee#..........#vvvvvvvvvvvvvvF",
-  "Fvvvvvvvvvvv=====v#SSS.....D_______#eee#eee#..........#vvvvvvvvvvvvvvF",
+  "Fvvvvvvvvvvv=====v#SSS.....q_______#eee#eee#..........#vvvvvvvvvvvvvvF",
   "Fvvvvvvvvvvv=====v#........#_______#EEE#EEE#..........#vvvvvvvvvvvvvvF",
-  "Fvvvvvvvvvvv=====v##########_______________#..........#vvvvvvvvvvvvvvF",
-  "Fvvvvvvvvvvv=====v#........#_______________x..........#vvvvvvvvvvvvvvF",
-  "Fvvvvvvvvvvv=====v#H.HHH..H#BBBBBBB#########..........#vvvvvvvvvvvvvvF",
-  "Fvvvvvvvvvvv=====v#H......H#_______K___#:U:#..........#vvvvvvvvvvvvvvF",
-  "Fvvvvvvvvvvv=====v#H......H#_______K___#:::#..........#vvvvvvvvvvvvvvF",
-  "Fvvvvvvvvvvv=====v#H.HHH..H#_______K___#:::#..........#vvvvvvvvvvvvvvF",
-  "Fvvvvvvvvvvv=====v#........#_______K___#::V#..........#vvvvvvvvvvvvvvF",
-  "Fvvvvvvvvvvv=====v#..HHH...#_______K___#:::#..........#vvvvvvvvvvvvvvF",
-  "Fvvvvvvvvvvv=====v#.......H#___________##k##..........#vvvvvvvvvvvvvvF",
-  "Fvvvvvvvvvvv=====v#.......H####DD###_______#..........#vvvvvvvvvvvvvvF",
-  "Fvvvvvvvvvvv=====v#KKK.....#_______#_______#..........#vvvvvvvvvvvvvvF",
-  "Fvvvvvvvvvvv=====v#........#_______#_______x..........#vvvvvvvvvvvvvvF",
-  "Fvvvvvvvvvvv=====v#........#P______#______P#..........#vvvvvvvvvvvvvvF",
-  "Fvvvvvvvvvvv=====v####GG######GGG######################vvvvvvvvvvvvvvF",
+  "Fvvvvvvv]]zz=====v##########_______________#..........#vvvvvvvvvvvvvvF",
+  "Fvvvvvvv]{zz=====v#........#_______________x..........#vvvvvvvvvvvvvvF",
+  "Fvvvvvvv]{zz=====v#H.HHH..H#_______#########..........#vvvvvvvvvvvvvvF",
+  "Fvvvvvvv]{zA=====v#H......H#_______K___#:U:#..........#vvvvvvvvvvvvvvF",
+  "Fvvvvvvv]{zz=====v#H......H#_______K___#:::#..........#vvvvvvvvvvvvvvF",
+  "Fvvvvvvv]]zz=====v#H.HHH..H#_______K___#:::#..........#vvvvvvvvvvvvvvF",
+  "Fv[^^^^^^^^[=====v#........#_______K___#::V#..........#vvvvvvvvvvvvvvF",
+  "Fv[////////[=====v#..HHH...#_______K___#:::#..........#vvvvvvvvvvvvvvF",
+  "Fv[////////[=====v#.......H#___________##k##..........#vvvvvvvvvvvvvvF",
+  "Fv[////////[=====v#.......H####DD###_______#..........#vvvvvvvvvvvvvvF",
+  "Fv[////////[=====v#KKK.....#_______#_______#..........#vvvvvvvvvvvvvvF",
+  "Fv[////////[=====v#........#_______#_______L..........#vvvvvvvvvvvvvvF",
+  "Fv[////////[=====v#........#P______#__a___P#..........#vvvvvvvvvvvvvvF",
+  "Fv[!!!!!!!![=====v####GG######GGG######################vvvvvvvvvvvvvvF",
   "FpppppppppppppppppppppppApppppppppppbbbbpppppppppppppppppppppppppppppF",
   "FppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppF",
   "FppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppF",
   "FrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrF",
-  "Fvv============================vvvvvvvvvvvzzzzzzzzzzzzzvvvvvvvvvvvvvvF",
-  "Fvv=XXX==XXX==XXX==XXX==XXX====vvvvvvvvvvvzzzzzzzzzzzzzvvvvvvvvvvvvvvF",
-  "Fvv=XXX==XXX==XXX==XXX==XXX====vvvvvvvvvvvzzNNNzzzzzzzzvvvvvvvvvvvvvvF",
-  "Fvv============================vvvvvvvvvvvzzzzzzzzzzzzzvvvvvvvvvvvvvvF",
-  "Fvv============================vvvvvvvvvvvzzzzzzzzAzzzzvvvvvvvvvvvvvvF",
-  "Fvv============================vvvvvvvvvvvzzzzzzzzzzzzzvvvvvvvvvvvvvvF",
-  "Fvv============================vvvvvvvvvvvzzzzzzzzzzzzzvvvvvvvvvvvvvvF",
+  "Fvv============================vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvF",
+  "Fvv=XXX==XXX==XXX==XXX==XXX====vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvF",
+  "Fvv=XXX==XXX==XXX==XXX==XXX====vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvF",
+  "Fvv============================vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvF",
+  "Fvv============================vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvF",
+  "Fvv============================vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvF",
+  "Fvv============================vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvF",
   "Fvv============================vpppppppppvvvvvvvvvvvvvvvvvvvvvvvvvvvvF",
   "FttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttF",
   "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF"
@@ -275,12 +320,12 @@
   "-OOOOOOOOOOOOOOOOO-QQQQQQQQ-HHHHHHH-LLL-lll-ZZZZZZZZZZ-OOOOOOOOOOOOOO-",
   "-OOOOOOOOOOOOOOOOO-QQQQQQQQQHHHHHHH-LLL-lll-ZZZZZZZZZZ-OOOOOOOOOOOOOO-",
   "-OOOOOOOOOOOOOOOOO-QQQQQQQQ-HHHHHHH-HHH-HHH-ZZZZZZZZZZ-OOOOOOOOOOOOOO-",
-  "-OOOOOOOOOOOOOOOOO----------HHHHHHHHHHHHHHH-ZZZZZZZZZZ-OOOOOOOOOOOOOO-",
-  "-OOOOOOOOOOOOOOOOO-SSSSSSSS-HHHHHHHHHHHHHHHZZZZZZZZZZZ-OOOOOOOOOOOOOO-",
-  "-OOOOOOOOOOOOOOOOO-SSSSSSSS-HHHHHHH---------ZZZZZZZZZZ-OOOOOOOOOOOOOO-",
-  "-OOOOOOOOOOOOOOOOO-SSSSSSSS-HHHHHHHHHHH-TTT-ZZZZZZZZZZ-OOOOOOOOOOOOOO-",
-  "-OOOOOOOOOOOOOOOOO-SSSSSSSS-HHHHHHHHHHH-TTT-ZZZZZZZZZZ-OOOOOOOOOOOOOO-",
-  "-OOOOOOOOOOOOOOOOO-SSSSSSSS-HHHHHHHHHHH-TTT-ZZZZZZZZZZ-OOOOOOOOOOOOOO-",
+  "-OOOOOOOMMMMOOOOOO----------HHHHHHHHHHHHHHH-ZZZZZZZZZZ-OOOOOOOOOOOOOO-",
+  "-OOOOOOOMMMMOOOOOO-SSSSSSSS-HHHHHHHHHHHHHHHZZZZZZZZZZZ-OOOOOOOOOOOOOO-",
+  "-OOOOOOOMMMMOOOOOO-SSSSSSSS-HHHHHHH---------ZZZZZZZZZZ-OOOOOOOOOOOOOO-",
+  "-OOOOOOOMMMMOOOOOO-SSSSSSSS-HHHHHHHHHHH-TTT-ZZZZZZZZZZ-OOOOOOOOOOOOOO-",
+  "-OOOOOOOMMMMOOOOOO-SSSSSSSS-HHHHHHHHHHH-TTT-ZZZZZZZZZZ-OOOOOOOOOOOOOO-",
+  "-OOOOOOOMMMMOOOOOO-SSSSSSSS-HHHHHHHHHHH-TTT-ZZZZZZZZZZ-OOOOOOOOOOOOOO-",
   "-OOOOOOOOOOOOOOOOO-SSSSSSSS-HHHHHHHHHHH-TTT-ZZZZZZZZZZ-OOOOOOOOOOOOOO-",
   "-OOOOOOOOOOOOOOOOO-SSSSSSSS-HHHHHHHHHHH-TTT-ZZZZZZZZZZ-OOOOOOOOOOOOOO-",
   "-OOOOOOOOOOOOOOOOO-SSSSSSSS-HHHHHHHHHHH--T--ZZZZZZZZZZ-OOOOOOOOOOOOOO-",
@@ -293,13 +338,13 @@
   "-OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO-",
   "-OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO-",
   "-OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO-",
-  "-OORRRRRRRRRRRRRRRRRRRRRRRRRRRROOOOOOOOOOOMMMMMMMMMMMMMOOOOOOOOOOOOOO-",
-  "-OORRRRRRRRRRRRRRRRRRRRRRRRRRRROOOOOOOOOOOMMMMMMMMMMMMMOOOOOOOOOOOOOO-",
-  "-OORRRRRRRRRRRRRRRRRRRRRRRRRRRROOOOOOOOOOOMMMMMMMMMMMMMOOOOOOOOOOOOOO-",
-  "-OORRRRRRRRRRRRRRRRRRRRRRRRRRRROOOOOOOOOOOMMMMMMMMMMMMMOOOOOOOOOOOOOO-",
-  "-OORRRRRRRRRRRRRRRRRRRRRRRRRRRROOOOOOOOOOOMMMMMMMMMMMMMOOOOOOOOOOOOOO-",
-  "-OORRRRRRRRRRRRRRRRRRRRRRRRRRRROOOOOOOOOOOMMMMMMMMMMMMMOOOOOOOOOOOOOO-",
-  "-OORRRRRRRRRRRRRRRRRRRRRRRRRRRROOOOOOOOOOOMMMMMMMMMMMMMOOOOOOOOOOOOOO-",
+  "-OORRRRRRRRRRRRRRRRRRRRRRRRRRRROOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO-",
+  "-OORRRRRRRRRRRRRRRRRRRRRRRRRRRROOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO-",
+  "-OORRRRRRRRRRRRRRRRRRRRRRRRRRRROOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO-",
+  "-OORRRRRRRRRRRRRRRRRRRRRRRRRRRROOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO-",
+  "-OORRRRRRRRRRRRRRRRRRRRRRRRRRRROOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO-",
+  "-OORRRRRRRRRRRRRRRRRRRRRRRRRRRROOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO-",
+  "-OORRRRRRRRRRRRRRRRRRRRRRRRRRRROOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO-",
   "-OORRRRRRRRRRRRRRRRRRRRRRRRRRRROOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO-",
   "-OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO-",
   "----------------------------------------------------------------------"
@@ -510,7 +555,7 @@
  "npcs": [
   {
    "kind": "porter",
-   "name": "Portier",
+   "name": "Pani Wiesia",
    "home": [
     37,
     49
@@ -523,7 +568,7 @@
   },
   {
    "kind": "cashier",
-   "name": "Kasa",
+   "name": "Kasjer",
    "home": [
     20,
     55
@@ -535,11 +580,41 @@
    "home": [
     25,
     55
+   ],
+   "patrol": [
+    [
+     24,
+     47
+    ],
+    [
+     20,
+     48
+    ],
+    [
+     24,
+     50
+    ],
+    [
+     20,
+     52
+    ],
+    [
+     25,
+     55
+    ]
    ]
   },
   {
    "kind": "cleaner",
-   "name": "Pani Krysia",
+   "name": "Pani Maria",
+   "home": [
+    46,
+    55
+   ]
+  },
+  {
+   "kind": "idler",
+   "name": "Paulina",
    "home": [
     38,
     56

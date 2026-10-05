@@ -31,6 +31,8 @@ fi
 [ -f "$ROOT/client/net/servers.cfg" ] || echo "uwaga: brak client/net/servers.cfg — klient będzie znał tylko serwer lokalny"
 
 rm -rf "$ROOT/build" && mkdir -p "$ROOT/build"
+echo "== przeglądarka w grze (godot_wry ze źródeł)"
+"$ROOT/tools/build_webview.sh"
 echo "== eksport z Godota"
 godot --headless --path "$ROOT/client" --import >/dev/null 2>&1 || true
 godot --headless --path "$ROOT/client" --export-release "macOS" "$APP"
@@ -52,6 +54,10 @@ echo "== podpis ($IDENTITY)"
 # Inside out: libraries first, then the app (hardened runtime, timestamp).
 find "$APP/Contents" -type f \( -name "*.dylib" -o -name "*.so" \) -print0 | while IFS= read -r -d '' lib; do
   codesign --force --timestamp --options runtime --sign "$IDENTITY" "$lib"
+done
+# GDExtension frameworks (the in-game browser) as whole bundles.
+find "$APP/Contents/Frameworks" -maxdepth 1 -name "*.framework" -print0 2>/dev/null | while IFS= read -r -d '' fw; do
+  codesign --force --timestamp --options runtime --sign "$IDENTITY" "$fw"
 done
 codesign --force --timestamp --options runtime --entitlements "$ROOT/tools/macos/entitlements.plist" --sign "$IDENTITY" "$APP"
 codesign --verify --strict --deep --verbose=2 "$APP"

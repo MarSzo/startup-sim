@@ -121,7 +121,7 @@ impl Server {
                 self.send_to(id, &Packet::Pong { client_time, server_tick });
             }
             Packet::Disconnect { .. } => self.remove_player(id, "left"),
-            Packet::Apply { offer, .. } => self.handle_apply(id, offer),
+            Packet::Apply { offer, salary, form, student, .. } => self.handle_apply(id, offer, salary, form, student),
             Packet::PortalAction { action, arg, .. } => self.handle_portal_action(id, action, arg),
             Packet::Answer { attempt, index, choice, .. } => self.handle_answer(id, attempt, index, choice),
             Packet::ItemAction { action, slot, .. } => self.handle_item_action(id, action, slot),
@@ -133,6 +133,10 @@ impl Server {
             Packet::LunchOrder { dish, .. } => self.handle_lunch_order(id, dish),
             Packet::FridgeAction { action, arg, .. } => self.handle_fridge_action(id, action, arg),
             Packet::SkipWait { .. } => self.handle_skip_wait(id),
+            Packet::Action { action, .. } => self.handle_action(id, action),
+            Packet::HrAction { action, arg, .. } => self.handle_hr_action(id, action, arg),
+            Packet::Roll { quality, .. } => self.handle_roll(id, quality),
+            Packet::ChatSay { text, .. } => self.handle_chat_say(id, &text),
             Packet::Voice { seq, whisper, data, .. } => self.handle_voice(id, seq, whisper, data),
             Packet::TaskAction { nonce, action, task, arg, text, .. } => self.handle_task_action(id, nonce, action, task, arg, &text),
             Packet::MailAction { nonce, action, id: mid, to, subject, body, .. } => {
@@ -430,6 +434,10 @@ fn session_token(packet: &Packet) -> Option<u32> {
         | Packet::LunchOrder { token, .. }
         | Packet::FridgeAction { token, .. }
         | Packet::SkipWait { token }
+        | Packet::Action { token, .. }
+        | Packet::HrAction { token, .. }
+        | Packet::Roll { token, .. }
+        | Packet::ChatSay { token, .. }
         | Packet::Voice { token, .. }
         | Packet::TaskAction { token, .. }
         | Packet::MailAction { token, .. }

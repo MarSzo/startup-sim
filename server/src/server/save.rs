@@ -127,7 +127,7 @@ impl Server {
         self.players.get(&id).map(|p| p.nick.clone()).unwrap_or_default()
     }
 
-    fn capture(&self, p: &Player) -> Character {
+    pub(super) fn capture(&self, p: &Player) -> Character {
         let nick_of = |id: u16| self.nick_of(id);
         let slot = |it: &Option<crate::inventory::Item>| it.as_ref().filter(|i| !i.unpaid).map(|i| SavedItem::from_item(i, nick_of));
         let mut inventory = vec![slot(&p.inventory.hands)];
@@ -145,10 +145,15 @@ impl Server {
             last_pay: p.last_pay,
             commute_mode: p.commute_mode,
             pay_rate: p.pay_rate,
+            salary: p.salary,
+            employment: p.employment,
+            terms: p.terms,
+            hr: p.hr.clone(),
             last_raise_day: p.last_raise_day,
             needs: p.needs.clone(),
             inventory,
             seen_questions: p.seen_questions.clone(),
+            reprimands: p.reprimands,
         }
     }
 
@@ -253,12 +258,17 @@ impl Server {
         p.day = c.day.max(1);
         p.commute_mode = c.commute_mode;
         p.pay_rate = c.pay_rate;
+        p.salary = c.salary;
+        p.employment = c.employment;
+        p.terms = c.terms;
+        p.hr = c.hr.clone();
         p.last_raise_day = c.last_raise_day;
         p.needs = c.needs.clone();
         p.last_pay = c.last_pay;
         p.worked_ds = c.worked_ds;
         p.attempts = c.attempts;
         p.seen_questions = c.seen_questions.clone();
+        p.reprimands = c.reprimands;
         if c.contract {
             p.contract = true;
             p.department = c.department;
@@ -271,6 +281,9 @@ impl Server {
             }
             refresh(p);
         }
+        // A board member saved before the breathalyser existed gets one.
+        let board_without =
+            c.contract && c.department == crate::company::BOARD_DEPARTMENT && !p.inventory.has(crate::inventory::kind::BREATHALYSER);
         // The company knows them by nick.
         if self.offline.founder.as_deref() == Some(nick.as_str()) && c.contract {
             self.company.founder = Some(pid);
@@ -285,6 +298,11 @@ impl Server {
                 comp.item.owner = pid;
             }
         }
+        if board_without {
+            self.give_new(pid, crate::inventory::kind::BREATHALYSER);
+        }
+        // Saved before the HR app: the file starts with the contract.
+        self.open_hr_file(pid);
         self.clock_dirty = true;
         self.says.push(super::Say::new(pid, "Z powrotem — wszystko jest tam, gdzie było."));
         self.log(format!("* save: {nick} is back (day {}, {})", c.day, crate::shop::zl(c.money)));

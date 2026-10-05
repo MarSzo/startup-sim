@@ -25,13 +25,20 @@
 //! [`Server::new`]), a `tick_*` method called from [`Server::tick`], packet
 //! handlers dispatched from `session::handle_datagram`.
 
+mod actions;
 mod alarm;
 mod board;
+mod breath;
+mod chat;
 mod cleaning;
 mod company;
 mod computers;
+mod contract;
 mod day;
 mod doors;
+mod fight;
+mod greetings;
+mod hr;
 mod interact;
 mod items;
 mod kitchen;
@@ -39,7 +46,9 @@ mod leave;
 mod office;
 mod positions;
 pub use positions::lines as position_lines;
+mod lost;
 mod lunch;
+mod media;
 mod movement;
 mod player;
 mod police;
@@ -51,13 +60,14 @@ mod shop;
 mod snapshot;
 mod spots;
 mod stats;
+mod supplies;
 mod treats;
 mod voice;
 
 #[cfg(test)]
 mod tests;
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::net::SocketAddr;
 use std::time::{Duration, Instant};
 
@@ -181,15 +191,35 @@ struct Say {
     speaker: u16,
     text: String,
     to: Option<u16>,
+    /// Who hears it: the room (and `to`), only `to` (a whisper) or the
+    /// whole floor (a shout).
+    reach: Reach,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Reach {
+    Room,
+    Whisper,
+    Floor,
 }
 
 impl Say {
     fn new(speaker: u16, text: impl Into<String>) -> Say {
-        Say { speaker, text: text.into(), to: None }
+        Say { speaker, text: text.into(), to: None, reach: Reach::Room }
     }
 
     fn addressed(speaker: u16, text: impl Into<String>, to: u16) -> Say {
-        Say { speaker, text: text.into(), to: Some(to) }
+        Say { speaker, text: text.into(), to: Some(to), reach: Reach::Room }
+    }
+
+    /// Only `to` (and the speaker) hear it.
+    fn whisper(speaker: u16, text: impl Into<String>, to: u16) -> Say {
+        Say { speaker, text: text.into(), to: Some(to), reach: Reach::Whisper }
+    }
+
+    /// Everybody on the speaker's floor hears it.
+    fn shout(speaker: u16, text: impl Into<String>) -> Say {
+        Say { speaker, text: text.into(), to: None, reach: Reach::Floor }
     }
 }
 
@@ -211,6 +241,28 @@ pub struct Server {
     shop_rooms: Vec<(u8, u16)>,
     /// The cashier NPC (says the alarm line).
     cashier: Option<u16>,
+    /// The TVs (channels) and the boombox's track (track, started on tick).
+    screens: Vec<media::Screen>,
+    music: Option<(u8, u32)>,
+    media_dirty: bool,
+    /// The first-aid cabinet, the storeroom, the key hook.
+    supplies: supplies::Supplies,
+    /// Somebody lost asking the way (lost.rs).
+    passersby: lost::Passersby,
+    /// Players the cashier already asked about the hot dog (until they step away).
+    cashier_asked: HashSet<u16>,
+    /// Pani Wiesia: when she last greeted each player, and the next joke.
+    porter_greeted: HashMap<u16, u32>,
+    porter_joke: usize,
+    /// "Skip the waiting": the vote going on (leave.rs).
+    skip_vote: Option<leave::SkipVote>,
+    /// The receptionist asked about lunch: player -> world day.
+    lunch_asked: HashMap<u16, u32>,
+    /// Pani Maria: when she last told each player something, when she may
+    /// talk again at all, and the next story.
+    maria_told: HashMap<u16, u32>,
+    maria_next: u32,
+    maria_story: usize,
     /// Some elevator was moving last tick (resend `Doors` when it starts/stops).
     lift_was_moving: bool,
     clock: Clock,
@@ -307,6 +359,19 @@ impl Server {
         let npcs = Npc::spawn_all(&building);
         let mut server = Server {
             cashier: npcs.iter().find(|n| n.role == npc::Role::Cashier).map(|n| n.id),
+            cashier_asked: HashSet::new(),
+            screens: media::find_screens(&building),
+            music: None,
+            media_dirty: false,
+            supplies: supplies::Supplies::find(&building),
+            passersby: lost::Passersby::default(),
+            porter_greeted: HashMap::new(),
+            porter_joke: 0,
+            skip_vote: None,
+            lunch_asked: HashMap::new(),
+            maria_told: HashMap::new(),
+            maria_next: 0,
+            maria_story: 0,
             npcs,
             machines: coffee::find_machines(&building),
             dropped: Vec::new(),
@@ -373,6 +438,8 @@ impl Server {
         };
         server.load_save().map_err(std::io::Error::other)?;
         server.schedule_treats();
+        server.ensure_media_items();
+        server.hide_bar_key();
         if server.cfg.treats_now {
             server.put_tray();
         }
@@ -441,6 +508,7 @@ impl Server {
     fn tick(&mut self) {
         self.tick = self.tick.wrapping_add(1);
         self.update_fast_forward();
+        self.tick_skip_vote();
         self.tick_clock();
         self.drop_timed_out(Instant::now());
 
@@ -459,6 +527,13 @@ impl Server {
         self.tick_vehicles();
         self.tick_police();
         self.tick_cleaning();
+        self.tick_cashier();
+        self.tick_reception();
+        self.tick_lunch_break();
+        self.tick_lost();
+        self.tick_maria();
+        self.tick_to_portal();
+        self.tick_media();
         self.tick_kitchen();
         self.tick_meetings();
         self.tick_lunch();
@@ -514,7 +589,7 @@ impl Server {
     fn mint_item(&mut self, kind: u8, label: impl Into<String>) -> Item {
         let id = self.next_item_id;
         self.next_item_id = self.next_item_id.wrapping_add(1).max(1);
-        Item { id, kind, label: label.into(), expires: None, owner: 0, count: 1, unpaid: false, stale: false }
+        Item { id, kind, label: label.into(), expires: None, owner: 0, count: 1, unpaid: false, stale: false, tainted: false, quality: 0 }
     }
 }
 

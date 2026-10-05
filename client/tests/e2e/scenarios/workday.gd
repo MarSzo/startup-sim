@@ -26,12 +26,15 @@ func run() -> void:
 	await until(func(): return not game().screen.visible, 5.0, "standing up")
 	log_step("lunch ordered")
 
-	if not await walk(4, 21, 8):  # the cupboard with mugs
+	if not await walk(4, 21, 15):  # the cupboard with mugs
 		return
 	await press_e()
+	if not await until(func(): return game().dialog.visible, 5.0, "the cupboard open"):
+		return
+	game().dialog._choose(0)  # Weź kubek
 	if not await until(func(): return holding(Item.CUP), 5.0, "a mug from the cupboard"):
 		return
-	if not await walk(4, 25, 8):  # the coffee machine
+	if not await walk(4, 20, 12):  # the coffee machine
 		return
 	await press_e()
 	if not await hear("Kawa gotowa", 8.0):

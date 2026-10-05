@@ -35,13 +35,13 @@ fn building() -> Building {
 }
 
 /// Server on a random port, dual-stack. Returns (IPv4 loopback addr, building crc).
-// Where to stand in the kitchenette (floor 4, appliances along row 7) and at
+// Where to stand in the kitchenette (floor 4, its lower left corner) and at
 // the shop's till (floor 0).
-const CUPBOARD: Tile = Tile { x: 21, y: 8 };
-const COFFEE: Tile = Tile { x: 25, y: 8 };
-const SINK: Tile = Tile { x: 27, y: 8 };
-const DISHWASHER: Tile = Tile { x: 28, y: 8 };
-const FRIDGE: Tile = Tile { x: 19, y: 8 };
+const CUPBOARD: Tile = Tile { x: 21, y: 15 };
+const COFFEE: Tile = Tile { x: 20, y: 12 };
+const SINK: Tile = Tile { x: 20, y: 15 };
+const DISHWASHER: Tile = Tile { x: 20, y: 14 };
+const FRIDGE: Tile = Tile { x: 20, y: 13 };
 const TILL: Tile = Tile { x: 20, y: 53 };
 
 fn start_server() -> (SocketAddr, u32) {
@@ -452,7 +452,7 @@ fn other_floors_are_invisible_and_state_matches_prediction() {
     }
     let (floor, room, x, y, lock, prev, ack) = last.expect("B gets snapshots");
     assert_eq!(ack, b.seq);
-    let server = Body { floor, pos: Pos { x, y }, prev_input: prev, lock, access: access::CARD, slow: false };
+    let server = Body { floor, pos: Pos { x, y }, prev_input: prev, lock, access: access::CARD, slow: false, drunk: 0 };
     assert_eq!(server, predicted, "server state == client prediction, bit for bit");
     assert_eq!(b0.floor(4).unwrap().room_name(room), "Korytarz");
 
@@ -468,8 +468,8 @@ fn onboarding_porter_reception_hr_card() {
     let spawn = b0.spawns()[0];
     let start = Body::at(spawn.0, Pos::tile_center(spawn.1.x, spawn.1.y));
 
-    // Without a pass the gates stop you: walking to the hall ends in the lobby.
-    assert!(Walker::to(&b0, &start, (0, Tile { x: 31, y: 44 })).is_none(), "no path without a pass");
+    // Without a pass the stairs (and the lifts) are closed.
+    assert!(Walker::to(&b0, &start, (0, Tile { x: 24, y: 42 })).is_none(), "no path without a pass");
 
     // Walk to the porter's desk and press E across it.
     let body = g.walk_to(&b0, start, (0, Tile { x: 34, y: 49 }), &[]);
@@ -485,7 +485,7 @@ fn onboarding_porter_reception_hr_card() {
                 welcomed |= text == lines::WELCOME_ESCORT;
             }
             Some(Packet::Snapshot { self_access, .. }) => got_pass |= self_access == access::GUEST,
-            Some(Packet::PlayerInfo { players }) => porter_named |= players.iter().any(|p| p.nick == "Portier"),
+            Some(Packet::PlayerInfo { players }) => porter_named |= players.iter().any(|p| p.nick == "Pani Wiesia"),
             _ => {}
         }
     }
@@ -505,9 +505,10 @@ fn onboarding_porter_reception_hr_card() {
     let at_hr = g.walk_to(&b0, body, (4, Tile { x: 47, y: 14 }), &[]);
     assert!(g.wait_for_line(lines::RECEPTION_ARRIVED, Duration::from_secs(6)).is_some(), "receptionist reached HR");
 
-    // HR: contract signed, the card replaces the guest pass.
+    // HR: the contract (signed), the card replaces the guest pass.
     g.press_e(&b0, at_hr);
-    let access = g.wait_for_line(lines::HR_SIGNED, Duration::from_secs(1));
+    answer_dialog(&g, game::pay::CONTRACT_ID, 0);
+    let access = g.wait_for_line(&game::pay::lines::signed(None, true), Duration::from_secs(1));
     let deadline = Instant::now() + Duration::from_millis(300);
     let mut latest = access;
     while Instant::now() < deadline {
@@ -568,7 +569,7 @@ fn desktop_portal_mail_interview_and_office() {
 
     // Another company answers with a (funny) rejection; a silent one never does.
     let apply = |offer: u8| {
-        c.send(&Packet::Apply { token: c.token, offer, motivation: "Bo lubię kawę.".into() });
+        c.send(&Packet::Apply { token: c.token, offer, motivation: "Bo lubię kawę.".into(), salary: 8000, form: 1, student: false });
     };
     apply(12);
     apply(11);
@@ -647,6 +648,7 @@ fn a_mug_left_in_the_chill_room_is_collected_by_the_cleaner() {
     std::thread::sleep(Duration::from_millis(100));
     let at = ola.walk_to(&b, body, (4, CUPBOARD), &[]);
     let at = ola.press_e(&b, at);
+    cupboard_take(&ola, 0);
     assert!(hands(&ola, item_kind::CUP), "a clean mug from the cupboard");
     let at = ola.walk_to(&b, at, (4, COFFEE), &[]);
     let at = ola.press_e(&b, at);
@@ -782,6 +784,7 @@ fn kitchenette_mugs_dishwasher_and_fridge() {
     // Mug -> coffee -> dirty mug -> dishwasher, switched on.
     let at = ola.walk_to(&b, at, (4, CUPBOARD), &[]);
     let at = ola.press_e(&b, at);
+    cupboard_take(&ola, 0);
     assert!(hands(&ola, item_kind::CUP));
     let at = ola.walk_to(&b, at, (4, COFFEE), &[]);
     let at = ola.press_e(&b, at);
@@ -798,6 +801,7 @@ fn kitchenette_mugs_dishwasher_and_fridge() {
     // Another coffee, with milk from the fridge; a free water.
     let at = ola.walk_to(&b, at, (4, CUPBOARD), &[]);
     let at = ola.press_e(&b, at);
+    cupboard_take(&ola, 0);
     assert!(hands(&ola, item_kind::CUP));
     let at = ola.walk_to(&b, at, (4, COFFEE), &[]);
     let at = ola.press_e(&b, at);
@@ -866,12 +870,14 @@ fn coffee_machine_brews_one_cup_at_a_time() {
     // Both take a mug from the cupboard and go to the machine.
     let at_a = a.walk_to(&b, spawn(0), (4, CUPBOARD), &[&c]);
     let at_a = a.press_e(&b, at_a);
+    cupboard_take(&a, 0);
     assert!(a.wait_for_line(&game::kitchen::lines::took_mug(7), Duration::from_millis(800)).is_some());
     let at_a = a.walk_to(&b, at_a, (4, COFFEE), &[&c]);
     let at_c = c.walk_to(&b, spawn(1), (4, CUPBOARD), &[&a]);
     let at_c = c.press_e(&b, at_c);
+    cupboard_take(&c, 0);
     assert!(c.wait_for_line(&game::kitchen::lines::took_mug(6), Duration::from_millis(800)).is_some());
-    let at_c = c.walk_to(&b, at_c, (4, Tile { x: 24, y: 8 }), &[&a]);
+    let at_c = c.walk_to(&b, at_c, (4, Tile { x: 20, y: 11 }), &[&a]);
 
     // A presses E: brewing starts; A's own bubble says so.
     a.press_e(&b, at_a);
@@ -1016,6 +1022,19 @@ fn access_card_can_be_dropped_picked_up_and_handed_over() {
 }
 
 /// Wait (pinging `keep` too) for a packet matching `f`.
+/// A server dialog `id` opened (the cupboard, the contract): answer `choice`.
+fn answer_dialog(c: &Client, id: u8, choice: u8) {
+    let open = wait_for(c, &[], Duration::from_secs(2), |p| matches!(p, Packet::Dialog { id: d, .. } if *d == id).then_some(()));
+    assert!(open.is_some(), "dialog {id} opens");
+    c.send(&Packet::DialogAnswer { token: c.token, id, choice });
+}
+
+/// E at the cupboard opened its window (mugs, knives): take option `choice`
+/// (0 = a mug).
+fn cupboard_take(c: &Client, choice: u8) {
+    answer_dialog(c, game::mischief::CUPBOARD_ID, choice);
+}
+
 fn wait_for<T>(me: &Client, keep: &[&Client], wait: Duration, mut f: impl FnMut(&Packet) -> Option<T>) -> Option<T> {
     let deadline = Instant::now() + wait;
     while Instant::now() < deadline {
@@ -1649,7 +1668,7 @@ fn sweets_tray_in_the_chill_room() {
     let ws = game::computer::find_workstations(&b);
     let w = ws.iter().find(|w| w.department == 1).unwrap();
     let body = Body { access: access::CARD, ..Body::at(w.floor, Pos::tile_center(w.tile.x, w.tile.y + 1)) };
-    let body = ola.walk_to(&b, body, (4, Tile { x: 36, y: 12 }), &[]);
+    let body = ola.walk_to(&b, body, (4, Tile { x: 35, y: 8 }), &[]);
     while ola.recv().is_some() {}
     let tray = |c: &Client| {
         wait_for(c, &[], wait, |p| match p {
@@ -1722,7 +1741,7 @@ fn a_filled_position_is_gone_for_the_others() {
     let (bob, _) = Client::connect(addr, "Bob");
     // Both apply for the one programmer position; both get invited.
     for c in [&ala, &bob] {
-        c.send(&Packet::Apply { token: c.token, offer: 1, motivation: "Kocham kod.".into() });
+        c.send(&Packet::Apply { token: c.token, offer: 1, motivation: "Kocham kod.".into(), salary: 8000, form: 1, student: false });
     }
     let invited = |c: &Client, other: &Client| {
         wait_for(c, &[other], Duration::from_millis(3000), |p| match p {
@@ -1807,7 +1826,7 @@ fn founder_founds_the_company_and_hires_from_the_panel() {
         _ => None,
     });
     assert_eq!(name.as_deref(), Some("Pixel Pierogi sp. z o.o."));
-    bob.send(&Packet::Apply { token: bob.token, offer: 1, motivation: "Chcę pierogi.".into() });
+    bob.send(&Packet::Apply { token: bob.token, offer: 1, motivation: "Chcę pierogi.".into(), salary: 8000, form: 1, student: false });
     let invited = wait_for(&bob, &[&ola], Duration::from_millis(3000), |p| {
         matches!(p, Packet::Mail { action, arg: 1, .. } if *action == proto::portal_action::JOIN_INTERVIEW).then_some(())
     });
@@ -1885,7 +1904,7 @@ fn founder_founds_the_company_and_hires_from_the_panel() {
         _ => None,
     });
     assert_eq!(seen, Some(("Office manager".into(), 1)));
-    ewa.send(&Packet::Apply { token: ewa.token, offer: new_id, motivation: String::new() });
+    ewa.send(&Packet::Apply { token: ewa.token, offer: new_id, motivation: String::new(), salary: 8000, form: 1, student: false });
     assert!(wait_for(&ewa, &[&ola, &bob], Duration::from_millis(3000), |p| {
         matches!(p, Packet::Mail { action, arg, .. } if *action == proto::portal_action::JOIN_INTERVIEW && *arg == new_id).then_some(())
     })

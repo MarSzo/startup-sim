@@ -60,7 +60,11 @@ mod tests {
     fn every_stall_is_its_own_room_and_one_in_a_bathroom_sees_it() {
         let b = Building::load(&default_building_path()).unwrap();
         let stalls = find_stalls(&b);
-        assert_eq!(stalls.len(), 13, "the hall toilet, 3 in the corridor, 3 in the wing bathrooms, 6 on floor 3");
+        assert_eq!(
+            stalls.len(),
+            14,
+            "the hall toilet, 2 in the corridor, 2 in the women's bathroom by it, 3 in the wing bathrooms, 6 on floor 3"
+        );
         for s in &stalls {
             let m = b.floor(s.floor).unwrap();
             let def = m.rooms.iter().find(|r| r.id == s.room).unwrap();

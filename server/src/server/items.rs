@@ -53,11 +53,17 @@ impl Server {
 
     /// Create a new item for `pid` (labelled for them) and hand it over.
     pub(super) fn give_new(&mut self, pid: u16, k: u8) {
+        self.give_new_tainted(pid, k, false);
+    }
+
+    /// `give_new`, maybe with something nasty in it (peed-in coffee).
+    pub(super) fn give_new_tainted(&mut self, pid: u16, k: u8, tainted: bool) {
         let label = self.label_for(pid, k);
         let coffee = k == item_kind::COFFEE;
         let item = Item {
             expires: coffee.then_some(self.tick + coffee::DRINK_TICKS),
             owner: if coffee { 0 } else { pid },
+            tainted,
             ..self.mint_item(k, label)
         };
         self.give(pid, item);
@@ -185,12 +191,15 @@ impl Server {
     }
 
     /// F: drink, eat, smoke or look at what you hold.
-    fn use_held(&mut self, id: u16) {
+    pub(super) fn use_held(&mut self, id: u16) {
         let tick = self.tick;
         let Some(p) = self.players.get_mut(&id) else { return };
         let Some(held) = &p.inventory.hands else { return };
         let snd = match held.kind {
-            item_kind::COFFEE | item_kind::LATTE => Some(crate::protocol::sound::DRINK),
+            item_kind::COFFEE | item_kind::LATTE | item_kind::COLA | item_kind::WHISKY | item_kind::COGNAC | item_kind::VODKA => {
+                Some(crate::protocol::sound::DRINK)
+            }
+            item_kind::STORE_COOKIES => Some(crate::protocol::sound::EAT),
             item_kind::FRUIT if !p.needs.is_full() => Some(crate::protocol::sound::EAT),
             item_kind::CIGARETTES if !held.unpaid => Some(crate::protocol::sound::LIGHTER),
             item_kind::WATER
@@ -210,17 +219,23 @@ impl Server {
         if let Some(s) = snd {
             self.sounds.push((s, p.body.floor, p.body.pos));
         }
+        let mut drink: Option<Option<needs::Event>> = None;
         let line = match held.kind {
             item_kind::COFFEE | item_kind::LATTE => {
                 let latte = held.kind == item_kind::LATTE;
+                let tainted = held.tainted;
                 p.inventory.take_hands();
                 p.needs.drink_coffee();
                 if latte {
                     p.needs.add_stress(-4); // smoother
                 }
                 refresh(p);
-                self.says.push(Say::new(id, coffee::lines::DRUNK));
                 self.give_new(id, item_kind::EMPTY_CUP);
+                if tainted {
+                    self.drank_pee(id);
+                } else {
+                    self.says.push(Say::new(id, coffee::lines::DRUNK));
+                }
                 return;
             }
             item_kind::EMPTY_CUP => "Brudny kubek. Do zlewu albo do zmywarki w kuchni.".into(),
@@ -252,15 +267,125 @@ impl Server {
                 if self.smoke.is_open_air((p.body.floor, p.room)) { fire::lines::LIT } else { fire::lines::LIT_INSIDE }.into()
             }
             item_kind::LAPTOP => format!("{} — położę go na wolnym biurku w swoim dziale (E).", held.label),
+            item_kind::BREATHALYSER => {
+                let department = p.department;
+                return self.breath_test(id, department);
+            }
+            item_kind::KNIFE => return self.attack(id),
+            item_kind::REMOTE => return self.use_remote(id),
+            item_kind::ROLLED if !held.unpaid => return self.smoke_roll(id),
+            item_kind::TOBACCO if !held.unpaid => crate::supplies::lines::ROLL_FIRST.into(),
+            item_kind::STORE_KEY => crate::supplies::lines::KEY.into(),
+            item_kind::BAR_KEY => crate::supplies::lines::BAR_KEY.into(),
+            item_kind::WHISKY | item_kind::COGNAC | item_kind::VODKA => {
+                let k = held.kind;
+                p.inventory.take_hands();
+                p.needs.apply(crate::shop::Effect { hunger: 0, energy: -5, stress: -20, bladder: 5 });
+                drink = Some(p.needs.drink_alcohol(crate::drunk::alcohol_of(k)));
+                refresh(p);
+                match k {
+                    item_kind::WHISKY => crate::supplies::lines::WHISKY,
+                    item_kind::COGNAC => crate::supplies::lines::COGNAC,
+                    _ => crate::supplies::lines::VODKA,
+                }
+                .into()
+            }
+            item_kind::COLA => {
+                p.inventory.take_hands();
+                p.needs.apply(crate::shop::Effect { hunger: 0, energy: 15, stress: -3, bladder: 12 });
+                refresh(p);
+                crate::supplies::lines::COLA.into()
+            }
+            item_kind::STORE_COOKIES => {
+                p.inventory.take_hands();
+                p.needs.apply(crate::shop::Effect { hunger: -12, energy: 3, stress: -5, bladder: 0 });
+                refresh(p);
+                crate::supplies::lines::COOKIES.into()
+            }
+            item_kind::PAINKILLER | item_kind::CHARCOAL | item_kind::VITAMIN | item_kind::PLASTER => {
+                let k = held.kind;
+                p.inventory.take_hands();
+                p.needs.medicine(k);
+                refresh(p);
+                match k {
+                    item_kind::PAINKILLER => crate::supplies::lines::PAINKILLER,
+                    item_kind::CHARCOAL => crate::supplies::lines::CHARCOAL,
+                    item_kind::VITAMIN => crate::supplies::lines::VITAMIN,
+                    _ => crate::supplies::lines::PLASTER,
+                }
+                .into()
+            }
+            item_kind::BOOMBOX => return self.use_boombox(id),
             k => {
                 let Some(prod) = shop::product(k) else { return };
                 p.inventory.take_hands();
                 p.needs.apply(prod.effect);
+                let alcohol = crate::drunk::alcohol_of(k);
+                if alcohol > 0 {
+                    drink = Some(p.needs.drink_alcohol(alcohol));
+                }
                 refresh(p);
                 prod.line.to_string()
             }
         };
         self.says.push(Say::new(id, line));
+        if let Some(event) = drink {
+            self.after_drink(id, event);
+        }
+    }
+
+    /// After a beer (wine, vodka): a burp - or throwing up / passing out.
+    fn after_drink(&mut self, id: u16, event: Option<needs::Event>) {
+        let tick = self.tick;
+        let Some(p) = self.players.get_mut(&id) else { return };
+        let (floor, pos) = (p.body.floor, p.body.pos);
+        match event {
+            Some(needs::Event::Vomit) => self.throw_up(id, crate::drunk::lines::VOMIT, "drunk"),
+            Some(needs::Event::PassOut) => {
+                p.held_until = tick + crate::drunk::PASS_OUT_TICKS;
+                p.held_activity = crate::protocol::activity::PASSED_OUT;
+                p.passed_out = true;
+                p.rest = None;
+                self.says.push(Say::new(id, crate::drunk::lines::PASS_OUT));
+                let text = format!("{} zasnął/zasnęła pijany(a) na podłodze.", self.nick_of_player(id));
+                self.notify_room_of(id, crate::protocol::notice::ALERT, &text);
+                self.log(format!("* drunk: {} passed out", self.nick_of_player(id)));
+            }
+            _ => self.sounds.push((crate::protocol::sound::BURP, floor, pos)),
+        }
+    }
+
+    /// Throwing up right here (drink, cigarettes, a "special" coffee): a
+    /// moment in place, the sound, `line`, a puddle.
+    pub(super) fn throw_up(&mut self, id: u16, line: &str, why: &str) {
+        let tick = self.tick;
+        let Some(p) = self.players.get_mut(&id) else { return };
+        let (floor, pos) = (p.body.floor, p.body.pos);
+        p.held_until = tick + crate::drunk::VOMIT_TICKS;
+        p.held_activity = crate::protocol::activity::VOMITING;
+        p.rest = None;
+        self.sounds.push((crate::protocol::sound::VOMIT, floor, pos));
+        self.says.push(Say::new(id, line));
+        self.leave_puddle(floor, pos, crate::protocol::puddle::VOMIT);
+        let text = format!("{} zwymiotował(a) na podłogę. Fuj.", self.nick_of_player(id));
+        self.notify_room_of(id, crate::protocol::notice::ALERT, &text);
+        self.log(format!("* {why}: {} threw up", self.nick_of_player(id)));
+    }
+
+    /// Drank something somebody peed in: disgust, and half the time it
+    /// comes back up.
+    pub(super) fn drank_pee(&mut self, id: u16) {
+        let Some(p) = self.players.get_mut(&id) else { return };
+        p.needs.disgusted();
+        if self.rng.u32(0..100) < crate::mischief::SICK_PERCENT {
+            self.throw_up(id, crate::mischief::lines::TASTE_SICK, "tainted drink");
+        } else {
+            self.says.push(Say::new(id, crate::mischief::lines::TASTE));
+        }
+    }
+
+    pub(super) fn nick_of_player(&self, id: u16) -> String {
+        self.players.get(&id).map(|p| p.nick.clone()).unwrap_or_default()
     }
 
     /// Pick up the nearest item on the floor within reach, if any.

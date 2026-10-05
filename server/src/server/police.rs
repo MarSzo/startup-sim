@@ -95,11 +95,21 @@ impl Server {
         let Some(role) = self.npcs.iter().find(|n| n.id == npc_id).map(|n| n.role) else { return };
         if role == npc::Role::Police {
             let Some(fine) = self.police_fine(pid) else { return };
+            if let Some(p) = self.players.get_mut(&pid) {
+                p.assault = None;
+            }
             self.hold(pid, security::POLICE_HOLD_TICKS);
             self.says.push(Say::addressed(npc_id, security::lines::police_fine(fine), pid));
             self.says.push(Say::new(pid, security::lines::SHAME));
             let nick = self.players.get(&pid).map_or("?", |p| p.nick.as_str());
             self.log(format!("* police fined {nick} {}", shop::zl(fine)));
+            return;
+        }
+        if self.caught_fighting(npc_id, pid) {
+            if let Some(p) = self.players.get_mut(&pid) {
+                p.inventory.remove_unpaid();
+                refresh(p);
+            }
             return;
         }
         let Some(p) = self.players.get_mut(&pid) else { return };
@@ -109,6 +119,7 @@ impl Server {
         }
         p.inventory.remove_unpaid();
         p.held_until = self.tick + security::GUARD_HOLD_TICKS;
+        p.held_activity = crate::protocol::activity::HELD;
         p.needs.add_stress(security::GUARD_STRESS);
         refresh(p);
         let again = p.thefts_today >= security::THEFTS_FOR_POLICE;
@@ -123,6 +134,7 @@ impl Server {
     fn hold(&mut self, pid: u16, ticks: u32) {
         if let Some(p) = self.players.get_mut(&pid) {
             p.held_until = self.tick + ticks;
+            p.held_activity = crate::protocol::activity::HELD;
         }
     }
 
@@ -130,6 +142,12 @@ impl Server {
     /// the fine anyway.
     pub(super) fn escaped(&mut self, npc_id: u16, pid: u16) {
         let Some(role) = self.npcs.iter().find(|n| n.id == npc_id).map(|n| n.role) else { return };
+        // Got away after a fight (a knife: the police are on their way anyway).
+        if let Some(p) = self.players.get_mut(&pid) {
+            if role == npc::Role::Police || p.assault == Some(false) {
+                p.assault = None;
+            }
+        }
         if role == npc::Role::Police {
             if let Some(fine) = self.police_fine(pid) {
                 self.says.push(Say::new(pid, security::lines::fine_by_mail(fine)));

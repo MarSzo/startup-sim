@@ -1,4 +1,4 @@
-# Protokół sieciowy (wersja 38)
+# Protokół sieciowy (wersja 46)
 
 Własny binarny protokół na UDP. Implementacje:
 - serwer: `server/src/protocol/` (źródło prawdy),
@@ -23,7 +23,7 @@ przez `cargo test` i czytane przez `client/tests/run_tests.gd`.
 | pole    | typ | wartość |
 |---------|-----|---------|
 | magic   | u16 | `0x5354` (bajty `54 53`, „TS”) |
-| version | u8  | `38` |
+| version | u8  | `45` |
 | type    | u8  | typ pakietu (niżej) |
 
 ## Jednostki
@@ -102,26 +102,32 @@ aplikuje max 6 (średnio 3 = 60/20). Kolejka ponad 30 jest przycinana od najstar
 | self_prev_input| u8 — poprzedni input odbiorcy (`sim::Body::prev_input`, do akcji „na wciśnięcie”) |
 | self_access    | u8 — uprawnienia odbiorcy (`map::access`: 1 przepustka gościa, 2 karta pracownika, 4 obsługa) |
 | self_slow      | u8 — `sim::Body::slow` odbiorcy (1 = wolny chód: wyczerpanie / pilna toaleta); część symulowanego stanu |
+| self_drunk     | u8 — `sim::Body::drunk` odbiorcy (0 trzeźwy, 1 zataczanie od 50% upojenia, 2 mocniejsze i wolny chód od 75%); część symulowanego stanu |
 | self_activity  | u8 — czynność odbiorcy (nie symulowana), jak `activity` encji; 1 = przy komputerze (klient pokazuje jego ekran, dopóki trwa) |
 | n              | u8 |
 | entities       | n × 14 B |
 
 Encja (14 B): `id u16 | kind u8 | x i32 | y i32 | flags u8 | held u8 | activity u8`.
 - `kind`: 0 gracz, 1 NPC, 2 przedmiot na podłodze, 3 laptop na biurku,
-  4 pojazd, 5 taca słodyczy, 6 kałuża po wpadce (bez stanu; sprzątaczka ją
-  ściera, inaczej znika o 22:00).
+  4 pojazd, 5 taca słodyczy, 6 kałuża po wpadce (`held` 0), wymiociny
+  (`held` 1), kupa (`held` 2) albo krew po dźgnięciu (`held` 3); sprzątaczka
+  ją ściera, inaczej znika o 22:00.
   Id: gracze 1..0xDFFF, przedmioty na podłodze i laptopy na biurkach od
   `0xE000` (wspólna pula), NPC od `0xF000`. `PlayerInfo` laptopa niesie imię
   i dział jego właściciela.
 - `held`: przedmiot w rękach (0 brak, 1 przepustka gościa, 2 karta
   pracownika, 3 laptop, 4 kawa, 5 owoc); dla `kind` 2 i 3 — sam przedmiot.
 - `activity`: 0 nic, 1 przy komputerze, 2 parzy kawę, 3 odpoczywa na sofie,
-  4 w toalecie, 5 pali (strefa palenia), 6 myje ręce.
+  4 w toalecie, 5 pali (strefa palenia), 6 myje ręce, 7 w pojeździe,
+  8 zatrzymany (ochrona / policja), 9 wymiotuje, 10 śpi pijany (odsypia),
+  11 znokautowany, 12 zadaje cios, 13 sika (pisuar, podłoga, ekspres, kubek),
+  14 kuca (kupa na podłodze). NPC: Paulina (fotel) ma 3.
 - `flags`: bity 0–1 kierunek (0 dół, 1 góra, 2 lewo, 3 prawo), bit 2 „w ruchu”,
   bity 3–5 wygląd (0 gracz, 1 portier — mundur z czapką, 2 pracownik biurowy —
   koszula z krawatem, 3 ochroniarz — czarny strój z żółtą opaską, 4 policjant —
-  granatowy mundur z czapką, 5 sprzątaczka — turkusowy fartuch i mop, 6 strażak — czerwony hełm, odblaski), bit 6 wolny chód (zmęczenie / pilna toaleta), bit 7
-  niska higiena (chmurka). U graczy (nie NPC) bit 3 = rozłożony parasol.
+  granatowy mundur z czapką, 5 sprzątaczka — turkusowy fartuch i mop, 6 strażak — czerwony hełm, odblaski, 7 kasjer — zielona koszulka i czapka; portier 1 to pani Wiesia — siwy kok, okulary, sweter), bit 6 wolny chód (zmęczenie / pilna toaleta), bit 7
+  niska higiena (chmurka). U graczy (nie NPC) bit 3 = rozłożony parasol, bity 4–5
+  = upojenie (0 trzeźwy, 1 od 25%, 2 od 50%, 3 od 75%).
   Dla laptopa (`kind` 3): bit 0 zablokowany, bit 1 ktoś przy nim siedzi.
 
 **Interest management**: lista zawiera tylko encje z tym samym `(floor, room)` co
@@ -201,8 +207,8 @@ gracz pojawia się przed budynkiem. Inne firmy odpowiadają `Mail` z odmową
 
 | typ | kierunek | treść |
 |-----|----------|-------|
-| 12 `JobOffers` | S→C | n u8, n × {`id u8`, `department u8` (0 = inna firma), `applied u8`, `vacancies u8` (wolne miejsca w naszym startupie; 0 = obsadzone), `company` str16, `title` str16, `description` str16} — lista może przyjść w kilku pakietach (≤ 1200 B każdy); klient scala po `id` |
-| 13 `Apply` | C→S | token u32, offer u8, `motivation` str16 („Dlaczego chcesz u nas pracować?”) |
+| 12 `JobOffers` | S→C | n u8, n × {`id u8`, `department u8` (0 = inna firma), `applied u8`, `vacancies u8` (wolne miejsca w naszym startupie; 0 = obsadzone), `salary_min u32`, `salary_max u32` (widełki, zł brutto / mies.), `company` str16, `title` str16, `description` str16} — lista może przyjść w kilku pakietach (≤ 1200 B każdy); klient scala po `id` |
+| 13 `Apply` | C→S | token u32, offer u8, `motivation` str16 („Dlaczego chcesz u nas pracować?”), `salary u32` (oczekiwania, zł brutto / mies.; powyżej widełek — odmowa mailem), `form u8` (1 umowa o pracę, 2 B2B, 3 umowa zlecenie — tylko `student` < 26 lat, inaczej ignorowane), `student u8` |
 | 14 `Question` | S→C | attempt u8, index u8, total u8, `text` str16, n u8 (≤ 4), n × `option` str16 (kolejność potasowana) |
 | 15 `Answer` | C→S | token u32, attempt u8, index u8, choice u8 — odpowiedzi nieaktualne (inna próba / pytanie) są ignorowane |
 | 16 `RecruitResult` | S→C | attempt u8, passed u8 (0/1), score u8, total u8, department u8 — wysyłany 2× |
@@ -284,9 +290,9 @@ widzą pokój mówiącego.
 ### 24 `Stats` (S→C)
 
 Potrzeby postaci odbiorcy, co 0,5 s (tylko w budynku): `hunger u8`, `energy
-u8`, `stress u8`, `bladder u8`, `hygiene u8` (każda 0..100), `flags u8` (bit 0
-brudne ręce, bit 1 rozstrój żołądka), `money u32` (portfel w groszach). Głód, stres i toaleta: 100 =
-źle; energia i higiena: 0 = źle. Liczy je tylko serwer.
+u8`, `stress u8`, `bladder u8`, `hygiene u8`, `alcohol u8`, `bowels u8`, `health u8` (każda 0..100),
+`flags u8` (bit 0 brudne ręce, bit 1 rozstrój żołądka), `money u32` (portfel w groszach). Głód,
+stres, toaleta, upojenie i jelita: 100 = źle; energia, higiena i zdrowie: 0 = źle. Liczy je tylko serwer.
 
 ### 29 `Clock` (S→C)
 
@@ -303,7 +309,7 @@ wyjazdu albo 0xFFFF), `money u32` (portfel — także w domu), `weather u8`
 `arrive` = 0xFFFF oznacza „jeszcze w domu, wybierz dojazd”; po wyjeździe
 `arrive` = minuta przyjazdu. Od v23 na końcu: `company` str16 (nazwa firmy,
 ≤ 64 B) i `founded u8` (1 = firma ma założyciela; 0 = portal pokazuje „Załóż
-firmę”). Od v26: `alarm u8` (1 = alarm pożarowy w budynku — ewakuacja).
+firmę”). Od v26: `alarm u8` (1 = alarm pożarowy w budynku — ewakuacja). Od v42 na końcu: `leave u8` (1 = dziś dzień urlopu — w domu).
 
 ### 30 `CommuteChoice` (C→S)
 
@@ -329,7 +335,10 @@ spotkaniem od 10 min przed do 10 min po jego początku; drzwi zarządu (kafel
 ### 33 `Dialog` (S→C), 34 `DialogAnswer` (C→S)
 
 Rozmowa z NPC (spotkanie z zarządem): `id u8` (0 = zamknij okno), `npc u16`,
-`text` str16, n u8 (≤ 4) × `option` str16; ponawiane co 1 s, dopóki trwa.
+`text` str16, n u8 (≤ 9, klawisze 1–9) × `option` str16, k u8 (≤ 9) × `item`
+u8 — przy szafce / apteczce / magazynku / barku rodzaj przedmiotu każdej
+opcji (0 = żaden; okno rysuje je jak ekwipunek), inaczej k = 0; ponawiane co
+1 s, dopóki trwa. Id 249: głosowanie „pomiń czekanie” (0 = tak, 1 = nie).
 `DialogAnswer`: token u32, id u8, choice u8 — odpowiedzi na nieaktualne `id`
 są ignorowane. Odpowiedzi NPC idą jako `Say`.
 
@@ -358,7 +367,7 @@ str8, `name` str16}, stanowiska n u8 (≤ 16) × {`id u8`, `places u8`,
 `department u8`, `set` str8, `title` str16, `description` str16}. `CompanyPeople`: n
 u8 × kandydat {`player u16`, `offer u8`, `score u8`, `total u8`, `nick` str16},
 m u8 × pracownik {`player u16`, `department u8`, `day u16` (dzień zatrudnienia),
-`nick` str16}.
+`reprimands u8` (nagany za alkohol, 3 = zwolnienie), `nick` str16}.
 
 `CompanyAction`: token u32, `action u8`, `target u16`, `value u8`, `text` str16.
 Akcje: 1 załóż firmę (z portalu, `text` = nazwa 3–40 znaków), 2 zmień nazwę,
@@ -461,12 +470,73 @@ n u8 (≤ 64) × {`kind u8`, `x i32`, `y i32`} (sub-piksele). Dźwięki zdarzeń
 tego ticku na piętrze odbiorcy w promieniu 28 kafli; klient gra je w miejscu
 zdarzenia (`SOUND_FILES` w `net/protocol.gd`). Nie są potwierdzane — zgubiony
 dźwięk po prostu przepada.
+Rodzaje: 1 ekspres, 2 kasa, 3 bramka sklepu, 4 winda, 5 zamek kabiny, 6
+włącznik, 7 spłuczka, 8 kran, 9 zapalniczka, 10 zmywarka, 11 lodówka, 12
+szafka, 13 podniesienie, 14 upuszczenie, 15 jedzenie, 16 picie, 17 gwizdek,
+18 beknięcie (po alkoholu; klient gra je ~1 s później, po łyku), 19 wymioty,
+20 cios, 21 dźgnięcie, 22 sikanie, 23 kupa.
+
+### 56 `HrAction` (C→S), 57 `HrInfo` (S→C)
+
+Aplikacja Kadry. `HrAction`: token u32, `action u8` (1 pokaż, 2 wniosek
+urlopowy na dzień `arg`, 3 anuluj wniosek `arg`), `arg u16`; serwer zawsze
+odpowiada `HrInfo` (tylko z umową). `HrInfo`: `title` str16, `department u8`,
+`form u8` (`employment`, 0 = sprzed widełek), `salary u32` (zł brutto /
+mies.), `pay_rate u32` (gr / h), `start_day u16`, `today u16` (dni gracza),
+`reprimands u8`, `leave_days u8`, `worked u8` (przepracowane dni do kolejnego
+dnia urlopu, z 5), aneksy n u8 (≤ 10, najnowsze na końcu) × {`day u16`, `text`
+str16}, wnioski n u8 (≤ 10) × {`id u8`, `day u16`, `status u8` (1
+zaakceptowany, 2 odrzucony, 3 anulowany, 4 wykorzystany)}.
+
+### 60 `ChatSay` (C→S), 61 `Notice` (S→C)
+
+`ChatSay`: token u32, `text` str16 (≤ `MAX_SAY_BYTES`) — czat tekstowy; serwer
+odsyła go jako `Say` gracza: zwykły tekst — pomieszczenie, „/s tekst” — tylko
+najbliższa osoba w 2 kaflach („(szeptem) …”), „/k tekst” — całe piętro
+(„(krzyczy) …”); co najmniej 0,5 s między liniami. `Notice`: `icon u8` (1 info,
+2 poczta, 3 jedzenie, 4 uwaga, 5 rozrywka), `text` str16 — powiadomienie w
+rogu ekranu. Przedmioty: 52 mały kluczyk (barek), 53 whisky, 54 koniak, 55
+wódka; barek to `Dialog` 255.
+
+### 59 `Roll` (C→S)
+
+token u32, `quality u8` (0..100) — wynik mini-gry skręcania; serwer zabiera
+porcję z zapłaconego tytoniu (43) w rękach i daje skręt (44) z jakością w
+nazwie (< 30 rozsypie się przy paleniu). Przedmioty: 45 klucz do magazynku
+(daje uprawnienie 16 — drzwi „storeroom_door”), 46 Coca-Cola, 47 ciastka z
+magazynu, 48 Apap, 49 węgiel aktywny, 50 witamina C, 51 plaster. Apteczka i
+regały magazynku: `Dialog` 255.
+
+### 58 `Media` (S→C)
+
+Telewizory i boomboxy, do wszystkich w budynku co 1 s i po każdej zmianie:
+ekrany n u8 (≤ 8) × {`floor u8`, `x u8`, `y u8` (lewy kafel ekranu), `channel
+u8` (0 wyłączony, 1 kreskówki, 2 wiadomości, 3 pogoda, 4 mecz, 5 przyroda),
+`started u32` (tick serwera, od którego leci)}, muzyka n u8 (≤ 8) × {`track
+u8` (1 disco polo, 2 lo-fi, 3 techno, 4 szanty — pliki `boombox_<n>`),
+`started u32`, `floor u8`, `x i32`, `y i32` (sub-piksele), `holder u16` (gracz
+z boomboxem; 0 = stoi na podłodze)}. Klient liczy, ile minęło od `started`,
+więc wszyscy widzą i słyszą ten sam moment. Wybór kanału / utworu: F z pilotem
+(41) / boomboxem (42) w rękach → `Dialog` 253 / 254.
+
+### 55 `Action` (C→S)
+
+token u32, `action u8`: 1 menu psot (R) — serwer odpowiada `Dialog` o id 250
+z tym, co da się tu zrobić (nasikać na podłogę, zesrać się na podłogę,
+nasikać do ekspresu w zasięgu, nasikać do kubka osoby obok; ostatnia opcja =
+nic); 2 atak (X) — cios pięścią albo, z nożem w rękach, dźgnięcie najbliższej
+osoby w zasięgu 1,5 kafla. Odpowiedź na menu to zwykły `DialogAnswer`. Szafka
+w kuchni (E z wolnymi rękami) to `Dialog` o id 251 (kubek, nóż, zamknij);
+id 200–249 to pytanie o naganę po alkomacie, 252 — umowa w HR (kwota niższa niż uzgodniona; 0 podpisuję, 1 rezygnuję — HR odprowadza na portiernię, przepustka wraca, potem portal).
 
 ### 44 `SkipWait` (C→S)
 
-token u32. „Pomiń czekanie” — tylko w domu / w drodze. Gdy poprosili wszyscy
-gracze (i wszyscy są w domu lub w drodze), zegar pędzi aż do przyjazdu;
-stan w `Clock::skip` (0 nie, 1 czekam na innych, 2 czas pędzi).
+token u32. „Pomiń czekanie” — z domu / z drogi: głosowanie wszystkich
+grających (`Dialog` 249 do pozostałych, 30 s). Przechodzi, gdy za jest ponad
+połowa grających: kto jest w pracy, idzie do domu (z wypłatą), a zegar pędzi
+do rana (albo do czyjegoś przyjazdu do pracy); rano się zatrzymuje, żeby
+każdy wybrał dojazd. W trakcie głosowania `SkipWait` to głos za. Stan w
+`Clock::skip` (0 nie, 1 głosowanie trwa, 2 czas pędzi).
 
 ### 42 `Fridge` (S→C), 43 `FridgeAction` (C→S)
 
@@ -491,13 +561,15 @@ liczy klient: pora dnia (`Clock.minute`), pogoda, `windows`, `light`
 n × {`kind u8`, `price u32` (grosze), `name` str16}. `ShopTake`: token u32,
 shelf u8, kind u8 — weź jedną sztukę (serwer sprawdza zasięg półki); towar
 trafia do ekwipunku jako niezapłacony (etykieta w `Inventory` z dopiskiem i
-ceną). Płacenie: E przy NPC „Kasa” (odpowiedź jako `Say`). Wyjście ze sklepu
+ceną). Płacenie: E przy NPC „Kasjer” (odpowiedź jako `Say`). Wyjście ze sklepu
 z niezapłaconym towarem: `Say` z alarmem od kasy, towar znika.
 
 Rodzaje przedmiotów sklepowych (`held`, `Inventory.kind`): 10 kanapka z serem,
 11 z szynką, 12 wrap wege, 13 hamburger, 14 frytki, 15 drożdżówka, 16 batonik,
 17 chipsy, 18 woda, 19 energetyk, 20 sok, 21 piwo, 22 wino, 23 papierosy,
 38 małpka (setka wódki; nazwa z serwera, więc starszy klient pokaże ją bez ikony).
+39 alkomat (nie ze sklepu — dostaje go Zarząd przy założeniu firmy), 40 nóż
+kuchenny (z szafki w kuchni).
 
 ## Połączenie i timeouty
 
@@ -557,48 +629,7 @@ szyfrowaniem.
 
 ## Historia wersji
 
-- **39** — piętro biurowe to teraz piętro 4 (`floor4.json`), nowe piętro 3 (`floor3.json`), piętra 1 i 2 zablokowane; klatki schodowe jako mapy 5 (parter–3) i 6 (3–4); panel pięter w windzie jako `Dialog` z `npc` 0 + `DialogAnswer` (zamiast „E jedzie na następne piętro”).
-- **38** — kałuża po wpadce: encja `kind` 6 (`flags`, `held`, `activity` = 0), id z puli od `0xE000`; widoczna jak przedmioty w pokoju; ściera ją sprzątaczka, inaczej znika o 22:00.
-- **37** — osobne działy: pakiet `Departments` (54, S→C) z listą działów; działy 4–10 (Mobile, DevOps, AI, Finanse, Sales, Marketing, Obsługa klienta), dział 1 nazywa się „Produkt / IT”.
-- **36** — dwie windy: `Doors` kończy się listą wind `n u8` (≤ 16) × {`floor u8`, `target u8` (255 = stoi), `moving u8`} zamiast jednej trójki `lift_*`.
-- **35** — stanowiska firmy: `CompanyOffers` w częściach, z działem, zestawem pytań i listą zestawów; `CompanyAction` 8–12 (dodaj / nazwa / dział / zestaw / usuń stanowisko).
-- **34** (uzup.) — `Reject` 7 = nick zajęty (konto, zapisana postać albo ktoś w grze), 8 = e-mail postaci zajęty.
-- **34** — szyfrowanie: pakiety `0xF0` (sesja) i `0xF1` (Connect) dla zalogowanych; pakiet gry ≤ 1152 B (datagram ≤ 1200 B); klucz sesji w odpowiedzi logowania (`key`).
-- **33** — konta: `Connect` + `ticket` str16 (≤ 64 B, z logowania HTTPS; pusty = gość); `Reject` 5 (bilet wygasł), 6 (serwer wymaga konta), 7 (nick ma konto).
-- **32** — czat głosowy: `Voice` (52, C→S), `VoiceFrom` (53, S→C).
-- **31** — firmowy komputer: `TaskAction` (46, C→S), `TaskBoard` (47), `TaskDetail` (48), `MailAction` (49, C→S), `WorkMail` (50), `MailState` (51).
-- **30** — dźwięki: `Sound` (45, S→C): n u8 (≤ 64) × {kind u8, x i32, y i32} — zdarzenia słyszalne na piętrze odbiorcy w promieniu 28 kafli (1 ekspres, 2 kasa, 3 bramka sklepu, 4 winda, 5 zamek kabiny, 6 włącznik, 7 spłuczka, 8 kran, 9 zapalniczka, 10 zmywarka, 11 lodówka, 12 szafka, 13 podniesienie, 14 upuszczenie, 15 jedzenie, 16 picie, 17 gwizdek).
-- **29** — `SkipWait` (44, C→S: token u32) — „Pomiń czekanie” w domu; `Clock` + `skip` u8 (0 nie, 1 poproszono, 2 czas pędzi); aktywność 8 = zatrzymany (ochrona / policja).
-- **28** — aneks kuchenny: `Fridge` (42), `FridgeAction` (43); przedmioty 35 kubek (czysty), 36 mleko (karton), 37 kawa z mlekiem; 34 = brudny kubek.
-- **27** — światło: pakiet `Lights` (41); w mapie `room_defs.*.light` / `switch` / `lit_by` / `windows`.
-- **26** — dym i straż: `Clock` + `alarm`, pakiet `Smoke` (40), wygląd NPC 6 (strażak), pojazd 6 (wóz strażacki).
-- **25** — kubki i sprzątaczka: przedmiot 34 = pusty kubek, wygląd NPC 5 (sprzątaczka); bez nowych pakietów.
-- **24** — ochrona i policja: wygląd NPC 3 (ochroniarz) i 4 (policjant), pojazd 5 (radiowóz); bez nowych pakietów.
-- **23** — panel założyciela: `Clock` + `company`, `founded`; `CompanyOffers`, `CompanyPeople`, `CompanyAction`; dział 3 (Zarząd).
-- **22** — wakaty: `JobOffers` + `vacancies u8` po `applied` (wolne miejsca; stanowiska z 0 portal ukrywa, chyba że gracz już aplikował).
-- **21** — obiady: `LunchMenu`, `LunchOrder`, przedmioty 28–33.
-- **20** — słodycze: encja tacy (`kind` 5: `held` = słodycz, `activity` = liczba sztuk), przedmioty 25 pączek, 26 ciastko, 27 sernik, `Stats.flags` bit 1 = rozstrój żołądka.
-- **19** — zarząd: `Calendar`, `CalendarBook`, `Dialog`, `DialogAnswer`, uprawnienie 8 (drzwi zarządu).
-- **18** — pogoda: `Clock` + `weather`, flaga parasola (bit 3 u graczy), przedmiot 24 = parasol.
-- **17** — dojazd: `Clock` + `mode`, `depart`, `money`; `CommuteChoice`; encja pojazdu; czynność 7 (jedzie).
-- **16** — zegar i dni: `Clock`.
-- **15** — sklep: `Stats` + `money`, `Shelf`, `ShopTake`, przedmioty 10–23.
-- **14** — `Doors` + `lift_moving`; limit 6 osób w windzie; mniejsza kabina (3×2).
-- **13** — higiena: `Stats` + `hygiene`, `flags` (brudne ręce), flaga encji 7 = niska higiena, czynność 6 = mycie rąk.
-- **12** — winda poza symulacją (wzywanie, jazda, drzwi w `Doors`), `Doors` + `lift_floor`, `lift_target`; mapa klatki schodowej (piętro 3).
-- **11** — kabiny toaletowe: `Doors`, `DoorAction`; zamknięte drzwi blokują ruch (także w predykcji klienta).
-- **10** — potrzeby: `activity` w encji (14 B) i `self_activity` w miejsce bitów `self_status`, `self_slow` (wolny chód w symulacji — też w wektorach golden ruchu), flaga 6 = wolny chód, pakiet `Stats`, przedmiot 5 = owoc.
-- **9** — komputer i komunikator: encja laptopa (`kind` 3), bit „przy komputerze” (`self_status` 0 / flaga 6, w miejsce „trzyma kawę”), `Computer`, `ComputerAction`, `Chat`.
-- **8** — ekwipunek: `held` w encji (13 B), encje przedmiotów na podłodze, `Inventory`, `ItemAction`; kubek kawy jako przedmiot.
-- **7** — pulpit: firmy i flaga `applied` w `JobOffers` (dzielonych na pakiety), `motivation` w `Apply`, `Mail`, `PortalAction`.
-- **6** — profil postaci w `Connect` (płeć, wiek, wygląd, miejscowość, e-mail); płeć i wygląd w `PlayerInfo`; `Reject(4)`.
-- **5** — `self_status` w snapshocie, bity czynności 6–7 we `flags` encji; `Say` także od graczy.
-- **4** — portal i rekrutacja (typy 12–16); `department` w `PlayerInfo`.
-- **3** — snapshot: `self_access`; pakiet `Say`; encje NPC (`kind` 1) z imionami w
-  `PlayerInfo`; wygląd w bitach 3–5 `flags` (dodany bez zmiany formatu).
-- **2** — snapshot: pola `self_lock`, `self_prev_input`; bit inputu 16 (interakcja);
-  `map_crc` liczone z całego budynku (wiele pięter).
-- **1** — wersja początkowa.
+Co zmieniało się w kolejnych wersjach: [protokol-historia.md](protokol-historia.md).
 
 ## Rozszerzenia (zaplanowane, nie zaimplementowane)
 

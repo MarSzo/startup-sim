@@ -36,6 +36,7 @@ impl Server {
     pub(super) fn office_mail(&mut self, to: &str, from: &str, subject: &str, body: &str) {
         let (day, minute) = (self.clock.day.min(u16::MAX as u32) as u16, self.clock.minute() as u16);
         self.post.send(from, to, subject, body, day, minute);
+        self.notify_nick(to, crate::protocol::notice::MAIL, format!("Nowa poczta od: {from} — {subject}"));
     }
 
     // ------------------------------------------------------------- tasks

@@ -8,6 +8,25 @@ tools/trailer/record_all.sh     # ujęcia -> tools/trailer/out/<ujęcie>/*.jpg
 tools/trailer/build.sh          # -> tools/trailer/out/startup_sim_zwiastun.mp4
 ```
 
+Ujęcia (`record_all.sh`): plansza tytułowa, deszcz — chodnikiem obok
+zamkniętego zjazdu do garażu pod wiatę palarni, hol z panią Wiesią (i
+Pauliną w fotelu), biuro z botami, chill room (mecz w telewizorze, boombox),
+sklep na parterze („Jaka parówka wariacie?”). Każde to osobny serwer z flagami dev i klient z `--goto`; start
+nagrywania jest przesunięty o czas łączenia klienta.
+
+GIF do README (`docs/media/zwiastun.gif`, 640 px, 8 kl./s — GitHub nie
+odtwarza mp4 z repozytorium w README):
+
+```
+F=$(mktemp -d)
+ffmpeg -i tools/trailer/out/startup_sim_zwiastun.mp4 -vf "fps=8,scale=640:-1:flags=lanczos" $F/f%04d.png
+ffmpeg -framerate 8 -i $F/f%04d.png -vf "palettegen=max_colors=96:stats_mode=diff" $F/pal.png
+ffmpeg -framerate 8 -i $F/f%04d.png -i $F/pal.png -lavfi "paletteuse=dither=none:diff_mode=rectangle" docs/media/zwiastun.gif
+```
+
+Zrzuty ekranu w `docs/media/` (4: palarnia, portiernia, chill room, sklep) to klatki z `tools/trailer/out/<ujęcie>/`
+przycięte do 1280×720 (`magick … -resize 1280x720^ -gravity center -extent 1280x720`).
+
 - `shoot.sh` — jedno ujęcie: serwer na porcie 7790 (flagi dev), opcjonalnie
   boty z imionami (`--nicks`), klient z `--goto` i `--record` (klatki JPG w
   stałym tempie, `client/dev_recorder.gd`).

@@ -30,7 +30,7 @@ func run() -> void:
 		return
 	log_step("position added in Mobile")
 
-	if not await until(func(): return not screen.company_people.get("candidates", []).is_empty(), 150.0, "a candidate"):
+	if not await until(func(): return not screen.company_people.get("candidates", []).is_empty(), 60.0, "a candidate"):
 		return
 	await pc("company:hire")
 	if not await until(func(): return mobile_open.call() == 0, 10.0, "the place taken"):

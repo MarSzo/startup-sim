@@ -193,6 +193,7 @@ func _build_pane() -> void:
 	var cr := HBoxContainer.new()
 	_line(_p_comment, "Napisz komentarz…", Protocol.TASK_COMMENT_MAX)
 	_p_comment.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_p_comment.keep_editing_on_text_submit = true
 	_p_comment.text_submitted.connect(func(_t): _comment())
 	cr.add_child(_p_comment)
 	var cb := Ink.button("Dodaj", true)

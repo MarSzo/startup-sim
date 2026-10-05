@@ -4,6 +4,8 @@
 extends Node2D
 
 var tile := Vector2i.ZERO
+## In a wall running left-right (drawn turned a quarter).
+var across := false
 var locked := false
 var open := false
 
@@ -26,6 +28,7 @@ func _panel(r: Rect2, fill: Color) -> void:
 
 func _draw() -> void:
 	# Local origin = tile center; the door stands in the partition line.
+	draw_set_transform(Vector2.ZERO, PI / 2 if across else 0.0, Vector2.ONE)
 	if open:
 		# Swung open against the partition above: just its edge.
 		_panel(Rect2(-8, -8, 2.6, 15), Color("#b9bfc2"))

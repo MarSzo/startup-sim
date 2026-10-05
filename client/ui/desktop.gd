@@ -9,7 +9,8 @@ const Ink = preload("res://ui/ink_ui.gd")
 const Protocol = preload("res://net/protocol.gd")
 const PlayerView = preload("res://game/player_view.gd")
 
-signal apply(offer_id: int, motivation: String)
+## `application`: {motivation, salary (zł a month), form (Protocol.EMPLOYMENT_*), student}.
+signal apply(offer_id: int, application: Dictionary)
 signal answer(attempt: int, index: int, choice: int)
 signal portal_action(action: int, arg: int)
 ## "Załóż firmę" (CompanyAction FOUND).
@@ -39,6 +40,9 @@ var profile := {}
 ## Dev: apply for this offer, answer at random, go to the office (0 = off).
 var auto_offer := 0
 var auto_delay := 0.0
+## Tests: picks the answer in auto mode (question text, options -> shown
+## index; -1 = guess). Unset: always guess.
+var auto_answer := Callable()
 ## Dev (--found=<name>): found the company once the portal knows it can.
 var auto_found := ""
 
@@ -54,7 +58,7 @@ var _mail_icon_badge := Label.new()
 var _browser_view := "list"   # list / form
 var _form_offer := 0
 var _motivation := TextEdit.new()
-var _pending_apply := {}      # offer -> [msec, motivation]
+var _pending_apply := {}      # offer -> [msec, application]
 var _pending_action := {}     # "action:arg" -> msec
 var _answered := {}           # "attempt:index" -> choice
 var _question_key := ""
@@ -282,6 +286,22 @@ static func draw_icon(c: Control, kind: String) -> void:
 				for wx in 3:
 					c.draw_rect(Rect2(r.position + Vector2(3 + wx * 8, 3 + wy * 7), Vector2(4, 4)), Color("#e8b85a") if (wx + wy) % 3 else Color(ink, 0.7))
 			c.draw_rect(Rect2(o + Vector2(-3, 11), Vector2(6, 8)), ink)
+		"hr":  # a folder with a document and a stamp
+			var f := Rect2(o + Vector2(-20, -12), Vector2(40, 30))
+			c.draw_rect(Rect2(f.position + Vector2(0, -5), Vector2(16, 7)), Color("#d9a13a"))
+			c.draw_rect(f, Color("#e8b85a"))
+			c.draw_rect(f, ink, false, 2.0)
+			c.draw_rect(Rect2(o + Vector2(-12, -8), Vector2(22, 20)), Color("#fbf8ef"))
+			for k in 3:
+				c.draw_line(o + Vector2(-9, -3 + k * 5), o + Vector2(6, -3 + k * 5), Color(ink, 0.6), 1.2)
+			c.draw_circle(o + Vector2(10, 10), 5, Color("#c0392b"))
+		"terminal":  # a dark window with a prompt
+			var t := Rect2(o + Vector2(-22, -16), Vector2(44, 34))
+			c.draw_rect(t, Color("#1e1f29"))
+			c.draw_rect(t, ink, false, 2.0)
+			c.draw_line(o + Vector2(-16, -6), o + Vector2(-9, -1), Color("#8be9fd"), 2.2, true)
+			c.draw_line(o + Vector2(-9, -1), o + Vector2(-16, 4), Color("#8be9fd"), 2.2, true)
+			c.draw_rect(Rect2(o + Vector2(-5, 3), Vector2(10, 3)), Color("#e6e6e6"))
 		"tasks":  # a board with three columns of cards
 			var r := Rect2(o + Vector2(-19, -15), Vector2(38, 30))
 			c.draw_rect(r.grow(1.5), ink)
@@ -423,6 +443,8 @@ func _render_browser(body: VBoxContainer) -> void:
 		var company: String = o.company + ("  ·  dział " + dept if dept != "" else "")
 		box.add_child(_label(company, 14, Color("#2e6bd9")))
 		box.add_child(_label(o.description, 15, Color("#4a5566")))
+		if o.get("salary_max", 0) > 0:
+			box.add_child(_label("💰 %s brutto / mies." % _range_text(o), 15, Color("#1c2430")))
 		if ours:
 			var free: int = o.get("vacancies", 0)
 			var places := "Stanowisko obsadzone" if free == 0 else ("Wolne miejsca: %d" % free)
@@ -458,6 +480,36 @@ func _render_form(body: VBoxContainer, o: Dictionary) -> void:
 	_motivation.placeholder_text = "Np. bo lubię wyzwania i kawę z ekspresu."
 	_motivation.wrap_mode = TextEdit.LINE_WRAPPING_BOUNDARY
 	box.add_child(_motivation)
+	# Expected pay and the form of employment (a mandate: students under 26).
+	box.add_child(_label("Oczekiwane wynagrodzenie (zł brutto / mies.) — widełki: %s" % _range_text(o), 15, Color("#4a5566")))
+	var salary := SpinBox.new()
+	salary.min_value = 1000
+	salary.max_value = 100000
+	salary.step = 100
+	salary.suffix = "zł"
+	salary.value = snappedf((o.get("salary_min", 6000) + o.get("salary_max", 9000)) / 2.0, 100)
+	salary.custom_minimum_size = Vector2(200, 0)
+	salary.get_line_edit().add_theme_color_override("font_color", Color("#1c2430"))
+	box.add_child(salary)
+	box.add_child(_label("Forma zatrudnienia", 15, Color("#4a5566")))
+	var form := OptionButton.new()
+	for f in [Protocol.EMPLOYMENT_CONTRACT, Protocol.EMPLOYMENT_B2B, Protocol.EMPLOYMENT_MANDATE]:
+		form.add_item(Protocol.EMPLOYMENT_NAMES[f], f)
+	form.custom_minimum_size = Vector2(240, 0)
+	box.add_child(form)
+	var student := CheckBox.new()
+	student.text = "Jestem studentem / studentką (umowa zlecenie: tylko studenci do 26 lat)"
+	for k in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color", "font_hover_pressed_color"]:
+		student.add_theme_color_override(k, Color("#1c2430"))
+	box.add_child(student)
+	var young: bool = int(profile.get("age", 99)) < Protocol.MANDATE_AGE
+	var mandate_ok := func() -> bool: return student.button_pressed and young
+	var refresh_forms := func(_x = null) -> void:
+		form.set_item_disabled(form.get_item_index(Protocol.EMPLOYMENT_MANDATE), not mandate_ok.call())
+		if form.get_selected_id() == Protocol.EMPLOYMENT_MANDATE and not mandate_ok.call():
+			form.select(form.get_item_index(Protocol.EMPLOYMENT_CONTRACT))
+	student.toggled.connect(refresh_forms)
+	refresh_forms.call()
 	var consent := CheckBox.new()
 	consent.text = "Wyrażam zgodę na przetwarzanie moich danych i mojej osoby w procesie rekrutacji."
 	consent.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -476,7 +528,8 @@ func _render_form(body: VBoxContainer, o: Dictionary) -> void:
 		if not consent.button_pressed:
 			_toast_msg("Zaznacz zgodę na przetwarzanie danych — bez tego HR nie przeczyta nawet imienia.")
 			return
-		_send_apply(oid, _motivation.text.strip_edges())
+		_send_apply(oid, {"motivation": _motivation.text.strip_edges(), "salary": int(salary.value),
+			"form": form.get_selected_id(), "student": student.button_pressed})
 		_motivation.text = ""
 		_browser_view = "list"
 		_render("browser")
@@ -485,9 +538,24 @@ func _render_form(body: VBoxContainer, o: Dictionary) -> void:
 	box.add_child(row)
 
 
-func _send_apply(offer: int, motivation: String) -> void:
-	_pending_apply[offer] = [Time.get_ticks_msec(), motivation]
-	apply.emit(offer, motivation)
+func _send_apply(offer: int, application: Dictionary) -> void:
+	_pending_apply[offer] = [Time.get_ticks_msec(), application]
+	apply.emit(offer, application)
+
+
+## "8 000–12 000 zł".
+static func _range_text(o: Dictionary) -> String:
+	return "%s–%s zł" % [_thousands(o.get("salary_min", 0)), _thousands(o.get("salary_max", 0))]
+
+
+static func _thousands(v: int) -> String:
+	var s := str(v)
+	var out := ""
+	for i in s.length():
+		if i > 0 and (s.length() - i) % 3 == 0:
+			out += " "
+		out += s[i]
+	return out
 
 
 # -------------------------------------------------------------------- mail
@@ -617,7 +685,8 @@ func _show_question(p: Dictionary, key: String) -> void:
 		body.add_child(b)
 	if auto_offer > 0:
 		var n: int = p.options.size()
-		_auto(func(): _send_answer(p.attempt, p.index, randi() % n))
+		var pick: int = auto_answer.call(p.text, p.options) if auto_answer.is_valid() else -1
+		_auto(func(): _send_answer(p.attempt, p.index, pick if pick >= 0 else randi() % n))
 
 
 func _send_answer(attempt: int, index: int, choice: int) -> void:
@@ -675,7 +744,10 @@ func on_packet(p: Dictionary) -> void:
 				_render("browser")
 			if auto_offer > 0 and not _auto_applied and offers.has(auto_offer) and not offers[auto_offer].applied:
 				_auto_applied = true
-				_auto(func(): _send_apply(auto_offer, "Tryb automatyczny."))
+				var o: Dictionary = offers[auto_offer]
+				var a := {"motivation": "Tryb automatyczny.", "salary": maxi(o.get("salary_min", 0), 1000),
+					"form": Protocol.EMPLOYMENT_CONTRACT, "student": false}
+				_auto(func(): _send_apply(auto_offer, a))
 		Protocol.T_MAIL:
 			if not mails.has(p.id):
 				mails[p.id] = p

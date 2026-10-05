@@ -71,6 +71,11 @@ impl Server {
                 p.needs.sanitize();
                 needs::lines::SANITIZED.into()
             }
+            SpotKind::Urinal => {
+                p.rest = Some((Rest::Urinal, floor, pos));
+                p.needs.use_toilet();
+                needs::lines::URINAL.into()
+            }
             SpotKind::Toilet => {
                 p.rest = Some((Rest::Toilet, floor, pos));
                 p.needs.use_toilet();

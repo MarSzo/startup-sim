@@ -261,7 +261,7 @@ mod tests {
     fn open_air_takes_the_smoke_away_and_detectors_are_where_expected() {
         let (b, mut s) = setup();
         let outside = room(&b, 0, "Strefa palenia");
-        s.puff(outside, 1, Pos::tile_center(45, 65));
+        s.puff(outside, 1, Pos::tile_center(10, 46));
         assert_eq!(s.get(outside), 0);
         let m1 = b.floor(4).unwrap();
         let has = |name: &str| m1.room_by_name(name).unwrap().detector;

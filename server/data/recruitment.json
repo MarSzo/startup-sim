@@ -1221,6 +1221,7 @@
    "set": "programming",
    "title": "Programista/ka",
    "description": "Rozwijasz nasz produkt. Oferujemy: owocowe czwartki, elastyczne godziny (głównie w nocy) i pełen dostęp do produkcji od pierwszego dnia.",
+   "salary": [8000, 12000],
    "vacancies": 1
   },
   {
@@ -1231,6 +1232,7 @@
    "set": "design",
    "title": "Designer/ka",
    "description": "Projektujesz produkt, który programiści zrobią „prawie tak samo”. Oferujemy: dwa monitory, zapas żółtych karteczek i prawo weta wobec Comic Sansa.",
+   "salary": [7000, 10000],
    "vacancies": 0
   },
   {
@@ -1241,6 +1243,7 @@
    "set": "sales",
    "title": "Specjalista/ka ds. sprzedaży",
    "description": "Sprzedajesz produkt, który IT właśnie skończy (prawie). Oferujemy: prowizję od sukcesów, nielimitowane spotkania i własny kubek z logo.",
+   "salary": [6000, 9000],
    "vacancies": 1
   },
   {
@@ -1251,6 +1254,7 @@
    "set": "marketing",
    "title": "Specjalista/ka ds. marketingu",
    "description": "Opowiadasz światu, że nasz produkt jest rewolucyjny. Oferujemy: budżet na kampanie (mały) i swobodę twórczą (dużą).",
+   "salary": [6500, 9500],
    "vacancies": 0
   },
   {
@@ -1259,6 +1263,7 @@
    "hiring": false,
    "title": "Młodszy analityk Excela",
    "description": "Wymagania: 7 lat doświadczenia w Excelu 2031, gotowość do pracy w piątek po 18:00. Oferujemy: owocowe czwartki (co drugi kwartał).",
+   "salary": [4500, 5500],
    "reply": "Szanowna Pani / Szanowny Panie, dziękujemy za aplikację. Po wnikliwej analizie Pani/Pana kandydatury nasz system zdecydował, że komórka A1 jest już zajęta. Z poważaniem, Dział Kadr."
   },
   {
@@ -1267,6 +1272,7 @@
    "hiring": false,
    "title": "Senior Developer (junior)",
    "description": "Szukamy seniora z 15-letnim doświadczeniem w technologii, która powstała 3 lata temu. Wynagrodzenie: konkurencyjne (dla stażysty).",
+   "salary": [9000, 25000],
    "reply": null
   },
   {
@@ -1275,6 +1281,7 @@
    "hiring": false,
    "title": "Dostawca/Dostawczyni",
    "description": "Rozwozisz pizzę po mieście. Wymagany własny rower i odporność na pytania „a gdzie moje zamówienie?”.",
+   "salary": [4300, 4800],
    "reply": "Cześć! Szukaliśmy kogoś z rowerem, a w formularzu nie było o rowerze ani słowa. Pozdrawiamy, Stefan (i pizza)."
   },
   {
@@ -1283,6 +1290,7 @@
    "hiring": false,
    "title": "Stażysta/ka ds. wszystkiego",
    "description": "Bezpłatny staż z możliwością bezpłatnego przedłużenia. Oferujemy doświadczenie, ekspozycję i darmową wodę z kranu.",
+   "salary": [1000, 1500],
    "reply": "Twoja aplikacja była za mało kreatywna. Następnym razem wyślij ją w formie tańca interpretacyjnego. Zespół BUZZ"
   }
  ]

@@ -42,13 +42,15 @@ impl Server {
             department: pos.department,
             applied: desk.applied.contains(&pos.id),
             vacancies: pos.places,
+            salary_min: pos.salary[0],
+            salary_max: pos.salary[1],
             company: self.company.name.clone(),
             title: pos.title.clone(),
             description: pos.description.clone(),
         });
         let all: Vec<proto::OfferInfo> = ours.chain(r.portal(|o| desk.applied.contains(&o))).collect();
         for offer in all {
-            let len = 4 + 6 + offer.company.len() + offer.title.len() + offer.description.len();
+            let len = 4 + 6 + 8 + offer.company.len() + offer.title.len() + offer.description.len();
             if size + len > proto::MAX_PACKET && !chunk.is_empty() {
                 packets.push(Packet::JobOffers { offers: std::mem::take(&mut chunk) });
                 size = proto::HEADER_LEN + 1;
@@ -86,7 +88,13 @@ impl Server {
         }
     }
 
-    pub(super) fn handle_apply(&mut self, id: u16, offer: u8) {
+    /// An application: expected pay (zł a month) and the form of employment
+    /// (a contract of mandate only for a student under 26).
+    pub(super) fn handle_apply(&mut self, id: u16, offer: u8, salary: u32, form: u8, student: bool) {
+        let age = self.players.get(&id).map_or(0, |p| p.profile.age);
+        if !(crate::pay::SALARY_MIN..=crate::pay::SALARY_MAX).contains(&salary) || !crate::pay::form_allowed(form, student, age) {
+            return; // the form checks it too
+        }
         let due = self.tick + self.cfg.recruitment.invite_delay_secs * TICK_HZ;
         let o = match self.position(offer) {
             Some(_) => (true, false),
@@ -104,6 +112,7 @@ impl Server {
             return; // duplicate (resent) application
         }
         desk.applied.push(offer);
+        desk.terms.push((offer, salary, form));
         if o.0 || o.1 {
             desk.pending.push((offer, due)); // other companies without a reply: silence
         }
@@ -114,7 +123,8 @@ impl Server {
     pub(super) fn deliver_replies(&mut self, id: u16) {
         let from = format!("{} — Rekrutacja", self.company.name);
         let tick = self.tick;
-        let titles: std::collections::HashMap<u8, String> = self.positions.iter().map(|p| (p.id, p.title.clone())).collect();
+        let titles: std::collections::HashMap<u8, (String, u32)> =
+            self.positions.iter().map(|p| (p.id, (p.title.clone(), p.salary[1]))).collect();
         let Some(p) = self.players.get_mut(&id) else { return };
         let nick = p.nick.clone();
         let Stage::Portal(desk) = &mut p.stage else { return };
@@ -124,7 +134,14 @@ impl Server {
         }
         desk.pending.retain(|(_, t)| *t > tick);
         for offer in due {
-            if let Some(title) = titles.get(&offer) {
+            if let Some((title, max)) = titles.get(&offer) {
+                let asked = desk.terms.iter().find(|t| t.0 == offer).map_or(0, |t| t.1);
+                if asked > *max {
+                    // Asked for too much: a polite no.
+                    let body = crate::pay::lines::too_much(&nick, title, *max);
+                    desk.mail(&from, crate::pay::lines::TOO_MUCH_SUBJECT.into(), body, proto::portal_action::NONE, 0);
+                    continue;
+                }
                 desk.invited.push(offer);
                 desk.mail(
                     &from,

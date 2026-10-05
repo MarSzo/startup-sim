@@ -9,6 +9,8 @@ const SPEED := 24
 const SPEED_DIAG := 17
 const SPEED_SLOW := 14
 const SPEED_SLOW_DIAG := 10
+## Sideways drift per straight step at drunk stagger 0, 1, 2.
+const DRIFT := [0, 3, 6]
 const HALF_W := 5 * SUBPIXELS
 const HALF_H := 4 * SUBPIXELS
 
@@ -52,8 +54,8 @@ static func input_dir(input: int) -> Vector2i:
 
 ## A character's full simulated state (see Body in sim.rs). `access` is the
 ## rights bitmask (MapData.ACCESS_*); only the server changes it.
-static func body(floor_i: int, pos: Vector2i, prev_input := 0, lock := LOCK_NONE, access := 0, slow := false) -> Dictionary:
-	return {"floor": floor_i, "pos": pos, "prev": prev_input, "lock": lock, "access": access, "slow": slow}
+static func body(floor_i: int, pos: Vector2i, prev_input := 0, lock := LOCK_NONE, access := 0, slow := false, drunk := 0) -> Dictionary:
+	return {"floor": floor_i, "pos": pos, "prev": prev_input, "lock": lock, "access": access, "slow": slow, "drunk": drunk}
 
 
 static func tile_of_pos(p: Vector2i) -> Vector2i:
@@ -68,7 +70,7 @@ static func step(building, b: Dictionary, input: int) -> Dictionary:
 	if map == null:
 		return b
 	var n := b.duplicate()
-	n.pos = move_on(map, b.pos, input, b.access, b.get("slow", false))
+	n.pos = move_on(map, b.pos, input, b.access, b.get("slow", false), b.get("drunk", 0))
 	if n.lock == LOCK_HELD and (input & IN_MOVE_MASK) != (b.prev & IN_MOVE_MASK):
 		n.lock = LOCK_RELEASED
 	var t := tile_of_pos(n.pos)
@@ -86,11 +88,14 @@ static func step(building, b: Dictionary, input: int) -> Dictionary:
 
 
 ## Move by one input step on a single floor for a character with rights
-## `access`. Resolves X then Y so the player slides along walls.
-static func move_on(map, pos: Vector2i, input: int, access := 0, slow := false) -> Vector2i:
+## `access`. Resolves X then Y so the player slides along walls. Drunk
+## (1 a little, 2 more and slowly): walking straight drifts to one side,
+## then the other - exactly like server/src/sim.rs `move_at`.
+static func move_on(map, pos: Vector2i, input: int, access := 0, slow := false, drunk := 0) -> Vector2i:
 	var d := input_dir(input)
 	if d == Vector2i.ZERO:
 		return pos
+	slow = slow or drunk >= 2
 	var diag := d.x != 0 and d.y != 0
 	var speed := (SPEED_SLOW_DIAG if diag else SPEED_SLOW) if slow else (SPEED_DIAG if diag else SPEED)
 	var p := pos
@@ -98,6 +103,14 @@ static func move_on(map, pos: Vector2i, input: int, access := 0, slow := false) 
 		p.x = _move_x(map, p, d.x * speed, access)
 	if d.y != 0:
 		p.y = _move_y(map, p, d.y * speed, access)
+	var drift: int = DRIFT[mini(drunk, 2)]
+	if drift > 0 and (d.x == 0) != (d.y == 0):
+		if d.x != 0:
+			var side := 1 if (p.x >> 9) & 1 == 0 else -1
+			p.y = _move_y(map, p, side * drift, access)
+		else:
+			var side := 1 if (p.y >> 9) & 1 == 0 else -1
+			p.x = _move_x(map, p, side * drift, access)
 	return p
 
 

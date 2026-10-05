@@ -91,7 +91,7 @@ impl Computer {
     }
 }
 
-/// Entity flags of a computer (see PROTOCOL.md).
+/// Entity flags of a computer (see docs/dev/protokol.md).
 pub mod flags {
     pub const LOCKED: u8 = 1;
     pub const IN_USE: u8 = 2;

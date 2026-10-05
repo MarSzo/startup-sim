@@ -36,6 +36,8 @@ pub mod lines {
     pub const SPOTLESS: &str = "Czysto dziś, aż miło! Tak trzymać.";
     /// Mopping up an accident puddle.
     pub const PUDDLE: &str = "Co za cham tu naszczał!";
+    /// Mopping up blood after a stabbing.
+    pub const BLOOD: &str = "Krew?! Co tu się działo… Ja już nic nie widziałam.";
     pub fn room_mess(n: u32) -> String {
         format!("No nie… {} w jednym pokoju! To jakaś kolekcja?", mugs(n))
     }
@@ -52,9 +54,43 @@ pub mod lines {
         if let Some((nick, k)) = record {
             s.push_str(&format!(" Rekordzista dnia: {nick} ({}).", mugs(k)));
         }
-        s.push_str(" — Pani Krysia");
+        s.push_str(" — Pani Maria");
         s
     }
+    /// Pani Maria talks. All the time. To everyone. About everything.
+    pub const STORIES: [&str; 30] = [
+        "Wie Pan/Pani, że u nas na osiedlu znowu rozkopali ulicę? Trzeci raz w tym roku!",
+        "Mój Zbyszek wczoraj naprawiał kran. Teraz mamy fontannę w łazience.",
+        "Na rynku pomidory po dwanaście złotych! Za moich czasów to za tyle był cały obiad.",
+        "Moja synowa robi te całe… jak to się nazywa… influencerstwo. I z tego żyje! No nie wiem.",
+        "Słyszał Pan/Pani, że zamykają tę piekarnię na rogu? Teraz będzie tam bank. Czwarty na ulicy.",
+        "Wnuczek mi pokazywał tego czata, co wszystko wie. Zapytałam o przepis na bigos — dobry był!",
+        "Tramwaj dziś znowu się spóźnił. Motorniczy pewnie też miał kawę w kubku po kimś.",
+        "U sąsiadki kot uciekł na dach. Straż przyjechała! Kot zszedł sam, jak tylko ich zobaczył.",
+        "Ja to w tym budynku sprzątam od samego początku. Jak tu jeszcze była hurtownia skarpet.",
+        "Na działce mi w tym roku cukinie urosły jak bejsbole. Przynieść Panu/Pani jedną?",
+        "Mówią, że w czwartek ma być burza. Moje kolano mówi, że już w środę.",
+        "Mój Zbyszek kupił sobie hulajnogę elektryczną. W wieku sześćdziesięciu trzech lat! Szaleniec.",
+        "A ten prezes to taki miły człowiek, tylko kubków po sobie nie odnosi. Jak wszyscy.",
+        "W sobotę byłam na weselu chrześnicy. Do czwartej rano tańczyłam! Nogi do dziś mnie bolą.",
+        "Wie Pan/Pani, ile teraz kosztuje mop? Sto dwadzieścia złotych! Złoty ten mop czy co?",
+        "Na Facebooku pisali, że w parku widzieli dzika. Ja tam wieczorem już nie chodzę.",
+        "Moja córka mówi, żebym poszła na emeryturę. A kto by wam tu kubki zbierał, co?",
+        "Wczoraj w telewizji był taki serial… ona go kochała, a on był bliźniakiem! Nie do wiary.",
+        "Pani Paulina znowu siedzi w tym fotelu? Ona tak od rana. Ja to bym nie umiała.",
+        "W mieście otworzyli nową kawiarnię. Kawa za dwadzieścia osiem złotych! W kubku z papieru!",
+        "Mój wnuk też jest programistą. Naprawia komputery. A może nie naprawia, nie wiem dokładnie.",
+        "Proszę uważać, w kuchni mokra podłoga. No, teraz już sucha. Ale była mokra!",
+        "Sąsiad z góry znowu wiercił w niedzielę. Siedem lat ten remont. Siedem!",
+        "Wie Pan/Pani, że pierogi najlepsze są odsmażane na drugi dzień? To naukowo udowodnione.",
+        "W autobusie dzisiaj jeden pan jadł śledzia. O siódmej rano! Cały autobus pachniał.",
+        "Mój Zbyszek mówi, że te całe startupy to bańka. Ale on mówił to samo o internecie.",
+        "Kupiłam sobie smartwatch. Liczy mi kroki. Dziś już dwanaście tysięcy, a jeszcze nie skończyłam!",
+        "Na targu spotkałam koleżankę ze szkoły. Ma już prawnuka! A ja dopiero wnuka. Ech.",
+        "Ten nowy z drugiego piętra to taki grzeczny. Zawsze mówi dzień dobry. Nie to co niektórzy.",
+        "No dobrze, nie przeszkadzam. Ale jeszcze tylko jedno powiem…",
+    ];
+
     fn capitalize(s: &str) -> String {
         let mut c = s.chars();
         c.next().map_or(String::new(), |f| f.to_uppercase().collect::<String>() + c.as_str())

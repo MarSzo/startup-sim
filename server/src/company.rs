@@ -40,6 +40,13 @@ pub struct Position {
     pub description: String,
     /// Open places.
     pub places: u8,
+    /// Pay range, zł a month gross.
+    #[serde(default = "default_range")]
+    pub salary: [u32; 2],
+}
+
+fn default_range() -> [u32; 2] {
+    crate::pay::DEFAULT_RANGE
 }
 
 /// `CompanyAction::action`.

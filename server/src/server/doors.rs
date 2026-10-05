@@ -57,6 +57,11 @@ impl Server {
         else {
             return false;
         };
+        // The call button needs the card, like the doors.
+        if body.access & crate::map::access::required("card").unwrap_or(0) == 0 {
+            self.says.push(Say::new(pid, elevator::lines::NO_CARD));
+            return true;
+        }
         self.doors_dirty = true; // show where the car is heading at once
         let line = self.elevators[i].call(body.floor, tick);
         self.says.push(Say::new(pid, line));
@@ -67,7 +72,7 @@ impl Server {
     pub(super) fn lift_panel_packet(&self, panel: &LiftPanel) -> Packet {
         let mut options: Vec<String> = panel.floors.iter().map(|&f| self.building.floor_name(f).to_string()).collect();
         options.push(PANEL_STAY.to_string());
-        Packet::Dialog { id: panel.id, npc: 0, text: PANEL_TEXT.to_string(), options }
+        Packet::Dialog { id: panel.id, npc: 0, text: PANEL_TEXT.to_string(), options, items: Vec::new() }
     }
 
     /// A button on the panel pressed (`DialogAnswer` to the panel's id).
@@ -88,7 +93,7 @@ impl Server {
         if self.players.get_mut(&pid).and_then(|p| p.lift_panel.take()).is_none() {
             return;
         }
-        let close = Packet::Dialog { id: 0, npc: 0, text: String::new(), options: Vec::new() };
+        let close = Packet::Dialog { id: 0, npc: 0, text: String::new(), options: Vec::new(), items: Vec::new() };
         self.send_to(pid, &close);
         self.send_to(pid, &close); // tiny packet; a duplicate makes loss unlikely
     }

@@ -10,6 +10,14 @@ deploy/pull-backups.sh           # dzienne kopie bazy z VPS-a do vps-backups/
 deploy/pull-crashes.sh           # raporty awarii klientów do crash-reports/
 ```
 
+Każde `deploy.sh` zapisuje się też na GitHubie jako wdrożenie środowiska
+**serwer-testowy** (zakładka *Deployments* w repo i przy commitach): który
+commit, kiedy, w toku / udane / nieudane. Potrzebne: zalogowane `gh` i
+wypchnięty commit; bez tego (albo z `NO_GITHUB_DEPLOY=1`) wdrożenie idzie
+normalnie, tylko bez wpisu. Adres serwera nie trafia na GitHuba. Lokalne,
+niezacommitowane zmiany w `server/`, `client/maps/` albo `deploy/` są
+zaznaczone w opisie („+ lokalne zmiany”).
+
 SSH tylko z tailnetu (jednorazowo, na VPS jako root, póki SSH jest publiczny):
 
 ```bash

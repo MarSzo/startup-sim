@@ -1,4 +1,4 @@
-//! Binary UDP protocol. See `docs/PROTOCOL.md`.
+//! Binary UDP protocol. See `docs/dev/protokol.md`.
 //!
 //! Every packet: `magic u16 | version u8 | type u8 | payload`, little-endian.
 //! `client/net/protocol.gd` mirrors this module; parity is checked against
@@ -23,7 +23,7 @@ pub use golden::{golden_samples, to_hex};
 pub use snapshot::{snapshot_fragments, SelfState};
 
 pub const MAGIC: u16 = 0x5354; // "ST"
-pub const VERSION: u8 = 39;
+pub const VERSION: u8 = 47;
 pub const HEADER_LEN: usize = 4;
 /// Hard upper bound for any datagram we send.
 /// A game packet at most (sealed, it grows by up to 48 B to `MAX_DATAGRAM`).
@@ -38,6 +38,9 @@ pub const MAX_SAY_BYTES: usize = MAX_TEXT_BYTES;
 pub const MAX_MAIL_BYTES: usize = 600;
 /// Max answer options of a recruitment question.
 pub const MAX_OPTIONS: usize = 4;
+/// Max answers in a `Dialog` window (keys 1-9): the TV's channels + off,
+/// the R menu, the first-aid cabinet...
+pub const MAX_DIALOG_OPTIONS: usize = 9;
 /// Messenger message text (a 200-char message of 2-byte letters fits whole).
 pub const MAX_CHAT_BYTES: usize = 400;
 /// Conversations in one `Computer` packet (2+1+2+24 B each -> < 1200 B).
@@ -46,7 +49,7 @@ pub const MAX_CONVS: usize = 40;
 pub const MAX_INPUTS_PER_PACKET: usize = 8;
 
 /// Fixed part of a Snapshot packet (header + fields before the entity list).
-pub const SNAPSHOT_FIXED_LEN: usize = HEADER_LEN + 4 + 4 + 1 + 1 + (4 + 4 + 1 + 2 + 1 + 1 + 1 + 1 + 1) + 1;
+pub const SNAPSHOT_FIXED_LEN: usize = HEADER_LEN + 4 + 4 + 1 + 1 + (4 + 4 + 1 + 2 + 1 + 1 + 1 + 1 + 1 + 1) + 1;
 pub const ENTITY_LEN: usize = 14;
 /// Entities per snapshot fragment so a fragment never exceeds `MAX_PACKET`.
 pub const MAX_ENTITIES_PER_SNAPSHOT: usize = (MAX_PACKET - SNAPSHOT_FIXED_LEN) / ENTITY_LEN;
@@ -106,6 +109,13 @@ pub mod ty {
     pub const VOICE: u8 = 52;
     pub const VOICE_FROM: u8 = 53;
     pub const DEPARTMENTS: u8 = 54;
+    pub const ACTION: u8 = 55;
+    pub const HR_ACTION: u8 = 56;
+    pub const HR_INFO: u8 = 57;
+    pub const MEDIA: u8 = 58;
+    pub const ROLL: u8 = 59;
+    pub const CHAT_SAY: u8 = 60;
+    pub const NOTICE: u8 = 61;
 }
 
 /// `ItemAction::action`.
@@ -239,6 +249,54 @@ pub mod activity {
     pub const RIDING: u8 = 7;
     /// Stopped by the guard / the police (can't move for a moment).
     pub const HELD: u8 = 8;
+    /// Throwing up (a moment; leaves a puddle).
+    pub const VOMITING: u8 = 9;
+    /// Passed out drunk (asleep on the floor for a while).
+    pub const PASSED_OUT: u8 = 10;
+    /// Knocked out in a fight (on the floor, stars).
+    pub const KNOCKED_OUT: u8 = 11;
+    /// Throwing a punch / stabbing (a moment).
+    pub const ATTACKING: u8 = 12;
+    /// Peeing standing up (urinal, floor, a machine, a mug).
+    pub const PEEING: u8 = 13;
+    /// Squatting: pooping on the floor.
+    pub const POOPING: u8 = 14;
+}
+
+/// `EntityState::held` of a puddle (`kind::PUDDLE`).
+pub mod puddle {
+    pub const PEE: u8 = 0;
+    pub const VOMIT: u8 = 1;
+    pub const POOP: u8 = 2;
+    /// After a stab.
+    pub const BLOOD: u8 = 3;
+}
+
+/// Form of employment (`Apply::form`, the contract).
+pub mod employment {
+    /// Umowa o pracę (an employment contract).
+    pub const EMPLOYMENT: u8 = 1;
+    /// B2B (own company: more on paper, no advance).
+    pub const B2B: u8 = 2;
+    /// Umowa zlecenie (only students under 26).
+    pub const MANDATE: u8 = 3;
+}
+
+/// `Notice::icon`.
+pub mod notice {
+    pub const INFO: u8 = 1;
+    pub const MAIL: u8 = 2;
+    pub const FOOD: u8 = 3;
+    pub const ALERT: u8 = 4;
+    pub const FUN: u8 = 5;
+}
+
+/// `Action::action` (C→S).
+pub mod action {
+    /// R: the menu of what can be done here (answered with a `Dialog`).
+    pub const MENU: u8 = 1;
+    /// X: punch (or stab, with a knife in hands) the nearest person.
+    pub const ATTACK: u8 = 2;
 }
 
 /// `Sound` kinds: things happening in the world that others hear too.
@@ -260,6 +318,36 @@ pub mod sound {
     pub const EAT: u8 = 15;
     pub const DRINK: u8 = 16;
     pub const WHISTLE: u8 = 17;
+    /// A burp after a beer (the client plays it a moment later).
+    pub const BURP: u8 = 18;
+    pub const VOMIT: u8 = 19;
+    pub const PUNCH: u8 = 20;
+    pub const STAB: u8 = 21;
+    pub const PEE: u8 = 22;
+    pub const POOP: u8 = 23;
+}
+
+/// `Packet::HrInfo`: the contract, its annexes and the leave.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct HrInfo {
+    pub title: String,
+    pub department: u8,
+    /// `employment::*` (0 = signed before the pay ranges).
+    pub form: u8,
+    /// zł a month gross; the rate in grosze an hour.
+    pub salary: u32,
+    pub pay_rate: u32,
+    /// The player's day it was signed on, and today.
+    pub start_day: u16,
+    pub today: u16,
+    pub reprimands: u8,
+    pub leave_days: u8,
+    /// Days worked towards the next leave day (of `hr::DAYS_PER_LEAVE_DAY`).
+    pub worked: u8,
+    /// (day, text), the newest last.
+    pub annexes: Vec<(u16, String)>,
+    /// (id, day, `hr::status`).
+    pub requests: Vec<(u8, u16, u8)>,
 }
 
 /// A department of the company in `Departments`.
@@ -343,6 +431,10 @@ pub const MAX_VOICE_BYTES: usize = 800;
 
 /// Most sounds in one `Sound` packet.
 pub const MAX_SOUNDS: usize = 64;
+/// Annexes / leave requests in `HrInfo`.
+pub const MAX_HR_ROWS: usize = 10;
+/// Screens / boomboxes in `Media`.
+pub const MAX_MEDIA: usize = 8;
 
 /// `Clock::place`: where the receiver is.
 pub mod place {
@@ -375,6 +467,11 @@ pub const FLAG_SLOW: u8 = 0x40;
 /// `EntityState::flags` bit 3 for players (NPC looks use bits 3-5): an open
 /// umbrella (outdoors in the rain).
 pub const FLAG_UMBRELLA: u8 = 0x08;
+
+/// `EntityState::flags` bits 4-5 for players: how drunk it shows (0 sober,
+/// 1 tipsy, 2 drunk, 3 very drunk).
+pub const FLAG_DRUNK_SHIFT: u8 = 4;
+pub const FLAG_DRUNK_MASK: u8 = 0x30;
 
 /// `EntityState::flags` bit: low hygiene (a smell cloud others can see).
 pub const FLAG_SMELLY: u8 = 0x80;
@@ -482,6 +579,9 @@ pub struct OfferInfo {
     pub applied: bool,
     /// Open positions (our startup; 0 for other companies).
     pub vacancies: u8,
+    /// Pay range, zł a month gross (0, 0 = not given).
+    pub salary_min: u32,
+    pub salary_max: u32,
     pub company: String,
     pub title: String,
     pub description: String,
@@ -533,6 +633,8 @@ pub enum Packet {
         self_access: u8,
         /// Receiver's `sim::Body::slow` (simulated: movement speed).
         self_slow: u8,
+        /// Receiver's `sim::Body::drunk` (simulated: staggering).
+        self_drunk: u8,
         /// Receiver's activity (not simulated): see `activity`.
         self_activity: u8,
         entities: Vec<EntityState>,
@@ -570,6 +672,12 @@ pub enum Packet {
         token: u32,
         offer: u8,
         motivation: String,
+        /// Expected pay, zł a month gross.
+        salary: u32,
+        /// `employment::*`.
+        form: u8,
+        /// "I'm a student" (needed for a contract of mandate, with age < 26).
+        student: bool,
     },
     /// Current recruitment question (resent every second until answered).
     Question {
@@ -647,6 +755,12 @@ pub enum Packet {
         stress: u8,
         bladder: u8,
         hygiene: u8,
+        /// Alcohol, 0..100 (75 throws up, 100 after that: passes out).
+        alcohol: u8,
+        /// Bowels, 0..100 (100 = an accident).
+        bowels: u8,
+        /// Health, 100 = fine, 0 = knocked out.
+        health: u8,
         flags: u8,
         money: u32,
     },
@@ -691,6 +805,8 @@ pub enum Packet {
         /// Skipping the wait at home: 0 no, 1 asked (waiting for the others
         /// at home), 2 time is flying.
         skip: u8,
+        /// Today is a day off (approved leave): at home all day.
+        leave: bool,
     },
     /// Morning choice of how to get to work (before the departure).
     CommuteChoice {
@@ -719,6 +835,9 @@ pub enum Packet {
         npc: u16,
         text: String,
         options: Vec<String>,
+        /// Per option: the item it is (`inventory::kind`, 0 = none) - a
+        /// cupboard / cabinet drawn like the inventory; empty = words only.
+        items: Vec<u8>,
     },
     DialogAnswer {
         token: u32,
@@ -749,10 +868,10 @@ pub enum Packet {
         offers: Vec<CompanyOffer>,
     },
     /// Company panel: candidates (player, offer, score, total, nick) and
-    /// staff (player, department, hired on day, nick).
+    /// staff (player, department, hired on day, reprimands, nick).
     CompanyPeople {
         candidates: Vec<(u16, u8, u8, u8, String)>,
-        staff: Vec<(u16, u8, u16, String)>,
+        staff: Vec<(u16, u8, u16, u8, String)>,
     },
     /// Found the company (from the portal) / run it (panel): `company::action`.
     CompanyAction {
@@ -791,6 +910,46 @@ pub enum Packet {
     /// everybody at home asked).
     SkipWait {
         token: u32,
+    },
+    /// The HR app: show the file, ask for leave on day `arg`, cancel
+    /// request `arg` (`hr::action`).
+    HrAction {
+        token: u32,
+        action: u8,
+        arg: u16,
+    },
+    /// Typed chat (Enter): to the room; "/s text" whispers to the person
+    /// next to you, "/k text" shouts to the whole floor.
+    ChatSay {
+        token: u32,
+        text: String,
+    },
+    /// A notification for the corner of the screen (`notice::*` icon).
+    Notice {
+        icon: u8,
+        text: String,
+    },
+    /// Rolled a cigarette (the minigame, tobacco in hands): how well, 0..100.
+    Roll {
+        token: u32,
+        quality: u8,
+    },
+    /// The HR app's view of the receiver's file.
+    HrInfo(Box<HrInfo>),
+    /// What the TVs show and the boomboxes play (`media`), everybody in the
+    /// building, every second and on change.
+    Media {
+        /// (floor, tile x, tile y of the screen's left end, channel 0 = off,
+        /// started on server tick).
+        screens: Vec<(u8, u8, u8, u8, u32)>,
+        /// (track, started on server tick, floor, x, y in sub-pixels, holder
+        /// player id - 0 = it stands on the floor).
+        music: Vec<(u8, u32, u8, i32, i32, u16)>,
+    },
+    /// R (menu of actions) / X (attack): `action::*`.
+    Action {
+        token: u32,
+        action: u8,
     },
     /// Sounds heard this tick on the receiver's floor: (kind, x, y) in
     /// sub-pixels (`sound::*`), at most `MAX_SOUNDS`.
@@ -856,7 +1015,7 @@ pub enum Packet {
         trashed: Vec<u16>,
     },
     /// Push-to-talk: one voice frame (opaque to the server: 16 kHz IMA
-    /// ADPCM, see PROTOCOL.md) to the room, or whispered to the nearest
+    /// ADPCM, see docs/dev/protokol.md) to the room, or whispered to the nearest
     /// person within reach (`whisper` = 1).
     Voice {
         token: u32,

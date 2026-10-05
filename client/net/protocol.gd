@@ -1,15 +1,16 @@
-## Binary UDP protocol - mirror of server/src/protocol.rs (see docs/PROTOCOL.md).
+## Binary UDP protocol - mirror of server/src/protocol.rs (see docs/dev/protokol.md).
 ## Little-endian. Header: magic u16 | version u8 | type u8.
 extends RefCounted
 
 const MAGIC := 0x5354
-const VERSION := 39
+const VERSION := 47
 const MAX_PACKET := 1152  # a game packet; sealed it grows to at most MAX_DATAGRAM
 const MAX_DATAGRAM := 1200
 const MAX_NICK_BYTES := 16
 const MAX_SAY_BYTES := 240
 const MAX_TEXT_BYTES := 240
 const MAX_OPTIONS := 4
+const MAX_DIALOG_OPTIONS := 9  # answers in a Dialog window (keys 1-9)
 const MAX_INPUTS_PER_PACKET := 8
 
 const T_CONNECT := 1
@@ -66,6 +67,13 @@ const T_MAIL_STATE := 51
 const T_VOICE := 52
 const T_VOICE_FROM := 53
 const T_DEPARTMENTS := 54
+const T_ACTION := 55
+const T_HR_ACTION := 56
+const T_HR_INFO := 57
+const T_MEDIA := 58
+const T_ROLL := 59
+const T_CHAT_SAY := 60
+const T_NOTICE := 61
 const MAX_VOICE_BYTES := 800
 # TaskAction.action / MailAction.action (server/src/protocol/mod.rs)
 const TA_SYNC := 0
@@ -89,7 +97,10 @@ const MAIL_BODY_MAX := 400
 ## Sound.kind -> file in res://sounds (server/src/protocol/mod.rs `sound`).
 const SOUND_FILES := {1: "coffee", 2: "till", 3: "gate_alarm", 4: "ding", 5: "lock", 6: "switch",
 	7: "flush", 8: "tap", 9: "lighter", 10: "dishwasher", 11: "fridge", 12: "cupboard",
-	13: "pickup", 14: "drop", 15: "eat", 16: "drink", 17: "whistle"}
+	13: "pickup", 14: "drop", 15: "eat", 16: "drink", 17: "whistle", 18: "burp", 19: "vomit",
+	20: "punch", 21: "stab", 22: "pee", 23: "poop"}
+const SOUND_BURP := 18
+const SOUND_STAB := 21
 # FridgeAction.action (server/src/kitchen.rs)
 const FRIDGE_TAKE := 1
 const FRIDGE_PUT := 2
@@ -175,12 +186,55 @@ const ACT_SMOKING := 5
 const ACT_WASHING := 6
 const ACT_RIDING := 7
 const ACT_HELD := 8  # stopped by the guard / the police
+const ACT_VOMITING := 9
+const ACT_PASSED_OUT := 10
+const ACT_KNOCKED_OUT := 11
+const ACT_ATTACKING := 12
+const ACT_PEEING := 13
+const ACT_POOPING := 14
+## Can't walk meanwhile (the server ignores the inputs).
+const ACT_STUCK := [ACT_RIDING, ACT_HELD, ACT_VOMITING, ACT_PASSED_OUT, ACT_KNOCKED_OUT, ACT_PEEING, ACT_POOPING]
+# Apply.form (server/src/protocol/mod.rs `employment`).
+const EMPLOYMENT_CONTRACT := 1  # umowa o pracę
+const EMPLOYMENT_B2B := 2
+const EMPLOYMENT_MANDATE := 3  # umowa zlecenie: a student under 26
+const EMPLOYMENT_NAMES := {1: "Umowa o pracę", 2: "B2B", 3: "Umowa zlecenie"}
+const MANDATE_AGE := 26
+# Dialog ids the server uses (besides board talks 1..199): the breathalyser
+# 200..249, the R menu 250, the kitchen cupboard 251, the contract at HR 252.
+const DIALOG_MENU := 250
+const DIALOG_CUPBOARD := 251
+const DIALOG_CONTRACT := 252
+const DIALOG_TV := 253
+const DIALOG_BOOMBOX := 254
+const DIALOG_SUPPLIES := 255  # the first-aid cabinet / the storeroom shelves
+const DIALOG_VOTE := 249  # "skip the waiting" for everybody: yes / no
+# HrAction.action (server/src/hr.rs `action`): show the file, ask for leave on
+# a day, cancel a request.
+const HR_SHOW := 1
+const HR_REQUEST := 2
+const HR_CANCEL := 3
+# Puddle entity `held` (server/src/protocol/mod.rs `puddle`).
+const PUDDLE_PEE := 0
+const PUDDLE_VOMIT := 1
+const PUDDLE_POOP := 2
+# Action.action: R = the menu of mischief (a Dialog comes back), X = attack.
+const ACTION_MENU := 1
+const ACTION_ATTACK := 2
 # Entity flags bit 6: walks slowly (exhausted / needs the toilet).
 const FLAG_SLOW := 0x40
 # Entity flags bit 7: low hygiene (smell cloud).
 const FLAG_SMELLY := 0x80
 # Entity flags bit 3 (players only; NPC looks use bits 3-5): open umbrella.
 const FLAG_UMBRELLA := 0x08
+# Entity flags bits 4-5 (players only): drunk tier 0 sober .. 3 very drunk.
+const FLAG_DRUNK_SHIFT := 4
+const FLAG_DRUNK_MASK := 0x30
+
+
+## Stats.alcohol (0..100) -> drunk tier, like server/src/needs.rs `drunk_tier`.
+static func drunk_tier(alcohol: int) -> int:
+	return 3 if alcohol >= 75 else (2 if alcohol >= 50 else (1 if alcohol >= 25 else 0))
 # Clock.weather
 const WEATHER_SUNNY := 1
 const WEATHER_CLOUDY := 2
@@ -290,11 +344,16 @@ static func encode_ping(token: int, client_time: int) -> PackedByteArray:
 	return b.data_array
 
 
-static func encode_apply(token: int, offer: int, motivation: String) -> PackedByteArray:
+## `form`: EMPLOYMENT_*; `salary`: expected, zł a month gross.
+static func encode_apply(token: int, offer: int, motivation: String, salary := 0, form := EMPLOYMENT_CONTRACT,
+		student := false) -> PackedByteArray:
 	var b := _writer(T_APPLY)
 	b.put_u32(token)
 	b.put_u8(offer)
 	_put_str16(b, motivation, MAX_TEXT_BYTES)
+	b.put_u32(salary)
+	b.put_u8(form)
+	b.put_u8(1 if student else 0)
 	return b.data_array
 
 
@@ -399,6 +458,37 @@ static func encode_voice(token: int, seq: int, whisper: bool, data: PackedByteAr
 	var n := mini(data.size(), MAX_VOICE_BYTES)
 	b.put_u16(n)
 	b.put_data(data.slice(0, n))
+	return b.data_array
+
+
+static func encode_action(token: int, action: int) -> PackedByteArray:
+	var b := _writer(T_ACTION)
+	b.put_u32(token)
+	b.put_u8(action)
+	return b.data_array
+
+
+static func encode_hr_action(token: int, action: int, arg: int) -> PackedByteArray:
+	var b := _writer(T_HR_ACTION)
+	b.put_u32(token)
+	b.put_u8(action)
+	b.put_u16(arg)
+	return b.data_array
+
+
+## Typed chat: to the room, "/s text" a whisper, "/k text" a shout.
+static func encode_chat_say(token: int, text: String) -> PackedByteArray:
+	var b := _writer(T_CHAT_SAY)
+	b.put_u32(token)
+	_put_str16(b, text, MAX_SAY_BYTES)
+	return b.data_array
+
+
+## The rolling minigame's result: quality 0..100.
+static func encode_roll(token: int, quality: int) -> PackedByteArray:
+	var b := _writer(T_ROLL)
+	b.put_u32(token)
+	b.put_u8(clampi(quality, 0, 100))
 	return b.data_array
 
 
@@ -529,6 +619,7 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			p.self_prev_input = r.u8()
 			p.self_access = r.u8()
 			p.self_slow = r.u8()
+			p.self_drunk = r.u8()
 			p.self_activity = r.u8()
 			var n := r.u8()
 			var ents := []
@@ -558,7 +649,8 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 				return {}
 			var offers := []
 			for i in n:
-				offers.append({"id": r.u8(), "department": r.u8(), "applied": r.u8() != 0, "vacancies": r.u8(), "company": r.str16(MAX_TEXT_BYTES),
+				offers.append({"id": r.u8(), "department": r.u8(), "applied": r.u8() != 0, "vacancies": r.u8(),
+					"salary_min": r.u32(), "salary_max": r.u32(), "company": r.str16(MAX_TEXT_BYTES),
 					"title": r.str16(MAX_TEXT_BYTES), "description": r.str16(MAX_TEXT_BYTES)})
 			p.offers = offers
 		T_QUESTION:
@@ -619,8 +711,54 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			p.stress = r.u8()
 			p.bladder = r.u8()
 			p.hygiene = r.u8()
+			p.alcohol = r.u8()
+			p.bowels = r.u8()
+			p.health = r.u8()
 			p.stats_flags = r.u8()
 			p.money = r.u32()
+		T_NOTICE:
+			p.icon = r.u8()
+			p.text = r.str16(MAX_TEXT_BYTES)
+		T_MEDIA:
+			var screens := []
+			var n := r.u8()
+			if n > 8:
+				return {}
+			for i in n:
+				screens.append({"floor": r.u8(), "x": r.u8(), "y": r.u8(), "channel": r.u8(), "started": r.u32()})
+			p.screens = screens
+			var music := []
+			n = r.u8()
+			if n > 8:
+				return {}
+			for i in n:
+				music.append({"track": r.u8(), "started": r.u32(), "floor": r.u8(), "x": r.i32(), "y": r.i32(), "holder": r.u16()})
+			p.music = music
+		T_HR_INFO:
+			p.title = r.str16(MAX_TEXT_BYTES)
+			p.department = r.u8()
+			p.form = r.u8()
+			p.salary = r.u32()
+			p.pay_rate = r.u32()
+			p.start_day = r.u16()
+			p.today = r.u16()
+			p.reprimands = r.u8()
+			p.leave_days = r.u8()
+			p.worked = r.u8()
+			var annexes := []
+			var n := r.u8()
+			if n > 10:
+				return {}
+			for i in n:
+				annexes.append({"day": r.u16(), "text": r.str16(MAX_TEXT_BYTES)})
+			p.annexes = annexes
+			var reqs := []
+			n = r.u8()
+			if n > 10:
+				return {}
+			for i in n:
+				reqs.append({"id": r.u8(), "day": r.u16(), "status": r.u8()})
+			p.requests = reqs
 		T_CLOCK:
 			p.day = r.u16()
 			p.minute = r.u16()
@@ -638,6 +776,7 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			p.founded = r.u8() != 0
 			p.alarm = r.u8()
 			p.skip = r.u8()
+			p.leave = r.u8() != 0
 		T_TASK_BOARD:
 			p.dept = r.u8()
 			p.done = r.u16()
@@ -766,7 +905,7 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 				return {}
 			var staff := []
 			for i in m:
-				staff.append({"id": r.u16(), "department": r.u8(), "day": r.u16(), "nick": r.str16(MAX_NICK_BYTES)})
+				staff.append({"id": r.u16(), "department": r.u8(), "day": r.u16(), "reprimands": r.u8(), "nick": r.str16(MAX_NICK_BYTES)})
 			p.staff = staff
 		T_CALENDAR:
 			p.mine_start = r.u16()
@@ -794,12 +933,19 @@ static func decode(bytes: PackedByteArray) -> Dictionary:
 			p.npc = r.u16()
 			p.text = r.str16(MAX_TEXT_BYTES)
 			var n := r.u8()
-			if n > MAX_OPTIONS:
+			if n > MAX_DIALOG_OPTIONS:
 				return {}
 			var opts := []
 			for i in n:
 				opts.append(r.str16(MAX_TEXT_BYTES))
 			p.options = opts
+			var k := r.u8()
+			if k > MAX_DIALOG_OPTIONS:
+				return {}
+			var items := []
+			for i in k:
+				items.append(r.u8())
+			p.items = items  # per option: the item (cupboards, cabinets), 0 = none
 		T_SHELF:
 			p.shelf = r.u8()
 			p.title = r.str16(MAX_TEXT_BYTES)
